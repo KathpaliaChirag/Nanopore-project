@@ -47,6 +47,12 @@ Next meeting / deadline: **2026-05-17**.
   - Installation details added to KB §7.1.
 - **POD-5 data from mam:** downloading — pending.
 - **Next:** once POD-5 arrives, identify flow cell chemistry from file metadata, then run `dorado basecaller hac <file.pod5> --output-dir results\`.
+- **Reviewed Kolin sir's mail** — fully understood and added to KB §8.
+  - Two sub-projects: Hot-K-mer LRU cache (Kraken-2, CPU) + Signal-to-Base cache (Dorado, GPU)
+  - Key tech: Intel TBB, AVX-512, LSH, CUDA shared memory
+  - **Immediate deliverable: 2-page profile report using perf + Nsight by ~2026-05-25**
+  - Profiling plan: WSL2 on local machine is the best option (Colab won't work — no root/Nsight access)
+  - Open question for mam/Kolin sir tomorrow: is there a lab server we can SSH into?
 
 ---
 

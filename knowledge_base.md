@@ -694,3 +694,138 @@ C:\Users\chira\OneDrive\Desktop\Nanopore project\dorado\dorado-1.4.0-win64\bin\d
 ```
 
 Model options: `fast` (quickest), `hac` (high accuracy, standard), `sup` (super accuracy, slowest). Model version is auto-selected based on flow cell metadata in the POD-5 file.
+
+---
+
+## 8. Kolin sir's Project — Caching Layer + Profiling
+
+### 8.0 The core idea
+
+Genomic pipelines (Dorado + Kraken-2) often process **repetitive sequences** — same species, same genomic regions, technical replicates. Right now, every read goes through the full expensive computation even if it's near-identical to something already processed.
+
+**The fix:** build a **caching layer** at two points in the pipeline:
+1. **Signal-level cache** inside Dorado (GPU side) — cache basecalling results for signal windows
+2. **K-mer frequency cache** inside Kraken-2 (CPU side) — cache k-mer → taxon lookups for hot entries
+
+Cache hit = skip the expensive computation entirely. Cache miss = run normally and store the result.
+
+Once both caches exist, the next step is a **genomic-aware cache replacement policy** — smarter than generic LRU, tuned to how DNA reads repeat in clinical metagenomics datasets.
+
+---
+
+### 8.1 Project 1 — Kraken-2 CPU-side cache (Hot-K-mer LRU)
+
+**The bottleneck:**
+Kraken-2's k-mer database is 50–100 GB. It doesn't fit in RAM on most machines. Even the portion that is in RAM gets constantly evicted from L3 cache because the lookup pattern is random (hash table access = unpredictable memory addresses). Result: frequent **page faults** and **L3 cache misses** dominate runtime.
+
+**The solution Kolin sir wants:**
+A **Hot-K-mer LRU cache** — identify the most frequently accessed k-mer → taxon ID entries and pin them in L3 cache (or locked physical memory). When a lookup hits the cache, skip the full hash table lookup entirely.
+
+**Tech stack:**
+- **Intel TBB (Threading Building Blocks)** — library for lock-free, high-concurrency data structures. Multiple threads can query/update the cache simultaneously without blocking each other (no mutex locks).
+- **AVX-512 SIMD intrinsics** — batch 8–16 k-mer lookups into a single CPU instruction instead of one at a time. Amortizes memory latency across a vector width.
+- **ARM + NEON** — same caching logic ported to ARM processors (for edge/hospital devices that run on ARM chips). NEON is ARM's equivalent of AVX-512.
+- **Profiling tools:** VTune or `perf` — measure cache hit rate vs remaining I/O overhead to quantify the gain.
+
+**Expected outcome:** measurable throughput gain on high-redundancy datasets (the exact regime in clinical metagenomics — same patient, same bacteria, many reads).
+
+---
+
+### 8.2 Project 2 — Dorado GPU-side cache (Signal-to-Base cache)
+
+**The bottleneck:**
+Dorado runs a full Transformer forward pass for every signal window — even when the input signal is nearly identical to one it processed moments ago (same species, same genomic region). This is wasteful: you're burning GPU TFLOPs on computation whose answer you already have.
+
+**The solution Kolin sir wants:**
+A **Signal-to-Base (S2B) cache** in CUDA shared memory. Before sending a signal window through the NN, check: "have I seen something *similar* to this before?" If yes → return the cached basecall. If no → run the NN, store result in cache.
+
+**The key challenge:** signal windows are never *exactly* identical (noise), so you need **fuzzy matching**, not exact matching.
+
+**Tech stack:**
+- **LSH (Locality Sensitive Hashing)** — a hashing technique where *similar* input vectors hash to the *same bucket* with high probability. Allows fast approximate nearest-neighbour search on the GPU. Similar signals → same hash → cache hit.
+- **CUDA Shared Memory** — fast on-chip GPU memory (much faster than VRAM/global memory). The rolling cache buffer lives here for low-latency retrieval.
+- **NanoMambaNet** — the edge inference pipeline this cache will be deployed alongside (mentioned by Kolin sir).
+
+**What needs to be measured (from the mail):**
+- Fraction of signal windows that fall within LSH collision threshold (i.e., cache-hit-able)
+- Accuracy vs speed trade-off curve — how much accuracy do you lose for how much speedup?
+- The "practical operating envelope" — at what level of read redundancy does the cache give net positive throughput?
+
+---
+
+### 8.3 Immediate deliverable — 2-page profile report
+
+**Deadline: ~2026-05-25** (2 weeks from first meeting on 2026-05-11)
+
+> *"The first step is to use tools like perf and Nsight and produce a 2-page profile report in the first 2 weeks or so."*
+
+You cannot design a cache without first knowing *where the time is actually going*. The profile report establishes the baseline — it answers: what are the bottlenecks, and how much headroom does a cache have to recover?
+
+**Report needs to cover:**
+
+For **Dorado (Nsight):**
+- Which CUDA kernels dominate runtime (Transformer attention, conv layers, CTC decoding)?
+- Memory transfer overhead (CPU → GPU)?
+- SM (Streaming Multiprocessor) occupancy — are all GPU cores being used?
+- Memory bandwidth saturation?
+
+For **Kraken-2 (perf):**
+- L3 cache miss rate on k-mer lookups
+- Memory bandwidth consumption
+- Hotspot functions (which lines of Kraken-2 code burn the most CPU time)
+- Page fault rate (disk → RAM transfers)
+
+---
+
+### 8.4 Profiling setup — where and how to run
+
+**Why Google Colab won't work:**
+- `perf` needs root/kernel-level access — Colab doesn't give this
+- Nsight needs direct GPU access and GUI — not available on Colab
+- Kraken-2 standard DB is ~100 GB — won't fit in Colab storage
+
+**Options ranked:**
+
+| Option | Dorado (Nsight) | Kraken-2 (perf) | Notes |
+|---|---|---|---|
+| **WSL2 on your machine** | ✓ CUDA passthrough works | ✓ perf works | Best local option |
+| **Your Windows machine (native)** | ✓ Nsight works on Windows | ✗ perf is Linux-only | Partial |
+| **University HPC / lab server** | ✓ if NVIDIA GPU available | ✓ Linux + root | Ideal — ask mam/Kolin sir |
+| **Google Colab** | ✗ | ✗ | Not viable for profiling |
+
+**Best path:** Set up **WSL2** on your Windows machine. It gives a full Linux environment, your NVIDIA GPU passes through via CUDA, and both `perf` + Nsight work.
+
+**Profiling commands:**
+
+Dorado with Nsight Systems:
+```bash
+nsys profile dorado basecaller hac data.pod5 --output-dir results/
+# Produces a .nsys-rep file → open in Nsight Systems GUI
+```
+
+Kraken-2 with perf:
+```bash
+perf stat -e cache-misses,LLC-load-misses,cache-references \
+    kraken2 --db /path/to/db reads.fastq
+# Prints hardware counter table after run completes
+```
+
+**The profiling workflow:**
+```
+POD-5 data → Dorado (Nsight watching) → BAM reads → Kraken-2 (perf watching)
+                     ↓                                        ↓
+             GPU profile report                      CPU profile report
+                                    ↓
+                           2-page combined report
+```
+
+---
+
+### 8.5 Connection to the memory-efficiency research angle (KB §4.3)
+
+Both the research angle and Kolin sir's project target the same root problem — Kraken-2's random memory access pattern:
+
+- **Research angle (§4.3):** reduce the DB size (Bloom filters, learned indexes) so more fits in RAM
+- **Kolin sir's project (§8.1):** keep the hot entries in L3 cache so frequent lookups skip RAM entirely
+
+These are complementary, not competing. A smaller DB (from §4.3) + a hot cache (from §8.1) together could bring Kraken-2's memory footprint to a point where it's viable on edge hardware.
