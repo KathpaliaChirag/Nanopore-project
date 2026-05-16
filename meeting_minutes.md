@@ -4,7 +4,7 @@
 
 ## Meeting 1 — 2026-05-11 (3–5 pm)
 
-**Attendees:** Chirag, mam  
+**Attendees:** chayanika mam, chirag K, rohit, rishab, chirag S   
 **Format:** First introductory meeting
 
 ### Topics covered
@@ -38,6 +38,7 @@
    - Kraken-2's role in point-of-care diagnostics
 
 6. **Planned experiments**
+   - EXP 1: study internals of cpu gpu how data goes etc
    - Exp-2: Kraken-2 internals + basecalling model benchmarking
    - Exp-3: end-to-end Dorado → Kraken pipeline + perf/Nsight profiling
 
@@ -53,15 +54,14 @@
 
 ## Meeting 2 — 2026-05-15
 
-**Attendees:** mam, Chirag Kathpalia, Chirag Suthar  
+**Attendees:** Chayanika mam, Chirag K, Chirag S  
 **Format:** Discussion / planning
-
+**important update :** Next meeting shifted to monday i.e, 18-05-26 
 ### Topics covered
 
 1. **Golden data — ESKAPE toy dataset**
    - Use a small curated dataset of ESKAPE pathogen sequences as a "golden dataset" — a toy database to experiment with rather than the full 100 GB Kraken-2 DB
    - Source: **NCBI** — sequences to be pulled from there
-   - This gives a controlled, manageable input to test the full pipeline without needing massive storage or RAM
 
 2. **Run Kraken-2 on the golden data**
    - Plan to run it on **Colab or similar** (cloud environment) — feasible here because we're using a small custom DB, not the full 100 GB standard DB
@@ -77,15 +77,6 @@
    - Break it down internally — understand the code, not just the concept
    - Connects to Kolin sir's caching project (KB §8.1) — need to understand internals before adding a cache layer
 
-### Key new info
-- **Chirag Suthar** is also on the project (was present at this meeting)
-- Using a **reduced custom Kraken-2 DB** (ESKAPE-only) instead of the full standard DB makes Colab viable for this phase
-- NCBI is the data source for the golden ESKAPE sequences
-
-### Database size
-- Kraken-2 standard DB is **~180 GB** (not the commonly cited 100 GB)
-- Goal: reduce to **16 GB or 8 GB** using the built-in utility + ESKAPE-only sequences
-- This is what makes running on Colab or a modest machine feasible
 
 ### Metrics to measure
 - **Accuracy** — how correct are the species classifications vs ground truth (golden data gives us the ground truth since sequences are known)
