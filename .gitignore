@@ -1,0 +1,17 @@
+# Raw sequencing data — never commit
+pod5 data/
+*.pod5
+*.fast5
+
+# Dorado outputs
+*.bam
+*.fastq
+*.sam
+*.cram
+
+# Large model files
+*.pt
+*.onnx
+
+# Dorado binary (installed separately)
+dorado/
