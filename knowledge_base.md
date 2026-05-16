@@ -636,3 +636,61 @@ They're common in hospital-acquired infections, have evolved resistance to most 
 ### Exp-3 — end-to-end
 - Dorado + Kraken end-to-end accuracy measurement
 - Profile with `perf` + Nsight (per Kolin sir's mail)
+
+---
+
+## 7. Setup & Installation
+
+### 7.1 Installing Dorado on Windows
+
+**What Dorado is:** the current production basecaller from ONT. Takes POD-5 raw signal files as input, outputs BAM/FASTQ reads. GPU-accelerated (CUDA on NVIDIA).
+
+**Where to get it:**
+
+ONT no longer distributes Dorado binaries via GitHub release assets (they show 0 assets). The actual download lives on ONT's CDN:
+
+```
+https://cdn.oxfordnanoportal.com/software/analysis/dorado-<version>-win64.zip
+```
+
+For v1.4.0 (current as of 2026-05-16):
+```
+https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.4.0-win64.zip
+```
+
+**Installation steps:**
+
+1. Download the zip (~2.8 GB):
+```powershell
+curl -L "https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.4.0-win64.zip" -o dorado-1.4.0-win64.zip
+```
+
+2. Extract:
+```powershell
+Expand-Archive -Path dorado-1.4.0-win64.zip -DestinationPath dorado\
+```
+
+3. Binary is at:
+```
+dorado\dorado-1.4.0-win64\bin\dorado.exe
+```
+
+4. Verify:
+```powershell
+.\dorado\dorado-1.4.0-win64\bin\dorado.exe --version
+# Output: 1.4.0+ba44a013
+```
+
+**Installed location (this machine):**
+```
+C:\Users\chira\OneDrive\Desktop\Nanopore project\dorado\dorado-1.4.0-win64\bin\dorado.exe
+```
+
+**GPU:** Dorado auto-detects NVIDIA GPU via `--device auto` (default). No extra config needed.
+
+**Running basecalling (basic command):**
+```powershell
+.\dorado.exe basecaller hac path\to\data.pod5 --output-dir results\
+```
+
+Model options: `fast` (quickest), `hac` (high accuracy, standard), `sup` (super accuracy, slowest). Model version is auto-selected based on flow cell metadata in the POD-5 file.

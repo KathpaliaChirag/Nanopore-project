@@ -35,6 +35,21 @@ Next meeting / deadline: **2026-05-17**.
 
 ---
 
+## 2026-05-16 — Study session 3 (day 3) — Inference setup
+
+- **Goal for today:** run basecalling inference on POD-5 data from mam.
+- **Dorado installation — complete.**
+  - Found that ONT no longer hosts binaries on GitHub (0 assets on all releases).
+  - Located the actual CDN download URL: `cdn.oxfordnanoportal.com/software/analysis/dorado-1.4.0-win64.zip`
+  - Downloaded (~2.8 GB), extracted, verified: `dorado.exe --version` → `1.4.0` ✓
+  - Installed at: `Desktop\Nanopore project\dorado\dorado-1.4.0-win64\bin\dorado.exe`
+  - GPU (NVIDIA) will be auto-detected at runtime — no extra config needed.
+  - Installation details added to KB §7.1.
+- **POD-5 data from mam:** downloading — pending.
+- **Next:** once POD-5 arrives, identify flow cell chemistry from file metadata, then run `dorado basecaller hac <file.pod5> --output-dir results\`.
+
+---
+
 ## 2026-05-13 — Study session 2 (day 2)
 
 - **Calibration update:** user is a CSE student. Bio is context, not core. Lightening bio depth in remaining Topic 2; leaning hard into Topic 3 (basecaller NN) and Topic 4 (Kraken-2 hashing + memory) which are the CSE-relevant parts.
