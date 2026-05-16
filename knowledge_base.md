@@ -507,19 +507,22 @@ read: ATCGATCGATCGATCG...   (length 1000)
 
 ### 4.2 Why the database is huge
 
-The Kraken-2 **standard database is ~100 GB** loaded in memory. The size math:
+The Kraken-2 **standard database is ~180 GB** loaded in memory. The size math:
 
 - ~10⁵ reference genomes × ~10⁶ bp/genome ≈ **10¹¹ bp** of reference sequence.
 - Unique k-mers extracted (k=35, with minimizers, m=31) ≈ **10¹⁰ entries**.
 - Each entry: hash + taxon ID ≈ **8 bytes**.
-- Total: ~80 GB hash table + auxiliary tables (LCA tree, taxonomy nodes) → **~100 GB**.
+- Total: hash table + auxiliary tables (LCA tree, taxonomy nodes) → **~180 GB**.
 
 **Why the size is a problem:**
 - Doesn't fit in RAM on most laptops/workstations (typical 16–64 GB).
 - **Kraken-2 loads the entire DB into memory at startup** — there's no on-disk fallback for the hot lookup path. So if you can't fit it, you can't run it (at least not with the standard DB).
-- For **point-of-care clinical use** (e.g., a device in a hospital triage room), 100 GB is a non-starter.
+- For **point-of-care clinical use** (e.g., a device in a hospital triage room), 180 GB is a non-starter.
 - For **cloud deployment**, the per-instance memory is expensive.
 - For **field / outbreak response** in low-resource settings, completely impractical.
+
+**Practical reduction target (from meeting 2):**
+Kraken-2 has a built-in utility (`kraken2-build`) to build a custom DB from any subset of reference genomes. By restricting to ESKAPE pathogen sequences only, the DB can be brought down to **8–16 GB** — fitting in Colab or a standard workstation. Accuracy vs size trade-off must be measured.
 
 This is why memory efficiency is the bottleneck — and your research angle.
 
@@ -716,7 +719,7 @@ Once both caches exist, the next step is a **genomic-aware cache replacement pol
 ### 8.1 Project 1 — Kraken-2 CPU-side cache (Hot-K-mer LRU)
 
 **The bottleneck:**
-Kraken-2's k-mer database is 50–100 GB. It doesn't fit in RAM on most machines. Even the portion that is in RAM gets constantly evicted from L3 cache because the lookup pattern is random (hash table access = unpredictable memory addresses). Result: frequent **page faults** and **L3 cache misses** dominate runtime.
+Kraken-2's k-mer database is ~180 GB. It doesn't fit in RAM on most machines. Even the portion that is in RAM gets constantly evicted from L3 cache because the lookup pattern is random (hash table access = unpredictable memory addresses). Result: frequent **page faults** and **L3 cache misses** dominate runtime.
 
 **The solution Kolin sir wants:**
 A **Hot-K-mer LRU cache** — identify the most frequently accessed k-mer → taxon ID entries and pin them in L3 cache (or locked physical memory). When a lookup hits the cache, skip the full hash table lookup entirely.

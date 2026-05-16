@@ -82,8 +82,19 @@
 - Using a **reduced custom Kraken-2 DB** (ESKAPE-only) instead of the full standard DB makes Colab viable for this phase
 - NCBI is the data source for the golden ESKAPE sequences
 
+### Database size
+- Kraken-2 standard DB is **~180 GB** (not the commonly cited 100 GB)
+- Goal: reduce to **16 GB or 8 GB** using the built-in utility + ESKAPE-only sequences
+- This is what makes running on Colab or a modest machine feasible
+
+### Metrics to measure
+- **Accuracy** — how correct are the species classifications vs ground truth (golden data gives us the ground truth since sequences are known)
+- **Time** — how long does classification take at each DB size
+- Together these give the accuracy vs speed vs memory trade-off curve that Kolin sir's caching project needs as a baseline
+
 ### Action items
 - Pull ESKAPE pathogen sequences from NCBI
-- Build a reduced Kraken-2 database using the built-in utility mam mentioned
+- Build a reduced Kraken-2 database (target 8–16 GB) using the built-in utility mam mentioned
 - Run Dorado → Kraken-2 pipeline on this golden data in Colab
+- Measure accuracy and runtime at each DB size
 - Study Kraken-2 internals / source code
