@@ -9,6 +9,7 @@ What I've learned, **in my own words**. Claude teaches a chunk, I paraphrase it 
 ---
 
 ## 1. Nanopore sequencing
+- How nanopore Sequeincing works (2 minutes- must watch) : https://youtu.be/RcP85JHLmnI?si=S_2spAh13R-XsRiZ
 
 ### 1.1 The physical idea (DNA through a hole, current as signal)
 
@@ -832,3 +833,140 @@ Both the research angle and Kolin sir's project target the same root problem —
 - **Kolin sir's project (§8.1):** keep the hot entries in L3 cache so frequent lookups skip RAM entirely
 
 These are complementary, not competing. A smaller DB (from §4.3) + a hot cache (from §8.1) together could bring Kraken-2's memory footprint to a point where it's viable on edge hardware.
+
+---
+
+## 9. First Inference Run — 2026-05-16
+
+### 9.1 Hardware specs (this machine)
+
+| Component | Spec | Implication for Dorado |
+|---|---|---|
+| GPU | NVIDIA GeForce GTX 1650 | 4 GB VRAM — tight for hac, too small for sup |
+| RAM | 14 GB | ~10 GB free after Windows; 8 GB Kraken-2 DB is risky |
+| CPU | AMD Ryzen 7 5800H | 8 cores, good for Kraken-2 CPU work |
+| OS | Windows 11 | Dorado works natively; perf needs WSL2 |
+
+**Key takeaway:** GTX 1650 can run Dorado `fast` and `hac` (with reduced batch size), but `sup` is likely OOM. For Kraken-2 with the reduced ESKAPE DB (8–16 GB), Colab is safer than local RAM.
+
+---
+
+### 9.2 The POD-5 file — metadata
+
+Inspected using the `pod5` Python library:
+
+```python
+import pod5
+with pod5.Reader('file.pod5') as r:
+    read = next(r.reads())
+    print(read.run_info.flow_cell_product_code)  # FLO-MIN114
+    print(read.run_info.sequencing_kit)           # sqk-nbd114-24
+    print(read.run_info.experiment_name)          # AIIMS_Shreshtha_1_301025
+    print(read.run_info.sample_rate)              # 5000
+    print(r.num_reads)                            # 104478
+```
+
+| Field | Value | What it means |
+|---|---|---|
+| Flow cell | FLO-MIN114 | MinION with R10.4.1 pores — latest chemistry |
+| Sequencing kit | SQK-NBD114-24 | Native Barcoding Kit, 24 barcodes — **data is multiplexed** |
+| Experiment | AIIMS_Shreshtha_1_301025 | Real clinical data from AIIMS (All India Institute of Medical Sciences) |
+| Sample rate | 5000 Hz | 5kHz — newer chemistry, Dorado auto-selects 5kHz models |
+| Total reads | 104,478 | Substantial dataset across all barcodes |
+
+**Model Dorado auto-selected:** `dna_r10.4.1_e8.2_400bps_hac@v5.2.0`
+
+---
+
+### 9.3 Barcoding and demultiplexing
+
+**What barcoding means:**
+
+The SQK-NBD114-24 kit allows up to 24 different DNA samples to be loaded into a single flow cell run — each sample gets a unique short DNA tag (a "barcode") attached to its adapters. All samples sequence together and get separated ("demultiplexed") computationally afterward.
+
+In clinical terms: one MinION run = up to 24 patient samples simultaneously. Cost-efficient for hospital settings.
+
+**What Dorado does with `--kit-name`:**
+
+When you pass `--kit-name SQK-NBD114-24`, Dorado does basecalling + demultiplexing in one step. Output is automatically sorted into per-barcode BAM files:
+
+```
+results/
+  bam_pass/
+    barcode01/  ← patient/sample 1
+    barcode02/  ← patient/sample 2
+    ...
+    unclassified/  ← reads where barcode couldn't be identified
+```
+
+**Why unclassified is the largest chunk:**
+
+In our run, `unclassified` (3.9 MB) was bigger than any individual barcode. Reasons this happens:
+- Reads too short for confident barcode detection
+- Degraded barcode sequence (pore damage, sample quality)
+- Some samples had very few reads (barcodes 07, 11 only 128K)
+- `fast` mode basecalling is less accurate → more uncertain barcode calls
+
+Running `hac` mode should reduce the unclassified fraction because better basecalling → more confident barcode detection.
+
+---
+
+### 9.4 Dorado inference results — fast vs hac
+
+**fast mode — completed successfully**
+
+Command:
+```powershell
+dorado.exe basecaller fast data.pod5 --kit-name SQK-NBD114-24 --output-dir results/fast
+```
+
+Result: completed quickly, all 12 barcodes + unclassified produced.
+
+| Barcode | BAM size |
+|---|---|
+| barcode02 | 1.9 MB |
+| barcode04, 06, 13 | ~896 KB |
+| barcode01, 03, 05, 09, 10, 14 | ~384 KB |
+| barcode07, 11 | 128 KB |
+| barcode12 | 0 (empty) |
+| unclassified | 3.9 MB |
+
+**hac mode — needs forced batch size**
+
+Default run (auto batch size): Dorado benchmarks the GPU to find optimal batch size. On GTX 1650 with 4 GB VRAM, this process OOM-crashed during benchmarking.
+
+Fix — force a small batch size:
+```powershell
+dorado.exe basecaller hac data.pod5 --kit-name SQK-NBD114-24 --output-dir results/hac --batchsize 16
+```
+
+With `--batchsize 16`, Dorado settled on `chunk size 9996, batch size 64` and started processing. Slower than fast but fits in VRAM.
+
+**sup mode** — not attempted yet. Expected to OOM even with reduced batch size on 4 GB VRAM.
+
+---
+
+### 9.5 What the BAM output contains
+
+Each BAM file contains the basecalled reads for one barcode — the ATGC sequences Dorado decoded from the raw signal. BAM is a compressed binary format; to view/work with it you need `samtools`.
+
+Pipeline position:
+```
+POD-5 (raw signal)
+    │
+    ▼ Dorado basecaller
+BAM files (per barcode — ATGC reads)
+    │
+    ▼ Kraken-2
+Species classification report
+```
+
+Next step: feed the per-barcode BAM files into Kraken-2 to identify which ESKAPE pathogens are in each patient sample.
+
+---
+
+### 9.6 CROC — tool found in project folder
+
+A Python package called `CROC-1.2.6` was found in the project directory alongside the POD-5 files. CROC = **Concentrated ROC** — a method for evaluating early recognition performance in ranked lists (related to ROC curve analysis). It also contains two POD-5 files identical to the ones in `pod5 data/`.
+
+Likely provided by mam for evaluating classification accuracy — CROC metrics (BEDROC) are used to assess how well a classifier ranks true positives early, which is relevant for evaluating Kraken-2's species identification performance. To be clarified at next meeting.

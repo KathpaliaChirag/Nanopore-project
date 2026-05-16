@@ -46,7 +46,14 @@ Next meeting / deadline: **2026-05-17**.
   - GPU (NVIDIA) will be auto-detected at runtime — no extra config needed.
   - Installation details added to KB §7.1.
 - **POD-5 data from mam:** downloading — pending.
-- **Next:** once POD-5 arrives, identify flow cell chemistry from file metadata, then run `dorado basecaller hac <file.pod5> --output-dir results\`.
+- **POD-5 data from mam arrived** — `FBE01990_24778b97_03e50f91_10.pod5` (4 GB, 104,478 reads).
+  - Flow cell: FLO-MIN114 (R10.4.1), Kit: SQK-NBD114-24 (barcoded), Experiment: AIIMS_Shreshtha_1_301025, 5kHz
+  - Real clinical data from AIIMS — kept off GitHub via .gitignore
+- **fast mode basecalling — complete.** 12 barcodes + unclassified BAMs produced. GTX 1650 handled it fine.
+- **hac mode** — default auto-batchsize OOM-crashed on 4 GB VRAM. Fixed with `--batchsize 16`, currently running.
+- **sup mode** — not attempted, expected OOM on GTX 1650.
+- **CROC tool** found in project folder — likely for accuracy evaluation (BEDROC metric). To clarify with mam.
+- KB §9 added: hardware specs, POD-5 metadata, barcoding explanation, inference results, BAM output structure.
 - **Reviewed Kolin sir's mail** — fully understood and added to KB §8.
   - Two sub-projects: Hot-K-mer LRU cache (Kraken-2, CPU) + Signal-to-Base cache (Dorado, GPU)
   - Key tech: Intel TBB, AVX-512, LSH, CUDA shared memory
