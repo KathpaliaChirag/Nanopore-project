@@ -15,3 +15,13 @@ pod5 data/
 
 # Dorado binary (installed separately)
 dorado/
+
+# Dorado temp files (created during model download + pod5 migration)
+.temp_dorado_model-*/
+.tmp_pod5_v3_v4_migration_*/
+
+# Results (local only — too large for git)
+results/
+
+# Claude local settings
+.claude/settings.local.json
