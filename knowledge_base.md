@@ -1,10 +1,50 @@
 # Nanopore Project — Knowledge Base
 
-What I've learned, **in my own words**. Claude teaches a chunk, I paraphrase it back, and that paraphrase lives here.
+Full deep-dive notes. For a quick reference see `summary.md`.
 
 - 1st meeting with **mam**: 2026-05-11
-- Profiling tools mail from **Kolin sir** (perf, Nsight) — to be reviewed
-- Next meeting / deadline: **2026-05-17**
+- Next meeting: **2026-05-18** (Monday)
+
+---
+
+## 0. Pipeline Overview (read this first)
+
+This is the full picture before diving into details. Everything in sections 1–10 is explaining one piece of this:
+
+```
+Patient sample (blood / swab)
+        │
+        ▼  wet lab: DNA extraction + adapter ligation
+DNA fragments with adapters
+        │
+        ▼  nanopore sequencer (MinION / PromethION)
+           - voltage pulls DNA through protein pore
+           - current blocked differently by each k-mer (5–6 letters at once)
+           - 512–3000 channels reading in parallel
+POD-5 file  ←── raw electrical signal, ~GBs, binary (Apache Arrow)
+        │
+        ▼  Dorado basecaller (GPU, transformer NN)
+           - normalise signal → CNN downsample → Transformer → CTC decode
+           - also demultiplexes barcodes (separates patient samples)
+BAM files  ←── one per barcode (patient), ATGC reads + quality scores
+        │
+        ▼  samtools fastq  (format conversion only)
+FASTQ files  ←── same reads, plain text
+        │
+        ▼  Kraken-2 (CPU, k-mer hash lookup)
+           - chops reads into 35-mer windows
+           - looks each up in DB → taxon ID
+           - majority vote per read
+Species report  ←── "barcode02: 100% Pseudomonas aeruginosa"
+```
+
+**Why each step exists:**
+- POD-5: signal is too big for plain files, needs compression + random access
+- Dorado: can't directly read current → letter because 6 letters are in pore at once + irregular timing → need NN
+- samtools: Kraken-2 takes text (FASTQ), Dorado outputs binary (BAM)
+- Kraken-2: aligning each read to every genome is too slow — k-mer hashing does same thing in milliseconds
+
+**The research problem:** this pipeline works but is slow and memory-hungry at scale. Kraken-2 DB = 180 GB. Dorado recomputes everything even for near-identical reads. Kolin sir's project adds a caching layer to fix both.
 
 ---
 
