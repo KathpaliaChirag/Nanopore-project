@@ -1,4 +1,4 @@
-# Nanopore Project — Knowledge Base
+# Nanopore Project - Knowledge Base
 
 Full deep-dive notes. For a quick reference see `summary.md`.
 
@@ -9,7 +9,7 @@ Full deep-dive notes. For a quick reference see `summary.md`.
 
 ## 0. Pipeline Overview (read this first)
 
-This is the full picture before diving into details. Everything in sections 1–10 is explaining one piece of this:
+This is the full picture before diving into details. Everything in sections 1-10 is explaining one piece of this:
 
 ```
 Patient sample (blood / swab)
@@ -19,110 +19,117 @@ DNA fragments with adapters
         │
         ▼  nanopore sequencer (MinION / PromethION)
            - voltage pulls DNA through protein pore
-           - current blocked differently by each k-mer (5–6 letters at once)
-           - 512–3000 channels reading in parallel
-POD-5 file  ←── raw electrical signal, ~GBs, binary (Apache Arrow)
+           - current blocked differently by each k-mer (5-6 letters at once)
+           - 512-3000 channels reading in parallel
+POD-5 file  <-- raw electrical signal, ~GBs, binary (Apache Arrow)
         │
         ▼  Dorado basecaller (GPU, transformer NN)
            - normalise signal → CNN downsample → Transformer → CTC decode
            - also demultiplexes barcodes (separates patient samples)
-BAM files  ←── one per barcode (patient), ATGC reads + quality scores
+BAM files  <-- one per barcode (patient), ATGC reads + quality scores
         │
         ▼  samtools fastq  (format conversion only)
-FASTQ files  ←── same reads, plain text
+FASTQ files  <-- same reads, plain text
         │
         ▼  Kraken-2 (CPU, k-mer hash lookup)
            - chops reads into 35-mer windows
            - looks each up in DB → taxon ID
            - majority vote per read
-Species report  ←── "barcode02: 100% Pseudomonas aeruginosa"
+Species report  <-- "barcode02: 100% Pseudomonas aeruginosa"
 ```
 
 **Why each step exists:**
 - POD-5: signal is too big for plain files, needs compression + random access
-- Dorado: can't directly read current → letter because 6 letters are in pore at once + irregular timing → need NN
+- Dorado: can't directly read current → letter because 6 letters are in pore at once + irregular timing - need a neural network
 - samtools: Kraken-2 takes text (FASTQ), Dorado outputs binary (BAM)
-- Kraken-2: aligning each read to every genome is too slow — k-mer hashing does same thing in milliseconds
+- Kraken-2: aligning each read to every genome is too slow - k-mer hashing does the same thing in milliseconds
 
 **The research problem:** this pipeline works but is slow and memory-hungry at scale. Kraken-2 DB = 180 GB. Dorado recomputes everything even for near-identical reads. Kolin sir's project adds a caching layer to fix both.
+
+The sections that follow unpack each box in the diagram above: what format the data is in, what computation happens, and why the design choices were made this way.
 
 ---
 
 ## 1. Nanopore sequencing
-- How nanopore Sequeincing works (2 minutes- must watch) : https://youtu.be/RcP85JHLmnI?si=S_2spAh13R-XsRiZ
+
+- How nanopore sequencing works (2 minutes - must watch): https://youtu.be/RcP85JHLmnI?si=S_2spAh13R-XsRiZ
 
 ### 1.1 The physical idea (DNA through a hole, current as signal)
 
-DNA is made up of long strands of 4 chemical letters — **A, T, G, C** — called **nucleotides**. The process of reading these strands is called **sequencing**. We sequence to figure out what species are present in a sample (useful for diagnosing infections, environmental monitoring, etc.).
+DNA is made up of long strands of 4 chemical letters - **A, T, G, C** - called **nucleotides**. The process of reading these strands is called **sequencing**. We sequence to figure out what species are present in a sample (useful for diagnosing infections, environmental monitoring, etc.).
 
 Two popular technologies:
-- **Illumina** — uses chemistry + fluorescent dyes + cameras; reads short strands (~150 letters each).
-- **Nanopore** — uses electrical signals. A **voltage is held across a membrane** that has a tiny pore in it. When a DNA strand passes *through* the pore, the letters inside partially block the **current**, and different letters block by different amounts. We decode that current signal back into ATGC.
+- **Illumina** - uses chemistry + fluorescent dyes + cameras; reads short strands (~150 letters each).
+- **Nanopore** - uses electrical signals. A **voltage is held across a membrane** that has a tiny pore in it. When a DNA strand passes *through* the pore, the letters inside partially block the **current**, and different letters block by different amounts. We decode that current signal back into ATGC.
 
-In short, a nanopore device is a **molecular electrical sensor**: DNA in → wobbling current out → computer recovers the letters.
+In short, a nanopore device is a **molecular electrical sensor**: DNA in, wobbling current out, computer recovers the letters.
 
-### 1.2 Device structure — flow cell, channels, pores
+The key advantage of nanopore over Illumina is **read length**. Illumina reads are ~150 letters; nanopore reads are typically 1,000-100,000 letters. Longer reads carry more context per read, which matters for both species identification (more k-mers per read) and the caching work (more redundancy to exploit).
+
+### 1.2 Device structure - flow cell, channels, pores
 
 The device has 3 nested things to keep track of:
 
-- **Flow cell** — a cartridge-like consumable that plugs into the sequencer and can be swapped out. The DNA sample is loaded into it.
-- **Membrane** — inside the flow cell, a thin synthetic membrane that holds many **channels**.
-- **Channel** — one independent DNA reader. Each channel = **one pore** (a hollow protein tube wide enough for a single DNA strand) + the membrane patch around it + its own electrodes + its own electronics measuring the current over time.
+- **Flow cell** - a cartridge-like consumable that plugs into the sequencer and can be swapped out. The DNA sample is loaded into it.
+- **Membrane** - inside the flow cell, a thin synthetic membrane that holds many **channels**.
+- **Channel** - one independent DNA reader. Each channel = **one pore** (a hollow protein tube wide enough for a single DNA strand) + the membrane patch around it + its own electrodes + its own electronics measuring the current over time.
 
-DNA passes *through* the pore. The big win of nanopore is **parallelism** — all channels read at the same time, each on a different DNA strand.
+DNA passes *through* the pore. The big win of nanopore is **parallelism** - all channels read at the same time, each on a different DNA strand.
 
 Rough numbers:
-- **MinION** flow cell ≈ 512 channels
-- **PromethION** flow cell ≈ 2,675 channels (one machine runs many flow cells)
+- **MinION** flow cell: approximately 512 channels
+- **PromethION** flow cell: approximately 2,675 channels (one machine runs many flow cells)
 
-Caveat: not all pores stay healthy through a run — some clog, some die. So channel count is a **theoretical max**; the number actually sequencing at any moment is lower.
+Caveat: not all pores stay healthy through a run - some clog, some die. So channel count is a **theoretical max**; the number actually sequencing at any moment is lower.
 
-### 1.3 K-mer window (5–6 bp), 4096 patterns, "ionic current = voice"
+### 1.3 K-mer window (5-6 bp), 4096 patterns, "ionic current = voice"
 
-Each pore is long enough that **5–6 nucleotides fit inside it at once**. So the current at any moment doesn't report a single letter — it reports the **whole 5-mer or 6-mer window** currently inside the pore. A "k-mer" is just "a string of k consecutive letters."
+Each pore is long enough that **5-6 nucleotides fit inside it at once**. So the current at any moment does not report a single letter - it reports the **whole 5-mer or 6-mer window** currently inside the pore. A "k-mer" is just "a string of k consecutive letters."
 
-- For k = 6, there are 4⁶ = **4,096 possible windows**, each producing its own characteristic current level.
-- As DNA ratchets through, the window **shifts by one letter per step** — if window N is `ATGCGA`, window N+1 might be `TGCGAC`. So consecutive readings are overlapping tones, not isolated ones.
-- Each window is like a distinct "tone." A long DNA strand produces a long stream of tones — this is why mam called the ionic current the **"voice" of DNA**.
+- For k = 6, there are 4^6 = **4,096 possible windows**, each producing its own characteristic current level.
+- As DNA ratchets through, the window **shifts by one letter per step** - if window N is `ATGCGA`, window N+1 might be `TGCGAC`. So consecutive readings are overlapping patterns, not isolated ones.
+- Each window is like a distinct "tone." A long DNA strand produces a long stream of tones - this is why mam called the ionic current the **"voice" of DNA**.
+
+Think of it like audio: the signal is a continuous waveform, not a sequence of discrete symbols. Recovering the original sequence from the waveform is the basecalling problem (Section 3).
 
 **Why a neural network is needed (basecalling):**
 
-A simple lookup of "current → letter" won't work because:
-1. The signal encodes a 6-letter window, not one letter.
-2. DNA moves through the pore irregularly — timing of each step isn't uniform.
+A simple lookup table of "current value → letter" won't work because:
+1. The signal encodes a 6-letter window, not one letter at a time.
+2. DNA moves through the pore irregularly - the timing of each step is not uniform.
 3. Some k-mers produce similar current values.
 
-So the basecaller's NN must do two jobs at once:
-- **Segmentation** — when did the window step from one k-mer to the next?
-- **Classification** — which k-mer was inside during each step?
+So the basecaller's neural network must do two jobs simultaneously:
+- **Segmentation** - when did the window step from one k-mer to the next?
+- **Classification** - which k-mer was inside during each step?
 
-The **basecaller** is the software running this NN (on CPU/GPU). It reads in the current trace and outputs strings of ATGC called **reads**. Downstream tools like **Kraken-2** consume these reads.
+The **basecaller** is the software running this neural network (on CPU/GPU). It reads in the current trace and outputs strings of ATGC called **reads**. Downstream tools like **Kraken-2** consume these reads.
 
 **Q: Why don't we just make the pore small enough to fit only one nucleotide?**
 
-1. **Sensing zone is a volume, not a point.** The current is influenced by everything within the Debye length (~1 nm) around the constriction — not just the single base at the narrowest point. So neighboring nucleotides always affect the signal.
-2. **Pores are proteins.** Common ONT pores (CsgG, MspA, α-hemolysin) have a reading-head length set by amino-acid folding — typically ~5 nucleotides thick. Can't be arbitrarily shrunk.
-3. **Solid-state alternatives** (graphene, MoS₂) could theoretically be single-base wide, but they have much higher noise and no motor protein to slow DNA down, so DNA shoots through too fast to read.
-4. **4,096 patterns is *more* informative than 4** — richer fingerprints, more noise-robust signal.
+1. **Sensing zone is a volume, not a point.** The current is influenced by everything within the Debye length (~1 nm) around the constriction - not just the single base at the narrowest point. So neighboring nucleotides always affect the signal.
+2. **Pores are proteins.** Common ONT pores (CsgG, MspA, alpha-hemolysin) have a reading-head length set by amino-acid folding - typically ~5 nucleotides thick. They cannot be arbitrarily shrunk.
+3. **Solid-state alternatives** (graphene, MoS2) could theoretically be single-base wide, but they have much higher noise and no motor protein to slow DNA down, so DNA shoots through too fast to read.
+4. **4,096 patterns is more informative than 4** - richer fingerprints, more noise-robust signal.
 5. **Decoding works.** Modern basecallers hit >99% accuracy; no incentive to redesign the physics.
 
 ### 1.4 POD-5 raw signal format, squiggle visualization
 
-**POD-5 — what it is**
+**POD-5 - what it is**
 
 POD-5 is Oxford Nanopore Technologies' current file format for storing the **raw electrical signal** captured by a flow cell during a run. It replaces an older format called **FAST5** (which was built on HDF5).
 
 Why a special format exists at all:
-- Signal data is huge — ~4,000 samples/sec × hundreds of channels × hours of runtime = **GBs to TBs per run**.
-- POD-5 uses better compression → smaller files.
-- Faster **random access** — a basecaller can pull out a specific read's signal without scanning the entire file.
-- Cleaner schema, based on **Apache Arrow** (a columnar binary format).
+- Signal data is huge - ~4,000 samples/sec x hundreds of channels x hours of runtime = **GBs to TBs per run**.
+- POD-5 uses better compression, producing smaller files.
+- Faster **random access** - a basecaller can pull out a specific read's signal without scanning the entire file.
+- Cleaner schema, based on **Apache Arrow** (a columnar binary format - think of it as Parquet for signal data).
 
 What's inside a POD-5 file:
-- **Per-read signal arrays** — the time-series of raw current values for each DNA strand that passed through a pore.
-- **Metadata** — channel number, pore ID, run ID, timestamps, calibration values (to convert raw integer samples to picoamperes), sample rate, etc.
+- **Per-read signal arrays** - the time-series of raw current values for each DNA strand that passed through a pore.
+- **Metadata** - channel number, pore ID, run ID, timestamps, calibration values (to convert raw integer samples to picoamperes), sample rate, etc.
 
-**Squiggle — what it is**
+**Squiggle - what it is**
 
 A **squiggle** is the **plot of raw current (in picoamperes) versus time** for a single read. It looks like a noisy wavy line with plateaus and transitions:
 
@@ -131,8 +138,8 @@ A **squiggle** is the **plot of raw current (in picoamperes) versus time** for a
 
 Why we look at squiggles:
 - Sanity-check signal quality (is the current in a normal range? is the pore healthy?).
-- Spot the **adapter region** at the start of each read — the adapter molecule (Topic 2) produces a distinctive signal.
-- Debug failed basecalling — eyeball where things went wrong (a pore stall, a bubble, etc.).
+- Spot the **adapter region** at the start of each read - the adapter molecule (Section 2) produces a distinctive signal.
+- Debug failed basecalling - eyeball where things went wrong (a pore stall, a bubble, etc.).
 - Detect **modified bases** (e.g., methylation) which shift current slightly compared to unmodified DNA.
 
 **Where POD-5 sits in the full pipeline**
@@ -150,51 +157,27 @@ flow cell  →  POD-5 (raw signal, viewable as squiggles)
                        Kraken-2  (species ID)
 ```
 
-POD-5 is the **input** to all Topic 3 (basecalling) work — when we run experiments, we'll be opening real POD-5 files and visualizing the squiggles.
+POD-5 is the **input** to all Section 3 (basecalling) work - when we run experiments, we'll be opening real POD-5 files and visualizing the squiggles.
 
 ---
 
 ## 2. Sample preparation pipeline
 
-### 2.1 DNA → fragment → adaptor ligation (motor protein, leader, docking point)
+This section covers the wet-lab steps that happen *before* the sequencer. From a CSE perspective, think of this as the **data ingestion layer** - it transforms a raw biological sample into a structured input format (DNA fragments with adapters) that the sequencer can actually process. Understanding what the adapter looks like physically explains why the squiggle signal looks the way it does.
+
+### 2.1 DNA extraction, fragmentation, and adapter ligation
 
 **Why prep exists at all**
 
-A raw biological sample (patient swab, bacterial culture, soil) can't be loaded into a flow cell directly. The DNA in that sample is:
-- locked inside cells,
-- tangled with proteins, RNA, debris, salts,
-- in double-stranded form (the pore reads one strand at a time),
-- of wildly varying length — sometimes whole chromosomes,
-- has no "handle" for the pore to grab onto.
+A raw biological sample (patient swab, bacterial culture) can't be loaded into a flow cell directly. The DNA must be extracted, cleaned, broken into manageable fragments, and fitted with engineered "handles" (adapters) before the sequencer can read it.
 
-So **sample prep = the wet-lab pipeline that turns raw sample into DNA fragments ready to be threaded through a nanopore.** It's the gate between biology and the sequencer.
+The three big prep steps:
 
-**The three big prep steps (overview)**
+1. **Extraction and purification** - break cells open, free the DNA, wash away proteins, RNA, and debris. Standard commercial kits handle this.
+2. **Fragmentation** - break long DNA into pieces (typically **1 kb to 100 kb** for nanopore, far longer than Illumina's ~150 bp). Long reads are part of nanopore's appeal.
+3. **Adapter ligation** - attach an engineered molecule (the "adapter") to each end of each fragment. This is the key step: it makes the DNA pore-compatible.
 
-1. **Extraction & purification** — break cells open, free the DNA, wash away proteins, RNA, debris. Standard kits (e.g., Qiagen) do this.
-2. **Fragmentation** — break long DNA into manageable pieces (typically **1 kb – 100 kb** for nanopore, far longer than Illumina's ~150 bp). Long reads are part of nanopore's appeal.
-3. **Adapter ligation** — attach an engineered molecule (the "adapter") to each end of each fragment. This is the **key step** — it makes the DNA pore-compatible.
-
-**Deep dive — fragmentation + the adapter**
-
-After fragmentation, each piece of DNA looks like:
-
-```
-5'-ATGCGATCGGCTA...TGCACGTA-3'
-3'-TACGCTAGCCGAT...ACGTGCAT-5'
-```
-
-A bare double-stranded fragment **cannot enter a pore on its own** — it has no handle, the pore reads single strands, and DNA in free solution rarely finds a pore in time. The fix is to attach an engineered molecule — the **adapter** — to each end.
-
-**End prep (cleanup before ligation)**
-
-DNA ends from fragmentation are messy (jagged, partially single-stranded). Before ligation, ends are cleaned up:
-- **Blunting** — fill in or chew back overhangs so ends are flat.
-- **A-tailing** — add a single `A` overhang on the 3' end so the adapter's complementary `T` overhang fits perfectly.
-
-This makes ligation efficient and directional.
-
-**The Y-adapter — structure**
+**The Y-adapter - structure**
 
 Each adapter is a small piece of engineered nucleic acid shaped like a Y:
 
@@ -211,64 +194,57 @@ Each adapter is a small piece of engineered nucleic acid shaped like a Y:
                           [DNA fragment]
 ```
 
-**The three key features (the ones mam mentioned):**
+**The three key features of the adapter:**
 
-1. **Motor protein** — a **helicase enzyme** bound to one arm of the Y.
+1. **Motor protein** - a helicase enzyme bound to one arm of the Y.
    - Once threading starts, it sits on top of the pore.
-   - **Unzips** the double-stranded DNA into a single strand (only one strand fits in the pore).
+   - Unzips the double-stranded DNA into a single strand (only one strand fits in the pore).
    - **Ratchets DNA through the pore one base at a time, at a controlled rate** (~400 bases/sec for modern chemistries).
-   - **This is the single most critical component.** Without it, DNA's natural electrophoretic speed would shoot it through the pore in microseconds — far too fast to read. The motor protein is the "speed governor."
+   - This is the single most critical component. Without it, DNA's natural electrophoretic speed would shoot it through the pore in microseconds - far too fast to read. The motor protein is the "speed governor," and its rate directly determines the density of signal samples per base.
 
-2. **Leader sequence** — a short, **known**, single-stranded sequence at the tip of the other Y-arm.
-   - It's the first thing that enters the pore.
-   - Like all DNA it's negatively charged, so the voltage across the membrane **pulls it in** (electrophoresis).
-   - Its sequence is known, so the basecaller uses it as a **start marker** — you can literally see the leader as a distinct early portion of every squiggle.
+2. **Leader sequence** - a short, known, single-stranded sequence at the tip of the other Y-arm.
+   - It is the first thing that enters the pore.
+   - Like all DNA it is negatively charged, so the voltage across the membrane **pulls it in** (electrophoresis).
+   - Its sequence is known, so the basecaller uses it as a **start marker** - you can literally see the leader as a distinct early portion of every squiggle.
 
-3. **Docking point (tether)** — a **hydrophobic anchor** attached to the adapter (typically a cholesterol or lipid tag).
+3. **Docking point (tether)** - a hydrophobic anchor attached to the adapter (typically a cholesterol or lipid tag).
    - Inserts into the membrane near the pores.
    - Holds the adapter (and its attached DNA) close to the membrane surface.
-   - **Hugely increases the chance of finding a pore** — without it, DNA would float around in bulk solution and rarely encounter a pore before the run ends.
+   - **Greatly increases the chance of finding a pore** - without it, DNA would float around in bulk solution and rarely encounter a pore before the run ends.
 
-**Ligation step**
+**Kit names you will encounter**
 
-A **ligase enzyme** covalently joins the adapter's double-stranded stem to each cleaned-up DNA fragment end. Result: every fragment has an adapter at each end.
+- **LSK** (Ligation Sequencing Kit) - the standard. Uses ligation as described. Higher accuracy, longer prep time.
+- **RAD / Rapid Sequencing Kit** - uses a transposase enzyme that both fragments DNA and inserts adapters in one shot. Prep time drops to ~10 min, but at slightly lower efficiency.
 
-**Kit names you'll encounter**
+**Why this matters for our project:** every basecalling experiment runs on data that came through this exact adapter mechanism. The **leader signal** at the start of each squiggle is what the basecaller uses to align. The **motor protein's speed** determines how dense each k-mer step is in the signal.
 
-- **LSK** (Ligation Sequencing Kit) — the standard. Uses ligation as described. Higher accuracy, longer prep time.
-- **RAD / Rapid Sequencing Kit** — uses a **transposase** enzyme that both fragments DNA and inserts adapters in one shot. Prep time drops to ~10 min, but at slightly lower efficiency.
-- These names appear constantly in ONT wet-lab discussions.
-
-**Why this design matters for our project**
-
-Every Topic 3 (basecalling) experiment runs on data that came through this exact adapter mechanism. The **leader signal** at the start of each squiggle is what the basecaller uses to align. The **motor protein's speed** determines how dense each k-mer step is in the signal. Understanding the adapter is foundational to understanding why the signal looks the way it does.
-
-### 2.2 How the adaptor gets DNA into the pore
+### 2.2 How the adapter gets DNA into the pore
 
 Three forces stacked together get a fragment from "floating in solution" to "threading through a specific pore":
 
-1. **Tether** — the hydrophobic tail on the adapter inserts into the membrane. This **biases DNA toward the membrane surface** instead of letting it float in bulk solution. Effectively a load-balancer for DNA-finds-pore events.
-2. **Voltage** — DNA is negatively charged. The voltage across the membrane (cis side −, trans side +) **electrostatically pulls the single-stranded leader sequence into the pore first**.
-3. **Motor protein** — as the leader threads in, the motor protein (on the other Y-arm) parks on top of the pore. It **unzips** the double strand and **ratchets DNA through one base at a time**. The squiggle starts being recorded.
+1. **Tether** - the hydrophobic tail on the adapter inserts into the membrane. This biases DNA toward the membrane surface instead of letting it float in bulk solution. Think of it as a load-balancer for DNA-finds-pore events: it increases the effective arrival rate.
+2. **Voltage** - DNA is negatively charged. The voltage across the membrane (cis side negative, trans side positive) electrostatically pulls the single-stranded leader sequence into the pore first.
+3. **Motor protein** - as the leader threads in, the motor protein (on the other Y-arm) parks on top of the pore. It unzips the double strand and ratchets DNA through one base at a time. The squiggle starts being recorded.
 
-When DNA exits the pore → pore becomes free → next adapter+DNA captured. Stochastic process — at any moment only a fraction of channels are actively sequencing, so **effective throughput < theoretical channel count**.
+When DNA exits the pore, the pore becomes free and the next adapter+DNA is captured. This is a stochastic process - at any moment only a fraction of channels are actively sequencing, so **effective throughput is less than the theoretical channel count**.
 
-CSE framing: it's a queueing system. Tether = arrival-rate boost, voltage = the driving force, motor protein = service-rate cap.
+CSE framing: it is a queueing system. Tether = arrival-rate boost, voltage = the driving force, motor protein = service-rate cap.
 
-### 2.3 A–T / G–C pairing recap
+### 2.3 A-T / G-C base pairing
 
-DNA in nature is mostly a **double helix** — two complementary strands held together by base pairing:
+DNA in nature is mostly a **double helix** - two complementary strands held together by base pairing:
 
-- **A pairs with T** — adenine ↔ thymine (2 hydrogen bonds)
-- **G pairs with C** — guanine ↔ cytosine (3 hydrogen bonds)
+- **A pairs with T** - adenine and thymine (2 hydrogen bonds)
+- **G pairs with C** - guanine and cytosine (3 hydrogen bonds)
 
-If one strand reads `5'-ATGCGA-3'`, the other reads `3'-TACGCT-5'` — note the direction reverses (DNA strands run **antiparallel**).
+If one strand reads `5'-ATGCGA-3'`, the other reads `3'-TACGCT-5'` - note the direction reverses (DNA strands run **antiparallel**).
 
 Why this matters for nanopore:
 
-1. **The pore only fits one strand at a time.** Prep has to either separate the two strands (denaturation) or use adapters that let one strand thread through while the other comes along behind.
+1. **The pore only fits one strand at a time.** Prep uses the motor protein to unzip the double helix and feed a single strand through.
 2. **Prep enzymes recognize specific base-pair patterns** (the motor protein, ligases, polymerases all depend on predictable A-T/G-C chemistry).
-3. **GC-rich regions are harder to denature** (3 H-bonds vs 2). This causes small accuracy dips in GC-rich stretches of the genome.
+3. **GC-rich regions are harder to separate** (3 H-bonds vs 2). This causes small accuracy dips in GC-rich stretches of the genome.
 
 ### 2.4 MinION, PromethION (and GridION)
 
@@ -276,73 +252,75 @@ Same chemistry, three product scales from ONT:
 
 | Device | Channels / flow cell | Output / run | Form factor | Use case |
 |---|---|---|---|---|
-| **MinION** | ~512 | ~10–30 GB | USB stick, ~$1k | Field work, small experiments |
-| **GridION** | 5 × MinION flow cells | ~150 GB | Desktop box | Lab-scale parallel |
-| **PromethION** | ~3,000 × 24–48 flow cells | up to ~10 TB | Rack-mount, ~$100k+ | Production / clinical |
+| **MinION** | ~512 | ~10-30 GB | USB stick, ~$1k | Field work, small experiments |
+| **GridION** | 5 x MinION flow cells | ~150 GB | Desktop box | Lab-scale parallel |
+| **PromethION** | ~3,000 x 24-48 flow cells | up to ~10 TB | Rack-mount, ~$100k+ | Production / clinical |
 
-Project-relevant: most public nanopore datasets we'll use come from MinION or PromethION runs.
+Project-relevant: most public nanopore datasets we will use come from MinION or PromethION runs.
 
 ### 2.5 AMR, MBR (terms used in prep / context)
 
-- **AMR = Antimicrobial Resistance.** Bacteria/fungi/parasites evolving resistance to drugs that used to kill them. WHO ranks AMR among the top 10 global health threats. *This is the clinical reason nanopore + Kraken-2 matters — fast identification of resistant strains at the point of care.* Topic 5 goes deeper.
-- **MBR** — *unclear what mam specifically meant*. Most likely "**Multi-drug Bacterial Resistance**" (informal, related to MDR — multidrug resistance). Could also refer to a specific resistance-gene database or a kit name. **To clarify with mam at the 2026-05-17 meeting.**
+- **AMR = Antimicrobial Resistance.** Bacteria/fungi/parasites evolving resistance to drugs that used to kill them. WHO ranks AMR among the top 10 global health threats. This is the clinical reason nanopore + Kraken-2 matters - fast identification of resistant strains at the point of care. Section 5 goes deeper.
+- **MBR** - still unclear what mam specifically meant. Most likely "Multi-drug Bacterial Resistance" (informal, related to MDR - multidrug resistance). Could also refer to a specific resistance-gene database or a kit name. **To clarify with mam at the 2026-05-18 meeting.**
 
 ---
 
 ## 3. Basecalling
 
-### 3.0 Basecalling as a Machine Learning problem (framing)
+Basecalling is the computational core of the pipeline. It takes the raw electrical signal from POD-5 and produces the ATGC strings that everything downstream depends on. This section covers the problem framing, the neural network architecture, and the signal-processing ideas behind it - the parts most relevant from a CSE perspective.
+
+### 3.0 Basecalling as a machine learning problem
 
 **Input/output:**
 
 ```
 INPUT  : current(t) — 1-D time-series of float values, sampled ~4 kHz,
-         length 10⁴ to 10⁷ samples per read
-OUTPUT : ATGC string, variable length 10² to 10⁵ bases per read
+         length 10^4 to 10^7 samples per read
+OUTPUT : ATGC string, variable length 10^2 to 10^5 bases per read
 ```
 
 This is a **sequence-to-sequence** problem with three structural challenges:
-1. **Variable-length input** — every read is a different number of samples.
-2. **Variable-length output** — every read produces a different number of bases.
-3. **No fixed input-to-output alignment** — DNA moves through the pore unevenly; one base might span 10 samples, the next 100. No constant "samples per base" ratio.
+1. **Variable-length input** - every read is a different number of samples.
+2. **Variable-length output** - every read produces a different number of bases.
+3. **No fixed input-to-output alignment** - DNA moves through the pore unevenly; one base might span 10 samples, the next 100. There is no constant "samples per base" ratio.
 
-This is structurally **almost identical to speech-to-text** (audio waveform → words). Modern basecallers borrow directly from speech-recognition architectures. *Useful mental model: nanopore basecalling = speech recognition for DNA.*
+This is structurally **almost identical to speech-to-text** (audio waveform -> words). Modern basecallers borrow directly from speech-recognition architectures. *Useful mental model: nanopore basecalling = speech recognition for DNA.*
 
-**Why it's hard:**
-- No fixed alignment → need an algorithm that learns segmentation + classification jointly. This is what **CTC loss** (Connectionist Temporal Classification) solves — same idea as DeepSpeech.
-- Each signal moment encodes a **6-mer context** (Topic 1), so the network has to deconvolve overlapping windows.
+**Why it is hard:**
+- No fixed alignment - need an algorithm that learns segmentation + classification jointly. This is what **CTC loss** (Connectionist Temporal Classification) solves - same idea as DeepSpeech.
+- Each signal moment encodes a **6-mer context** (Section 1), so the network has to deconvolve overlapping windows.
 - Noise: pore wear, ionic fluctuations, modified bases (methylation), pore-to-pore variability.
-- Scale: a single PromethION run = up to ~100 TB of signal; real-time inference during the run is the target.
+- Scale: a single PromethION run can generate up to ~100 TB of signal; real-time inference during the run is the target.
 
 **Training:**
-Labeled data comes from running samples with **known sequences** (from Sanger or synthetic constructs) through the device, producing `(squiggle, known_sequence)` pairs. Modern training sets contain millions of such pairs across species and pore chemistries. Training is offline, expensive, GPU-cluster scale.
+Labeled data comes from running samples with **known sequences** (from Sanger sequencing or synthetic constructs) through the device, producing `(squiggle, known_sequence)` pairs. Modern training sets contain millions of such pairs across species and pore chemistries. Training is offline, expensive, and GPU-cluster scale.
 
 **Where inference runs:**
-- **GPU-first.** Dorado is GPU-native; CPU fallback exists but is 10–100× slower.
-- A modern NVIDIA GPU (A100, H100) basecalls a PromethION run in hours; without GPU, days-to-weeks.
-- This is the surface where **`perf` + Nsight profiling** matters (Exp-3, Kolin sir's mail) — SM utilization, memory bandwidth, kernel occupancy.
+- **GPU-first.** Dorado is GPU-native; a CPU fallback exists but is 10-100x slower.
+- A modern NVIDIA GPU (A100, H100) basecalls a PromethION run in hours; without GPU it takes days to weeks.
+- This is the surface where **`perf` + Nsight profiling** matters (Exp-3, Kolin sir's mail) - SM utilization, memory bandwidth, kernel occupancy.
 
-**One-line summary:** Basecalling is real-time speech recognition for DNA, running on GPU, where the "speaker" is a noisy nanopore and the "language" is ATGC.
+**One-line summary:** basecalling is real-time speech recognition for DNA, running on GPU, where the "speaker" is a noisy nanopore and the "language" is ATGC.
 
-### 3.1 Dorado, Guppy, Bonito — what each is
+### 3.1 Dorado, Guppy, Bonito - what each is
 
 Three basecallers from ONT, different generations:
 
-**Bonito** — open-source research basecaller, started ~2019.
+**Bonito** - open-source research basecaller, started ~2019.
 - First to use deep learning (CNN + LSTM + CTC) for basecalling, replacing the older HMM-based methods.
-- Proof-of-concept that DL beats HMM. Still maintained but mainly for research/experimentation.
-- Python, PyTorch, hackable — good for academic experiments.
+- Proof-of-concept that deep learning beats HMM. Still maintained but mainly for research/experimentation.
+- Python, PyTorch, hackable - good for academic experiments.
 - GitHub: `nanoporetech/bonito`.
 
-**Guppy** — legacy production basecaller (~2017–2023).
+**Guppy** - legacy production basecaller (~2017-2023).
 - Closed-source binary distribution.
-- Evolved from HMM → CNN+RNN+CTC over the years.
+- Evolved from HMM to CNN+RNN+CTC over the years.
 - Model flavors: **fast** / **hac** (high accuracy) / **sup** (super accuracy).
-- **Deprecated** — being replaced by Dorado.
+- **Deprecated** - being replaced by Dorado.
 
-**Dorado** — current production basecaller (~2022 onward), the one we'll use.
+**Dorado** - current production basecaller (~2022 onward), the one we will use.
 - Open source (MPL), C++ with PyTorch under the hood.
-- Modern architecture — **transformer-based** (different from CNN+RNN of older tools).
+- Modern architecture - **transformer-based** (different from the CNN+RNN of older tools).
 - Supports:
   - **Simplex** basecalling (one strand at a time, normal mode)
   - **Duplex** basecalling (combine both strands of a fragment for higher accuracy)
@@ -357,46 +335,48 @@ Three basecallers from ONT, different generations:
 | Guppy | Deprecated | Closed | CNN + RNN + CTC | CUDA, CPU |
 | Dorado | Current production | Open (MPL) | Transformer-based | CUDA, Metal |
 
-**For our experiments:** Dorado is the default. We'll benchmark one of its models (likely **hac** or **sup**) for speed + accuracy.
+**For our experiments:** Dorado is the default. We will benchmark one of its models (likely **hac** or **sup**) for speed + accuracy.
 
-### 3.2 Neural network: squiggle → ATGC
+### 3.2 Neural network: squiggle to ATGC
 
 The inside of a modern basecaller, viewed as a 5-stage pipeline:
 
-**Stage 1 — Input normalization**
+**Stage 1 - Input normalization**
 - Raw signal arrives as int16 values from the ADC; convert to picoamperes using per-channel calibration (scale + offset stored in POD-5).
 - Optionally normalize per-read (median, MAD scaling) to reduce pore-to-pore variability.
+- CSE analogy: this is like normalizing audio volume before feeding it to a speech recognizer.
 
-**Stage 2 — CNN feature extractor (front-end)**
-- A stack of **1-D convolutional layers** (typically 3–5 layers) with `stride > 1`.
-- Job: downsample the time axis. Raw signal is at ~4 kHz; bases occur at ~400 Hz (≈10 samples/base average). The conv layers crunch 10⁴–10⁷ samples down to a manageable 10²–10⁵ feature vectors.
+**Stage 2 - CNN feature extractor (front-end)**
+- A stack of **1-D convolutional layers** (typically 3-5 layers) with `stride > 1`.
+- Job: downsample the time axis. Raw signal is at ~4 kHz; bases occur at ~400 Hz (approximately 10 samples/base on average). The conv layers compress 10^4-10^7 samples down to a manageable 10^2-10^5 feature vectors.
 - Each conv layer learns local patterns: signal-level transitions, plateau shapes, slope features.
 - **Output**: a sequence of d-dimensional embedding vectors at the lower rate.
+- CSE analogy: this is the same role as a mel-spectrogram front-end in audio processing - it compresses redundant raw samples into informative feature vectors.
 
-**Stage 3 — Sequence backbone (RNN or Transformer)**
-- Captures context across time. Why needed: each base's signature depends on neighboring 6-mers and on motor-protein pause patterns.
+**Stage 3 - Sequence backbone (RNN or Transformer)**
+- Captures context across time. Needed because each base's signature depends on neighboring 6-mers and on motor-protein pause patterns.
 - **Older models** (Bonito, early Guppy): bidirectional LSTM.
 - **Modern Dorado**: **Transformer**.
-  - Better parallelism (no recurrence) → faster GPU inference.
-  - Better long-range context handling.
+  - Better parallelism (no recurrence) - faster GPU inference.
+  - Better long-range context handling via self-attention.
 - **Output**: another sequence of d-dim embeddings, now context-aware.
 
-**Stage 4 — Output projection**
+**Stage 4 - Output projection**
 - Linear layer projects each time-step embedding to a vocabulary of labels.
 - Vocab = `{A, T, G, C, blank}` for standard CTC basecalling.
 - **Output**: at each time step, a probability distribution over the label vocabulary.
 
-**Stage 5 — CTC decoding**
-- The output is a `T × V` matrix (`T` time-steps × `V` labels).
-- CTC algorithm: find the most likely *output sequence* by considering all possible alignments (which time-steps emit which letter, with `blank` handling "no base emitted yet").
+**Stage 5 - CTC decoding**
+- The output is a `T x V` matrix (`T` time-steps x `V` labels).
+- CTC algorithm: find the most likely *output sequence* by considering all possible alignments (which time-steps emit which letter, with `blank` handling "no base emitted yet"). The `blank` token is CTC's way of saying "still in the middle of the previous base, don't emit yet" - it handles the variable-duration problem.
 - Two decoding modes:
-  - **Greedy** — pick argmax at each step; fast, less accurate.
-  - **Beam search** — explore top-K hypotheses; slower, higher accuracy. The `sup` models use this.
+  - **Greedy** - pick argmax at each step; fast, less accurate.
+  - **Beam search** - explore top-K hypotheses; slower, higher accuracy. The `sup` models use this.
 
 **Full pipeline:**
 
 ```
-raw signal (int16, ~10⁶ samples)
+raw signal (int16, ~10^6 samples)
         │
         ▼
   normalize → float
@@ -405,79 +385,79 @@ raw signal (int16, ~10⁶ samples)
   CNN front-end (stride>1, downsample)
         │
         ▼
-  embedding sequence (e.g., 10⁴ × 512-d)
+  embedding sequence (e.g., 10^4 × 512-d)
         │
         ▼
   Transformer backbone (context mixing)
         │
         ▼
-  context-aware embeddings (10⁴ × 512-d)
+  context-aware embeddings (10^4 × 512-d)
         │
         ▼
   linear projection
         │
         ▼
-  label probs (10⁴ × 5)   [A, T, G, C, blank]
+  label probs (10^4 × 5)   [A, T, G, C, blank]
         │
         ▼
   CTC decoding (greedy / beam search)
         │
         ▼
-  ATGC string (~10³ bases)
+  ATGC string (~10^3 bases)
 ```
 
 **Model sizes:**
-- `fast`: ~10⁷ parameters
-- `hac`: ~5×10⁷ parameters
-- `sup`: ~10⁸+ parameters, beam search at inference
+- `fast`: ~10^7 parameters
+- `hac`: ~5x10^7 parameters
+- `sup`: ~10^8+ parameters, beam search at inference
 
 Tradeoff: bigger = more accurate, slower, more GPU memory.
 
 **Where the bottleneck is (relevant for Nsight profiling, Exp-3):**
-- **Memory bandwidth** — loading weights for each batch.
-- **SM occupancy** — keeping all GPU compute units busy.
+- **Memory bandwidth** - loading weights for each batch is the dominant cost; modern inference is bandwidth-bound, not compute-bound.
+- **SM occupancy** - keeping all GPU streaming multiprocessors busy.
 - **KV-cache** for transformer attention is memory-heavy.
 - **Mixed precision** (FP16 / BF16) is standard for inference.
-- These are exactly the metrics you'll be probing with Nsight Compute / Nsight Systems.
+- These are exactly the metrics you will probe with Nsight Compute / Nsight Systems.
 
-### 3.3 Signal compression — vector quantization, Shannon source coding, Euclidean vectors
+### 3.3 Signal compression - vector quantization, Shannon source coding, Euclidean vectors
 
-This is what mam called the "signal compression angle." Three signal-processing / information-theory ideas that show up inside modern basecallers.
+This is what mam called the "signal compression angle." Three signal-processing and information-theory ideas that appear inside modern basecallers.
 
 **Vector Quantization (VQ)**
 
 - **Concept**: take a continuous-valued vector and **snap it to the nearest entry in a discrete codebook** of representative vectors. The codebook is learned to minimize reconstruction error.
 - **Where used**: in modern neural codecs (VQ-VAE, SoundStream, EnCodec), continuous embeddings get quantized into discrete codes.
 - **In basecalling**:
-  - The NN's internal embeddings live in continuous ℝᵈ.
-  - VQ can discretize these → cleaner state representations → easier to map to discrete base outputs.
-  - Also used for signal compression — store/transmit fewer bits per time-step.
+  - The network's internal embeddings live in continuous R^d.
+  - VQ can discretize these into cleaner state representations, making it easier to map to discrete base outputs.
+  - Also used for signal compression - store/transmit fewer bits per time-step.
 
 **Shannon Source Coding**
 
-- **Concept**: Shannon's source coding theorem — any source can be losslessly compressed to its entropy H(X), and no further.
+- **Concept**: Shannon's source coding theorem - any source can be losslessly compressed to its entropy H(X), and no further.
 - **Connection to basecalling**:
-  - The nanopore signal has heavy redundancy — consecutive 6-mer windows share 5 of 6 bases, so the signal stream is highly correlated.
-  - Raw signal: ~4 kHz × 16 bits = **64 kbps** of raw data.
-  - Actual information rate: ~400 bp/sec × 2 bits/base = **~800 bps**.
-  - So there's an information-theoretic ceiling: the signal is ~80× redundant. POD-5 compression and downstream representations exploit this.
+  - The nanopore signal has heavy redundancy - consecutive 6-mer windows share 5 of 6 bases, so the signal stream is highly correlated.
+  - Raw signal: ~4 kHz x 16 bits = **64 kbps** of raw data.
+  - Actual information rate: ~400 bp/sec x 2 bits/base = **~800 bps**.
+  - So there is an information-theoretic ceiling: the signal is ~80x redundant. POD-5 compression and downstream representations exploit this.
 
 **Euclidean Vector Representation**
 
-- **Concept**: represent each k-mer (or signal context) as a fixed-dim vector in ℝᵈ, where similar contexts are close in Euclidean distance. The classic "embedding" idea.
+- **Concept**: represent each k-mer (or signal context) as a fixed-dim vector in R^d, where similar contexts are close in Euclidean distance. The classic "embedding" idea familiar from NLP.
 - **In basecalling**:
-  - The NN's intermediate embeddings ARE Euclidean vectors.
-  - The output projection acts as nearest-codeword classification — each output class is an "anchor" vector in embedding space.
+  - The network's intermediate embeddings are Euclidean vectors.
+  - The output projection acts as nearest-codeword classification - each output class is an "anchor" vector in embedding space.
   - Euclidean distance is the natural similarity measure here: two 6-mers with similar current values should map to nearby embeddings.
 
-**How the three fit together — the basecaller as a lossy compressor:**
+**How the three fit together - the basecaller as a lossy compressor:**
 
 ```
 raw signal              (high entropy, 64 kbps, noisy)
    │
    │  CNN front-end → lossy compression to embeddings
    ▼
-embeddings              (Euclidean vectors, ℝ^512 per step)
+embeddings              (Euclidean vectors, R^512 per step)
    │
    │  Transformer → context mixing in Euclidean space
    ▼
@@ -492,19 +472,21 @@ label distribution     (discrete, 5 classes)
 ATGC string            (discrete, ~800 bps — close to information floor)
 ```
 
-The journey: **continuous noisy signal → information-bounded discrete sequence**. Vector quantization is the bridge between continuous embeddings and discrete output. Shannon source coding bounds how much compression is theoretically possible. Euclidean vectors are the language the NN thinks in.
+The journey is: **continuous noisy signal to information-bounded discrete sequence**. Vector quantization is the bridge between continuous embeddings and discrete output. Shannon source coding bounds how much compression is theoretically possible. Euclidean vectors are the language the network thinks in.
 
 ---
 
 ## 4. Kraken-2
 
-### 4.1 K-mer hashing → species identification
+With basecalling done, we have ATGC reads. The next problem is: which species did these reads come from? That is taxonomic classification, and Kraken-2 is the tool that does it. This section covers how it works and why its memory footprint is the bottleneck our research targets.
+
+### 4.1 K-mer hashing to species identification
 
 **The problem Kraken-2 solves:**
-Given a read (ATGC string, length ~10²–10⁵), figure out **which species it came from**. This is *taxonomic classification*.
+Given a read (ATGC string, length ~10^2-10^5), figure out **which species it came from**. This is *taxonomic classification*.
 
-**The naive approach (don't):**
-Align each read against every known reference genome and pick the best match. With ~10⁵ reference genomes and ~10⁶ reads per sample, you're looking at billions of alignments — computationally hopeless.
+**The naive approach (do not use):**
+Align each read against every known reference genome and pick the best match. With ~10^5 reference genomes and ~10^6 reads per sample, you are looking at billions of alignments - computationally hopeless.
 
 **Kraken-2's approach: k-mer matching against a precomputed index.**
 
@@ -528,18 +510,18 @@ read: ATCGATCGATCGATCG...   (length 1000)
 
 **Why k-mers work:**
 - Two reads from the **same organism** share many k-mers.
-- Two reads from **different organisms** share very few k-mers — random-chance overlap is ~4⁻³⁵ ≈ 10⁻²¹ per k-mer.
+- Two reads from **different organisms** share very few k-mers - random-chance overlap is ~4^-35 per k-mer, which is negligibly small.
 - So k-mer overlap is a very strong species signal.
 
 **The index (database):**
 - Built once from reference genomes (RefSeq, GTDB, etc.).
-- Maps `k-mer → LCA (Lowest Common Ancestor) in NCBI taxonomy`.
-- **LCA logic**: if a k-mer appears in both *E. coli* and *Shigella* (close relatives), it maps to their common ancestor (genus level), not to either species. Reads with such k-mers get classified at the genus level — this avoids overconfident false species calls.
+- Maps `k-mer -> LCA (Lowest Common Ancestor) in NCBI taxonomy`.
+- **LCA logic**: if a k-mer appears in both *E. coli* and *Shigella* (close relatives), it maps to their common ancestor (genus level), not to either species. Reads with such k-mers get classified at the genus level - this avoids overconfident false species calls. Think of it as a conservative disambiguation strategy.
 
-**Hashing scheme — minimizers (Kraken-2's key optimization):**
+**Hashing scheme - minimizers (Kraken-2's key optimization):**
 - Naive: store every k-mer in a giant hash table. Too big.
 - **Minimizer trick**: for each window of `L` consecutive k-mers, store only the lexicographically smallest k-mer of the window (the "minimizer"). At query time, compute the minimizer for each window of the read and look it up.
-- Result: ~10× DB shrinkage with minimal accuracy loss. (Default `k=35`, `m=31` — minimizer is a 31-mer inside each 35-mer window.)
+- Result: ~10x DB shrinkage with minimal accuracy loss. (Default `k=35`, `m=31` - minimizer is a 31-mer inside each 35-mer window.)
 
 **Output:**
 - Per-read classification (taxon ID + confidence)
@@ -550,67 +532,67 @@ read: ATCGATCGATCGATCG...   (length 1000)
 
 The Kraken-2 **standard database is ~180 GB** loaded in memory. The size math:
 
-- ~10⁵ reference genomes × ~10⁶ bp/genome ≈ **10¹¹ bp** of reference sequence.
-- Unique k-mers extracted (k=35, with minimizers, m=31) ≈ **10¹⁰ entries**.
-- Each entry: hash + taxon ID ≈ **8 bytes**.
-- Total: hash table + auxiliary tables (LCA tree, taxonomy nodes) → **~180 GB**.
+- ~10^5 reference genomes x ~10^6 bp/genome = approximately **10^11 bp** of reference sequence.
+- Unique k-mers extracted (k=35, with minimizers, m=31) = approximately **10^10 entries**.
+- Each entry: hash + taxon ID = approximately **8 bytes**.
+- Total: hash table + auxiliary tables (LCA tree, taxonomy nodes) = **~180 GB**.
 
 **Why the size is a problem:**
-- Doesn't fit in RAM on most laptops/workstations (typical 16–64 GB).
-- **Kraken-2 loads the entire DB into memory at startup** — there's no on-disk fallback for the hot lookup path. So if you can't fit it, you can't run it (at least not with the standard DB).
+- Does not fit in RAM on most laptops/workstations (typical 16-64 GB).
+- **Kraken-2 loads the entire DB into memory at startup** - there is no on-disk fallback for the hot lookup path. If you cannot fit it, you cannot run it (at least not with the standard DB).
 - For **point-of-care clinical use** (e.g., a device in a hospital triage room), 180 GB is a non-starter.
-- For **cloud deployment**, the per-instance memory is expensive.
-- For **field / outbreak response** in low-resource settings, completely impractical.
+- For **cloud deployment**, the per-instance memory cost is significant.
+- For **field / outbreak response** in low-resource settings, it is completely impractical.
 
 **Practical reduction target (from meeting 2):**
-Kraken-2 has a built-in utility (`kraken2-build`) to build a custom DB from any subset of reference genomes. By restricting to ESKAPE pathogen sequences only, the DB can be brought down to **8–16 GB** — fitting in Colab or a standard workstation. Accuracy vs size trade-off must be measured.
+Kraken-2 has a built-in utility (`kraken2-build`) to build a custom DB from any subset of reference genomes. By restricting to ESKAPE pathogen sequences only, the DB can be brought down to **8-16 GB** - fitting in Colab or a standard workstation. Accuracy vs size trade-off must be measured.
 
-This is why memory efficiency is the bottleneck — and your research angle.
+This is why memory efficiency is the bottleneck - and your research angle.
 
-### 4.3 Memory efficiency — **my research angle**
+### 4.3 Memory efficiency - my research angle
 
-**The question:** can we make Kraken-2 (or a Kraken-2-equivalent classifier) run in **<10 GB or even <1 GB of memory**, without giving up too much accuracy?
+**The question:** can we make Kraken-2 (or a Kraken-2-equivalent classifier) run in **less than 10 GB or even less than 1 GB of memory**, without giving up too much accuracy?
 
 **Approaches in the literature:**
 
 1. **Smaller k / smaller alphabet**
-   - Reduce k from 35 to e.g. 25 → smaller k-mer space, smaller DB.
+   - Reduce k from 35 to e.g. 25 - smaller k-mer space, smaller DB.
    - Cost: more collisions, lower specificity.
 
 2. **Better minimizer schemes**
    - Optimize the minimizer window size or hash function for tighter packing.
    - Research area: "universal hitting sets," "syncmers."
 
-3. **Approximate membership data structures** ← *strong candidate direction*
+3. **Approximate membership data structures** - strong candidate direction
    - Use a **Bloom filter** or **Cuckoo filter** instead of an exact hash table.
-   - Bloom: small false-positive rate, no false negatives, much smaller memory.
+   - Bloom filter: small false-positive rate, no false negatives, much smaller memory.
    - Research projects: **BIGSI**, **COBS**, **Bloom Filter Trie**.
-   - Tradeoff: false positives → spurious k-mer hits → noisier classification.
+   - Tradeoff: false positives cause spurious k-mer hits and noisier classification.
 
 4. **Hierarchical / compressed databases**
-   - **Centrifuge** uses an **FM-index** (compressed BWT) — smaller than Kraken-2's hash, slower lookups.
+   - **Centrifuge** uses an **FM-index** (compressed BWT) - smaller than Kraken-2's hash, slower lookups.
    - Kraken-uniq uses HyperLogLog counters for unique-k-mer counting.
 
 5. **Streaming / partial classification**
-   - Don't hold the full DB in RAM; stream queries against an on-disk index.
+   - Do not hold the full DB in RAM; stream queries against an on-disk index.
    - Trades latency for memory.
 
 6. **Learned indexes / neural classifiers**
-   - Replace the hash table with a neural net that maps k-mer → taxon.
-   - Active research; not yet production-quality but interesting angle.
+   - Replace the hash table with a neural network that maps k-mer -> taxon.
+   - Active research; not yet production-quality but an interesting direction.
 
 **Where you might land:**
-Pick one direction — probably **Bloom-filter-based** or **learned-index-based** — and benchmark on real nanopore data (Dorado-called reads). Metrics:
+Pick one direction - probably **Bloom-filter-based** or **learned-index-based** - and benchmark on real nanopore data (Dorado-called reads). Metrics:
 - Memory footprint (peak RSS)
 - Classification accuracy (precision/recall vs full-DB Kraken-2)
 - Query throughput (reads/sec)
 
 **Why nanopore data specifically helps your angle:**
-- Nanopore reads are **long** (10³–10⁵ bp), so each read contains many k-mers.
+- Nanopore reads are **long** (10^3-10^5 bp), so each read contains many k-mers.
 - Even a noisier (lower-recall) classifier can still get a confident species call by **majority voting across the k-mers in a single long read**.
-- This noise tolerance gives a smaller, lossier index room to work — which is the lever your research can pull on.
+- This noise tolerance gives a smaller, lossier index room to work - which is the lever your research can pull on.
 
-Exp-2 (Kraken-2 internals) + Exp-3 (end-to-end Dorado→Kraken benchmark) are the experimental scaffolding for this.
+Exp-2 (Kraken-2 internals) + Exp-3 (end-to-end Dorado to Kraken benchmark) are the experimental scaffolding for this.
 
 ---
 
@@ -620,45 +602,45 @@ Exp-2 (Kraken-2 internals) + Exp-3 (end-to-end Dorado→Kraken benchmark) are th
 
 ESKAPE is an acronym for six bacterial pathogens that are especially good at *escaping* the effects of antibiotics. WHO lists them as priority threats:
 
-- **E** — *Enterococcus faecium*
-- **S** — *Staphylococcus aureus* (MRSA is the famous resistant variant)
-- **K** — *Klebsiella pneumoniae*
-- **A** — *Acinetobacter baumannii*
-- **P** — *Pseudomonas aeruginosa*
-- **E** — *Enterobacter* species
+- **E** - *Enterococcus faecium*
+- **S** - *Staphylococcus aureus* (MRSA is the famous resistant variant)
+- **K** - *Klebsiella pneumoniae*
+- **A** - *Acinetobacter baumannii*
+- **P** - *Pseudomonas aeruginosa*
+- **E** - *Enterobacter* species
 
-They're common in hospital-acquired infections, have evolved resistance to most antibiotics, and leave doctors with few treatment options. They're the "headline" organisms our pipeline is built to identify quickly.
+They are common in hospital-acquired infections, have evolved resistance to most antibiotics, and leave doctors with few treatment options. They are the "headline" organisms our pipeline is built to identify quickly.
 
-### 5.2 AMR / MBR — why the crisis is growing
+### 5.2 AMR / MBR - why the crisis is growing
 
 **Drivers of AMR:**
 - Overuse of antibiotics in clinical settings.
 - Massive use in agriculture (livestock).
 - Antibiotic residues in the environment (wastewater).
-- **Horizontal gene transfer** — resistance genes spread between bacteria via plasmids, not just inherited; AMR can jump species.
+- **Horizontal gene transfer** - resistance genes spread between bacteria via plasmids, not just inherited; AMR can jump species.
 
 **Impact:**
 - WHO projection: AMR could cause **~10 million deaths/year by 2050** if unchecked.
 - Treating resistant infections costs thousands more per patient.
 - "Last-line" antibiotics like colistin are losing effectiveness.
 
-**MBR** — *still to be clarified with mam at the next meeting.* Most likely "Multi-drug Bacterial Resistance" (informal abbreviation, related to MDR). See open question flagged in §2.5.
+**MBR** - still to be clarified with mam at the next meeting. Most likely "Multi-drug Bacterial Resistance" (informal abbreviation, related to MDR). See open question flagged in section 2.5.
 
 ### 5.3 Kraken-2's role in detection
 
-**The clinical workflow we're building toward:**
+**The clinical workflow we are building toward:**
 
-1. Patient sample (blood, swab) → DNA extraction
-2. Nanopore sequencing → POD-5 raw signal
-3. **Dorado** basecalling → ATGC reads
-4. **Kraken-2** classification → which bacterial species are present
+1. Patient sample (blood, swab) - DNA extraction
+2. Nanopore sequencing - POD-5 raw signal
+3. **Dorado** basecalling - ATGC reads
+4. **Kraken-2** classification - which bacterial species are present
 5. (Parallel step: identify resistance genes via tools like **CARD** / **ResFinder**)
-6. Doctor gets: *"Patient has K. pneumoniae, resistant to carbapenems."*
+6. Doctor gets: "Patient has K. pneumoniae, resistant to carbapenems."
 7. Targeted antibiotic prescribed within **hours** instead of days.
 
 **Speed matters:**
-- Traditional culture-based ID takes **24–72 hours**.
-- Nanopore + Kraken-2 can do this in **1–4 hours**.
+- Traditional culture-based ID takes **24-72 hours**.
+- Nanopore + Kraken-2 can do this in **1-4 hours**.
 - For sepsis patients, faster ID = lives saved.
 
 **Why memory matters (research angle, again):**
@@ -671,19 +653,19 @@ They're common in hospital-acquired infections, have evolved resistance to most 
 
 ## 6. Experiments
 
-### Exp-2 — components
-- Study Kraken-2 internals — k-mer hashing
+### Exp-2 - components
+- Study Kraken-2 internals - k-mer hashing
 - Test basecalling models on available data; measure accuracy + inference time
 - Understand Dorado mechanics
 - CPU/GPU memory model
 
-### Exp-3 — end-to-end
+### Exp-3 - end-to-end
 - Dorado + Kraken end-to-end accuracy measurement
 - Profile with `perf` + Nsight (per Kolin sir's mail)
 
 ---
 
-## 7. Setup & Installation
+## 7. Setup and Installation
 
 ### 7.1 Installing Dorado on Windows
 
@@ -741,101 +723,111 @@ Model options: `fast` (quickest), `hac` (high accuracy, standard), `sup` (super 
 
 ---
 
-## 8. Kolin sir's Project — Caching Layer + Profiling
+## 8. Kolin sir's Project - Caching Layer + Profiling
 
 ### 8.0 The core idea
 
-Genomic pipelines (Dorado + Kraken-2) often process **repetitive sequences** — same species, same genomic regions, technical replicates. Right now, every read goes through the full expensive computation even if it's near-identical to something already processed.
+Genomic pipelines (Dorado + Kraken-2) often process **repetitive sequences** - same species, same genomic regions, technical replicates. Right now, every read goes through the full expensive computation even if it is near-identical to something already processed.
+
+Think of it as the classic "memoization" optimization in programming: if you have already computed the answer for an input, cache it and return immediately on the next call instead of recomputing from scratch. The challenge in the genomic context is that inputs are never exactly identical (noise), so the cache must support **approximate (fuzzy) matching**.
 
 **The fix:** build a **caching layer** at two points in the pipeline:
-1. **Signal-level cache** inside Dorado (GPU side) — cache basecalling results for signal windows
-2. **K-mer frequency cache** inside Kraken-2 (CPU side) — cache k-mer → taxon lookups for hot entries
+1. **Signal-level cache** inside Dorado (GPU side) - cache basecalling results for signal windows that are similar to previously seen ones
+2. **K-mer frequency cache** inside Kraken-2 (CPU side) - cache k-mer to taxon lookups for hot (frequently accessed) entries
 
 Cache hit = skip the expensive computation entirely. Cache miss = run normally and store the result.
 
-Once both caches exist, the next step is a **genomic-aware cache replacement policy** — smarter than generic LRU, tuned to how DNA reads repeat in clinical metagenomics datasets.
+Once both caches exist, the next step is a **genomic-aware cache replacement policy** - smarter than generic LRU, tuned to how DNA reads repeat in clinical metagenomics datasets.
 
 ---
 
-### 8.1 Project 1 — Kraken-2 CPU-side cache (Hot-K-mer LRU)
+### 8.1 Project 1 - Kraken-2 CPU-side cache (Hot-K-mer LRU)
 
 **The bottleneck:**
-Kraken-2's k-mer database is ~180 GB. It doesn't fit in RAM on most machines. Even the portion that is in RAM gets constantly evicted from L3 cache because the lookup pattern is random (hash table access = unpredictable memory addresses). Result: frequent **page faults** and **L3 cache misses** dominate runtime.
+Kraken-2's k-mer database is ~180 GB. It does not fit in RAM on most machines. Even the portion that is in RAM gets constantly evicted from L3 cache because the lookup pattern is random (hash table access = unpredictable memory addresses). Result: frequent **page faults** and **L3 cache misses** dominate runtime.
+
+From a systems perspective, this is the classic "random access to a large hash map" problem. The data structure is a hash table, which gives O(1) average lookup, but the random memory access pattern defeats hardware prefetching and cache locality - so practical throughput is much lower than the theoretical O(1) suggests.
 
 **The solution Kolin sir wants:**
-A **Hot-K-mer LRU cache** — identify the most frequently accessed k-mer → taxon ID entries and pin them in L3 cache (or locked physical memory). When a lookup hits the cache, skip the full hash table lookup entirely.
+A **Hot-K-mer LRU cache** - identify the most frequently accessed k-mer to taxon ID entries and pin them in L3 cache (or locked physical memory). When a lookup hits the cache, skip the full hash table lookup entirely.
+
+In clinical metagenomics, a single patient sample is dominated by one or two species (e.g., Pseudomonas aeruginosa). This means a small set of k-mers accounts for the majority of lookups - exactly the regime where a cache pays off. The "hot" k-mers are the ones belonging to the dominant species, and once they are cached the tail of cold lookups (rare k-mers) becomes a smaller fraction of total runtime.
 
 **Tech stack:**
-- **Intel TBB (Threading Building Blocks)** — library for lock-free, high-concurrency data structures. Multiple threads can query/update the cache simultaneously without blocking each other (no mutex locks).
-- **AVX-512 SIMD intrinsics** — batch 8–16 k-mer lookups into a single CPU instruction instead of one at a time. Amortizes memory latency across a vector width.
-- **ARM + NEON** — same caching logic ported to ARM processors (for edge/hospital devices that run on ARM chips). NEON is ARM's equivalent of AVX-512.
-- **Profiling tools:** VTune or `perf` — measure cache hit rate vs remaining I/O overhead to quantify the gain.
+- **Intel TBB (Threading Building Blocks)** - library for lock-free, high-concurrency data structures. Multiple threads can query/update the cache simultaneously without blocking each other (no mutex locks). Think of it as concurrent hash map with atomic operations instead of coarse-grained locking.
+- **AVX-512 SIMD intrinsics** - batch 8-16 k-mer lookups into a single CPU instruction instead of one at a time. This amortizes memory latency across a vector width - instead of issuing 16 separate loads, you issue one wide load and process all 16 in parallel.
+- **ARM + NEON** - same caching logic ported to ARM processors (for edge/hospital devices that run on ARM chips). NEON is ARM's equivalent of AVX-512.
+- **Profiling tools:** VTune or `perf` - measure cache hit rate vs remaining I/O overhead to quantify the gain.
 
-**Expected outcome:** measurable throughput gain on high-redundancy datasets (the exact regime in clinical metagenomics — same patient, same bacteria, many reads).
+**Expected outcome:** measurable throughput gain on high-redundancy datasets (the exact regime in clinical metagenomics - same patient, same bacteria, many reads).
 
 ---
 
-### 8.2 Project 2 — Dorado GPU-side cache (Signal-to-Base cache)
+### 8.2 Project 2 - Dorado GPU-side cache (Signal-to-Base cache)
 
 **The bottleneck:**
-Dorado runs a full Transformer forward pass for every signal window — even when the input signal is nearly identical to one it processed moments ago (same species, same genomic region). This is wasteful: you're burning GPU TFLOPs on computation whose answer you already have.
+Dorado runs a full Transformer forward pass for every signal window - even when the input signal is nearly identical to one it processed moments ago (same species, same genomic region). This is wasteful: you are burning GPU TFLOPs on computation whose answer you already have.
+
+This is structurally identical to the Kraken-2 problem, but on the GPU side and with an additional complication: signal windows are never *exactly* identical (electrical noise), so an **exact-match cache** would have a near-zero hit rate. The cache must support **approximate nearest-neighbor lookup**.
 
 **The solution Kolin sir wants:**
-A **Signal-to-Base (S2B) cache** in CUDA shared memory. Before sending a signal window through the NN, check: "have I seen something *similar* to this before?" If yes → return the cached basecall. If no → run the NN, store result in cache.
+A **Signal-to-Base (S2B) cache** in CUDA shared memory. Before sending a signal window through the neural network, check: "have I seen something *similar* to this before?" If yes - return the cached basecall. If no - run the network, store result in cache.
 
-**The key challenge:** signal windows are never *exactly* identical (noise), so you need **fuzzy matching**, not exact matching.
+**The key challenge:** signal windows are never exactly identical (noise), so you need **fuzzy matching**, not exact matching.
 
 **Tech stack:**
-- **LSH (Locality Sensitive Hashing)** — a hashing technique where *similar* input vectors hash to the *same bucket* with high probability. Allows fast approximate nearest-neighbour search on the GPU. Similar signals → same hash → cache hit.
-- **CUDA Shared Memory** — fast on-chip GPU memory (much faster than VRAM/global memory). The rolling cache buffer lives here for low-latency retrieval.
-- **NanoMambaNet** — the edge inference pipeline this cache will be deployed alongside (mentioned by Kolin sir).
+- **LSH (Locality Sensitive Hashing)** - a hashing technique where *similar* input vectors hash to the *same bucket* with high probability. Allows fast approximate nearest-neighbour search on the GPU. Similar signals hash to the same bucket, and that bucket is the cache key. This is the same family of techniques used in document similarity search and recommendation systems.
+- **CUDA Shared Memory** - fast on-chip GPU memory (much faster than VRAM/global memory). The rolling cache buffer lives here for low-latency retrieval. Shared memory is per-SM and has ~100 GB/s bandwidth vs ~2 TB/s for global VRAM for sequential access, but for small random lookups shared memory wins decisively.
+- **NanoMambaNet** - the edge inference pipeline this cache will be deployed alongside (mentioned by Kolin sir).
 
 **What needs to be measured (from the mail):**
 - Fraction of signal windows that fall within LSH collision threshold (i.e., cache-hit-able)
-- Accuracy vs speed trade-off curve — how much accuracy do you lose for how much speedup?
-- The "practical operating envelope" — at what level of read redundancy does the cache give net positive throughput?
+- Accuracy vs speed trade-off curve - how much accuracy do you lose for how much speedup?
+- The "practical operating envelope" - at what level of read redundancy does the cache give net positive throughput?
 
 ---
 
-### 8.3 Immediate deliverable — 2-page profile report
+### 8.3 Immediate deliverable - 2-page profile report
 
 **Deadline: ~2026-05-25** (2 weeks from first meeting on 2026-05-11)
 
 > *"The first step is to use tools like perf and Nsight and produce a 2-page profile report in the first 2 weeks or so."*
 
-You cannot design a cache without first knowing *where the time is actually going*. The profile report establishes the baseline — it answers: what are the bottlenecks, and how much headroom does a cache have to recover?
+You cannot design a cache without first knowing *where the time is actually going*. The profile report establishes the baseline - it answers: what are the bottlenecks, and how much headroom does a cache have to recover?
+
+The profiling workflow mirrors how any systems optimization project starts: measure first, then optimize. Do not guess where the bottleneck is.
 
 **Report needs to cover:**
 
 For **Dorado (Nsight):**
 - Which CUDA kernels dominate runtime (Transformer attention, conv layers, CTC decoding)?
-- Memory transfer overhead (CPU → GPU)?
-- SM (Streaming Multiprocessor) occupancy — are all GPU cores being used?
+- Memory transfer overhead (CPU to GPU)?
+- SM (Streaming Multiprocessor) occupancy - are all GPU cores being used?
 - Memory bandwidth saturation?
 
 For **Kraken-2 (perf):**
 - L3 cache miss rate on k-mer lookups
 - Memory bandwidth consumption
 - Hotspot functions (which lines of Kraken-2 code burn the most CPU time)
-- Page fault rate (disk → RAM transfers)
+- Page fault rate (disk to RAM transfers)
 
 ---
 
-### 8.4 Profiling setup — where and how to run
+### 8.4 Profiling setup - where and how to run
 
-**Why Google Colab won't work:**
-- `perf` needs root/kernel-level access — Colab doesn't give this
-- Nsight needs direct GPU access and GUI — not available on Colab
-- Kraken-2 standard DB is ~100 GB — won't fit in Colab storage
+**Why Google Colab will not work:**
+- `perf` needs root/kernel-level access - Colab does not give this
+- Nsight needs direct GPU access and GUI - not available on Colab
+- Kraken-2 standard DB is ~100 GB - will not fit in Colab storage
 
 **Options ranked:**
 
 | Option | Dorado (Nsight) | Kraken-2 (perf) | Notes |
 |---|---|---|---|
-| **WSL2 on your machine** | ✓ CUDA passthrough works | ✓ perf works | Best local option |
-| **Your Windows machine (native)** | ✓ Nsight works on Windows | ✗ perf is Linux-only | Partial |
-| **University HPC / lab server** | ✓ if NVIDIA GPU available | ✓ Linux + root | Ideal — ask mam/Kolin sir |
-| **Google Colab** | ✗ | ✗ | Not viable for profiling |
+| **WSL2 on your machine** | CUDA passthrough works | perf works | Best local option |
+| **Your Windows machine (native)** | Nsight works on Windows | perf is Linux-only | Partial |
+| **University HPC / lab server** | if NVIDIA GPU available | Linux + root | Ideal - ask mam/Kolin sir |
+| **Google Colab** | Not viable | Not viable | Not viable for profiling |
 
 **Best path:** Set up **WSL2** on your Windows machine. It gives a full Linux environment, your NVIDIA GPU passes through via CUDA, and both `perf` + Nsight work.
 
@@ -865,33 +857,33 @@ POD-5 data → Dorado (Nsight watching) → BAM reads → Kraken-2 (perf watchin
 
 ---
 
-### 8.5 Connection to the memory-efficiency research angle (KB §4.3)
+### 8.5 Connection to the memory-efficiency research angle (section 4.3)
 
-Both the research angle and Kolin sir's project target the same root problem — Kraken-2's random memory access pattern:
+Both the research angle and Kolin sir's project target the same root problem - Kraken-2's random memory access pattern:
 
-- **Research angle (§4.3):** reduce the DB size (Bloom filters, learned indexes) so more fits in RAM
-- **Kolin sir's project (§8.1):** keep the hot entries in L3 cache so frequent lookups skip RAM entirely
+- **Research angle (section 4.3):** reduce the DB size (Bloom filters, learned indexes) so more fits in RAM
+- **Kolin sir's project (section 8.1):** keep the hot entries in L3 cache so frequent lookups skip RAM entirely
 
-These are complementary, not competing. A smaller DB (from §4.3) + a hot cache (from §8.1) together could bring Kraken-2's memory footprint to a point where it's viable on edge hardware.
+These are complementary, not competing. A smaller DB (from section 4.3) + a hot cache (from section 8.1) together could bring Kraken-2's memory footprint to a point where it is viable on edge hardware. The profile report from section 8.3 gives the numbers that will tell us which lever - DB size or cache - gives the bigger gain for a given engineering effort.
 
 ---
 
-## 9. First Inference Run — 2026-05-16
+## 9. First Inference Run - 2026-05-16
 
 ### 9.1 Hardware specs (this machine)
 
 | Component | Spec | Implication for Dorado |
 |---|---|---|
-| GPU | NVIDIA GeForce GTX 1650 | 4 GB VRAM — tight for hac, too small for sup |
+| GPU | NVIDIA GeForce GTX 1650 | 4 GB VRAM - tight for hac, too small for sup |
 | RAM | 14 GB | ~10 GB free after Windows; 8 GB Kraken-2 DB is risky |
 | CPU | AMD Ryzen 7 5800H | 8 cores, good for Kraken-2 CPU work |
 | OS | Windows 11 | Dorado works natively; perf needs WSL2 |
 
-**Key takeaway:** GTX 1650 can run Dorado `fast` and `hac` (with reduced batch size), but `sup` is likely OOM. For Kraken-2 with the reduced ESKAPE DB (8–16 GB), Colab is safer than local RAM.
+**Key takeaway:** GTX 1650 can run Dorado `fast` and `hac` (with reduced batch size), but `sup` is likely OOM. For Kraken-2 with the reduced ESKAPE DB (8-16 GB), Colab is safer than local RAM.
 
 ---
 
-### 9.2 The POD-5 file — metadata
+### 9.2 The POD-5 file - metadata
 
 Inspected using the `pod5` Python library:
 
@@ -908,10 +900,10 @@ with pod5.Reader('file.pod5') as r:
 
 | Field | Value | What it means |
 |---|---|---|
-| Flow cell | FLO-MIN114 | MinION with R10.4.1 pores — latest chemistry |
-| Sequencing kit | SQK-NBD114-24 | Native Barcoding Kit, 24 barcodes — **data is multiplexed** |
+| Flow cell | FLO-MIN114 | MinION with R10.4.1 pores - latest chemistry |
+| Sequencing kit | SQK-NBD114-24 | Native Barcoding Kit, 24 barcodes - **data is multiplexed** |
 | Experiment | AIIMS_Shreshtha_1_301025 | Real clinical data from AIIMS (All India Institute of Medical Sciences) |
-| Sample rate | 5000 Hz | 5kHz — newer chemistry, Dorado auto-selects 5kHz models |
+| Sample rate | 5000 Hz | 5kHz - newer chemistry, Dorado auto-selects 5kHz models |
 | Total reads | 104,478 | Substantial dataset across all barcodes |
 
 **Model Dorado auto-selected:** `dna_r10.4.1_e8.2_400bps_hac@v5.2.0`
@@ -922,7 +914,7 @@ with pod5.Reader('file.pod5') as r:
 
 **What barcoding means:**
 
-The SQK-NBD114-24 kit allows up to 24 different DNA samples to be loaded into a single flow cell run — each sample gets a unique short DNA tag (a "barcode") attached to its adapters. All samples sequence together and get separated ("demultiplexed") computationally afterward.
+The SQK-NBD114-24 kit allows up to 24 different DNA samples to be loaded into a single flow cell run - each sample gets a unique short DNA tag (a "barcode") attached to its adapters. All samples sequence together and get separated ("demultiplexed") computationally afterward.
 
 In clinical terms: one MinION run = up to 24 patient samples simultaneously. Cost-efficient for hospital settings.
 
@@ -945,15 +937,15 @@ In our run, `unclassified` (3.9 MB) was bigger than any individual barcode. Reas
 - Reads too short for confident barcode detection
 - Degraded barcode sequence (pore damage, sample quality)
 - Some samples had very few reads (barcodes 07, 11 only 128K)
-- `fast` mode basecalling is less accurate → more uncertain barcode calls
+- `fast` mode basecalling is less accurate, leading to more uncertain barcode calls
 
-Running `hac` mode should reduce the unclassified fraction because better basecalling → more confident barcode detection.
+Running `hac` mode should reduce the unclassified fraction because better basecalling leads to more confident barcode detection.
 
 ---
 
-### 9.4 Dorado inference results — fast vs hac
+### 9.4 Dorado inference results - fast vs hac
 
-**fast mode — completed successfully**
+**fast mode - completed successfully**
 
 Command:
 ```powershell
@@ -971,24 +963,24 @@ Result: completed quickly, all 12 barcodes + unclassified produced.
 | barcode12 | 0 (empty) |
 | unclassified | 3.9 MB |
 
-**hac mode — needs forced batch size**
+**hac mode - needs forced batch size**
 
 Default run (auto batch size): Dorado benchmarks the GPU to find optimal batch size. On GTX 1650 with 4 GB VRAM, this process OOM-crashed during benchmarking.
 
-Fix — force a small batch size:
+Fix - force a small batch size:
 ```powershell
 dorado.exe basecaller hac data.pod5 --kit-name SQK-NBD114-24 --output-dir results/hac --batchsize 16
 ```
 
 With `--batchsize 16`, Dorado settled on `chunk size 9996, batch size 64` and started processing. Slower than fast but fits in VRAM.
 
-**sup mode** — not attempted yet. Expected to OOM even with reduced batch size on 4 GB VRAM.
+**sup mode** - not attempted yet. Expected to OOM even with reduced batch size on 4 GB VRAM.
 
 ---
 
 ### 9.5 What the BAM output contains
 
-Each BAM file contains the basecalled reads for one barcode — the ATGC sequences Dorado decoded from the raw signal. BAM is a compressed binary format; to view/work with it you need `samtools`.
+Each BAM file contains the basecalled reads for one barcode - the ATGC sequences Dorado decoded from the raw signal. BAM is a compressed binary format; to view/work with it you need `samtools`.
 
 Pipeline position:
 ```
@@ -1005,36 +997,36 @@ Next step: feed the per-barcode BAM files into Kraken-2 to identify which ESKAPE
 
 ---
 
-### 9.5 fast vs hac — comparison
+### 9.6 fast vs hac - comparison
 
 Both modes ran on the same 104,478-read POD-5 file. Key results:
 
 | Metric | fast | hac |
 |---|---|---|
-| Time | ~4–5 minutes | ~60+ minutes |
+| Time | ~4-5 minutes | ~60+ minutes |
 | GPU batch size | auto | forced `--batchsize 16` (4 GB VRAM) |
 | unclassified reads | 6.5 MB | 896 KB |
 | barcode02 | 2.0 MB | 384 KB |
 
-**Most important finding:** unclassified dropped from 6.5 MB → 896 KB in hac mode. Better basecalling = more confident barcode detection = far fewer reads left unassigned. The per-barcode BAMs are smaller in hac not because there are fewer reads, but because the quality filtering is stricter — only high-confidence reads pass.
+**Most important finding:** unclassified dropped from 6.5 MB to 896 KB in hac mode. Better basecalling = more confident barcode detection = far fewer reads left unassigned. The per-barcode BAMs are smaller in hac not because there are fewer reads, but because the quality filtering is stricter - only high-confidence reads pass.
 
-**sup mode:** not attempted — expected OOM on GTX 1650 (4 GB VRAM).
+**sup mode:** not attempted - expected OOM on GTX 1650 (4 GB VRAM).
 
 ---
 
-## 10. Kraken-2 — First Classification Run (Google Colab)
+## 10. Kraken-2 - First Classification Run (Google Colab)
 
 ### 10.0 Why Colab for Kraken-2
 
-Kraken-2 is Linux-only. Running it locally on Windows requires WSL2 (not set up yet). Colab gives a free Linux VM with ~12 GB RAM — enough for our small custom DB. The standard 180 GB DB would not fit, but our ESKAPE-only DB at 650 MB fits easily.
+Kraken-2 is Linux-only. Running it locally on Windows requires WSL2 (not set up yet). Colab gives a free Linux VM with ~12 GB RAM - enough for our small custom DB. The standard 180 GB DB would not fit, but our ESKAPE-only DB at 650 MB fits easily.
 
 ---
 
 ### 10.1 Setting up Colab environment
 
-**Step 1 — Install condacolab**
+**Step 1 - Install condacolab**
 
-Colab uses pip by default and doesn't have conda/mamba. `condacolab` installs mamba on the Colab VM:
+Colab uses pip by default and does not have conda/mamba. `condacolab` installs mamba on the Colab VM:
 
 ```python
 !pip install condacolab -q
@@ -1044,7 +1036,7 @@ condacolab.install()   # runtime restarts automatically after this — normal
 
 **Important:** after `condacolab.install()` the runtime restarts. Any variables or installations from before the restart are wiped. Always run install cells *after* the restart, not before.
 
-**Step 2 — Fix Python pin conflict and install tools**
+**Step 2 - Fix Python pin conflict and install tools**
 
 Colab has a Python version pin file that conflicts with mamba. Remove it first:
 
@@ -1053,9 +1045,9 @@ Colab has a Python version pin file that conflicts with mamba. Remove it first:
 !mamba install -c bioconda -c conda-forge kraken2 samtools -y -q
 ```
 
-- `rm -f /usr/local/conda-meta/pinned` — deletes the conflicting pin file (harmless)
-- `mamba install -c bioconda -c conda-forge kraken2 samtools` — installs both tools from bioconda (bioinformatics conda channel)
-- `-y` — auto-confirm, `-q` — quiet mode
+- `rm -f /usr/local/conda-meta/pinned` - deletes the conflicting pin file (harmless)
+- `mamba install -c bioconda -c conda-forge kraken2 samtools` - installs both tools from bioconda (bioinformatics conda channel)
+- `-y` - auto-confirm, `-q` - quiet mode
 
 **Verify:**
 ```python
@@ -1086,8 +1078,8 @@ for name, taxon in species.items():
     !unzip -o {name}.zip -d {name}_genome -q
 ```
 
-- `--reference` — downloads only the NCBI reference genome (1 per species, high quality)
-- `--include genome` — only the FASTA sequence, not annotations
+- `--reference` - downloads only the NCBI reference genome (1 per species, high quality)
+- `--include genome` - only the FASTA sequence, not annotations
 - Each genome is a `.fna` file (FASTA nucleotide) inside the zip
 
 **What we got:**
@@ -1115,7 +1107,7 @@ Kraken-2 DB construction has 3 steps: taxonomy download, add sequences to librar
 rsync error: error starting client-server protocol (code 5)
 ```
 
-**Fix:** manually download only the needed parts of the taxonomy via HTTPS, and create a minimal accession→taxon ID map for just our 6 genomes:
+**Fix:** manually download only the needed parts of the taxonomy via HTTPS, and create a minimal accession to taxon ID map for just our 6 genomes:
 
 ```python
 import glob, os
@@ -1138,9 +1130,9 @@ os.makedirs("eskape_db/taxonomy", exist_ok=True)
 !cd eskape_db/taxonomy && tar -xzf taxdump.tar.gz nodes.dmp names.dmp
 ```
 
-- `nodes.dmp` — the taxonomy tree (parent-child relationships between taxon IDs)
-- `names.dmp` — human-readable names for each taxon ID
-- Together these define the full NCBI taxonomy hierarchy (bacteria → genus → species)
+- `nodes.dmp` - the taxonomy tree (parent-child relationships between taxon IDs)
+- `names.dmp` - human-readable names for each taxon ID
+- Together these define the full NCBI taxonomy hierarchy (bacteria to genus to species)
 
 ```python
 # Build minimal accession2taxid for just our 6 genomes
@@ -1163,7 +1155,7 @@ with open("eskape_db/taxonomy/nucl_gb.accession2taxid", "w") as out:
                     out.write(f"{base}\t{seqid}\t{taxid}\t0\n")
 ```
 
-This file maps each chromosome/contig accession → taxon ID. Kraken-2 uses it during DB build to label k-mers with the correct species.
+This file maps each chromosome/contig accession to a taxon ID. Kraken-2 uses it during DB build to label k-mers with the correct species.
 
 **Add sequences to library and build:**
 
@@ -1174,7 +1166,7 @@ for fna in glob.glob("*_genome/**/*.fna", recursive=True):
     !kraken2-build --add-to-library {fna} --db eskape_db
 ```
 
-- `--add-to-library` — processes the FASTA file, masks low-complexity regions (repeats that would cause false matches), and stages it for the DB build
+- `--add-to-library` - processes the FASTA file, masks low-complexity regions (repeats that would cause false matches), and stages it for the DB build
 
 ```python
 # Build the hash table
@@ -1191,13 +1183,13 @@ Database construction complete. [30.773s]
 650M    eskape_db/
 ```
 
-**Result: 650 MB custom DB** — vs 180 GB standard. **277x smaller.** Built in 30 seconds.
+**Result: 650 MB custom DB** - vs 180 GB standard. **277x smaller.** Built in 30 seconds.
 
 The 17 sequences = chromosomes + plasmids across all 6 reference genomes. 53 million bp of reference sequence total.
 
 ---
 
-### 10.4 Converting BAM → FASTQ with samtools
+### 10.4 Converting BAM to FASTQ with samtools
 
 Kraken-2 takes FASTQ (text) as input. Dorado outputs BAM (binary). `samtools fastq` converts between them:
 
@@ -1205,19 +1197,19 @@ Kraken-2 takes FASTQ (text) as input. Dorado outputs BAM (binary). `samtools fas
 samtools fastq barcode02.bam > barcode02.fastq
 ```
 
-- `samtools fastq` — reads each BAM record and writes it as a FASTQ entry (`@header`, sequence, `+`, quality scores)
-- `>` — redirects output to a file
+- `samtools fastq` - reads each BAM record and writes it as a FASTQ entry (`@header`, sequence, `+`, quality scores)
+- `>` - redirects output to a file
 
 **Important:** if the filename has spaces or parentheses (e.g. `file (3).bam` from repeated Colab uploads), the shell will break. Always rename first:
 ```python
 os.rename("file (3).bam", "barcode02.bam")
 ```
 
-**Truncation warning** we saw:
+**Truncation warning we saw:**
 ```
 [W::bam_hdr_read] EOF marker is absent. The input is probably truncated
 ```
-This means the BAM file was cut off mid-upload (Colab's 2 MB upload limit). We still got 44 reads out of ~2 MB — enough to test the pipeline.
+This means the BAM file was cut off mid-upload (Colab's 2 MB upload limit). We still got 44 reads out of ~2 MB - enough to test the pipeline.
 
 ---
 
@@ -1232,10 +1224,10 @@ print(f"Time: {elapsed:.1f}s")
 !cat report.txt
 ```
 
-- `--db eskape_db` — path to the custom DB folder
-- `--report report.txt` — human-readable summary report per taxon (the main output we care about)
-- `barcode02.fastq` — input reads
-- `> output.kraken` — per-read classification (one line per read with taxon ID)
+- `--db eskape_db` - path to the custom DB folder
+- `--report report.txt` - human-readable summary report per taxon (the main output we care about)
+- `barcode02.fastq` - input reads
+- `> output.kraken` - per-read classification (one line per read with taxon ID)
 
 **Output format of report.txt** (tab-separated):
 ```
@@ -1276,14 +1268,14 @@ Bacteria → Pseudomonadota → Gammaproteobacteria → Pseudomonadales
 
 **Caveats:**
 - Only 44 reads (file truncated at 2 MB during upload)
-- DB only contains 6 ESKAPE species — reads from any other organism would be forced into the nearest ESKAPE match. 100% classification rate is partly because there's no "other" category
+- DB only contains 6 ESKAPE species - reads from any other organism would be forced into the nearest ESKAPE match. 100% classification rate is partly because there is no "other" category
 - With the full 180 GB DB, some reads might land elsewhere or be unclassified
 
-**Clinical interpretation:** barcode02 from this AIIMS run appears to be *Pseudomonas aeruginosa* — a dangerous hospital-acquired ESKAPE pathogen, resistant to many antibiotics.
+**Clinical interpretation:** barcode02 from this AIIMS run appears to be *Pseudomonas aeruginosa* - a dangerous hospital-acquired ESKAPE pathogen, resistant to many antibiotics.
 
 ---
 
-### 10.7 End-to-end pipeline — complete
+### 10.7 End-to-end pipeline - complete
 
 ```
 POD-5 (raw signal, 4 GB, 104,478 reads, AIIMS clinical data)
@@ -1306,8 +1298,8 @@ Species report — Pseudomonas aeruginosa (barcode02)
 
 ---
 
-### 9.6 CROC — tool found in project folder
+### 9.6 CROC - tool found in project folder
 
-A Python package called `CROC-1.2.6` was found in the project directory alongside the POD-5 files. CROC = **Concentrated ROC** — a method for evaluating early recognition performance in ranked lists (related to ROC curve analysis). It also contains two POD-5 files identical to the ones in `pod5 data/`.
+A Python package called `CROC-1.2.6` was found in the project directory alongside the POD-5 files. CROC = **Concentrated ROC** - a method for evaluating early recognition performance in ranked lists (related to ROC curve analysis). It also contains two POD-5 files identical to the ones in `pod5 data/`.
 
-Likely provided by mam for evaluating classification accuracy — CROC metrics (BEDROC) are used to assess how well a classifier ranks true positives early, which is relevant for evaluating Kraken-2's species identification performance. To be clarified at next meeting.
+Likely provided by mam for evaluating classification accuracy - CROC metrics (BEDROC) are used to assess how well a classifier ranks true positives early, which is relevant for evaluating Kraken-2's species identification performance. To be clarified at next meeting.
