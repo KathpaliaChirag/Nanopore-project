@@ -1671,6 +1671,154 @@ Notebook link: https://colab.research.google.com/drive/1mj3lRxxIFS_qCeStrXszhIYH
 
 ---
 
+---
+
+## 12. Viva Preparation - 20 Questions
+
+---
+
+**Q1. You have a 4 GB POD-5 file. What is actually stored inside it, and why is it not just a plain text file with ATGC letters?**
+
+POD-5 stores raw electrical signal - arrays of int16 numbers, 5000 values per second per channel. This is the current measurement as DNA passes through the pore. No ATGC yet - just numbers. Also stores metadata per read: flow cell ID, run ID, sample rate, calibration values to convert int16 to picoamperes. It is binary (Apache Arrow format) not plain text because the signal is massive (5000 readings/sec x 512 channels x hours = billions of numbers) and needs compression + random access. ATGC letters don't exist at this stage - Dorado computes them in the next step.
+
+---
+
+**Q2. Walk me through what happens inside Dorado - what are the 5 stages and what does each one do?**
+
+1. **Normalise** - raw int16 signal converted to picoamperes using calibration values from POD-5 metadata. Removes hardware variation between flow cells.
+2. **CNN** - 1D convolutions downsample signal from 5000 Hz to ~400 Hz. Like compressing audio - removes noise, keeps the pattern. One output step roughly = one DNA base.
+3. **Transformer** - looks at context across time. Each position attends to neighbors so the model understands what came before and after. Same architecture as LLMs.
+4. **Linear projection** - outputs probability over {A, T, G, C, blank} at each time step.
+5. **CTC decoding** - finds the most likely ATGC sequence from those probabilities. Handles the fact that signal steps don't map 1-to-1 to bases.
+
+Output = one read = one ATGC string decoded from one DNA strand through one pore.
+
+---
+
+**Q3. What is a k-mer and how does Kraken-2 use k-mers to identify species?**
+
+A k-mer is a substring of fixed length k. Kraken-2 uses k=35. It slides a 35-letter window across each read, hashes each k-mer (O(1) lookup), and looks it up in the database which maps hash → taxon ID. Each k-mer votes for a species. If a k-mer matches multiple species (conserved sequence), LCA is used - it assigns that k-mer to the lowest common ancestor in the taxonomy tree rather than guessing. Majority vote across all k-mers in the read gives the final species call.
+
+---
+
+**Q4. Why is the standard Kraken-2 DB 180 GB and how did we build a 650 MB custom DB?**
+
+Standard DB is 180 GB because it contains every known organism - thousands of species, all their k-mers hashed and stored. More species = more k-mers = bigger DB. Our ESKAPE DB is 650 MB because we only put in 6 species (~42 MB of genome data total). We built it by: downloading 6 reference genomes from NCBI RefSeq, tagging each sequence header with `|kraken:taxid|XXXX`, downloading NCBI taxonomy, creating an accession2taxid map manually (rsync blocked on Colab), then running `kraken2-build --build`. Builds in 20 seconds, runs in <1 GB RAM.
+
+---
+
+**Q5. We got 14-26% unclassified reads even in sup mode. Give two reasons why a read might be unclassified.**
+
+1. **Species not in DB** - our DB only has 6 ESKAPE species. Human host DNA, other bacteria, contaminants have no match - forced unclassified. Main reason for 14-26% unclassified.
+2. **Sequencing errors** - nanopore has ~5% base error rate even in sup mode. If enough bases in k-mers are wrong, the hash won't match anything in the DB. This is why sup reduces unclassified slightly vs fast - better base accuracy = more k-mers match.
+3. (Bonus) **Very short reads** - too short to generate enough k-mers for a confident majority vote.
+
+---
+
+**Q6. Why is it impossible to use a simple lookup table to decode nanopore signal to ATGC?**
+
+5-6 letters are in the pore at once, giving 4^5 to 4^6 = 1024 to 4096 possible current levels. Each level is a combined signal from all bases together, not one base. The window slides - as one base exits and a new one enters, current changes but you can't isolate which base caused it. On top of that, the same k-mer produces slightly different current values each time due to electrical noise. A lookup table would need 4096 overlapping noisy entries - not cleanly separable. A neural network learns the mapping from messy signal patterns to ATGC, same way speech recognition handles messy audio.
+
+---
+
+**Q7. What is CTC and why does Dorado need it?**
+
+CTC = Connectionist Temporal Classification. After the Transformer, Dorado has say 1000 time steps but only 200 actual bases. Simple argmax at each step gives `AAAAATTTTT` instead of `AT` because one base spans many time steps and DNA moves at irregular speed. CTC introduces a blank token and a collapsing rule: remove blanks and collapse repeats. So `A A A _ T T _ G` → `ATG`. Multiple raw sequences map to the same final output - CTC finds the most likely final sequence by summing over all valid alignments. Solves the variable-length alignment problem without knowing in advance when each base starts. Invented for speech-to-text, adopted for nanopore basecalling.
+
+---
+
+**Q8. What is the difference between BAM and FASTQ? Why do we need samtools to convert?**
+
+FASTQ is plain text - 4 lines per read: read ID, ATGC sequence, separator, quality scores. That's it. BAM is binary compressed format storing everything FASTQ has plus: alignment position, mapping quality, CIGAR string, and extra tags (barcode, model used, methylation calls, signal quality). Dorado outputs BAM by default because it's the standard for downstream analysis and smaller than FASTQ. Kraken-2 is old and only accepts plain text (FASTQ/FASTA) - it doesn't understand BAM. Hence `samtools fastq` to convert. Dorado also has `--emit-fastq` flag to skip BAM entirely, but you lose the extra metadata.
+
+---
+
+**Q9. What is multiplexing/barcoding and why is it done?**
+
+Flow cells are expensive (~$500-900) with limited lifespan. Running one patient sample per flow cell wastes capacity. Multiplexing mixes multiple patient samples into one run. In wet lab, each patient's DNA gets a unique short synthetic DNA tag (barcode) attached. All samples are loaded onto one flow cell together. Pores read everything randomly - one read from patient 3, next from patient 11. Dorado demultiplexes: reads the barcode tag at the start of each read and sorts them into separate BAM files. Our kit SQK-NBD114-24 supports 24 barcodes. Unclassified folder = reads where Dorado couldn't confidently identify the barcode.
+
+---
+
+**Q10. What is the difference between MinION and PromethION?**
+
+| | MinION | PromethION |
+|---|---|---|
+| Channels | ~512 | ~3000 |
+| Output | 10-30 GB | up to 10 TB |
+| Use case | portable, clinical | high-throughput lab |
+
+PromethION has ~6x more parallel channels. Our 4 GB file from MinION would be ~24 GB minimum on PromethION for the same duration, and in practice much more since PromethION runs are longer. This makes the memory bottleneck in Kraken-2 even more critical at PromethION scale.
+
+---
+
+**Q11. What are minimizers in Kraken-2 and why are they used?**
+
+Instead of hashing every k-mer, Kraken-2 slides a window and only keeps the lexicographically smallest k-mer within that window as a representative (the minimizer). Adjacent windows usually share the same minimizer, so instead of one hash per base you store one hash per ~10 bases - ~10x DB size reduction. Kraken-2 uses k=35, m=31. Without minimizers the 180 GB DB would be ~1.8 TB. Our ESKAPE DB goes from ~6 GB to 650 MB for the same reason.
+
+---
+
+**Q12. What is LCA and when does Kraken-2 use it? Give a concrete example.**
+
+LCA = Lowest Common Ancestor. When a k-mer appears in two different species' genomes (conserved sequence), Kraken-2 can't pick one. Instead it assigns the k-mer to the lowest node in the taxonomy tree that is an ancestor of both. Example: a k-mer matching both P. aeruginosa and K. pneumoniae gets assigned to Gammaproteobacteria (their common ancestor), not either species. This is conservative - never makes a false species call. Majority vote across all k-mers still works because most k-mers are species-specific. The 15 K. pneumoniae reads in barcode02 are likely k-mers that hit an LCA node, not real K. pneumoniae.
+
+---
+
+**Q13. Why does Kraken-2 need 180 GB of RAM, not just disk space?**
+
+Classification requires random access into the hash table per k-mer - each lookup jumps to an unpredictable position. If DB is on disk: each random lookup = disk seek = ~10ms. 100k reads x thousands of k-mers x 10ms = hours. If DB is in RAM: each lookup = ~100ns. Same reads = seconds. Even in RAM, random lookups cause L3 cache misses - CPU goes to DRAM (100ns) instead of L3 (10ns). This is exactly what Kolin sir's Hot-K-mer LRU cache targets: pin frequent k-mers in L3 so most lookups never reach DRAM. `perf` measures the baseline cache miss rate before adding the cache.
+
+---
+
+**Q14. What is architecturally different between fast, hac, and sup models?**
+
+All 3 use the same CNN + Transformer + CTC pipeline. The difference is Transformer size - number of layers, attention heads, and parameters. fast = small, hac = medium, sup = large. Bigger model = more matrix multiplications per read = more GPU memory per read = fewer reads fit in VRAM = smaller batch size. We saw this: fast batch 640, hac batch 1664 (T4 optimized), sup batch 96. sup is 32x slower than fast not because of window size but because of model weight count. On GTX 1650 (4 GB VRAM) sup OOM crashes - the model alone barely fits.
+
+---
+
+**Q15. What is POD-5 and why did ONT switch from FAST5?**
+
+POD-5 stores per-read raw signal arrays (int16, 5000 Hz) + metadata, using Apache Arrow binary format. FAST5 used HDF5 format - poor compression, slow random access, hard to parallelize. POD-5 gives ~4x better compression, true random access (jump directly to any read by index), columnar storage, and parallel reading support. Dorado needs to jump to specific reads quickly and load them in parallel for GPU batching - POD-5's design directly speeds up the data loading stage before inference starts.
+
+---
+
+**Q16. What are the trade-offs of our 650 MB ESKAPE DB vs the standard 180 GB DB in a real clinical setting?**
+
+| | ESKAPE DB | Standard DB |
+|---|---|---|
+| Size | 650 MB | 180 GB |
+| RAM needed | <1 GB | 180 GB |
+| Species covered | 6 | All known |
+| Unclassified rate | 14-26% | Much lower |
+| Build time | 20 sec | Hours |
+
+ESKAPE DB advantage: runs on any machine, edge/clinical devices, no expensive server needed. Disadvantage: can only identify 6 species - everything else is unclassified. In a real clinical setting you might miss a non-ESKAPE infection entirely. Standard DB catches everything but needs a 180 GB RAM server. The research goal is to get the accuracy of the standard DB at the memory footprint of the custom DB - using Bloom filters or learned indexes.
+
+---
+
+**Q17. What is the role of the motor protein in the Y-adapter and why is it needed?**
+
+Without the motor protein, DNA would fly through the pore too fast to measure - at free diffusion speed the bases pass in microseconds, far faster than the 5000 Hz sampling rate can capture. The motor protein (a helicase enzyme) attached to the Y-adapter grips the DNA and ratchets it through the pore one base at a time in a controlled stepwise manner, slowing it to ~400-500 bases per second. This is what makes the electrical signal measurable and decodable.
+
+---
+
+**Q18. What is the sample rate of 5000 Hz and what does it mean in terms of bases per second?**
+
+5000 Hz means 5000 current measurements per second per channel. DNA passes through at ~400-500 bases per second (controlled by the motor protein). So there are roughly 5000/450 ≈ 10-12 signal measurements per base. This is why the CNN downsampling stage in Dorado is needed - it compresses those 10-12 measurements per base down to roughly 1 output step per base before the Transformer processes it.
+
+---
+
+**Q19. In our results, barcodes 09-12 had ~50% unclassified even in sup mode while barcodes 01-07 had only 14-20% unclassified. What does this tell you about those samples?**
+
+Barcodes 01-07 are predominantly P. aeruginosa at 75-87% - the dominant pathogen fills most reads. Barcodes 09-12 show K. pneumoniae at 16-35% and E. faecium at 13-24% - together only ~40-50% of reads. The ~50% unclassified is too high to be just sequencing error. Most likely those samples contain significant human host DNA or another organism not in our 6-species DB. This also means the patient samples may not be pure bacterial cultures - they could be direct clinical samples (blood, sputum) with mixed content.
+
+---
+
+**Q20. Why is hac the clinical sweet spot and not sup?**
+
+From our benchmarks: fast→hac gives +3-8% classification improvement. hac→sup gives only +0.1-1% improvement. But sup takes 32x longer than fast and 6.5x longer than hac. In a clinical setting, time matters - a doctor needs results in hours not days. The marginal 1% accuracy gain from sup does not justify 6.5x more compute time and cost. hac gives near-sup accuracy at a fraction of the time. sup is useful for research where maximum accuracy is needed and time is not critical.
+
+---
+
 ### 9.6 CROC - tool found in project folder
 
 A Python package called `CROC-1.2.6` was found in the project directory alongside the POD-5 files. CROC = **Concentrated ROC** - a method for evaluating early recognition performance in ranked lists (related to ROC curve analysis). It also contains two POD-5 files identical to the ones in `pod5 data/`.
