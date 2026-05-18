@@ -1298,6 +1298,318 @@ Species report — Pseudomonas aeruginosa (barcode02)
 
 ---
 
+---
+
+## 11. Full Colab Run - Dorado + Kraken-2 (2026-05-18)
+
+This section documents the complete, working end-to-end pipeline run on Google Colab using a T4 GPU. Follow these steps exactly to reproduce it.
+
+---
+
+### 11.1 Setup - before you start
+
+- Upload your POD-5 file to Google Drive (any folder, e.g. `nanopore data/`)
+- Open a new notebook at colab.research.google.com
+- Go to **Runtime - Change runtime type - Hardware accelerator - T4 GPU - Save**
+
+---
+
+### 11.2 Mount Google Drive
+
+```python
+# Connect Colab to your Google Drive so it can read the POD-5 file
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+Confirm the file is visible:
+
+```python
+import os
+os.path.exists("/content/drive/MyDrive/nanopore data/FBE01990_24778b97_03e50f91_10.pod5")
+# Should print: True
+```
+
+---
+
+### 11.3 Install Dorado
+
+Run each cell separately:
+
+```python
+# Download Dorado for Linux (Colab runs Ubuntu Linux, not Windows)
+!wget -q https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.4.0-linux-x64.tar.gz
+```
+
+```python
+# Extract the archive
+!tar -xzf dorado-1.4.0-linux-x64.tar.gz
+```
+
+```python
+# Verify installation - should print: 1.4.0+ba44a013
+!./dorado-1.4.0-linux-x64/bin/dorado --version
+```
+
+**Why Linux binary:** Colab VMs run Ubuntu. The Windows `.exe` will not work here.
+
+**Why separate cells:** the URL is long and wraps across lines if pasted into a `%%bash` block - splitting into `!` cells avoids this.
+
+---
+
+### 11.4 Run Dorado fast mode basecalling
+
+```python
+%%time
+# Run basecalling + barcode demultiplexing on the POD-5 file
+# fast = fastest model, good enough for species ID
+# --kit-name = barcoding kit used during wet lab prep (tells Dorado how to demux)
+# --output-dir = folder where per-barcode BAM files will be saved
+!./dorado-1.4.0-linux-x64/bin/dorado basecaller fast \
+    "/content/drive/MyDrive/nanopore data/FBE01990_24778b97_03e50f91_10.pod5" \
+    --kit-name SQK-NBD114-24 \
+    --output-dir results/fast
+```
+
+**Expected output:**
+```
+[info] Using CUDA devices:
+[info] cuda:0 - Tesla T4
+[info] cuda:0 using chunk size 9996, batch size 640
+[info] Simplex reads basecalled: 104441
+[info] Finished in (ms): 177832
+Wall time: 3min 58s
+```
+
+**Key numbers vs local GTX 1650:**
+
+| | Colab T4 | Local GTX 1650 |
+|---|---|---|
+| Wall time | ~4 min | ~5 min |
+| Batch size (auto) | 640 | 64 |
+| Reads processed | 104,441 | 104,441 |
+
+T4 uses 10x larger batch size because it has 15 GB VRAM vs 4 GB on the GTX 1650.
+
+---
+
+### 11.5 Find the output BAM files
+
+Dorado nests output inside experiment/run subdirectories:
+
+```python
+# Walk down to find where the per-barcode BAMs actually are
+bam_dir = "results/fast/AIIMS_Shreshtha_1_301025/AIIMS_Shreshtha_1_301025/20251030_1420_MD-103113_FBE01990_24778b97/bam_pass"
+
+# Set this variable once - used in all cells below
+import os, glob
+print(os.listdir(bam_dir))
+```
+
+Output: 14 barcode folders + unclassified (barcode08, 15, 16, 17, 18 absent - those reads didn't demux cleanly).
+
+Each barcode folder contains one BAM file, e.g.:
+```
+bam_pass/barcode02/FBE01990_pass_barcode02_24778b97_03e50f91_0.bam  (31 MB)
+```
+
+---
+
+### 11.6 Install Kraken-2 and samtools
+
+```python
+# Install condacolab first - adds mamba/conda to Colab
+!pip install -q condacolab
+import condacolab
+condacolab.install()
+# Kernel will restart automatically - this is expected
+```
+
+After restart:
+
+```python
+# Remove pin conflict that condacolab leaves behind, then install
+!rm -f /usr/local/conda-meta/pinned
+!mamba install -c bioconda -c conda-forge kraken2 samtools -y -q
+```
+
+Verify:
+
+```python
+!kraken2 --version   # should print: Kraken version 2.x.x
+!samtools --version  # should print: samtools 1.x.x
+```
+
+**Why condacolab:** Kraken-2 and samtools are bioinformatics tools not available via pip. They live in the `bioconda` conda channel.
+
+---
+
+### 11.7 Build the ESKAPE Kraken-2 database
+
+This is a custom 6-species database - 650 MB vs the standard 180 GB.
+
+**Step 1 - Download taxonomy:**
+
+```python
+# Kraken-2 needs the NCBI taxonomy tree to build its index
+!mkdir -p eskape_db/taxonomy
+!mkdir -p eskape_db/library/added
+!wget -q https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz -O eskape_db/taxonomy/taxdump.tar.gz
+!cd eskape_db/taxonomy && tar -xzf taxdump.tar.gz nodes.dmp names.dmp
+```
+
+**Step 2 - Download ESKAPE reference genomes:**
+
+```python
+# One complete reference genome per ESKAPE pathogen from NCBI RefSeq
+!wget -q "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/174/395/GCF_000174395.2_Ente_faec_62415_V1/GCF_000174395.2_Ente_faec_62415_V1_genomic.fna.gz" -O eskape_db/library/added/e_faecium.fna.gz
+!wget -q "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/013/425/GCF_000013425.1_ASM1342v1/GCF_000013425.1_ASM1342v1_genomic.fna.gz" -O eskape_db/library/added/s_aureus.fna.gz
+!wget -q "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/240/185/GCF_000240185.1_ASM24018v2/GCF_000240185.1_ASM24018v2_genomic.fna.gz" -O eskape_db/library/added/k_pneumoniae.fna.gz
+!wget -q "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/012/085/GCF_000012085.1_ASM1208v1/GCF_000012085.1_ASM1208v1_genomic.fna.gz" -O eskape_db/library/added/a_baumannii.fna.gz
+!wget -q "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/006/765/GCF_000006765.1_ASM676v1/GCF_000006765.1_ASM676v1_genomic.fna.gz" -O eskape_db/library/added/p_aeruginosa.fna.gz
+!wget -q "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/025/565/GCF_000025565.1_ASM2556v1/GCF_000025565.1_ASM2556v1_genomic.fna.gz" -O eskape_db/library/added/e_cloacae.fna.gz
+```
+
+**Step 3 - Tag each genome with its taxon ID:**
+
+Kraken-2 identifies sequences by taxon ID. We embed the ID directly in the FASTA header using the `|kraken:taxid|XXXX` tag format:
+
+```python
+import gzip
+
+taxids = {
+    "e_faecium.fna.gz":    1352,  # Enterococcus faecium
+    "s_aureus.fna.gz":     1280,  # Staphylococcus aureus
+    "k_pneumoniae.fna.gz":  573,  # Klebsiella pneumoniae
+    "a_baumannii.fna.gz":   470,  # Acinetobacter baumannii
+    "p_aeruginosa.fna.gz":  287,  # Pseudomonas aeruginosa
+    "e_cloacae.fna.gz":     550,  # Enterobacter cloacae
+}
+
+for fname, taxid in taxids.items():
+    inpath = f"eskape_db/library/added/{fname}"
+    outpath = inpath.replace(".fna.gz", "_tagged.fna")
+    with gzip.open(inpath, "rt") as fin, open(outpath, "w") as fout:
+        for line in fin:
+            if line.startswith(">"):
+                line = line.rstrip() + f"|kraken:taxid|{taxid}\n"
+            fout.write(line)
+    print(f"Tagged {fname} -> taxid {taxid}")
+```
+
+**Step 4 - Add to library:**
+
+```python
+import glob
+for fna in glob.glob("eskape_db/library/added/*_tagged.fna"):
+    !kraken2-build --add-to-library {fna} --db eskape_db
+```
+
+**Step 5 - Create accession-to-taxid map:**
+
+The taxonomy download uses rsync which is blocked on Colab - so we create this map manually using the accession IDs from the reference genomes:
+
+```python
+accession_map = {
+    "NC_016847": 1352, "NC_016841": 1352, "NC_016845": 1352,
+    "NC_016840": 1352, "NC_016846": 1352, "NC_016838": 1352,
+    "NC_016839": 1352,  # E. faecium chromosomes + plasmids
+    "NC_007795": 1280,  # S. aureus
+    "NC_014108": 573, "NC_014107": 573, "NC_014121": 573,  # K. pneumoniae
+    "NC_008710": 470,   # A. baumannii
+    "NC_002516": 287,   # P. aeruginosa
+}
+
+with open("eskape_db/taxonomy/nucl_gb.accession2taxid", "w") as f:
+    f.write("accession\taccession.version\ttaxid\tgi\n")
+    for acc, taxid in accession_map.items():
+        f.write(f"{acc}\t{acc}.1\t{taxid}\t0\n")
+print("accession2taxid map created")
+```
+
+**Step 6 - Build the index:**
+
+```python
+# Remove any stale cache files first, then build
+!rm -f eskape_db/hash.k2d eskape_db/seqid2taxid.map
+!kraken2-build --build --db eskape_db
+```
+
+Expected output:
+```
+Found 13/13 targets...
+Completed processing of 26 sequences, 42568426 bp
+Database construction complete. [Total: 20.787s]
+```
+
+**How to verify it worked:** "Found 13/13 targets" and "26 sequences" - not 0. If you see 0, the accession map has wrong IDs. Check `eskape_db/unmapped.txt` to see which accessions Kraken-2 couldn't find and add them to the map.
+
+---
+
+### 11.8 Run all barcodes through Kraken-2
+
+```python
+%%time
+import os, glob
+
+bam_dir = "results/fast/AIIMS_Shreshtha_1_301025/AIIMS_Shreshtha_1_301025/20251030_1420_MD-103113_FBE01990_24778b97/bam_pass"
+barcodes = sorted([b for b in os.listdir(bam_dir) if b.startswith("barcode")])
+
+for barcode in barcodes:
+    bam_file = glob.glob(f"{bam_dir}/{barcode}/*.bam")[0]
+    
+    # Convert BAM (binary) to FASTQ (text) - Kraken-2 needs text input
+    os.system(f"samtools fastq {bam_file} > {barcode}.fastq")
+    
+    # Classify reads against ESKAPE DB
+    os.system(f"kraken2 --db eskape_db --report report_{barcode}.txt {barcode}.fastq > output_{barcode}.kraken 2>/dev/null")
+    
+    # Print species-level hits only (rank code S)
+    print(f"--- {barcode} ---")
+    with open(f"report_{barcode}.txt") as f:
+        for line in f:
+            if "\tS\t" in line:
+                parts = line.strip().split("\t")
+                print(f"  {parts[5].strip()}: {parts[0]}% ({parts[1]} reads)")
+    print()
+```
+
+Total time: **39.5 seconds** for all 14 barcodes.
+
+---
+
+### 11.9 Results - AIIMS run barcode classification
+
+All 14 barcodes from the AIIMS_Shreshtha_1_301025 run (fast mode basecalling):
+
+| Barcode | Primary species | % | Secondary | Notes |
+|---|---|---|---|---|
+| 01 | P. aeruginosa | 82% | - | clear |
+| 02 | P. aeruginosa | 84% | - | clear |
+| 03 | P. aeruginosa | 60% | - | lower confidence |
+| 04 | P. aeruginosa | 83% | - | clear, most reads (17k) |
+| 05 | P. aeruginosa | 80% | - | clear |
+| 06 | P. aeruginosa | 81% | - | clear |
+| 07 | P. aeruginosa | 76% | E. faecium 5% | mostly clear |
+| 09 | K. pneumoniae | 22% | E. faecium 17% | mixed, high unclassified |
+| 10 | K. pneumoniae | 27% | E. faecium 21% | mixed, high unclassified |
+| 11 | K. pneumoniae | 16% | E. faecium 13% | mixed, high unclassified |
+| 12 | K. pneumoniae | 23% | E. faecium 17% | mixed, high unclassified |
+| 13 | E. faecium | 63% | P. aeruginosa 16% | mostly clear |
+| 14 | P. aeruginosa | 43% | E. faecium 40% | genuinely mixed |
+| 19 | P. aeruginosa | 100% | - | only 1 read - ignore |
+
+**Observations:**
+- Barcodes 01-07: all predominantly *P. aeruginosa* - likely same patient population or sample type
+- Barcodes 09-12: ~50-60% unclassified - the dominant pathogen may not be in our 6-species DB, OR these are host DNA reads
+- Barcode 14: two pathogens at near-equal levels - genuine polymicrobial infection or contamination
+- Low-% secondary hits (e.g. 0.21% K. pneumoniae in barcode02) are likely noise - below 5% treat as cross-contamination
+- Barcode 08 and 15-18 absent from output - those reads failed demultiplexing entirely
+
+**Caveat on 100% classification in earlier test:** when we ran on only 44 reads with a truncated BAM, we got 100% P. aeruginosa. With the full 7105-read BAM we get 84% - the 14% unclassified are likely human host DNA or bacterial sequences not in our 6-species DB. The ESKAPE-only DB forces every classified read into one of 6 species - it cannot say "other bacteria".
+
+---
+
 ### 9.6 CROC - tool found in project folder
 
 A Python package called `CROC-1.2.6` was found in the project directory alongside the POD-5 files. CROC = **Concentrated ROC** - a method for evaluating early recognition performance in ranked lists (related to ROC curve analysis). It also contains two POD-5 files identical to the ones in `pod5 data/`.
