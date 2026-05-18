@@ -1302,6 +1302,8 @@ Species report — Pseudomonas aeruginosa (barcode02)
 
 ## 11. Full Colab Run - Dorado + Kraken-2 (2026-05-18)
 
+**Colab notebook:** https://colab.research.google.com/drive/1mj3lRxxIFS_qCeStrXszhIYHlJ2Z36bw?usp=sharing
+
 This section documents the complete, working end-to-end pipeline run on Google Colab using a T4 GPU. Follow these steps exactly to reproduce it.
 
 ---
@@ -1607,6 +1609,65 @@ All 14 barcodes from the AIIMS_Shreshtha_1_301025 run (fast mode basecalling):
 - Barcode 08 and 15-18 absent from output - those reads failed demultiplexing entirely
 
 **Caveat on 100% classification in earlier test:** when we ran on only 44 reads with a truncated BAM, we got 100% P. aeruginosa. With the full 7105-read BAM we get 84% - the 14% unclassified are likely human host DNA or bacterial sequences not in our 6-species DB. The ESKAPE-only DB forces every classified read into one of 6 species - it cannot say "other bacteria".
+
+---
+
+---
+
+### 11.10 Basecalling mode benchmarks - all 3 modes on T4
+
+All 3 Dorado modes run on Colab T4 GPU, same POD-5 file (104k reads):
+
+| Mode | Wall time | Batch size | Samples/s | Reads basecalled |
+|---|---|---|---|---|
+| fast | 3 min 58s | 640 | 2.85 x 10^7 | 104,441 |
+| hac | 19 min 8s | 1664 | 4.75 x 10^6 | 104,443 |
+| sup | 2h 5min 38s | 96 | 6.76 x 10^5 | 104,441 |
+
+- sup batch size is 96 vs 1664 for hac - the sup model is much larger and barely fits on T4
+- sup is 32x slower than fast, 6.5x slower than hac
+- all 3 basecall the same number of reads - mode affects quality, not quantity
+
+---
+
+### 11.11 Kraken-2 results - fast vs hac vs sup comparison
+
+All barcodes run through Kraken-2 with the 650 MB ESKAPE DB for all 3 modes. Species calls are **identical** across all modes - the pathogen identified never changes. Only the classification percentage improves.
+
+| Barcode | fast | hac | sup | Primary pathogen |
+|---|---|---|---|---|
+| 01 | 82.3% | 85.4% | 85.5% | P. aeruginosa |
+| 02 | 84.2% | 86.8% | 87.1% | P. aeruginosa |
+| 03 | 59.7% | 67.2% | 68.5% | P. aeruginosa |
+| 04 | 83.0% | 85.8% | 86.1% | P. aeruginosa |
+| 05 | 80.3% | 85.1% | 85.5% | P. aeruginosa |
+| 06 | 80.9% | 83.1% | 83.4% | P. aeruginosa |
+| 07 | 75.7% | 79.0% | 79.2% | P. aeruginosa |
+| 09 | 21.7% | 27.8% | 28.7% | K. pneumoniae (mixed) |
+| 10 | 26.8% | 34.3% | 35.2% | K. pneumoniae (mixed) |
+| 11 | 15.8% | 21.6% | 22.5% | K. pneumoniae (mixed) |
+| 12 | 23.2% | 29.2% | 30.4% | K. pneumoniae (mixed) |
+| 13 | 63.4% | 65.7% | 66.1% | E. faecium |
+| 14 | 43.3% | 44.1% | 43.9% | mixed P.aer + E.fae |
+
+**Key findings:**
+- fast to hac: +3-8% improvement, biggest gains in barcodes 03, 09-12 (lower confidence samples)
+- hac to sup: only +0.1-1% - marginal improvement for 6.5x more compute time
+- **hac is the clinical sweet spot** - near-sup accuracy at a fraction of the time
+- barcodes 09-12 remain ~50% unclassified even in sup mode - the missing reads are likely human host DNA or organisms not in the 6-species ESKAPE DB, not a basecalling quality issue
+
+---
+
+### 11.12 Visualizations
+
+4 charts generated in the Colab notebook (saved as `mode_comparison.png`):
+
+1. **Grouped bar chart** - classification % per barcode for all 3 modes, with exact values on top of each bar
+2. **Improvement chart** - gain from fast→hac and hac→sup per barcode. Shows fast→hac jump is large; hac→sup jump is tiny
+3. **Heatmap** - all barcodes × all modes in one grid, color-coded by % classified. Immediately shows barcodes 09-12 as the weak cluster
+4. **Time vs accuracy scatter** - x-axis = basecalling time, y-axis = avg % classified with std dev error bars. Visualizes the diminishing returns of sup
+
+Notebook link: https://colab.research.google.com/drive/1mj3lRxxIFS_qCeStrXszhIYHlJ2Z36bw?usp=sharing
 
 ---
 

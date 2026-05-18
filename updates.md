@@ -83,3 +83,20 @@ Next meeting / deadline: **2026-05-17**.
   - §5.2 AMR drivers, MBR still flagged
   - §5.3 Clinical workflow + why memory matters
 - **All theory topics (1–5) now in KB.** Topic 6 (experiments) is the remaining piece — that's hands-on, not theory; will start when user is ready.
+
+---
+
+## 2026-05-18 - Study session 4 - Full Colab pipeline run (all 3 modes)
+
+- **Goal:** run Dorado fast mode on Colab, then extend to hac and sup for benchmarking.
+- **Dorado on Colab T4 - all 3 modes complete:**
+  - fast: 3 min 58s, batch 640
+  - hac: 19 min 8s, batch 1664
+  - sup: 2h 5min 38s, batch 96 (barely fits on T4)
+- **ESKAPE Kraken-2 DB rebuilt from scratch on Colab** - same 650 MB DB as before, 13/13 accessions mapped
+- **All 14 barcodes classified for all 3 modes** - species calls identical across modes, only % classified improves
+- **Key finding:** hac is the clinical sweet spot - fast→hac gives +3-8%, hac→sup gives only +0.1-1%
+- **Barcode summary:** bc01-07 = P. aeruginosa, bc09-12 = mixed K.pneumoniae + E.faecium, bc13 = E.faecium, bc14 = mixed
+- **Visualizations:** 4 charts (grouped bar, improvement bar, heatmap, time vs accuracy scatter) in Colab notebook
+- **Colab notebook:** https://colab.research.google.com/drive/1mj3lRxxIFS_qCeStrXszhIYHlJ2Z36bw?usp=sharing
+- KB §11 added with complete step-by-step Colab guide + all results
