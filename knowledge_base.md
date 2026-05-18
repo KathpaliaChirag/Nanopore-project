@@ -1673,6 +1673,327 @@ Notebook link: https://colab.research.google.com/drive/1mj3lRxxIFS_qCeStrXszhIYH
 
 ---
 
+## 13. Deep Dives — K-mers, Kraken-2 Architecture, Full Pipeline Walkthrough
+
+---
+
+### 13.1 K-mers — Complete Definition
+
+**What is a k-mer:**
+
+A k-mer is a substring of length k from a DNA sequence. Every possible contiguous window of k letters.
+
+Example with k=4 on sequence `ATGCATGC`:
+```
+ATGC  <- k-mer 1 (position 0)
+TGCA  <- k-mer 2 (position 1)
+GCAT  <- k-mer 3 (position 2)
+CATG  <- k-mer 4 (position 3)
+ATGC  <- k-mer 5 (position 4)
+```
+
+From a sequence of length L you get **L - k + 1** k-mers.
+
+**How many possible k-mers exist:**
+
+With 4 bases (A, T, G, C) and length k:
+- k=4: 4^4 = 256
+- k=21: 4^21 = ~4.4 trillion
+- k=31: 4^31 = ~4.6 x 10^18
+- k=35: 4^35 = ~1.2 x 10^21
+
+At k=35 the space is astronomically large. Most k-mers never appear in any real genome. The ones that do appear are like fingerprints — species-specific.
+
+**Why k-mers are powerful for species ID:**
+
+A k-mer of length 35 that appears in P. aeruginosa is overwhelmingly likely to ONLY appear in P. aeruginosa and its close relatives — not in S. aureus or humans. The longer k, the more species-specific each k-mer becomes. At k=35 the probability of a random k-mer appearing in two unrelated species by chance is essentially zero.
+
+**Where k-mers are used across the pipeline:**
+
+| Stage | Tool | k-mer use |
+|---|---|---|
+| Basecalling | Dorado | NOT used - works on raw signal not sequence |
+| Species ID | Kraken-2 | k=35 windows slid across reads, hashed, looked up |
+| DB building | kraken2-build | Every k-mer from reference genomes extracted and hashed |
+| Minimizers | Kraken-2 | m=31 minimizers selected from k=35 windows to reduce DB |
+
+**K-mers vs alignment:**
+
+Full alignment (Smith-Waterman) is O(n x m) per read — hours/days for 100k reads against thousands of genomes. K-mer hashing is O(L) per read — 7105 reads classified in 3.8 seconds in our run.
+
+**K-mers in the nanopore context:**
+
+Nanopore reads are long (thousands of bases) but error-prone (~5% error rate). At k=35 a single error affects at most 35 consecutive k-mers — but a read has thousands of k-mers total so the majority still match correctly.
+
+---
+
+### 13.2 Kraken-2 — Full Architecture and Mathematics
+
+**The core data structure — Compact Hash Table (CHT):**
+
+Kraken-2 stores all k-mers in a purpose-built compact hash table. Standard hash maps store the full k-mer string (35 bases = 70 bits) + taxon ID — wasteful. Kraken-2 eliminates this:
+
+```
+k-mer (35-mer)
+    ↓
+extract minimizer (31-mer) → used as hash table index
+    ↓
+remaining bits → stored as key in bucket
+    ↓
+taxon ID → stored as value (minimum bits needed, e.g. 6 bits for 64 species)
+```
+
+Taxon ID storage: if you have 10 species you only need 4 bits (2^4 = 16 > 10). CHT uses exactly as many bits as needed. Collision handling uses open addressing with linear probing — if bucket occupied, check next bucket. Table sized to stay under ~70% full for performance.
+
+**Minimizers — the math:**
+
+A minimizer is the lexicographically smallest m-mer within a k-mer window.
+
+```
+k-mer (k=35): ATGCGATCGGCTAGCTAGCTAGCATGCGATCGGCT
+slide m=31 window inside it
+pick the lex. smallest 31-mer = minimizer
+```
+
+Two adjacent k-mers (shifted by 1 base) contain almost identical sub-sequences. With high probability they share the same minimizer — so they map to the same bucket instead of storing two entries. Reduction factor = k - m + 1 = 35 - 31 + 1 = 5x theoretical, ~10x in practice.
+
+Canonical k-mers: DNA is double-stranded. Kraken-2 always takes the lexicographically smaller of (k-mer, reverse_complement(k-mer)) so it doesn't matter which strand the read came from.
+
+**Database build — step by step:**
+
+Step 1 - Extract k-mers:
+```
+For each genome G in reference set:
+    For each position i in G:
+        kmer = G[i : i+k]
+        canon_kmer = min(kmer, reverse_complement(kmer))
+        minimizer = get_minimizer(canon_kmer, m)
+        emit (minimizer, taxon_id)
+```
+
+Step 2 - LCA assignment: multiple species may share a k-mer. For each k-mer appearing in multiple taxa:
+```
+assigned_taxon = LCA(taxon_1, taxon_2, ..., taxon_n)
+```
+
+LCA computed on NCBI taxonomy tree (nodes.dmp):
+```
+root (1)
+└── Bacteria (2)
+    ├── Pseudomonadota (1224)
+    │   └── Gammaproteobacteria (1236)
+    │       ├── Pseudomonas aeruginosa (287)
+    │       └── Klebsiella pneumoniae (573)
+    └── Bacillota (1239)
+        └── Enterococcus faecium (1352)
+```
+
+A k-mer shared by P. aeruginosa (287) and K. pneumoniae (573) → LCA = Gammaproteobacteria (1236).
+
+Step 3 - Build hash table:
+```
+n_kmers = total unique minimizers across all genomes
+load_factor = 0.7
+table_size = n_kmers / load_factor
+```
+
+Our ESKAPE DB: estimated hash table = 39,267,472 bytes (~37 MB). Rest of 650 MB is taxonomy data and sequence ID maps.
+
+**Classification — step by step:**
+
+Given read R of length L:
+
+Step 1 - Extract k-mers and vote:
+```
+For i in range(L - k + 1):
+    kmer = R[i : i+k]
+    canon = min(kmer, revcomp(kmer))
+    minimizer = get_minimizer(canon, m)
+    taxon = CHT.lookup(minimizer)
+    votes[taxon] += 1
+```
+
+Step 2 - Hit vector (one vote per k-mer position):
+```
+position:  1    2    3    4     5    6    7    8    9    10
+taxon:    287  287  287  1236  287  287  573  287  287  287
+```
+Most k-mers hit P. aeruginosa (287), one ambiguous hit Gammaproteobacteria (1236), one noise hit K. pneumoniae (573).
+
+Step 3 - Tree traversal (not simple majority vote):
+```
+For each node in taxonomy tree:
+    score(node) = votes at node + votes at all descendant nodes
+
+Pick leaf node with highest score that passes confidence threshold
+```
+
+Confidence score:
+```
+confidence = votes_at_winning_clade / total_k-mers_in_read
+```
+
+If confidence < threshold → read classified at higher taxonomic level or unclassified. Default threshold = 0.
+
+Step 4 - Output:
+
+Per-read `.kraken` file:
+```
+C  read_id  287  1500|287  287:142 1236:3 287:8 ...
+```
+
+Report `.txt` file:
+```
+84.22%  5984  5984  S  287    Pseudomonas aeruginosa
+```
+
+**Why Kraken-2 is fast:**
+1. Hash lookup is O(1) - no alignment, no dynamic programming
+2. Minimizers reduce work ~10x
+3. Memory-mapped DB - OS pages in only what's needed
+4. Multi-threaded - each read classified independently
+5. No false positives by design - every k-mer came from a real genome
+
+---
+
+### 13.3 Full Walkthrough — DNA to Species Report
+
+**Stage 0 - The patient sample:**
+
+Doctor takes blood, sputum, or wound swab. Contains:
+- Patient's human cells (majority of DNA)
+- Bacterial cells (the pathogen)
+- Possibly other microbes
+
+Everything goes into wet lab together.
+
+**Stage 1 - Wet lab preparation:**
+
+- **DNA extraction:** cells lysed, DNA released, proteins/membranes removed
+- **Fragmentation:** long DNA broken into 1-10 kb fragments
+- **End prep:** fragment ends cleaned up for adapter attachment
+- **Adapter ligation:** Y-adapter attached to each fragment
+  - Leader sequence: single-stranded overhang, enters pore first
+  - Motor protein (helicase): controls speed through pore (~400-500 bases/sec)
+  - Tether: anchors adapter near the membrane
+- **Barcoding:** if multiplexing, a unique 12-24 base barcode tag added per patient sample
+- **Loading:** prepared DNA library pipetted onto flow cell
+
+**Stage 2 - The flow cell and sequencer:**
+
+```
+Flow cell
+├── Membrane (synthetic lipid bilayer)
+├── ~512 channels (MinION) - each an independent measurement circuit
+│   └── Each channel: one protein nanopore (R10.4.1 chemistry in our case)
+└── Electronics beneath each pore - measuring current at 5000 Hz
+```
+
+What happens per DNA fragment:
+1. Leader sequence captured by pore first
+2. Voltage (~180 mV) pulls DNA through
+3. Motor protein ratchets DNA at ~400-500 bases/sec
+4. 5-6 bases in pore simultaneously - their combined effect changes ionic current
+5. Electronics sample current 5000x/second
+
+Different k-mers block current by different amounts:
+```
+...ATGCGA...  →  87.3 pA
+...ATGCGT...  →  91.1 pA
+...ATGCGG...  →  84.7 pA
+```
+
+Output - POD-5 file:
+- Raw int16 signal arrays (one per read), Apache Arrow binary format
+- Metadata: flow cell ID, run ID, sample rate, calibration values
+- Our file: 4 GB, 104,478 reads, FLO-MIN114, R10.4.1
+
+**Stage 3 - Basecalling (Dorado):**
+
+```
+POD-5 raw signal (int16, 5000 Hz)
+    ↓  [1] Normalisation
+       int16 → picoamperes using calibration constants
+       removes inter-device variation
+    ↓  [2] CNN (1D convolutions)
+       downsamples 5000 Hz → ~400 steps/sec
+       one feature vector per ~12 signal samples ≈ one base
+       analogy: raw audio → mel-spectrogram
+    ↓  [3] Transformer encoder
+       multi-head self-attention: each position attends to all others
+       captures long-range context
+       multiple layers deep
+    ↓  [4] Linear projection
+       maps each time step → probability over {A, T, G, C, blank}
+       output: T x 5 matrix
+    ↓  [5] CTC decoding
+       T time steps but only L << T actual bases
+       blank token handles variable timing
+       AAAA_TTT__GG → ATG (collapse repeats, remove blanks)
+       output: ATGC string + per-base quality score
+    ↓  [6] Demultiplexing
+       reads barcode from each read
+       sorts into per-barcode BAM files
+```
+
+Output - BAM files (one per barcode):
+- ATGC reads + quality scores (Phred: Q10=90% accuracy, Q20=99%)
+- Tags: barcode, model used, read duration
+
+**Stage 4 - Format conversion (samtools):**
+
+```bash
+samtools fastq barcode02.bam > barcode02.fastq
+```
+
+FASTQ (4 lines per read):
+```
+@read_id
+ATGCGATCGG...
++
+IIIHHGGG...
+```
+
+**Stage 5 - Species classification (Kraken-2):**
+
+```
+barcode02.fastq (7105 reads, 31 MB)
+    ↓  For each read:
+       slide k=35 window → extract k-mers
+       compute minimizer (m=31)
+       hash → CHT lookup → taxon vote
+       shared k-mers → LCA
+    ↓  Per read: tree traversal → highest scoring clade
+    ↓  Report
+```
+
+Output:
+```
+84.22%  5984  S  287   Pseudomonas aeruginosa
+ 1.29%    92  S  1352  Enterococcus faecium
+ 0.21%    15  S  573   Klebsiella pneumoniae
+14.26%  1013  U  0     unclassified
+```
+
+Clinical interpretation: barcode02 = patient 2 = predominantly P. aeruginosa. Total time POD-5 to species: ~4 min (fast) to ~20 min (hac) on Colab T4.
+
+**Complete pipeline:**
+```
+Patient sample
+    ↓  wet lab: extraction + fragmentation + adapter + barcode
+DNA fragments with Y-adapters
+    ↓  nanopore sequencer: voltage + pore + motor protein
+POD-5  (raw int16 signal, GBs, binary Arrow)
+    ↓  Dorado: CNN + Transformer + CTC + demux  (GPU, minutes)
+BAM files  (ATGC reads + quality, one per barcode)
+    ↓  samtools fastq  (format conversion, seconds)
+FASTQ files  (plain text, 4 lines per read)
+    ↓  Kraken-2: k-mer hash + CHT + LCA + vote  (CPU, seconds)
+Species report  (% reads per taxon, clinical diagnosis)
+```
+
+---
+
 ## 12. Viva Preparation - 20 Questions
 
 ---
