@@ -4,6 +4,10 @@
 > This document is a learning + execution guide. Read it top to bottom.
 > Each tool section goes: what it is → how to set it up → what to run → what to note (beginner → intermediate → advanced).
 > Everything ties back to one question: **where is the pipeline slow and why?**
+>
+> At every step, instructions are split:
+> - **Windows/WSL2** — for Chirag's setup
+> - **Native Linux** — for anyone running Ubuntu/Debian directly (Rishabh, Rohit, or lab server)
 
 ---
 
@@ -33,13 +37,15 @@ The profiling tools tell you which one it is. You cannot guess — the answer is
 
 ## Phase 0 — Setup (do this once)
 
-### 0.1 WSL2 (for Kraken-2 profiling)
+### 0.1 Linux environment setup
 
-You already have WSL2. Open it and run:
-
+**If Windows/WSL2:**
+Open WSL2 (search "Ubuntu" or "WSL" in Start menu) and run:
 ```bash
-# Check your Linux distro version
-cat /etc/os-release
+# Confirm you are inside WSL2 (not PowerShell)
+uname -a   # should print "Linux"
+
+cat /etc/os-release   # shows your distro
 
 # Update packages
 sudo apt update && sudo apt upgrade -y
@@ -48,7 +54,7 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y \
     build-essential \
     git \
-    gprof \
+    binutils \
     valgrind \
     linux-tools-common \
     linux-tools-generic \
@@ -57,63 +63,120 @@ sudo apt install -y \
     curl
 ```
 
-**What to note (beginner):** just confirm each install succeeds. No errors = good.
+**If native Linux (Ubuntu/Debian):**
+Open a terminal and run the exact same commands — no difference here.
+```bash
+uname -a   # confirm you are on Linux
 
-**Check perf works:**
+sudo apt update && sudo apt upgrade -y
+
+sudo apt install -y \
+    build-essential \
+    git \
+    binutils \
+    valgrind \
+    linux-tools-common \
+    linux-tools-$(uname -r) \
+    cmake \
+    wget \
+    curl
+```
+> Note: `linux-tools-$(uname -r)` installs the perf version matched to your exact kernel — more reliable than `linux-tools-generic` on native Linux.
+
+**What to note (beginner):** just confirm each install succeeds with no errors.
+
+**Check perf works (both WSL2 and Linux):**
 ```bash
 perf stat ls
 ```
-If it prints hardware counters (cache-misses, instructions) — great, full perf works.
-If it says "Permission denied" or "not supported" — only software events work (still useful).
-**Note which case you are in.**
+
+**If Windows/WSL2:** hardware counters often blocked by the hypervisor. You may see:
+```
+Error: The sys_perf_event_open() syscall returned with 1 (Operation not permitted)
+```
+→ This is normal for WSL2. Software events still work. Note this happened.
+
+**If native Linux:** hardware counters almost always work. If you see permission denied, fix with:
+```bash
+sudo sysctl kernel.perf_event_paranoid=1
+```
+Then re-run `perf stat ls` — should now show cache-misses and instructions counts.
+
+**Note which case you are in — this determines what you can collect in Tool C.**
 
 ---
 
-### 0.2 Nsight Systems (for Dorado profiling — Windows)
+### 0.2 Nsight Systems (for Dorado GPU profiling)
 
-Nsight Systems is NVIDIA's free profiling tool for GPU programs.
+Nsight Systems is NVIDIA's free profiling tool for GPU programs. It records a full timeline of GPU kernels, memory transfers, and CPU activity.
 
-**Download:** go to `developer.nvidia.com/nsight-systems` → download the Windows installer.
-Install it. It creates two things:
-- **Nsight Systems GUI** — the visual timeline viewer
-- `nsys` — the command-line tool that actually does the recording
-
-**Verify install:**
+**If Windows/WSL2:**
+- Download the **Windows** installer from `developer.nvidia.com/nsight-systems`
+- Install on Windows (not inside WSL2 — the GPU is on the Windows side)
+- After install, verify in PowerShell:
 ```powershell
 nsys --version
+# Should print: NVIDIA Nsight Systems version 2024.x.x
 ```
-Should print something like `NVIDIA Nsight Systems version 2024.x.x`.
+- You will also get the **Nsight Systems GUI** — a visual timeline viewer. It opens `.nsys-rep` files.
 
-**What to note (beginner):** the version number. Write it down for the report.
+**If native Linux:**
+- Download the **Linux** installer (`.deb` or `.run`) from `developer.nvidia.com/nsight-systems`
+- Install with:
+```bash
+# If .deb package
+sudo dpkg -i NsightSystems-linux-*.deb
+
+# If .run package
+chmod +x NsightSystems-linux-*.run
+sudo ./NsightSystems-linux-*.run
+
+# Verify
+nsys --version
+```
+- The GUI is included — launch with `nsys-ui` from terminal or find it in your app launcher.
+- Dorado runs natively on Linux, so you can wrap it directly (no WSL needed).
+
+**What to note (beginner):** the version number printed by `nsys --version`. Write it down for the report.
 
 ---
 
 ### 0.3 Get Kraken-2 source code (needed for gprof)
 
-gprof requires the program to be compiled with a special flag (`-pg`). The pre-installed Kraken-2 binary does not have this. You need to build it yourself.
+gprof requires the program to be compiled with a special flag (`-pg`). Pre-installed Kraken-2 binaries do not have this. You need to build it from source.
 
+**If Windows/WSL2:**
 ```bash
-# In WSL2
+# Run inside WSL2
 cd ~
 git clone https://github.com/DerrickWood/kraken2.git
 cd kraken2
 
-# Open the Makefile and find the CXXFLAGS line — add -pg to it
-# It will look like: CXXFLAGS = -O2 -Wall
-# Change to:         CXXFLAGS = -O2 -Wall -pg
-
-nano Makefile   # or use any editor
-# Find CXXFLAGS line, add -pg, save
+# Edit the Makefile — find the CXXFLAGS line and add -pg
+# It currently looks like: CXXFLAGS = -O2 -Wall
+# Change it to:            CXXFLAGS = -O2 -Wall -pg
+nano Makefile
+# (Ctrl+W to search for "CXXFLAGS", add -pg, Ctrl+X then Y to save)
 
 # Build
 ./install_kraken2.sh ~/kraken2-build
 ```
 
-**What to note (beginner):** whether the build succeeds. If errors appear, copy them — they are almost always a missing library that `apt install` fixes.
+**If native Linux:**
+Exact same steps — no difference. Just run in your regular terminal:
+```bash
+cd ~
+git clone https://github.com/DerrickWood/kraken2.git
+cd kraken2
+nano Makefile   # add -pg to CXXFLAGS line
+./install_kraken2.sh ~/kraken2-build
+```
+
+**What to note (beginner):** whether the build succeeds. If errors appear, copy them — they are almost always a missing library that `apt install` fixes (e.g., `sudo apt install zlib1g-dev`).
 
 ---
 
-## Phase 1 — Dorado Profiling with Nsight Systems (Windows, GPU)
+## Phase 1 — Dorado Profiling with Nsight Systems (GPU)
 
 ### What is Nsight Systems?
 
@@ -126,20 +189,20 @@ Think of it like a flight recorder for your GPU. After the run it gives you a vi
 
 ### Why does this matter for the project?
 
-Dorado runs a neural network (Transformer) on the GPU. If you find that, say, 80% of time is spent in the attention kernels and only 5% in data transfer — then the bottleneck is compute, not I/O. That tells you exactly where a cache or optimization would help and where it would not.
+Dorado runs a neural network (Transformer) on the GPU. If you find that 80% of time is in attention kernels and only 5% in data transfer — the bottleneck is compute, not I/O. That tells you exactly where a cache would help and where it would not.
 
 ---
 
 ### 1.1 Run Dorado under Nsight Systems
 
-Open PowerShell (not WSL — this runs on Windows where the GPU is).
-
+**If Windows/WSL2:**
+Open PowerShell (not WSL — Dorado uses the Windows GPU directly):
 ```powershell
 # Set your paths
-$nsys    = "C:\Program Files\NVIDIA Corporation\Nsight Systems 2024.x.x\target-windows-x64\nsys.exe"
-$dorado  = "C:\Users\chira\OneDrive\Desktop\Nanopore project\dorado\dorado-1.4.0-win64\bin\dorado.exe"
-$pod5    = "C:\Users\chira\OneDrive\Desktop\Nanopore project\Nanopore project\pod5 data\FBE01990_24778b97_03e50f91_10.pod5"
-$outdir  = "C:\Users\chira\OneDrive\Desktop\Nanopore project\Nanopore project\results\nsight"
+$nsys   = "C:\Program Files\NVIDIA Corporation\Nsight Systems 2024.x.x\target-windows-x64\nsys.exe"
+$dorado = "C:\Users\chira\OneDrive\Desktop\Nanopore project\dorado\dorado-1.4.0-win64\bin\dorado.exe"
+$pod5   = "C:\Users\chira\OneDrive\Desktop\Nanopore project\Nanopore project\pod5 data\FBE01990_24778b97_03e50f91_10.pod5"
+$outdir = "C:\Users\chira\OneDrive\Desktop\Nanopore project\Nanopore project\results\nsight"
 
 # Create output folder
 New-Item -ItemType Directory -Force $outdir
@@ -153,6 +216,28 @@ New-Item -ItemType Directory -Force $outdir
     & $dorado basecaller fast $pod5 --output-dir "$outdir\bam" --batchsize 64
 ```
 
+**If native Linux:**
+Open a terminal. Dorado has a Linux binary — download the Linux version from `cdn.oxfordnanoportal.com` if you have not already.
+```bash
+# Set your paths
+NSYS="nsys"   # nsys is on PATH after install
+DORADO=~/dorado/bin/dorado   # adjust to where you installed it
+POD5=~/data/FBE01990_24778b97_03e50f91_10.pod5   # adjust to your pod5 path
+OUTDIR=~/results/nsight
+
+mkdir -p $OUTDIR
+
+# Run Dorado wrapped in nsys
+nsys profile \
+    --output $OUTDIR/dorado_fast_profile \
+    --trace cuda,nvtx,osrt \
+    --stats true \
+    -- \
+    $DORADO basecaller fast $POD5 --output-dir $OUTDIR/bam --batchsize 64
+```
+
+Both produce the same output: `dorado_fast_profile.nsys-rep` + a terminal stats summary.
+
 This will:
 1. Run Dorado fast mode (~5 min)
 2. Record everything into `dorado_fast_profile.nsys-rep`
@@ -162,8 +247,7 @@ This will:
 
 ### 1.2 What to note — Beginner level
 
-When the run finishes, the terminal prints a stats summary. **Write down these numbers:**
-
+When the run finishes, the terminal prints a stats summary (same on both Windows and Linux):
 ```
 Time (%)  Total Time (ns)  Instances  Avg (ns)   Name
 --------  ---------------  ---------  ---------  ----
@@ -184,7 +268,11 @@ Time (%)  Total Time (ns)  Instances  Avg (ns)   Name
 
 ### 1.3 What to note — Intermediate level
 
-Open the `.nsys-rep` file in the Nsight Systems GUI (just double-click it).
+Open the `.nsys-rep` file in the Nsight Systems GUI.
+
+**If Windows/WSL2:** double-click the `.nsys-rep` file in Explorer — Nsight Systems GUI opens it.
+
+**If native Linux:** run `nsys-ui` from terminal, then File → Open → select the `.nsys-rep` file.
 
 You will see a timeline with multiple rows. Look at:
 
@@ -208,11 +296,14 @@ You will see a timeline with multiple rows. Look at:
 
 ### 1.4 What to note — Advanced level
 
-In the GUI, right-click on the top kernel → "Analyze in Nsight Compute" (if available).
+Run Nsight Compute to get per-kernel throughput metrics.
 
-Or run Nsight Compute separately:
+**If Windows/WSL2:**
 ```powershell
-$ncu = "C:\Program Files\NVIDIA Corporation\Nsight Compute 2024.x.x\ncu.exe"
+$ncu    = "C:\Program Files\NVIDIA Corporation\Nsight Compute 2024.x.x\ncu.exe"
+$dorado = "C:\Users\chira\OneDrive\Desktop\Nanopore project\dorado\dorado-1.4.0-win64\bin\dorado.exe"
+$pod5   = "C:\Users\chira\OneDrive\Desktop\Nanopore project\Nanopore project\pod5 data\FBE01990_24778b97_03e50f91_10.pod5"
+$outdir = "C:\Users\chira\OneDrive\Desktop\Nanopore project\Nanopore project\results\nsight"
 
 & $ncu --target-processes all `
     --metrics sm__throughput.avg.pct_of_peak_sustained_elapsed,`
@@ -221,10 +312,19 @@ $ncu = "C:\Program Files\NVIDIA Corporation\Nsight Compute 2024.x.x\ncu.exe"
     -- & $dorado basecaller fast $pod5 --output-dir "$outdir\bam2"
 ```
 
+**If native Linux:**
+```bash
+ncu --target-processes all \
+    --metrics sm__throughput.avg.pct_of_peak_sustained_elapsed,\
+dram__throughput.avg.pct_of_peak_sustained_elapsed \
+    --output ~/results/nsight/ncu_report \
+    -- $DORADO basecaller fast $POD5 --output-dir ~/results/nsight/bam2
+```
+
 **What to note:**
 - `sm__throughput` — what % of peak GPU compute are you using? (100% = compute-bound, <50% = memory-bound)
 - `dram__throughput` — what % of peak memory bandwidth are you using?
-- These two numbers together tell you if Dorado on GTX 1650 is compute-bound or memory-bound
+- These two numbers together tell you if Dorado on your GPU is compute-bound or memory-bound
 
 **Why this matters for Kolin sir's cache:**
 - If memory-bound: a cache that reduces data movement will help a lot
@@ -232,9 +332,32 @@ $ncu = "C:\Program Files\NVIDIA Corporation\Nsight Compute 2024.x.x\ncu.exe"
 
 ---
 
-## Phase 2 — Kraken-2 Profiling (WSL2, CPU)
+## Phase 2 — Kraken-2 Profiling (CPU)
 
 Three tools, each giving different information. Run all three — they complement each other.
+
+**If Windows/WSL2:** run everything inside WSL2.
+**If native Linux:** run everything directly in your terminal — no difference in commands.
+
+The only difference is how you get your data files:
+
+**If Windows/WSL2 — copy files from Windows into WSL2:**
+```bash
+# FASTQ from Dorado output (adjust path to wherever yours is)
+cp "/mnt/c/Users/chira/OneDrive/Desktop/Nanopore project/Nanopore project/results/hac/barcode02.fastq" ~/
+
+# ESKAPE database
+cp -r "/mnt/c/Users/chira/OneDrive/Desktop/Nanopore project/Nanopore project/eskape_db" ~/
+```
+
+**If native Linux — files are already local:**
+```bash
+# Just set variables pointing to where your files are
+FASTQ=~/data/barcode02.fastq      # adjust to your path
+DB=~/data/eskape_db               # adjust to your path
+```
+
+All commands below use `~/barcode02.fastq` and `~/eskape_db` — adjust if your paths differ.
 
 ---
 
@@ -263,36 +386,45 @@ If `lookup_kmer_in_db` is the hotspot — that is exactly where Kolin sir's Hot-
 
 ### A.1 Run gprof
 
+**If Windows/WSL2 — run inside WSL2:**
 ```bash
-# In WSL2 — make sure you built Kraken-2 with -pg (Phase 0.3)
+# Make sure you built Kraken-2 with -pg (Phase 0.3)
+# Make sure barcode02.fastq and eskape_db are copied to ~/ (see Phase 2 intro above)
 
-# Copy your FASTQ file into WSL2 (if not already there)
-# From Windows path: /mnt/c/Users/chira/OneDrive/Desktop/...
-cp "/mnt/c/Users/chira/OneDrive/Desktop/Nanopore project/Nanopore project/results/hac/barcode02.fastq" ~/
-
-# Copy your ESKAPE database into WSL2
-cp -r "/mnt/c/Users/chira/OneDrive/Desktop/Nanopore project/Nanopore project/eskape_db" ~/
-
-# Run Kraken-2 (this generates gmon.out automatically because of -pg flag)
+# Run Kraken-2 — the -pg build automatically generates gmon.out
 ~/kraken2-build/kraken2 \
     --db ~/eskape_db \
     --report ~/kraken2_report.txt \
     ~/barcode02.fastq \
     > ~/kraken2_output.kraken
 
-# Now generate the gprof report
+# Generate the gprof report
 gprof ~/kraken2-build/kraken2 gmon.out > ~/gprof_report.txt
 
 # View it
 less ~/gprof_report.txt
 ```
 
+**If native Linux — same commands, just run in your terminal:**
+```bash
+# Same — just make sure paths point to your files
+~/kraken2-build/kraken2 \
+    --db ~/eskape_db \
+    --report ~/kraken2_report.txt \
+    ~/barcode02.fastq \
+    > ~/kraken2_output.kraken
+
+gprof ~/kraken2-build/kraken2 gmon.out > ~/gprof_report.txt
+less ~/gprof_report.txt
+```
+
+No difference between WSL2 and Linux for this tool.
+
 ---
 
 ### A.2 What to note — Beginner level
 
 Look at the **Flat Profile** section at the top of `gprof_report.txt`:
-
 ```
 Flat profile:
 Each sample counts as 0.01 seconds.
@@ -313,7 +445,6 @@ Each sample counts as 0.01 seconds.
 Look at the **Call Graph** section below the flat profile.
 
 It shows for each function: who called it, how many times, how long each call took.
-
 ```
 index  % time   self  children  called  name
                 0.36    2.89  1234567  lookup_kmer_in_db [1]
@@ -359,10 +490,10 @@ Cachegrind gives you the **exact cache miss count per function**. If `lookup_kme
 
 ### B.1 Run Cachegrind
 
+**If Windows/WSL2 — run inside WSL2:**
 ```bash
-# In WSL2
-# Warning: this runs 10-50x slower than normal — that is normal for Valgrind
-# Use a small input (single barcode, not the full dataset) to keep it under 10 min
+# Warning: Valgrind runs 10-50x slower than normal — that is expected
+# Use a single barcode FASTQ (small input) to keep runtime under 10-15 min
 
 valgrind \
     --tool=cachegrind \
@@ -380,12 +511,28 @@ cg_annotate ~/cachegrind.out > ~/cachegrind_report.txt
 less ~/cachegrind_report.txt
 ```
 
+**If native Linux — same commands, same output:**
+```bash
+valgrind \
+    --tool=cachegrind \
+    --cachegrind-out-file=~/cachegrind.out \
+    ~/kraken2-build/kraken2 \
+        --db ~/eskape_db \
+        --report ~/kraken2_report_cg.txt \
+        ~/barcode02.fastq \
+        > ~/kraken2_output_cg.kraken
+
+cg_annotate ~/cachegrind.out > ~/cachegrind_report.txt
+less ~/cachegrind_report.txt
+```
+
+No difference between WSL2 and Linux for this tool.
+
 ---
 
 ### B.2 What to note — Beginner level
 
 At the top of `cachegrind_report.txt` you will see a summary:
-
 ```
 I   refs:      xxx,xxx,xxx        (instructions executed)
 I1  misses:    xxx,xxx            (L1 instruction cache misses)
@@ -406,7 +553,6 @@ LL  misses:    xxx,xxx,xxx        (total last-level cache misses)
 ### B.3 What to note — Intermediate level
 
 Below the summary, cachegrind lists miss counts **per function**, annotated with source lines.
-
 ```
          Ir    I1mr   ILmr    Dr    D1mr   DLmr    Dw    D1mw   DLmw   file:function
 xxx,xxx,xxx       0      0   xxx   x,xxx  x,xxx     xx      0      0   kraken2.cpp:lookup_kmer
@@ -424,9 +570,10 @@ xxx,xxx,xxx       0      0   xxx   x,xxx  x,xxx     xx      0      0   kraken2.c
 
 Cachegrind also shows **line-level annotation** — it points to the exact line of code causing misses.
 
-To see this:
+**Both WSL2 and Linux — same command:**
 ```bash
 cg_annotate --auto=yes ~/cachegrind.out > ~/cachegrind_annotated.txt
+less ~/cachegrind_annotated.txt
 ```
 
 Find the inner loop of the k-mer lookup. It will show which line is causing cache misses.
@@ -436,7 +583,7 @@ Find the inner loop of the k-mer lookup. It will show which line is causing cach
 - Is it happening on the k-mer string itself? — data layout issue
 - If the hash table access is the culprit — this is exactly what blocking and caching fixes
 
-**Cross-reference with gprof:** same function, high time in gprof + high cache misses in cachegrind = confirmed bottleneck. Two tools agree = strong evidence.
+**Cross-reference with gprof:** same function, high time in gprof + high cache misses in cachegrind = confirmed bottleneck.
 
 ---
 
@@ -444,20 +591,20 @@ Find the inner loop of the k-mer lookup. It will show which line is causing cach
 
 ### What is perf?
 
-perf reads the CPU's built-in performance counters — tiny hardware registers that count events like cache misses, branch mispredictions, and instructions per cycle.
+perf reads the CPU's built-in hardware performance counters — tiny registers that count events like cache misses, branch mispredictions, and instructions per cycle.
 
-Unlike Valgrind (which simulates), perf reads the actual hardware — so the numbers are from real execution, not a model. But it only works if WSL2 exposes those counters (not guaranteed).
+Unlike Valgrind (which simulates the cache), perf reads the actual hardware — real numbers from real execution.
 
-### What it helps in the project
-
-perf gives you wall-clock confirmed numbers. If Valgrind says "10M cache misses" and perf says "10M LLC misses" — you have two independent measurements agreeing. That is what makes a good report.
+**Key difference between WSL2 and Linux here:**
+- **Native Linux:** hardware counters almost always work — you get the full picture.
+- **Windows/WSL2:** hardware counters are often blocked by the Hyper-V hypervisor — you may only get software events. Still useful, just less complete.
 
 ---
 
 ### C.1 Try running perf
 
+**Both WSL2 and Linux — same command to test:**
 ```bash
-# First test — does hardware perf work?
 perf stat -e cache-misses,LLC-load-misses,instructions,cycles \
     ~/kraken2-build/kraken2 \
         --db ~/eskape_db \
@@ -466,9 +613,7 @@ perf stat -e cache-misses,LLC-load-misses,instructions,cycles \
         > /dev/null
 ```
 
-**Two possible outcomes:**
-
-**Outcome A — perf works (hardware counters available):**
+**Outcome A — hardware counters work (likely on native Linux, possible on WSL2):**
 ```
 Performance counter stats:
 
@@ -479,13 +624,13 @@ Performance counter stats:
 
        3.456789 seconds time elapsed
 ```
-→ Note all numbers. This is gold.
+→ Note all numbers. This is the best possible output.
 
-**Outcome B — hardware counters not available in WSL2:**
+**Outcome B — hardware counters blocked (common on WSL2):**
 ```
 Error: The sys_perf_event_open() syscall returned with 1 (Operation not permitted)
 ```
-→ Fall back to software events:
+→ Fall back to software events — these always work on both WSL2 and Linux:
 ```bash
 perf stat -e task-clock,page-faults,context-switches \
     ~/kraken2-build/kraken2 \
@@ -494,7 +639,14 @@ perf stat -e task-clock,page-faults,context-switches \
         ~/barcode02.fastq \
         > /dev/null
 ```
-Software events always work. Note `task-clock` (CPU time) and `page-faults` (disk reads).
+`task-clock` = CPU time used. `page-faults` = how many times data had to be loaded from disk.
+
+**If native Linux and still getting permission denied:**
+```bash
+# One-time fix — lower the paranoia level
+sudo sysctl kernel.perf_event_paranoid=1
+# Then retry the perf stat command above
+```
 
 ---
 
@@ -502,27 +654,28 @@ Software events always work. Note `task-clock` (CPU time) and `page-faults` (dis
 
 Whichever outcome you get, note:
 - Total wall-clock time (`seconds time elapsed`)
-- If hardware counters work: `cache-misses` count and `LLC-load-misses` count
-- If only software: `page-faults` count (high page faults = DB not fitting in RAM, causing disk reads)
+- If hardware counters work: `cache-misses` and `LLC-load-misses` counts
+- If only software events: `page-faults` count (high page faults = DB not fitting in RAM, disk reads happening)
+- **Note whether you got hardware or software events** — this goes in the report as a setup detail
 
 ---
 
 ### C.3 What to note — Intermediate level
 
-If hardware perf works, calculate:
+If hardware perf works (native Linux most likely), calculate:
 
 **Cache miss rate:**
 ```
 LLC miss rate = LLC-load-misses / instructions × 100
 ```
-A rate above 1% is notable. Above 5% is severe for a lookup-heavy program.
+Above 1% is notable. Above 5% is severe for a lookup-heavy program like Kraken-2.
 
 **Instructions per cycle (IPC):**
 ```
 IPC = instructions / cycles
 ```
-IPC < 1.0 = memory-bound (CPU is stalling waiting for data)
-IPC > 2.0 = compute-bound (CPU is churning through calculations)
+IPC < 1.0 = memory-bound (CPU is stalling waiting for data to arrive from RAM)
+IPC > 2.0 = compute-bound (CPU is doing lots of arithmetic)
 
 **Note both numbers — they directly classify the bottleneck.**
 
@@ -530,7 +683,9 @@ IPC > 2.0 = compute-bound (CPU is churning through calculations)
 
 ### C.4 What to note — Advanced level
 
-Use `perf record` for line-level hotspots:
+Use `perf record` for line-level hotspots.
+
+**Both WSL2 and Linux — same command (works better on native Linux):**
 ```bash
 perf record -g \
     ~/kraken2-build/kraken2 \
@@ -542,9 +697,11 @@ perf record -g \
 perf report
 ```
 
-This opens an interactive view showing which source lines are hottest. Navigate with arrow keys, press `a` to annotate source.
+This opens an interactive view. Navigate with arrow keys, press `a` to annotate source lines.
 
 **Note:** the top 3 source lines by sample count. These are where SIMD/blocking changes would land.
+
+**If on WSL2 and `perf record` fails:** skip this step — cachegrind already gives line-level data via `cg_annotate --auto=yes`.
 
 ---
 
@@ -557,8 +714,8 @@ After running all tools, you will have:
 | Top 3 hotspot functions | gprof flat profile | Where Kraken-2 spends its time |
 | LLd miss rate (%) | cachegrind summary | How often it waits for RAM |
 | Exact lines causing misses | cachegrind annotated | Where to apply blocking/caching |
-| LLC-load-misses count | perf (if works) | Hardware confirmation of cache misses |
-| IPC | perf | Memory-bound vs compute-bound verdict |
+| LLC-load-misses count | perf (if hardware works) | Hardware confirmation of cache misses |
+| IPC | perf (if hardware works) | Memory-bound vs compute-bound verdict |
 | Top GPU kernels (%) | Nsight Systems | Where Dorado spends GPU time |
 | Memory transfer % | Nsight Systems | Is GPU starved of data? |
 | SM throughput % | Nsight Compute | Is GPU at compute capacity? |
@@ -577,7 +734,7 @@ After running all tools, you will have:
 → Caching helps less
 
 **If Dorado is memory-bound (SM throughput < 50%, high DtoH/HtoD time):**
-→ Signal-to-Base cache in CUDA shared memory is the right fix (avoids sending similar signals through the full pipeline)
+→ Signal-to-Base cache in CUDA shared memory is the right fix
 
 **If Dorado is compute-bound (SM throughput > 80%):**
 → Need algorithmic changes — cache alone won't help much
@@ -586,21 +743,20 @@ After running all tools, you will have:
 
 ## Phase 4 — The 2-Page Report Structure
 
-When you have your numbers, structure the report like this:
-
 ```
 Page 1: Kraken-2 CPU Profile
-  - Setup: WSL2, Kraken-2 built from source, ESKAPE DB (650 MB), barcode02.fastq input
+  - Setup: WSL2 or Linux, Kraken-2 built from source with -pg,
+           ESKAPE DB (650 MB), barcode02.fastq input, note if perf gave hardware or software events
   - gprof results: top 5 functions + % time table
   - cachegrind results: LLd miss rate + top miss-causing functions
-  - perf results: IPC, LLC miss count (or page-faults if hardware counters unavailable)
+  - perf results: IPC + LLC miss count (or page-faults if hardware counters unavailable)
   - Verdict: memory-bound or compute-bound, with the numbers
 
 Page 2: Dorado GPU Profile
-  - Setup: Windows, GTX 1650 (4GB VRAM), fast mode, 104k reads
-  - Nsight Systems: top 3 kernels + % time, memory transfer % 
+  - Setup: Windows or Linux, GPU model + VRAM, fast mode, 104k reads
+  - Nsight Systems: top 3 kernels + % time, memory transfer %
   - SM throughput + DRAM throughput (from Nsight Compute if run)
-  - Verdict: where the GPU time goes, is it memory or compute bound
+  - Verdict: where GPU time goes, memory or compute bound
   - Connection to cache: what % of time a cache could theoretically recover
 ```
 
@@ -609,37 +765,54 @@ Page 2: Dorado GPU Profile
 ## Quick Reference — Command Cheatsheet
 
 ```bash
-# === WSL2 — Kraken-2 profiling ===
+# === Kraken-2 profiling (WSL2 or native Linux — same commands) ===
 
-# gprof run + report
+# gprof
 ~/kraken2-build/kraken2 --db ~/eskape_db --report ~/report.txt ~/barcode02.fastq > /dev/null
 gprof ~/kraken2-build/kraken2 gmon.out > ~/gprof_report.txt
 
-# cachegrind run + report
+# cachegrind
 valgrind --tool=cachegrind --cachegrind-out-file=~/cg.out \
     ~/kraken2-build/kraken2 --db ~/eskape_db --report ~/report.txt ~/barcode02.fastq > /dev/null
 cg_annotate --auto=yes ~/cg.out > ~/cachegrind_report.txt
 
-# perf (try hardware first, fall back to software)
+# perf — try hardware first
 perf stat -e cache-misses,LLC-load-misses,instructions,cycles \
     ~/kraken2-build/kraken2 --db ~/eskape_db --report ~/report.txt ~/barcode02.fastq > /dev/null
 
-# perf hotspots
+# perf — fallback software events (always works)
+perf stat -e task-clock,page-faults,context-switches \
+    ~/kraken2-build/kraken2 --db ~/eskape_db --report ~/report.txt ~/barcode02.fastq > /dev/null
+
+# perf hotspots (native Linux recommended)
 perf record -g ~/kraken2-build/kraken2 --db ~/eskape_db --report ~/report.txt ~/barcode02.fastq > /dev/null
 perf report
 ```
 
 ```powershell
-# === Windows — Dorado profiling ===
+# === Dorado profiling — Windows/WSL2 (run in PowerShell) ===
 
-# Nsight Systems (timeline recording)
 nsys profile --output results\nsight\dorado_fast_profile --trace cuda,nvtx,osrt --stats true `
     -- dorado.exe basecaller fast "pod5 data\file.pod5" --output-dir results\nsight\bam
 
-# Nsight Compute (per-kernel deep metrics)
 ncu --metrics sm__throughput.avg.pct_of_peak_sustained_elapsed,dram__throughput.avg.pct_of_peak_sustained_elapsed `
     --output results\nsight\ncu_report `
     -- dorado.exe basecaller fast "pod5 data\file.pod5" --output-dir results\nsight\bam2
+```
+
+```bash
+# === Dorado profiling — native Linux (run in terminal) ===
+
+nsys profile \
+    --output ~/results/nsight/dorado_fast_profile \
+    --trace cuda,nvtx,osrt \
+    --stats true \
+    -- ~/dorado/bin/dorado basecaller fast ~/data/file.pod5 --output-dir ~/results/nsight/bam
+
+ncu \
+    --metrics sm__throughput.avg.pct_of_peak_sustained_elapsed,dram__throughput.avg.pct_of_peak_sustained_elapsed \
+    --output ~/results/nsight/ncu_report \
+    -- ~/dorado/bin/dorado basecaller fast ~/data/file.pod5 --output-dir ~/results/nsight/bam2
 ```
 
 ---
@@ -648,22 +821,26 @@ ncu --metrics sm__throughput.avg.pct_of_peak_sustained_elapsed,dram__throughput.
 
 ```
 Day 1 (Setup):
-  [ ] Install Nsight Systems on Windows — verify nsys --version works
-  [ ] In WSL2: apt install build-essential valgrind linux-tools-generic
-  [ ] Clone Kraken-2, edit Makefile to add -pg, build it
-  [ ] Copy barcode02.fastq and eskape_db into WSL2 home directory
-  [ ] Test: run plain kraken2 once to confirm it works before adding profiling
+  [ ] Windows/WSL2: install Nsight Systems on Windows, verify nsys --version
+      Native Linux: download and install Nsight Systems Linux package, verify nsys --version
+  [ ] WSL2: apt install build-essential valgrind linux-tools-common linux-tools-generic
+      Native Linux: apt install build-essential valgrind linux-tools-common linux-tools-$(uname -r)
+  [ ] Clone Kraken-2, edit Makefile to add -pg to CXXFLAGS, build with install_kraken2.sh
+  [ ] WSL2: copy barcode02.fastq and eskape_db from Windows into WSL2 home directory
+      Native Linux: confirm barcode02.fastq and eskape_db are accessible, note their paths
+  [ ] Test: run kraken2 once WITHOUT profiling to confirm it works before adding tools
+  [ ] Test perf: run "perf stat ls" — note whether hardware counters work or not
 
 Day 2 (Dorado profiling):
-  [ ] Run Dorado fast mode under nsys (takes ~5 min + overhead)
-  [ ] Open .nsys-rep in GUI — note top kernels + memory transfer %
-  [ ] Run Nsight Compute on top kernel — note SM throughput + DRAM throughput
+  [ ] Run Dorado fast mode under nsys (~5 min + overhead)
+  [ ] Open .nsys-rep in Nsight Systems GUI — note top kernels + memory transfer %
+  [ ] Run Nsight Compute on the top kernel — note SM throughput + DRAM throughput
   [ ] Write up Page 2 of the report from these numbers
 
 Day 3 (Kraken-2 profiling):
-  [ ] Run gprof version of kraken2 — note top 5 functions
-  [ ] Run cachegrind — note LLd miss rate + top miss functions (will be slow, ~20 min)
-  [ ] Try perf stat — note whether hardware counters work or not, collect whatever works
+  [ ] Run gprof version of kraken2 — note top 5 functions + % time
+  [ ] Run cachegrind — note LLd miss rate + top miss functions (will take ~20 min — normal)
+  [ ] Run perf stat (hardware if available, software fallback) — note IPC and miss counts
   [ ] Write up Page 1 of the report from these numbers
 
 Day 4 (Report):
