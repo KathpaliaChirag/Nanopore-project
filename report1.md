@@ -1,7 +1,7 @@
 # Profiling Report — Nanopore Pipeline
 ## Dorado (GPU) + Kraken-2 (CPU) Baseline Analysis
 
-**Prepared by:** Chirag K, Chirag S  
+**Prepared by:** Chirag Kathpalia  
 **Date:** 2026-05-19  
 **Submitted to:** Kolin sir  
 
@@ -33,12 +33,16 @@ The central question: **is each stage memory-bound or compute-bound?**
 |---|---|
 | WSL2 Kernel | 6.6.87.2-microsoft-standard-WSL2 |
 | Linux Distro | Ubuntu 24.04.4 LTS (Noble Numbat) |
+| Architecture | x86_64 |
 | Dorado | 1.4.0 (Windows binary) |
 | Kraken-2 | built from source with -pg flag |
 | Nsight Systems | [ VERSION — fill after install ] |
 | Nsight Compute | [ VERSION — fill after install ] |
-| Valgrind | [ VERSION — fill after install, run: valgrind --version ] |
-| perf | [ VERSION — fill after install, run: perf --version ] |
+| build-essential | 12.10ubuntu1 |
+| git | 2.43.0 |
+| cmake | 3.28.3 |
+| Valgrind | 3.22.0 |
+| perf | [ VERSION — fill after running: perf --version ] |
 
 ### 2.3 Input Data
 
@@ -54,13 +58,25 @@ The central question: **is each stage memory-bound or compute-bound?**
 | Database size | 650 MB |
 | Dorado mode | fast |
 
-### 2.4 perf Hardware Counters Availability
+### 2.4 perf Availability
 
-| Counter type | Available? |
+| Counter type | Status |
 |---|---|
-| Hardware counters (cache-misses, LLC-load-misses) | [ YES / NO — fill after running perf stat ls ] |
-| Software counters (task-clock, page-faults) | Always available |
-| Note | WSL2 hypervisor commonly blocks hardware PMU access |
+| perf binary | NOT FOUND for current kernel |
+| Hardware counters (cache-misses, LLC-load-misses) | Blocked — perf binary missing |
+| Software counters (task-clock, page-faults) | Blocked — perf binary missing |
+| Kernel | 6.6.87.2-microsoft-standard-WSL2 (Microsoft custom kernel) |
+| Root cause | `linux-tools-generic` installs perf for Ubuntu's stock kernel only. The matching package `linux-tools-6.6.87.2-microsoft-standard-WSL2` does not exist in Ubuntu's repos. |
+
+**Options to get perf working:**
+
+| Option | Effort | Notes |
+|---|---|---|
+| Build perf from WSL2 kernel source | High | Clone github.com/microsoft/WSL2-Linux-Kernel, build tools/perf — takes ~30 min |
+| Use a native Linux machine / lab server | Low | perf works out of the box, hardware counters available |
+| Proceed with gprof + cachegrind only | None | Both tools already cover hotspot and cache miss analysis — perf would add IPC confirmation |
+
+**Status:** [ TO BE DECIDED — build from source / use lab machine / proceed without ]
 
 ---
 
@@ -221,9 +237,11 @@ Top function: **[ FILL function name ]**
 
 ### 4.7 perf Results
 
-**Hardware counters available:** [ YES / NO ]
+**Status:** perf binary not found for WSL2 kernel `6.6.87.2-microsoft-standard-WSL2`
 
-**If hardware counters available:**
+See Section 2.4 for root cause and options.
+
+**If perf is made available (build from source or lab machine), fill in:**
 
 | Metric | Value |
 |---|---|
@@ -235,22 +253,12 @@ Top function: **[ FILL function name ]**
 | LLC miss rate (LLC-load-misses / instructions × 100) | **[ FILL ]%** |
 | Wall-clock time | [ FILL ] s |
 
-**If hardware counters NOT available (WSL2 limitation):**
-
-| Metric | Value |
-|---|---|
-| task-clock | [ FILL ] ms |
-| page-faults | [ FILL ] |
-| context-switches | [ FILL ] |
-| Wall-clock time | [ FILL ] s |
-| Note | Hardware PMU counters blocked by Hyper-V hypervisor in WSL2 |
-
 **IPC interpretation:**
 - IPC < 1.0 → memory-bound (CPU stalling on RAM fetches)
 - IPC 1.0–2.0 → mixed
 - IPC > 2.0 → compute-bound
 
-**Result:** [ FILL ]
+**Result:** [ FILL once perf is available ]
 
 ---
 

@@ -90,19 +90,26 @@ sudo apt install -y \
 perf stat ls
 ```
 
-**If Windows/WSL2:** hardware counters often blocked by the hypervisor. You may see:
+**If Windows/WSL2:** you will likely see:
 ```
-Error: The sys_perf_event_open() syscall returned with 1 (Operation not permitted)
+WARNING: perf not found for kernel 6.6.87.2-microsoft
+  You may need to install the following packages for this specific kernel:
+    linux-tools-6.6.87.2-microsoft-standard-WSL2
+    linux-cloud-tools-6.6.87.2-microsoft-standard-WSL2
 ```
-→ This is normal for WSL2. Software events still work. Note this happened.
+These packages do not exist in Ubuntu's repos — WSL2 uses a Microsoft-custom kernel. You have three options:
+1. **Build perf from WSL2 kernel source** — clone `github.com/microsoft/WSL2-Linux-Kernel`, build `tools/perf` (~30 min, gives full hardware counters)
+2. **Use a native Linux machine or lab server** — perf works out of the box
+3. **Proceed without perf** — gprof + cachegrind already cover hotspot and cache miss data; perf adds IPC on top
+Note which option you chose and why — it goes in the report.
 
 **If native Linux:** hardware counters almost always work. If you see permission denied, fix with:
 ```bash
 sudo sysctl kernel.perf_event_paranoid=1
 ```
-Then re-run `perf stat ls` — should now show cache-misses and instructions counts.
+Then re-run `perf stat ls` — should show cache-misses and instructions counts.
 
-**Note which case you are in — this determines what you can collect in Tool C.**
+**Note which case you are in — if on WSL2 and perf is missing, skip Tool C entirely and rely on gprof + cachegrind.**
 
 ---
 
@@ -597,7 +604,11 @@ Unlike Valgrind (which simulates the cache), perf reads the actual hardware — 
 
 **Key difference between WSL2 and Linux here:**
 - **Native Linux:** hardware counters almost always work — you get the full picture.
-- **Windows/WSL2:** hardware counters are often blocked by the Hyper-V hypervisor — you may only get software events. Still useful, just less complete.
+- **Windows/WSL2:** perf will likely show "perf not found for kernel X". WSL2 uses a Microsoft-custom kernel and `linux-tools-generic` only covers Ubuntu's stock kernel. You have three options:
+  1. **Build perf from WSL2 kernel source** — clone `github.com/microsoft/WSL2-Linux-Kernel`, build `tools/perf`, takes ~30 min but gives full hardware counters
+  2. **Use a native Linux machine or lab server** — perf works out of the box there
+  3. **Proceed with gprof + cachegrind** — both already cover hotspot and cache miss analysis; perf adds IPC confirmation on top
+  Decide based on available time and machines.
 
 ---
 
