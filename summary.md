@@ -200,6 +200,27 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 
 **Immediate deliverable:** 2-page profile report using `perf` (Kraken-2) + Nsight (Dorado) by ~2026-05-25.
 
+### Goal 3 — Time & Accuracy Improvement (assigned 2026-05-18, §14)
+
+**Two axes from Kolin sir's Meeting 3 direction:**
+
+**Time improvement — storage access + compute:**
+- Find **cache reuse** opportunities across the POD-5 → Dorado → Kraken-2 flow
+- Profiling tools to use:
+  - `gprof` — CPU call-graph, find which functions consume the most time
+  - `Valgrind / cachegrind` — cache miss rates, memory access pattern analysis
+- Find **matrix-vector / vector-matrix / matrix-matrix blocks** in Kraken-2 and Dorado source
+- Apply **cache blocking (tiling)** — restructure loops so data stays in L1/L2 cache
+- Apply **SIMD / MMX2 / AVX2 / AVX-512** — vectorize inner loops, process multiple k-mers per instruction
+
+**Accuracy improvement:**
+- Improve classification accuracy through the full pipeline (methods TBD in follow-up meetings)
+
+### Team / GitHub Structure (assigned 2026-05-18)
+- **Repo 1:** Chirag K + Chirag S — code, experiments, meeting minutes
+- **Repo 2:** Rishabh + Rohit — their work and contributions
+- Both repos must stay up to date and be accessible to Kolin sir at all times
+
 ---
 
 ## Hardware Constraints (This Machine)
@@ -225,8 +246,10 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 | Kraken-2 | Species classification | FASTQ | Species report |
 | pod5 (Python) | Inspect POD-5 metadata | POD-5 | Metadata |
 | nvidia-smi | Check GPU utilization | — | GPU stats |
-| perf | CPU profiling (Linux) | running process | Cache miss rates |
+| perf | CPU profiling (Linux) | running process | Cache miss rates, hotspots |
 | Nsight | GPU profiling | running process | Kernel timings |
+| gprof | CPU call-graph profiling | compiled binary | Function-level time breakdown |
+| Valgrind / cachegrind | Cache + memory analysis | running process | Cache miss rates, access patterns |
 
 ---
 
@@ -242,9 +265,10 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 
 ---
 
-## Open Questions (for Monday meeting)
+## Open Questions
 
 - What does **MBR** stand for exactly?
 - Is there a **lab server** we can SSH into for profiling (perf + Nsight)?
 - What is **CROC** tool used for in this project (BEDROC metric)?
 - Which barcodes correspond to which patient samples / pathogens?
+- Accuracy improvement specifics — methods to be discussed in next meeting

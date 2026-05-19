@@ -2145,3 +2145,151 @@ From our benchmarks: fast→hac gives +3-8% classification improvement. hac→su
 A Python package called `CROC-1.2.6` was found in the project directory alongside the POD-5 files. CROC = **Concentrated ROC** - a method for evaluating early recognition performance in ranked lists (related to ROC curve analysis). It also contains two POD-5 files identical to the ones in `pod5 data/`.
 
 Likely provided by mam for evaluating classification accuracy - CROC metrics (BEDROC) are used to assess how well a classifier ranks true positives early, which is relevant for evaluating Kraken-2's species identification performance. To be clarified at next meeting.
+
+---
+
+## 14. Meeting 3 Directions — Time & Accuracy Improvement (2026-05-18)
+
+Assigned by Kolin sir in the third meeting. Two improvement axes for the POD-5 → Dorado → Kraken-2 pipeline.
+
+---
+
+### 14.1 GitHub repository structure
+
+Two repos to be maintained and kept accessible to Kolin sir at all times:
+
+| Repo | Maintainers | Contents |
+|---|---|---|
+| Repo 1 | Chirag K + Chirag S | Code, experiments, meeting minutes |
+| Repo 2 | Rishabh + Rohit | Their work and contributions |
+
+---
+
+### 14.2 Time improvement — finding and fixing the bottlenecks
+
+The goal is to reduce end-to-end wall-clock time for the pipeline by improving storage access patterns and compute efficiency.
+
+#### Step 1 — Profile first, optimize second
+
+Do not guess where the bottleneck is. Use profiling tools to find it:
+
+| Tool | What it measures | How to use |
+|---|---|---|
+| `gprof` | CPU call graph — which functions consume the most time | Compile with `-pg`, run binary, run `gprof` on output |
+| `Valgrind / cachegrind` | Cache miss rates, memory access patterns at instruction level | `valgrind --tool=cachegrind ./kraken2 ...` |
+| `perf stat` | Hardware counters — L1/L2/L3 cache misses, branch mispredictions | `perf stat -e cache-misses,LLC-load-misses kraken2 ...` |
+| `perf record + report` | Hotspot functions with annotated source lines | `perf record ./kraken2 ...; perf report` |
+
+Look for:
+- Functions with high self-time (gprof) — these are the hotspots
+- High LLC (Last Level Cache) miss rates (perf, cachegrind) — memory bottleneck
+- High instruction counts in inner loops — compute bottleneck
+
+#### Step 2 — Cache reuse: identify hot k-mer lookups
+
+Once hotspots are identified, check: is the same data being loaded repeatedly?
+
+In Kraken-2, the inner loop does:
+```
+for each read:
+    for each 35-mer window in read:
+        hash(k-mer) → look up in compact hash table → taxon ID
+```
+
+For a patient sample dominated by one species (e.g., *Pseudomonas aeruginosa*), a small fraction of k-mers accounts for the vast majority of lookups. These "hot" k-mers are always for the same species. If they are evicted from L3 cache between lookups, you pay a cache miss penalty every time.
+
+**Cache reuse opportunity:** pin the hot k-mer → taxon entries in L3 cache (or a software cache in front of the hash table). This is Kolin sir's Hot-K-mer LRU idea (§8.1) — section 14 now gives the profiling basis for it.
+
+#### Step 3 — Find matrix/vector compute blocks
+
+Both Dorado (Transformer) and Kraken-2 (hash table construction) contain linear algebra kernels. Look for:
+
+| Pattern | Where | What to look for in source |
+|---|---|---|
+| Matrix-vector multiply | Dorado attention, linear projections | `Ax` patterns, `cblas_sgemv`, `torch::mm` |
+| Vector-matrix multiply | Same — transposed form | `x^T A` patterns |
+| Matrix-matrix multiply | Dorado batched attention | `AB` patterns, `torch::bmm`, `cublasSgemm` |
+
+These are the blocks where cache blocking and SIMD apply.
+
+#### Step 4 — Cache blocking (tiling)
+
+**The problem with naive matrix multiply:**
+```
+for i in rows:
+    for j in cols:
+        for k in inner:
+            C[i][j] += A[i][k] * B[k][j]   # B[k][j] jumps in memory — cache miss every step
+```
+
+B is accessed column-by-column but stored row-by-row → every `B[k][j]` access is a cache miss.
+
+**Cache blocking fix — tile the loops:**
+```
+for i in 0..rows step TILE:
+    for j in 0..cols step TILE:
+        for k in 0..inner step TILE:
+            # process TILE×TILE subblock — fits in L1/L2 cache
+            for ii in i..i+TILE:
+                for jj in j..j+TILE:
+                    for kk in k..k+TILE:
+                        C[ii][jj] += A[ii][kk] * B[kk][jj]
+```
+
+TILE is chosen so the working set (A tile + B tile + C tile) fits in L1 or L2 cache. This converts random wide-stride accesses into sequential accesses within a small block — hardware prefetcher can keep up, cache miss rate drops drastically.
+
+**Where to apply in this project:**
+- Dorado's transformer linear layers (if accessing source)
+- Kraken-2's k-mer hash table construction (if batch processing k-mers)
+
+#### Step 5 — SIMD / MMX2 / AVX2 / AVX-512
+
+**What SIMD is:**
+Single Instruction, Multiple Data. One CPU instruction processes multiple data elements in parallel using wide registers.
+
+| Instruction set | Register width | Floats per op | Ints per op |
+|---|---|---|---|
+| MMX / SSE2 | 128-bit | 4x float32 | 16x int8 |
+| AVX2 | 256-bit | 8x float32 | 32x int8 |
+| AVX-512 | 512-bit | 16x float32 | 64x int8 |
+
+**For Kraken-2 k-mer hashing:**
+Instead of hashing one 35-mer at a time:
+```c
+// Scalar — one at a time
+for (int i = 0; i < n_kmers; i++) {
+    result[i] = hash(kmers[i]);
+}
+```
+Use AVX2 to process 8 k-mers per iteration:
+```c
+// Vectorized — 8 at a time with AVX2
+__m256i kmer_vec = _mm256_loadu_si256((__m256i*)&kmers[i]);
+__m256i hash_vec = avx2_hash(kmer_vec);  // custom vectorized hash
+_mm256_storeu_si256((__m256i*)&result[i], hash_vec);
+```
+
+This is exactly what Kolin sir's AVX-512 plan in §8.1 targets. Profiling first (gprof/Valgrind) will confirm whether this loop is hot enough to justify the implementation effort.
+
+**Ryzen 7 5800H supports:** SSE4.2, AVX2 — does NOT support AVX-512 (that is Intel Skylake-X and above).
+
+---
+
+### 14.3 Accuracy improvement
+
+Direction from Kolin sir: improve classification accuracy through the full pipeline.
+
+Specific methods and metrics to be discussed in the next meeting. Likely involves:
+- Comparing fast vs hac vs sup basecalling accuracy
+- Measuring Kraken-2 classification accuracy against known ground-truth (golden dataset from §10)
+- Possibly tuning k-mer length, confidence thresholds, or the Kraken-2 DB composition
+
+---
+
+### 14.4 Immediate next steps (post-Meeting 3)
+
+1. Set up 2 GitHub repos — share links with Kolin sir
+2. Profile Kraken-2 with `gprof` and `Valgrind/cachegrind` under WSL2
+3. Identify matrix/vector blocks in Kraken-2 source code
+4. Document cache miss rate baseline (the number that will justify the caching work)
+5. Start reading about cache blocking and AVX2 intrinsics

@@ -89,3 +89,56 @@
 - Run Dorado → Kraken-2 pipeline on this golden data in Colab
 - Measure accuracy and runtime at each DB size
 - Study Kraken-2 internals / source code
+
+---
+
+## Meeting 3 — 2026-05-18
+
+**Attendees:** Kolin sir, Chayanika mam, Chirag K, Chirag S, Rohit, Rishabh
+**Format:** Task assignment + research direction
+
+### Topics covered
+
+1. **GitHub documentation (mandatory)**
+   - Maintain **2 GitHub repositories** covering all work done and all meeting discussions
+   - Both repos must be viewable by Kolin sir at any time — treat them as the living record of the project
+   - **Repo 1 (Chirag K + Chirag S):** maintained jointly by both Chirags 
+   - **Repo 2 (Rishabh + Rohit):** maintained jointly by Rishabh and Rohit 
+
+2. **Performance improvement research — POD-5 → Dorado → Kraken-2 pipeline**
+
+   Two axes of improvement were identified:
+
+   **a) Time improvement (storage access + compute)**
+   - Investigate **cache reuse** opportunities along the pipeline — where are the same data structures or lookups repeated?
+   - Use **hotspot profiling tools** to find bottlenecks:
+     - `gprof` — CPU-level call graph profiling
+     - `Valgrind` (especially `cachegrind`) — cache miss analysis, memory access patterns
+   - Identify **compute-heavy blocks** in Kraken-2 and Dorado:
+     - Look for **matrix-vector**, **vector-matrix**, and **matrix-matrix** multiplication blocks
+     - Apply **cache blocking / tiling** to improve data locality for these blocks
+     - Explore **MMX2 / SIMD** (e.g., AVX2, AVX-512) intrinsics to vectorize inner loops
+   - Goal: reduce memory latency + increase compute throughput on the same hardware
+
+   **b) Accuracy improvement**
+   - Improve classification accuracy through the full POD-5 → Dorado → Kraken-2 flow
+   - Specific methods to be explored in follow-up meetings
+
+### Key tools to investigate
+| Tool | Purpose |
+|---|---|
+| `gprof` | CPU call-graph profiling — find which functions take the most time |
+| `Valgrind / cachegrind` | Cache miss rates, memory access pattern analysis |
+| `perf` | Linux hardware counter profiling (hotspots, cache misses, branch mispredictions) |
+| SIMD / AVX2 / AVX-512 | Vectorized arithmetic — parallelize inner loop math |
+| Cache blocking (tiling) | Restructure matrix ops to keep data in L1/L2 cache |
+
+### Action items
+- Set up and share **2 GitHub repos** (code + docs/minutes) — accessible to Kolin sir
+- Profile Kraken-2 with `gprof` and `Valgrind/cachegrind` to find cache miss hotspots
+- Identify matrix/vector computation blocks in Kraken-2 source
+- Research cache blocking and SIMD opportunities in those blocks
+- Document findings in the knowledge base (§14 onwards)
+
+### Next meeting
+TBD
