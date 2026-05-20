@@ -29,20 +29,5 @@ Update this every time a new major topic is pushed.
 **report.md** →
 - (empty — add entries as profiling work is executed)
 
-**report1.md** →
-- [2026-05-16] System setup documented: Windows 11 + WSL2, Ryzen 7 5800H, GTX 1650 4GB, Valgrind 3.22.0 installed, perf not available on WSL2 custom kernel
-
-**meeting_minutes.md** →
-- Meeting 1: 2026-05-11 (intro — nanopore, Dorado, Kraken-2, ESKAPE)
-- Meeting 2: 2026-05-15 (golden dataset, reduced DB, Colab pipeline)
-- Meeting 3: 2026-05-18 (Kolin sir — 2 GitHub repos, profiling tools, SIMD/cache blocking)
-
-**summary.md** →
-- Quick reference: all 4 pipeline stages with commands
-- ESKAPE pathogen table, research goals, hardware constraints, key findings
-
-**updates.md** →
-- 2026-05-11, 2026-05-12, 2026-05-13, 2026-05-16, 2026-05-18
-
 **daily_summary.md** →
 - 2026-05-20
