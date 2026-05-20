@@ -23,4 +23,4 @@
 | build-essential | 12.10ubuntu1 |
 | git | 2.43.0 |
 | cmake | 3.28.3 |
-| perf | Not available — WSL2 custom kernel has no matching linux-tools package |
+| perf | Built from WSL2-Linux-Kernel source (tag linux-msft-wsl-6.6.87.2). Hardware counters work (cycles, instructions, cache-misses, branches). LLC-specific counters (LLC-loads, LLC-load-misses) show `<not supported>` — Hyper-V does not expose them. Per-function LLC data covered by cachegrind. |

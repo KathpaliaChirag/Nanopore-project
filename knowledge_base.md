@@ -824,7 +824,7 @@ For **Kraken-2 (perf):**
 
 | Option | Dorado (Nsight) | Kraken-2 (perf) | Notes |
 |---|---|---|---|
-| **WSL2 on your machine** | CUDA passthrough works | perf works | Best local option |
+| **WSL2 on your machine** | CUDA passthrough works | perf works (built from WSL2 kernel source — see §15.3); LLC counters blocked by Hyper-V, use cachegrind for those | Best local option |
 | **Your Windows machine (native)** | Nsight works on Windows | perf is Linux-only | Partial |
 | **University HPC / lab server** | if NVIDIA GPU available | Linux + root | Ideal - ask mam/Kolin sir |
 | **Google Colab** | Not viable | Not viable | Not viable for profiling |
@@ -841,9 +841,11 @@ nsys profile dorado basecaller hac data.pod5 --output-dir results/
 
 Kraken-2 with perf:
 ```bash
-perf stat -e cache-misses,LLC-load-misses,cache-references \
+perf stat -e cache-misses,cache-references,instructions,cycles,branches,branch-misses \
     kraken2 --db /path/to/db reads.fastq
 # Prints hardware counter table after run completes
+# Note: LLC-loads and LLC-load-misses show <not supported> on WSL2 (Hyper-V blocks them)
+# Use cachegrind for per-function LLC miss data instead
 ```
 
 **The profiling workflow:**
@@ -2292,4 +2294,180 @@ Specific methods and metrics to be discussed in the next meeting. Likely involve
 2. Profile Kraken-2 with `gprof` and `Valgrind/cachegrind` under WSL2
 3. Identify matrix/vector blocks in Kraken-2 source code
 4. Document cache miss rate baseline (the number that will justify the caching work)
+
+---
+
+## 15. perf — Profiling Tool Deep Dive
+
+### 15.1 What perf is
+
+`perf` is Linux's built-in profiling tool. It reads hardware performance counters (PMU — Performance Monitoring Unit) that are physically built into every modern CPU. These counters are tiny registers that increment automatically every time a certain event happens: a cache miss, a branch misprediction, a clock cycle, an instruction completing.
+
+Think of it as a flight recorder for the CPU. While your program runs, perf counts exactly what the CPU was doing at the hardware level. After the run, it prints a table of those counts.
+
+The key advantage over tools like Valgrind is that perf adds almost zero overhead — it reads real hardware, it doesn't simulate anything. Valgrind slows your program down 10–50x because it intercepts every memory access. perf: near-zero overhead, real execution speed.
+
+### 15.2 Event Types
+
+perf has three classes of events:
+
+**Hardware events** — read from CPU PMU registers. The most precise, real hardware counts.
+Examples: `cycles`, `instructions`, `cache-misses`, `cache-references`, `branches`, `branch-misses`
+
+**Hardware cache events** — a specialised subset of hardware events for the cache hierarchy specifically.
+Examples: `L1-dcache-loads`, `L1-dcache-load-misses`, `LLC-loads`, `LLC-load-misses`, `dTLB-loads`, `dTLB-load-misses`
+
+**Software events** — tracked by the Linux kernel in software, not hardware. Always work everywhere including WSL2 and virtual machines.
+Examples: `task-clock`, `page-faults`, `context-switches`, `cpu-migrations`
+
+Run `perf list` to see everything available on your system. Run `perf list | grep cache` to filter just cache events.
+
+### 15.3 Getting perf Working on WSL2
+
+WSL2 uses a Microsoft-custom kernel (`6.6.87.2-microsoft-standard-WSL2`). Ubuntu's `linux-tools-generic` package only ships perf for Ubuntu's own kernels — there is no package for Microsoft's kernel. Running `perf stat ls` will show:
+```
+WARNING: perf not found for kernel 6.6.87.2-microsoft
+```
+
+**The fix: build perf from the WSL2 kernel source.**
+
+Microsoft open-sources their WSL2 kernel at `github.com/microsoft/WSL2-Linux-Kernel`. The `tools/perf` directory inside it is the perf tool for that exact kernel. Building it yourself takes ~15 minutes.
+
+```bash
+# 1. Install build dependencies
+sudo apt install -y flex bison libelf-dev libdw-dev libaudit-dev \
+    libslang2-dev python3-dev libunwind-dev libbpf-dev \
+    libcap-dev libnuma-dev libzstd-dev libtraceevent-dev
+
+# 2. Clone matching kernel source (--depth=1 = only latest snapshot, saves ~3 GB of history)
+git clone --depth=1 \
+    --branch linux-msft-wsl-6.6.87.2 \
+    https://github.com/microsoft/WSL2-Linux-Kernel.git \
+    ~/WSL2-Linux-Kernel
+
+# 3. Build perf (-j$(nproc) = use all CPU cores in parallel, ~15 min)
+cd ~/WSL2-Linux-Kernel/tools/perf
+make -j$(nproc)
+
+# 4. Install to /usr/local/bin (on PATH, takes precedence over Ubuntu's wrapper at /usr/bin/perf)
+sudo cp perf /usr/local/bin/perf
+
+# 5. Clear zsh command cache (zsh caches command locations — rehash forces a fresh lookup)
+rehash
+which perf   # should now print /usr/local/bin/perf
+
+# 6. Verify
+perf stat ls
+```
+
+Common build issue: if `make` fails with `libtraceevent is missing` — run `sudo apt install libtraceevent-dev` and re-run `make`. The other warnings in the build output (missing libbabeltrace, JDK, libpfm4) are harmless — they only disable optional features.
+
+**WSL2 hardware counter limitation:** even after building perf correctly, Hyper-V (the Windows hypervisor that runs WSL2) does not expose all PMU counters to the VM. LLC-specific counters (`LLC-loads`, `LLC-load-misses`) show `<not supported>`. This is a Hyper-V decision — no user-level fix exists on Windows Home. What does work:
+
+| Counter | Status on WSL2 |
+|---|---|
+| `cycles`, `instructions` | ✓ Works |
+| `cache-misses`, `cache-references` | ✓ Works — gives overall miss rate |
+| `branches`, `branch-misses` | ✓ Works |
+| `task-clock`, `page-faults` | ✓ Always works (software events) |
+| `LLC-loads`, `LLC-load-misses` | ✗ `<not supported>` — Hyper-V blocks these |
+| `L1-dcache-load-misses` | ✗ Usually blocked too |
+
+For per-function LLC miss data, use cachegrind instead — it simulates the full L1/L2/L3 hierarchy in software and gives per-function and per-line breakdown, which is more detailed for our purpose.
+
+### 15.4 The Important Counters for This Project
+
+These are the numbers that matter for the profiling report and Kolin sir's caching work:
+
+**IPC — Instructions Per Cycle**
+```
+IPC = instructions / cycles
+```
+This is the single most important diagnostic number.
+- IPC < 1.0 → **memory-bound** — CPU is stalling, waiting for data from RAM. Fix: caching, better data layout.
+- IPC 1.0–2.0 → mixed
+- IPC > 2.0 → **compute-bound** — CPU is doing lots of arithmetic. Fix: SIMD, better algorithms.
+
+For Kraken-2 doing random hash table lookups into a 650 MB DB: we expect IPC well below 1.0 — every lookup is a random jump that misses all cache levels and forces a ~100ns wait for RAM. That's the evidence for Kolin sir's LRU cache.
+
+**Cache miss rate**
+```
+miss rate = cache-misses / cache-references × 100%
+```
+This is the overall fraction of cache lookups that missed — the data wasn't in any cache level and had to be fetched from RAM. Above 5% is notable. Above 20% is severe for a lookup-heavy program.
+
+**Page faults**
+Every page fault means the program accessed memory that wasn't loaded from disk yet — the OS paused the program, read a 4 KB page from disk into RAM, then resumed. For Kraken-2 with a 650 MB database: first run will have thousands of page faults (loading DB into RAM). Second run will have far fewer (OS kept the pages in RAM). Run twice and compare — the difference shows how much of the slowness is disk I/O vs actual computation.
+
+**Branch miss rate**
+```
+branch miss rate = branch-misses / branches × 100%
+```
+The CPU predicts which way an if/else will go. A miss means it predicted wrong, threw away work, and had to redo it. Above 5% is high. For Kraken-2's hash lookup inner loop, the branch predictor has a hard time because hash table lookups have unpredictable hit/miss patterns.
+
+**Stalled cycles frontend**
+The CPU frontend fetches and decodes instructions. Stalls here mean the CPU ran out of instructions to execute — usually due to instruction cache misses or branch mispredictions creating bubbles in the pipeline. High frontend stalls (>30%) combined with low IPC confirms memory-bound behaviour.
+
+### 15.5 First perf Run on our Machine (ls — baseline)
+
+To establish what perf output looks like on our WSL2 setup, we ran it on `ls` first:
+
+```
+Performance counter stats for 'ls':
+
+              3.50 msec task-clock:u              #  0.613 CPUs utilized
+                 0      context-switches:u
+                 0      cpu-migrations:u
+               105      page-faults:u             #  29.972 K/sec
+            836864      cycles:u                  #  0.239 GHz
+            281233      stalled-cycles-frontend:u #  33.61% frontend cycles idle
+            936476      instructions:u            #  1.12  insn per cycle
+                                                  #  0.30  stalled cycles per insn
+            191591      branches:u                #  54.690 M/sec
+              9811      branch-misses:u           #  5.12% of all branches
+
+       0.005715004 seconds time elapsed
+```
+
+And for cache counters specifically:
+```
+             12786      cache-misses:u            #  26.73% of all cache refs
+             47832      cache-references:u
+   <not supported>      LLC-load-misses:u
+   <not supported>      LLC-loads:u
+```
+
+What this tells us:
+- IPC = 1.12 — ls is mildly compute-bound (expected — it's doing string sorting and formatting)
+- 26.73% cache miss rate — high for ls, but it's a short-lived program loading cold code and libraries
+- LLC-specific counters blocked by Hyper-V — confirmed limitation on WSL2
+- 105 page faults — ls loading its own code + shared libraries for the first time
+
+For **Kraken-2** we expect: IPC much lower (likely 0.3–0.6), cache miss rate much higher (possibly 50–80%), page faults in the thousands (first run loading the 650 MB DB). Those numbers are the bottleneck evidence that justifies the caching work.
+
+### 15.6 Key perf Commands Reference
+
+```bash
+# Basic stat — run program and print counter summary
+perf stat <program> [args]
+
+# Specify exact counters with -e
+perf stat -e cycles,instructions,cache-misses,cache-references,branches,branch-misses \
+    <program> [args]
+
+# Add page faults and task-clock (software events — always work)
+perf stat -e task-clock,page-faults,context-switches \
+    <program> [args]
+
+# Record samples for hotspot analysis (which functions are hot)
+perf record -g <program> [args]
+perf report   # opens interactive view — arrow keys to navigate, 'a' to annotate source
+
+# List all available events
+perf list
+perf list | grep cache     # filter to cache events only
+perf list | grep branch    # filter to branch events only
+```
+
+The `:u` suffix on counter names (e.g., `cycles:u`) means user-space only — kernel time is excluded. This is the default in WSL2 because kernel-space hardware counters are blocked by Hyper-V. For our purpose (profiling Kraken-2's user-space code) this is fine.
 5. Start reading about cache blocking and AVX2 intrinsics

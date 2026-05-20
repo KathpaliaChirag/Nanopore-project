@@ -93,23 +93,51 @@ perf stat ls
 **If Windows/WSL2:** you will likely see:
 ```
 WARNING: perf not found for kernel 6.6.87.2-microsoft
-  You may need to install the following packages for this specific kernel:
-    linux-tools-6.6.87.2-microsoft-standard-WSL2
-    linux-cloud-tools-6.6.87.2-microsoft-standard-WSL2
 ```
-These packages do not exist in Ubuntu's repos — WSL2 uses a Microsoft-custom kernel. You have three options:
-1. **Build perf from WSL2 kernel source** — clone `github.com/microsoft/WSL2-Linux-Kernel`, build `tools/perf` (~30 min, gives full hardware counters)
-2. **Use a native Linux machine or lab server** — perf works out of the box
-3. **Proceed without perf** — gprof + cachegrind already cover hotspot and cache miss data; perf adds IPC on top
-Note which option you chose and why — it goes in the report.
+This is because WSL2 uses a Microsoft-custom kernel and Ubuntu's `linux-tools-generic` package only covers Ubuntu's own kernels. The fix is to **build perf from the WSL2 kernel source**. Run these steps inside WSL2:
+
+```bash
+# Step 1 — install build dependencies
+sudo apt install -y flex bison libelf-dev libdw-dev libaudit-dev \
+    libslang2-dev python3-dev libunwind-dev libbpf-dev \
+    libcap-dev libnuma-dev libzstd-dev libtraceevent-dev
+
+# Step 2 — clone matching kernel source (shallow, only latest snapshot)
+git clone --depth=1 \
+    --branch linux-msft-wsl-6.6.87.2 \
+    https://github.com/microsoft/WSL2-Linux-Kernel.git \
+    ~/WSL2-Linux-Kernel
+
+# If that tag fails, find the right tag name first:
+# git ls-remote --tags https://github.com/microsoft/WSL2-Linux-Kernel | grep 6.6.87
+
+# Step 3 — build perf (takes ~10-15 min)
+cd ~/WSL2-Linux-Kernel/tools/perf
+make -j$(nproc)
+
+# Step 4 — install and clear shell cache
+sudo cp perf /usr/local/bin/perf
+rehash        # clears zsh command cache so it finds the new perf
+which perf    # should print /usr/local/bin/perf
+
+# Step 5 — verify
+perf stat ls
+```
+
+> Note: the build will print several "Warning: Kernel ABI header differences" lines and optional-feature warnings (no libbabeltrace, no JDK, etc.). These are harmless — they only disable features we do not need. The only fatal error to watch for is `libtraceevent is missing` — fix it with `sudo apt install libtraceevent-dev` and re-run `make`.
+
+**Important WSL2 caveat:** even with the correct perf binary, Hyper-V (the Windows hypervisor) does not expose all hardware PMU counters to the WSL2 VM. Specifically, `LLC-loads` and `LLC-load-misses` will show `<not supported>`. What does work:
+- `cache-misses`, `cache-references` (overall cache miss rate — sufficient for the report)
+- `instructions`, `cycles`, `branches`, `branch-misses` (IPC calculation works fine)
+- All software events: `task-clock`, `page-faults`, `context-switches`
+
+For per-function LLC miss data (which `LLC-load-misses` would give), use **cachegrind** — it simulates the full L1/L2/L3 hierarchy in software and gives per-function breakdown, which is actually more detailed than perf for our purpose.
 
 **If native Linux:** hardware counters almost always work. If you see permission denied, fix with:
 ```bash
 sudo sysctl kernel.perf_event_paranoid=1
 ```
-Then re-run `perf stat ls` — should show cache-misses and instructions counts.
-
-**Note which case you are in — if on WSL2 and perf is missing, skip Tool C entirely and rely on gprof + cachegrind.**
+Then re-run `perf stat ls` — should show all counters including LLC.
 
 ---
 
@@ -603,12 +631,8 @@ perf reads the CPU's built-in hardware performance counters — tiny registers t
 Unlike Valgrind (which simulates the cache), perf reads the actual hardware — real numbers from real execution.
 
 **Key difference between WSL2 and Linux here:**
-- **Native Linux:** hardware counters almost always work — you get the full picture.
-- **Windows/WSL2:** perf will likely show "perf not found for kernel X". WSL2 uses a Microsoft-custom kernel and `linux-tools-generic` only covers Ubuntu's stock kernel. You have three options:
-  1. **Build perf from WSL2 kernel source** — clone `github.com/microsoft/WSL2-Linux-Kernel`, build `tools/perf`, takes ~30 min but gives full hardware counters
-  2. **Use a native Linux machine or lab server** — perf works out of the box there
-  3. **Proceed with gprof + cachegrind** — both already cover hotspot and cache miss analysis; perf adds IPC confirmation on top
-  Decide based on available time and machines.
+- **Native Linux:** hardware counters almost always work — you get the full picture including `LLC-loads` and `LLC-load-misses`.
+- **Windows/WSL2:** `linux-tools-generic` does not cover the Microsoft custom kernel. The fix is to build perf from the WSL2 kernel source (see Phase 0.1 for full instructions — we did this). After building: `cycles`, `instructions`, `cache-misses`, `cache-references`, `branches`, and `branch-misses` all work. `LLC-loads` and `LLC-load-misses` show `<not supported>` because Hyper-V does not expose those specific PMU counters to the VM. Use cachegrind for per-function LLC data instead.
 
 ---
 
@@ -834,13 +858,13 @@ ncu \
 Day 1 (Setup):
   [ ] Windows/WSL2: install Nsight Systems on Windows, verify nsys --version
       Native Linux: download and install Nsight Systems Linux package, verify nsys --version
-  [ ] WSL2: apt install build-essential valgrind linux-tools-common linux-tools-generic
+  [ ] WSL2: apt install build-essential valgrind linux-tools-common linux-tools-generic libtraceevent-dev + build perf from WSL2-Linux-Kernel source (see Phase 0.1)
       Native Linux: apt install build-essential valgrind linux-tools-common linux-tools-$(uname -r)
   [ ] Clone Kraken-2, edit Makefile to add -pg to CXXFLAGS, build with install_kraken2.sh
   [ ] WSL2: copy barcode02.fastq and eskape_db from Windows into WSL2 home directory
       Native Linux: confirm barcode02.fastq and eskape_db are accessible, note their paths
   [ ] Test: run kraken2 once WITHOUT profiling to confirm it works before adding tools
-  [ ] Test perf: run "perf stat ls" — note whether hardware counters work or not
+  [ ] WSL2: verify perf works — run "perf stat ls" — confirm cycles/instructions/cache-misses show numbers (LLC counters will show <not supported> — that is expected and fine)
 
 Day 2 (Dorado profiling):
   [ ] Run Dorado fast mode under nsys (~5 min + overhead)
