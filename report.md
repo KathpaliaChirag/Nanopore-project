@@ -89,6 +89,90 @@ nsys cannot intercept Dorado's CUDA runtime without `sudo`. Dorado bundles its o
 
 ---
 
+## Phase 1c — Dorado Optimization Analysis
+
+**Date:** 2026-05-21
+**Based on:** nsys profiling results from Phase 1 (fast) and Phase 1b (HAC)
+
+---
+
+### What Dorado Already Uses
+
+Dorado is not a naive implementation. It uses NVIDIA's highest-level GPU math libraries:
+
+**CUTLASS (NVIDIA's GPU Linear Algebra Templates):**
+- `cutlass::LstmKernel` and `cutlass::LinearLayer` are the dominant kernels in HAC (69.8% + 5.9%)
+- CUTLASS internally implements: tiled matrix multiply, shared memory blocking, register blocking, double buffering (software pipelining), warp-level Tensor Core operations
+- Strided MM, blocking, tiling — **already done at the library level**
+
+**Tensor Cores (Ampere architecture):**
+- `ampere_h16816gemm` (fast model) — FP16 matrix multiply on hardware Tensor Cores
+- CUTLASS LSTM (HAC) — also runs on Tensor Cores via FP16
+- RTX 4050 Laptop GPU has 20 Tensor Core units — Dorado is using them
+
+**Conclusion:** Standard textbook GPU optimizations (blocking, tiling, shared memory, SIMD) are already implemented by CUTLASS. Hand-writing these would not beat the library.
+
+---
+
+### What Could Actually Make Dorado Faster
+
+| Optimization | Potential Speedup | Difficulty | Current Status |
+|---|---|---|---|
+| INT8 quantization | ~2× on Tensor Cores | Medium | Not used (FP16 only) |
+| 2:4 structured sparsity | Up to 2× on Ampere+ | Hard | Not used |
+| Larger batch size | 10–30% | Easy | Tunable (`--batchsize`) |
+| Beam search kernel rewrite | 10–20% | Hard | Custom but unoptimized |
+| Replace LSTM → Mamba/S4 | Architecture-level | Very hard | Research area |
+| FP8 precision | ~2× over FP16 | Medium | Requires Hopper GPU (H100) |
+
+---
+
+### Most Realistic Optimizations on RTX 4050
+
+**1. Larger batch size (immediate, zero code change)**
+
+Batchsize 64 was used. Larger batches improve Tensor Core utilization:
+```bash
+dorado basecaller ... --batchsize 128
+# or
+dorado basecaller ... --batchsize 256
+```
+Expected 10–30% throughput gain.
+
+**2. INT8 quantization (significant, research gap)**
+
+Dorado uses FP16 throughout. INT8 would double Tensor Core throughput on Ampere (RTX 4050 supports INT8 Tensor Cores). Oxford Nanopore has not implemented this — open research opportunity. Accuracy impact on basecalling needs evaluation.
+
+**3. Beam search kernel (tractable target)**
+
+`beam_search_step` is 26.2% of fast model GPU time. CTC beam search has GPU-unfriendly access patterns — sequential, branchy, irregular memory access. This is a custom Dorado kernel (not CUTLASS) and the most realistic target for a new optimized implementation without changing the model architecture.
+
+---
+
+### Why a Cache Does Not Help Dorado
+
+Dorado is **compute-bound** (confirmed by both fast and HAC profiles):
+- 98–99% of CUDA API time is `cudaStreamSynchronize` — CPU waiting on GPU
+- GPU is saturated with LSTM and GEMM computation
+- Memory transfers are efficient and not the bottleneck
+
+A signal-to-base cache would target data movement — but data movement is <5% of total runtime. Even eliminating all memory transfers would save ~9 seconds on the 187s fast run. The LSTM and beam search kernels cannot be cached because every read produces unique signal data.
+
+---
+
+### Relevance to Kolin Sir's Hot-K-mer Cache
+
+The Hot-K-mer LRU cache targets **Kraken-2** (CPU, k-mer hash table lookup) — not Dorado. The profiling confirms this is the right split:
+
+| Component | Bottleneck type | Right fix |
+|---|---|---|
+| Dorado (GPU) | Compute-bound — LSTM + GEMM | Quantization, larger batches, beam search rewrite |
+| Kraken-2 (CPU) | Memory-bound — random hash table access on 180 GB DB | LRU cache (Kolin sir's proposal) |
+
+Profiling provides the quantitative justification for building the cache on Kraken-2 and not Dorado.
+
+---
+
 ## Phase 1b — Dorado HAC GPU Profiling (Nsight Systems)
 
 **Date:** 2026-05-21
