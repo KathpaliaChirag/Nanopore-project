@@ -88,3 +88,98 @@ Transfers are large and regular (~1.28 MB per call) — efficient, not fragmente
 nsys cannot intercept Dorado's CUDA runtime without `sudo`. Dorado bundles its own private `libcudart.so.12` in `dorado/lib/`, which ignores nsys's standard `CUDA_INJECTION64_PATH` injection. Running as root bypasses this restriction. All future nsys runs on Dorado require `sudo`.
 
 ---
+
+## Phase 1b — Dorado HAC GPU Profiling (Nsight Systems)
+
+**Date:** 2026-05-21
+**Tool:** nsys 2026.2.1 (sudo)
+**Input:** `FBE01990_24778b97_03e50f91_10.pod5`
+**Model:** `dna_r10.4.1_e8.2_400bps_hac@v5.2.0`
+**GPU:** NVIDIA GeForce RTX 4050 Laptop GPU (6 GB VRAM)
+**Command:**
+```bash
+sudo nsys profile --output ~/results/nsight/dorado_hac_profile \
+  --trace cuda --stats true --resolve-symbols=false --force-overwrite true \
+  -- /opt/dorado/bin/dorado basecaller \
+  dna_r10.4.1_e8.2_400bps_hac@v5.2.0 FBE01990_24778b97_03e50f91_10.pod5 \
+  --output-dir ~/results/nsight/bam_hac --batchsize 64
+```
+
+### Run Summary
+
+| Metric | Fast Model | HAC Model |
+|---|---|---|
+| Total runtime | 186.8 s | 502.0 s |
+| Reads basecalled | 104,478 | 104,477 (1 filtered) |
+| Throughput | 27.2M samples/sec | 10.1M samples/sec |
+| Slowdown vs fast | — | **2.69×** |
+| Batch size | 64 | 64 |
+
+---
+
+### Top GPU Kernels
+
+| Rank | % Time | Total Time | Instances | Kernel |
+|---|---|---|---|---|
+| 1 | **69.8%** | 347.9 s | 59,906 | `cutlass::LstmKernel` (CUTLASS LSTM) |
+| 2 | 8.6% | 42.7 s | 8,558 | `beam_search_step` |
+| 3 | 5.9% | 29.5 s | 8,558 | `cutlass::LinearLayer` (GEMM) |
+| 4 | 4.3% | 21.2 s | 8,558 | `compute_posts_step` |
+| 5 | 3.9% | 19.3 s | 8,558 | `decode_step` |
+| 6 | 3.0% | 15.2 s | 8,558 | `back_guide_step` |
+
+Top 6 kernels account for **95.5%** of total GPU time.
+
+**Key difference from fast model:** HAC uses a much larger CUTLASS LSTM kernel (69.8% of time vs fast model's simpler `lstm` at 23.2%). The HAC LSTM alone accounts for more GPU time than the entire fast model run proportionally.
+
+---
+
+### Memory Transfers
+
+| Operation | % of Transfer Time | Total Data | Avg per Call | Calls |
+|---|---|---|---|---|
+| Host → Device | 87.2% | 25,137 MB | 0.196 MB | 128,403 |
+| Device → Host | 8.9% | 2,694 MB | 0.315 MB | 8,556 |
+| Device → Device | 3.8% | 10,642 MB | 1.239 MB | 8,587 |
+
+**Notable:** HAC has 128,403 HtoD transfers vs fast's 9,107 — 14× more calls but smaller average size (0.196 MB vs 1.254 MB). More fragmented data movement, consistent with a larger, more complex model architecture.
+
+---
+
+### CUDA API Breakdown
+
+| % Time | Calls | API Call |
+|---|---|---|
+| 99.1% | 51,378 | `cudaStreamSynchronize` |
+| 0.5% | 299,649 | `cudaLaunchKernel` |
+| 0.4% | 145,546 | `cudaMemcpyAsync` |
+
+CPU blocking on GPU even more dominant than fast model (99.1% vs 98.4%) — HAC model keeps the GPU busier for longer per synchronization point.
+
+---
+
+### Fast vs HAC Comparison
+
+| Metric | Fast | HAC |
+|---|---|---|
+| Runtime | 186.8 s | 502.0 s |
+| Top kernel | `beam_search_step` (26.2%) | `LstmKernel` (69.8%) |
+| LSTM % of GPU time | ~23% | ~70% |
+| Memory transfer calls (HtoD) | 9,107 | 128,403 |
+| `cudaStreamSynchronize` % | 98.4% | 99.1% |
+| Throughput | 27.2M samples/s | 10.1M samples/s |
+
+---
+
+### Verdict
+
+**HAC is even more strongly compute-bound than fast.**
+
+- The CUTLASS LSTM kernel alone consumes 69.8% of all GPU time — this is a large transformer-style recurrent layer with no equivalent in the fast model
+- Beam search drops from #1 bottleneck (fast) to #2 (HAC), because the LSTM now dominates
+- Memory transfers are more fragmented (14× more HtoD calls) but still not the bottleneck
+- GPU is saturated: CPU spends 99.1% of CUDA API time in `cudaStreamSynchronize`
+
+**Implication for cache:** Same conclusion as fast model — HAC is compute-bound, not memory-bound. A cache targeting data movement would recover <5% of runtime. The CUTLASS LSTM kernel is the target for any real speedup (quantization, pruning, or a smaller model variant).
+
+---
