@@ -100,3 +100,34 @@ Next meeting / deadline: **2026-05-17**.
 - **Visualizations:** 4 charts (grouped bar, improvement bar, heatmap, time vs accuracy scatter) in Colab notebook
 - **Colab notebook:** https://colab.research.google.com/drive/1mj3lRxxIFS_qCeStrXszhIYHlJ2Z36bw?usp=sharing
 - KB §11 added with complete step-by-step Colab guide + all results
+
+---
+
+## 2026-05-20/21 — Study session 5 — Profiling setup + Dorado GPU profile
+
+- **Goal:** run perf on Kraken-2 and nsys on Dorado, produce profiling report
+- **perf on WSL2 — resolved:**
+  - `linux-tools-generic` does not cover Microsoft's custom WSL2 kernel
+  - Fix: built perf from WSL2 kernel source (`github.com/microsoft/WSL2-Linux-Kernel`, tag `linux-msft-wsl-6.6.87.2`)
+  - Key dependency: `libtraceevent-dev` (not installed by default, causes build failure)
+  - After build: `sudo cp perf /usr/local/bin/perf` + `rehash` (zsh command cache)
+  - Working counters: cycles, instructions, cache-misses, cache-references, branches, branch-misses
+  - Blocked by Hyper-V: LLC-loads, LLC-load-misses — use cachegrind instead for per-function LLC data
+  - KB §15 added: full perf deep dive
+- **Nsight Systems — installed and working:** version 2024.2.3 on Windows
+  - Several command-line issues resolved: `--` separator not supported in nsys 2024.2.3, `osrt` not a valid trace type, `--stats` flag ambiguous — fixed with `-o`, `--trace cuda,nvtx`, no `--`
+  - Must run as Administrator for full tracing
+  - Run took ~3 hours total with nsys overhead on GTX 1650
+- **Dorado GPU profile — complete:**
+  - 82% of GPU time is GEMM (matrix multiply, Tensor Cores) — compute-bound
+  - cudaStreamSynchronize = 98.9% of CUDA API time — CPU blocks waiting on GPU
+  - Memory transfers not the bottleneck
+  - Full results in KB §16 and report1.md Page 2
+- **Kraken-2 build — complete:**
+  - Cloned from GitHub, added `-pg` to CXXFLAGS in `src/Makefile` (not top-level Makefile)
+  - Fixed Windows line endings with `sed -i 's/\r//' install_kraken2.sh`
+  - Built with `./install_kraken2.sh ~/kraken2-build` — binaries at `~/kraken2-build/kraken2`
+- **FASTQ for Kraken-2 profiling — pending:**
+  - Local fast/hac BAM files are truncated (Dorado runs were interrupted)
+  - nsys BAM is complete — need to convert to FASTQ with samtools
+  - samtools installed in WSL2

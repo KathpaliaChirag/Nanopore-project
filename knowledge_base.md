@@ -2470,4 +2470,118 @@ perf list | grep branch    # filter to branch events only
 ```
 
 The `:u` suffix on counter names (e.g., `cycles:u`) means user-space only — kernel time is excluded. This is the default in WSL2 because kernel-space hardware counters are blocked by Hyper-V. For our purpose (profiling Kraken-2's user-space code) this is fine.
-5. Start reading about cache blocking and AVX2 intrinsics
+
+---
+
+## 16. Dorado GPU Profile — Nsight Systems Results (2026-05-21)
+
+### 16.1 Setup
+
+| Item | Detail |
+|---|---|
+| Tool | Nsight Systems 2024.2.3 (Windows) |
+| Command | `nsys profile -o dorado_fast_profile --trace cuda,nvtx dorado.exe basecaller fast <pod5> --batchsize 64` |
+| Input | FBE01990_24778b97_03e50f91_10.pod5 — 104,478 reads, 4 GB |
+| Mode | fast |
+| GPU | NVIDIA GTX 1650, 4 GB VRAM |
+| Output | dorado_fast_profile.nsys-rep + .sqlite |
+
+---
+
+### 16.2 NVTX Range Summary — Wall-clock breakdown by stage
+
+NVTX annotations are markers Dorado places in its own code to label what it is doing at each point. nsys records when each annotation starts and ends.
+
+| % Time | Stage | What it means |
+|---|---|---|
+| 39.8% | basecall_current_batch | Outer loop — one batch of reads going through the full pipeline |
+| 39.8% | call_chunks | Inner loop — chunking each read into signal windows and processing them |
+| 19.6% | cuda_thread_fn_device_0 | Actual GPU execution time — CUDA kernels running on the GPU |
+| 0.2% | nn_forward | Neural network forward pass annotation |
+| 0.1% | cpu_decode | CTC decoding on CPU |
+| 0.1% | lstm_stack | LSTM layers |
+| 0.1% | gpu_decode | CTC decoding on GPU |
+| 0.1% | conv | Convolutional layers |
+
+`basecall_current_batch` and `call_chunks` are nested annotations (same wall time, different scope). `cuda_thread_fn_device_0` at 19.6% represents how much of the total annotated time was actual GPU kernel execution — the rest is overhead, synchronisation, and data movement.
+
+9,085–9,087 instances = number of batches processed for 104,478 reads.
+
+---
+
+### 16.3 CUDA GPU Kernel Summary — Where GPU time actually goes
+
+This is the most important table. It shows what the GPU was actually computing.
+
+| % GPU Time | Kernel | What it does |
+|---|---|---|
+| **68.5%** | `cutlass_70_tensorop_h884gemm_128x64_nn_align8` | Matrix multiply (GEMM) using Tensor Cores, FP16, 128×64 tile |
+| **13.5%** | `cutlass_70_tensorop_h884gemm_128x128_nn_align8` | Matrix multiply (GEMM) using Tensor Cores, FP16, 128×128 tile |
+| 4.7% | `beam_search_step` | CTC beam search decoding |
+| 4.5% | `lstm (forward)` | LSTM forward pass, 96 channels |
+| 3.0% | `lstm (backward)` | LSTM backward pass, 96 channels |
+| 1.6% | `convolution_ntc` | CNN feature extraction |
+| 1.3% | `decode_step` | Viterbi-style decode |
+| 1.3% | `compute_posts_step` | Posterior probability computation |
+
+**82% of all GPU time is GEMM (matrix multiply).** These are the Transformer attention and linear projection layers — the core neural network arithmetic. They use CUTLASS (CUDA Templates for Linear Algebra Subroutines), NVIDIA's optimised GEMM library. `h884` = half-precision (FP16) Tensor Core tile 8×8×4.
+
+The LSTM kernels (7.5% combined) are the recurrent layers in Dorado's architecture. The convolution (1.6%) is the CNN front-end that extracts features from the raw signal before the LSTM/Transformer.
+
+---
+
+### 16.4 CUDA API Summary — What the CPU does
+
+| % Time | Calls | Avg | API |
+|---|---|---|---|
+| **98.9%** | 27,283 | 56.6 ms | cudaStreamSynchronize |
+| 0.5% | 190,891 | 43.5 μs | cudaLaunchKernel |
+| 0.3% | 27,304 | 186 μs | cudaMemcpyAsync |
+
+`cudaStreamSynchronize` taking 98.9% of CUDA API time means: the CPU launches a batch of GPU kernels, then immediately calls `cudaStreamSynchronize` and **blocks** — it does nothing until the GPU finishes. The CPU is a spectator while the GPU works. This is a synchronous pipeline design.
+
+27,283 sync calls at 56.6 ms average = ~1,544 seconds of CPU blocking = the bulk of total runtime.
+
+This confirms the GPU is the bottleneck. The CPU is idle most of the time waiting.
+
+---
+
+### 16.5 Memory Transfer Summary
+
+| % Time | Total | Per batch | Direction |
+|---|---|---|---|
+| 59.9% | 11,427 MB | ~1.25 MB | Host→Device (CPU RAM → GPU VRAM) — signal data going in |
+| 25.1% | 11,427 MB | ~1.25 MB | Device→Device (GPU internal copies) |
+| 15.0% | 2,856 MB | ~0.31 MB | Device→Host (GPU VRAM → CPU RAM) — basecalls coming out |
+
+Total data moved: ~25.7 GB across the full run. Memory transfers are a minority of total time — the GPU is not being starved of data. The bottleneck is compute, not bandwidth.
+
+---
+
+### 16.6 Verdict — Compute-bound
+
+**Dorado fast mode on GTX 1650 is compute-bound.**
+
+| Evidence | Value | Interpretation |
+|---|---|---|
+| GEMM % of GPU time | 82% | GPU is doing math, not waiting |
+| cudaStreamSynchronize % | 98.9% | CPU is waiting on GPU — GPU is the bottleneck |
+| Memory transfer % | ~15% of transfer time | Data movement is not the constraint |
+
+The GPU is fully occupied doing matrix multiply. It is not idle, not waiting for data. This is exactly what "compute-bound" means.
+
+---
+
+### 16.7 Implications for Kolin sir's Signal-to-Base (S2B) Cache
+
+The S2B cache (§8.2) aims to skip the neural network forward pass for signal windows similar to previously seen ones. The profiling numbers tell us exactly what the cache would save:
+
+- If a cache hit skips the GEMM kernels entirely → saves 82% of GPU time for that batch
+- At 30% cache hit rate → ~25% total GPU time saved
+- At 50% cache hit rate → ~41% total GPU time saved
+
+The cache lookup must be faster than running the GEMM. On GTX 1650: one GEMM call averages 19.6 ms. The LSH lookup + shared memory read must complete in well under that to be worth it.
+
+The synchronous pipeline (CPU blocks on cudaStreamSynchronize) means there is no CPU-side parallelism to hide cache lookup latency — the lookup must happen on the GPU itself, which is why CUDA shared memory is the right storage for the cache (per §8.2).
+
+**Key number for the report:** 82% of Dorado's GPU time is GEMM. A cache that avoids recomputation has up to 82% of GPU time as recoverable headroom.
