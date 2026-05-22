@@ -30,7 +30,9 @@ Update this every time a new major topic is pushed.
 - Phase 1a: Dorado fast model nsys profiling — 186.8s, 27.2M samples/s, compute-bound (beam_search 26%, GEMM 17%, LSTM 23%)
 - Phase 1b: Dorado HAC model nsys profiling — 502.0s, 10.1M samples/s, CUTLASS LstmKernel 69.8%, 2.69× slower than fast
 - Phase 1c: Dorado optimization analysis — INT8 quantization and beam search rewrite are real targets; cache does not help Dorado
+- Phase 2: Kraken-2 CPU profiling (gprof + cachegrind + perf) — fast vs HAC comparison, 69% CPU in hash lookup, 34% LLC miss rate, memory-bound verdict
 
 **daily_summary.md** →
 - 2026-05-20
 - 2026-05-21
+- 2026-05-22

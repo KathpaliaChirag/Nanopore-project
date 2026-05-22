@@ -25,3 +25,18 @@ One dated entry per session. Append at end of each conversation.
 - Confirmed: Dorado is compute-bound, cache won't help — Kraken-2 is the right target for Kolin sir's LRU cache
 - Wrote Phases 1a, 1b, 1c in report.md — 4 commits pushed to hobbbit branch
 - Pending: Phase 2 — build Kraken-2 with -pg, locate ESKAPE DB, run gprof + cachegrind + perf
+
+---
+
+## 2026-05-22
+
+- Updated index.md to reflect Phase 1a/1b/1c and daily_summary 2026-05-21
+- Added SessionStart hook to auto-pull ~/memory hobbbit branch on every Claude session
+- Built Kraken-2 v2.17.1 from source with -pg at /opt/kraken2-build/bin/
+- Downloaded 6 ESKAPE reference genomes from NCBI FTP
+- Built custom ESKAPE Kraken-2 database (60 MB hash table) at /opt/kraken2-build/db/
+- Ran Kraken-2 on both fast (22,386 reads, 74.18% classified) and HAC (104,921 reads, 80.89% classified)
+- Ran full Phase 2 profiling: gprof + cachegrind + perf on both fast and HAC inputs
+- Key result: CompactHashTable::Get() = 69% CPU time; LLC miss rate = 34% — Kraken-2 is memory-bound
+- Wrote Phase 2 to report.md with full fast vs HAC comparison tables
+- Pending: Phase 3 (interpret results) + Phase 4 (2-page report for Kolin sir, due 2026-05-25)
