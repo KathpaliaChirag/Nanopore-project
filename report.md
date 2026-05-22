@@ -360,3 +360,37 @@ sudo nsys profile --output ~/results/nsight/dorado_gpu_fast \
     <model> <pod5> --output-dir /tmp/bam_gpu_fast --batchsize 16
 ```
 
+---
+
+## Phase 1e — CPU vs GPU Scaling Across File Sizes (Dorado Fast)
+
+**Date:** 2026-05-22
+**Model:** `dna_r10.4.1_e8.2_400bps_fast@v5.2.0`
+**Inputs:** `Merged_files/{200,400,600}.pod5` (219 / 419 / 620 MB)
+**Profilers:** CPU `perf record --call-graph dwarf,512 -F 50`; GPU `nsys profile --trace cuda`
+**Batch size:** 16
+
+### Wall-Clock Results
+
+| File | CPU | GPU | Speedup |
+|------|-----|-----|---------|
+| 200.pod5 | 364.0 s | 14.9 s | **24×** |
+| 400.pod5 | 705.2 s | 24.4 s | **29×** |
+| 600.pod5 | 1030.3 s | 33.7 s | **31×** |
+
+Graph: `~/results/cpu_vs_gpu.svg` (log-scale grouped bars).
+
+### Findings
+
+- Both devices scale ~linearly with input size; CPU ≈ 1.7 s/MB, GPU ≈ 0.055 s/MB.
+- **Speedup widens with size (24× → 31×)** — GPU amortizes fixed startup (model load, batch-size benchmarking) over more reads, while CPU has no such fixed cost to hide.
+- Consistent with Phase 1d: GPU wins via FP16 tensor cores + parallel LSTM and avoids the CPU's page-fault / allocation overhead.
+
+### Automation
+
+Reusable scripts in `~/Desktop/summer_project/`:
+- `benchmark_cpu_gpu.sh [fast|hac]` — loops POD5 files, runs perf (CPU) + nsys (GPU), appends wall times to `~/results/timing_cpu_gpu.csv`.
+- `plot_cpu_gpu.py` — reads the CSV, emits log-scale CPU-vs-GPU bar chart (matplotlib PNG, or dependency-free SVG fallback).
+
+**Pending:** add 800.pod5 and 1000.pod5 to complete the scaling curve.
+

@@ -39,4 +39,8 @@ One dated entry per session. Append at end of each conversation.
 - Ran full Phase 2 profiling: gprof + cachegrind + perf on both fast and HAC inputs
 - Key result: CompactHashTable::Get() = 69% CPU time; LLC miss rate = 34% — Kraken-2 is memory-bound
 - Wrote Phase 2 to report.md with full fast vs HAC comparison tables
-- Pending: Phase 3 (interpret results) + Phase 4 (2-page report for Kolin sir, due 2026-05-25)
+- Ran CPU-vs-GPU scaling benchmark on Merged_files 200/400/600.pod5 (fast model, perf + nsys)
+- Results: CPU 364/705/1030s vs GPU 14.9/24.4/33.7s — speedup grows 24×→31× with file size
+- Wrote reusable `benchmark_cpu_gpu.sh` + `plot_cpu_gpu.py` (log-scale graph, SVG fallback); chart at ~/results/cpu_vs_gpu.svg
+- Wrote Phase 1e to report.md
+- Pending: add 800/1000.pod5 to scaling curve; Phase 3 (interpret results) + Phase 4 (2-page report for Kolin sir, due 2026-05-25)
