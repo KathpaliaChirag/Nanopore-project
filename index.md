@@ -27,7 +27,10 @@ Update this every time a new major topic is pushed.
 - Phase 4: 2-page report structure for Kolin sir (due ~2026-05-25)
 
 **report.md** →
-- (empty — add entries as profiling work is executed)
+- Phase 1a: Dorado fast model nsys profiling — 186.8s, 27.2M samples/s, compute-bound (beam_search 26%, GEMM 17%, LSTM 23%)
+- Phase 1b: Dorado HAC model nsys profiling — 502.0s, 10.1M samples/s, CUTLASS LstmKernel 69.8%, 2.69× slower than fast
+- Phase 1c: Dorado optimization analysis — INT8 quantization and beam search rewrite are real targets; cache does not help Dorado
 
 **daily_summary.md** →
 - 2026-05-20
+- 2026-05-21
