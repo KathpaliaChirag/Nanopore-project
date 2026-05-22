@@ -255,16 +255,110 @@ A signal-to-base cache would target data movement — but data movement is <5% o
 
 ---
 
-### Relevance to Kolin Sir's Hot-K-mer Cache
+## Phase 1d — CPU vs GPU Comparison (Dorado Fast Model)
 
-The Hot-K-mer LRU cache targets **Kraken-2** (CPU, k-mer hash table lookup) — not Dorado. The profiling confirms this is the right split:
+**Date:** 2026-05-22  
+**Input:** `200.pod5` (Merged_files, ~200 MB)  
+**Model:** `dna_r10.4.1_e8.2_400bps_fast@v5.2.0`  
+**CPU:** AMD Ryzen 7 7735HS (16 threads)  
+**GPU:** NVIDIA GeForce RTX 4050 Laptop GPU  
+**Profiler (CPU):** `perf record --call-graph dwarf,512 -F 50`  
+**Profiler (GPU):** `nsys profile --trace cuda --stats true`
 
-| Component | Bottleneck type | Right fix |
-|---|---|---|
-| Dorado (GPU) | Compute-bound — LSTM + GEMM | Quantization, larger batches, beam search rewrite |
-| Kraken-2 (CPU) | Memory-bound — random hash table access on 180 GB DB | LRU cache (Kolin sir's proposal) |
+---
 
-Profiling provides the quantitative justification for building the cache on Kraken-2 and not Dorado.
+### Run Summary
+
+| Metric | CPU | GPU | Speedup |
+|--------|-----|-----|---------|
+| Wall time | 340,235 ms | 9,622 ms | **~35x** |
+| Throughput | 8.02 × 10⁵ samples/s | 2.84 × 10⁷ samples/s | **~35x** |
+| Reads basecalled | 1861 | 1861 | — |
+| Batch size | 16 | 64 (Dorado auto-adjusted) | — |
+
+---
+
+### CPU Profiling (`perf`) — Top Hotspots by Self Time
+
+**Samples:** 283K of `cpu/cycles/P` (~12.5 × 10¹² cycles)
+
+| % | Thread | Symbol | Notes |
+|---|--------|--------|-------|
+| 5.72% | `cpu_beam_search` | `cpu_index_kernel` | Tensor gather/index — memory-bandwidth bound |
+| 2.44% | `cpu_beam_search` | `beam_search` | Dorado CTC beam decoder |
+| 2.38% | `cpu_beam_search` | `cat_serial_kernel` | **Serial** tensor concat — no parallelism |
+| 2.01% | `cpu_beam_search` | `add_kernel` AVX2 | Vectorized float add |
+| 1.58% | `cpu_beam_search` | `max_values_kernel_impl` AVX2 | Vectorized max reduction |
+| 1.45% | `cpu_beam_search` | `mkl_vml_sExp` | MKL exp |
+| 1.44% | `bscl_worker` | `kernel_init_pages` | Page fault — memory zeroing on first touch |
+| 1.15% | `bscl_worker` | `mkl_blas_def_sgemm_kernel_0_zen` | SGEMM (AMD Zen-optimized, FP32) |
+| ~0.7% | `cpu_beam_search` | `TensorIteratorBase` ctor/dtor + `malloc` | Tensor allocation churn |
+
+**Thread types:** `bscl_worker` (neural net inference via JIT + DNNL), `cpu_beam_search` (CTC decoding)
+
+**Memory pressure:** Top-level perf showed **~10% of cycles** in `asm_exc_page_fault` → `do_anonymous_page` — Dorado demand-pages large buffers instead of pre-allocating.
+
+---
+
+### GPU Profiling (`nsys`) — Kernel Breakdown
+
+**Chunk sizes:** 9996 and 4998 (two model heads), batch size 64
+
+| % | Kernel | What |
+|---|--------|------|
+| 25.9% | `beam_search_step` | CTC beam decoder — dominant GPU kernel |
+| 16.9% | `ampere_h16816gemm_128x64` | FP16 GEMM (Ampere tensor cores) |
+| 13.9% | `lstm` (fwd, 96 units, int8 input) | LSTM forward pass |
+| 9.9% | `decode_step` | CTC path decoding |
+| 9.3% | `lstm` (bidirectional, 96 units) | LSTM reverse pass |
+| 8.6% | `compute_posts_step` | Posterior probability computation |
+| 6.4% | `convolution_ntc` (stride 16, ReLU) | CNN feature extraction |
+| 3.8% | `back_guide_step` | CTC backward guide |
+| 3.7% | `window_ntwc_f16` | FP16 windowing for chunked inference |
+
+**CUDA API:** 97.2% of time in `cudaStreamSynchronize` — CPU is idle, GPU is the pacing unit.
+
+**Memory transfers:** 590 MB H→D (input chunks), 147 MB D→H (basecall results), 592 MB D→D (activations).
+
+---
+
+### CPU vs GPU Side-by-Side
+
+| Aspect | CPU | GPU |
+|--------|-----|-----|
+| Top bottleneck | Tensor gather/index (5.7%) | Beam search kernel (25.9%) |
+| NN compute | FP32 SGEMM (MKL/DNNL) | FP16 GEMM + int8 LSTM (tensor cores) |
+| Memory behavior | ~10% cycles in page faults | Clean, async pre-allocated transfers |
+| Parallelism | Serial `cat_serial_kernel` is a bottleneck | Fully parallel GPU pipeline |
+| CPU utilization | Fully loaded | Idle (97% waiting on GPU) |
+
+---
+
+### Key Findings
+
+1. **35x speedup** from FP16 tensor cores (vs FP32 SGEMM), parallel LSTM execution, and no memory allocation overhead.
+2. **Beam search is the consistent bottleneck** on both devices — 2.44% self time on CPU, 25.9% on GPU. As NN gets faster, decoding becomes proportionally more dominant.
+3. **CPU memory management is costly** — ~10% of cycles lost to page faults and tensor allocation churn; GPU avoids this entirely.
+4. **GPU CPU-side overhead is negligible** — 97% of CUDA API time is waiting, confirming GPU is the bottleneck on the GPU run.
+
+---
+
+### Profiling Commands
+
+```bash
+# CPU
+sudo perf record -g --call-graph dwarf,512 -F 50 \
+    -o /tmp/perf.data \
+    /opt/dorado/bin/dorado basecaller --device cpu \
+    <model> <pod5> --output-dir /tmp/bam_cpu_fast --batchsize 16
+sudo perf report --input /tmp/perf.data --stdio --no-children
+
+# GPU
+sudo nsys profile --output ~/results/nsight/dorado_gpu_fast \
+    --trace cuda --stats true --resolve-symbols=false --force-overwrite true \
+    -- /opt/dorado/bin/dorado basecaller \
+    <model> <pod5> --output-dir /tmp/bam_gpu_fast --batchsize 16
+```
 
 ---
 
