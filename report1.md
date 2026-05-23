@@ -29,6 +29,64 @@
 
 ---
 
+## Page 1 — Kraken-2 CPU Profile (perf stat)
+
+**Input:** barcode02.fastq — 104,829 reads, 357.62 Mbp  
+**Database:** k2_standard_08gb (8 GB pre-built standard database)  
+**Tool:** perf stat -e task-clock,cache-misses,cache-references,instructions,cycles  
+**Environment:** WSL2 (Ubuntu 24.04), AMD Ryzen 7 5800H, 14 GB RAM
+
+---
+
+### 1.1 perf stat Results
+
+| Counter | Value | Notes |
+|---|---|---|
+| task-clock | 93,832 ms | CPU time used |
+| cache-misses | 301,288,020 | 301 million cache misses |
+| cache-references | 879,854,514 | 880 million total cache accesses |
+| **cache miss rate** | **34.24%** | 1 in 3 cache accesses goes to RAM |
+| instructions | 155,949,518,373 | 156 billion instructions |
+| cycles | 68,853,332,412 | 69 billion cycles |
+| IPC | 2.26 insn/cycle | *see caveat below* |
+| wall time | 159.4 s | total elapsed time |
+| user time | 39.7 s | CPU in user space |
+| sys time | 52.5 s | CPU in kernel (memory management) |
+
+**WSL2 caveat on IPC:** the clock frequency reported (0.734 GHz) is far below the real Ryzen 5800H speed (~3.2 GHz). This is a Hyper-V hardware counter limitation — the IPC and cycle numbers are unreliable. The **cache miss rate (34.24%) is the reliable metric** as it is a ratio and does not depend on clock accuracy.
+
+---
+
+### 1.2 Verdict — Memory-Bound
+
+**Kraken-2 with the 8 GB database is severely memory-bound.**
+
+| Evidence | Value | Interpretation |
+|---|---|---|
+| Cache miss rate | 34.24% | 1 in 3 accesses goes to slow RAM (normal: 1-5%) |
+| Cache misses total | 301 million | Each miss costs ~100 ns RAM latency |
+| sys time | 52.5 s (33% of wall time) | High kernel time = heavy memory mapping overhead |
+| Database size | 8 GB | Does not fit in L3 cache (~16 MB on Ryzen 5800H) |
+
+**Why this happens:** Kraken-2 hashes each read's k-mers and looks them up in the database hash table. The table is 8 GB — 500× larger than the L3 cache. Every lookup lands in a random location in RAM, causing a cache miss almost every time. The CPU spends most of its time waiting for RAM, not computing.
+
+---
+
+### 1.3 Implications for Kolin sir's Hot-K-mer LRU Cache
+
+The 34.24% cache miss rate is the direct justification for the LRU k-mer cache:
+
+- If the cache keeps recently-seen k-mers in fast memory, repeated lookups hit cache instead of RAM
+- 1 cache hit saved = 100 ns gained (RAM latency avoided)
+- At 301 million misses per run — even a 20% hit rate = 60 million fewer RAM accesses = ~6 seconds saved
+- The cache does not need to be large: k-mer accesses are not uniformly random — clinical samples have dominant species whose k-mers repeat heavily across reads
+
+**Key number for the report:** 34.24% cache miss rate. Kraken-2 misses cache on 1 in 3 memory accesses — confirming it is memory-bound and that a k-mer cache directly targets the bottleneck.
+
+---
+
+---
+
 ## Page 2 — Dorado GPU Profile (Nsight Systems)
 
 **Input:** FBE01990_24778b97_03e50f91_10.pod5 — 104,478 reads, 4 GB  
