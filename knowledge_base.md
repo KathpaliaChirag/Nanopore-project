@@ -2585,3 +2585,176 @@ The cache lookup must be faster than running the GEMM. On GTX 1650: one GEMM cal
 The synchronous pipeline (CPU blocks on cudaStreamSynchronize) means there is no CPU-side parallelism to hide cache lookup latency — the lookup must happen on the GPU itself, which is why CUDA shared memory is the right storage for the cache (per §8.2).
 
 **Key number for the report:** 82% of Dorado's GPU time is GEMM. A cache that avoids recomputation has up to 82% of GPU time as recoverable headroom.
+
+---
+
+## 17. Kraken-2 Database Build — WSL2 Attempt Log (2026-05-23)
+
+This section documents every issue hit while trying to replicate the Colab ESKAPE database build natively in WSL2. Kept as a reference so we don't repeat mistakes.
+
+---
+
+### 17.1 Goal
+
+Build a small (~650 MB) custom Kraken-2 database containing only the 6 ESKAPE pathogen reference genomes, run it natively in WSL2, then compare profiling numbers against the 8 GB pre-built standard database.
+
+---
+
+### 17.2 Setup that worked
+
+**Kraken-2 binary (CRLF fix):**
+
+The Kraken-2 build was cloned and built from source on Windows/WSL2. All Perl scripts and shell scripts had Windows line endings (`\r\n`) which broke execution. Fix applied to all scripts:
+
+```bash
+sed -i 's/\r//' ~/kraken2-build/kraken2
+sed -i 's/\r//' ~/kraken2-build/kraken2-build
+sed -i 's/\r//' ~/kraken2-build/*.sh ~/kraken2-build/*.pl
+```
+
+**Taxonomy download (rsync blocked — use wget instead):**
+
+`kraken2-build --download-taxonomy` uses rsync which fails with `@ERROR: Unknown module 'pub'` on NCBI's current servers. Workaround — download manually:
+
+```bash
+mkdir -p ~/eskape_db/taxonomy
+cd ~/eskape_db/taxonomy
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz
+tar -xzf taxdump.tar.gz
+
+# Create placeholder accession files (see §17.4 for why this is wrong)
+touch nucl_gb.accession2taxid
+touch nucl_wgs.accession2taxid
+```
+
+**Genome downloads:**
+
+The Colab notebook had a wrong folder name for E. faecium (`GC_000174395.2` instead of `GCF_000174395.2`). Correct URLs verified by browsing the NCBI FTP directory listing:
+
+```bash
+# E. faecium — corrected folder name
+wget "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/174/395/GCF_000174395.2_ASM17439v2/GCF_000174395.2_ASM17439v2_genomic.fna.gz" -O ~/eskape_db/library/added/e_faecium.fna.gz
+
+wget "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/013/425/GCF_000013425.1_ASM1342v1/GCF_000013425.1_ASM1342v1_genomic.fna.gz" -O ~/eskape_db/library/added/s_aureus.fna.gz
+wget "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/240/185/GCF_000240185.1_ASM24018v2/GCF_000240185.1_ASM24018v2_genomic.fna.gz" -O ~/eskape_db/library/added/k_pneumoniae.fna.gz
+wget "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/012/085/GCF_000012085.1_ASM1208v1/GCF_000012085.1_ASM1208v1_genomic.fna.gz" -O ~/eskape_db/library/added/a_baumannii.fna.gz
+wget "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/006/765/GCF_000006765.1_ASM676v1/GCF_000006765.1_ASM676v1_genomic.fna.gz" -O ~/eskape_db/library/added/p_aeruginosa.fna.gz
+wget "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/025/565/GCF_000025565.1_ASM2556v1/GCF_000025565.1_ASM2556v1_genomic.fna.gz" -O ~/eskape_db/library/added/e_cloacae.fna.gz
+```
+
+**Header tagging (Python — run from Windows path accessible to WSL2):**
+
+Script saved to project folder and run via `/mnt/c/...` path to avoid terminal heredoc indentation issues:
+
+```python
+# tag_genomes.py
+import gzip
+
+taxids = {
+    "e_faecium.fna.gz":    1352,
+    "s_aureus.fna.gz":     1280,
+    "k_pneumoniae.fna.gz":  573,
+    "a_baumannii.fna.gz":   470,
+    "p_aeruginosa.fna.gz":  287,
+    "e_cloacae.fna.gz":     550,
+}
+
+for fname, taxid in taxids.items():
+    inpath = f"/home/chira/eskape_db/library/added/{fname}"
+    outpath = inpath.replace(".fna.gz", "_tagged.fna")
+    with gzip.open(inpath, "rt") as fin, open(outpath, "w") as fout:
+        for line in fin:
+            if line.startswith(">"):
+                line = line.rstrip() + f"|kraken:taxid|{taxid}\n"
+            fout.write(line)
+    print(f"Tagged {fname} -> taxid {taxid}")
+```
+
+```bash
+python3 "/mnt/c/Users/chira/OneDrive/Desktop/Nanopore project/Nanopore project/tag_genomes.py"
+```
+
+**Add to library:**
+
+```bash
+for fna in ~/eskape_db/library/added/*_tagged.fna; do
+    ~/kraken2-build/kraken2-build --add-to-library $fna --db ~/eskape_db
+done
+```
+
+---
+
+### 17.3 The build failure — why `|kraken:taxid|` tags were ignored
+
+After `--add-to-library`, the prelim_map files (which Kraken-2 uses to map sequence IDs to taxon IDs) showed `ACCNUM` entries instead of `TAXID` entries:
+
+```
+ACCNUM  NC_017960.1     NC_017960   ← taxid NOT found
+ACCNUM  NC_007795.1     NC_007795
+...
+```
+
+The `|kraken:taxid|` tags WERE correctly written into the FASTA headers — confirmed by inspecting the stored masked files:
+
+```
+>NC_008710.1 Borrelia turicatae 91E135, complete genome|kraken:taxid|470
+```
+
+The tag was present but `scan_fasta_file.pl` (the Perl script that creates the prelim_map) did not recognize it. Root cause not fully diagnosed — likely a Perl script CRLF or version issue. Result: all 17 sequences had no taxon ID → `build --db` completed with 0 sequences in the database.
+
+---
+
+### 17.4 The correct approach (what Colab did differently)
+
+Looking at §11.7 step 5, the Colab did NOT use `|kraken:taxid|` header tags at all. Instead it manually created the `nucl_gb.accession2taxid` file with real entries for every accession:
+
+```python
+accession_map = {
+    "NC_016847": 1352, "NC_016841": 1352, "NC_016845": 1352,
+    "NC_016840": 1352, "NC_016846": 1352, "NC_016838": 1352,
+    "NC_016839": 1352,  # E. faecium
+    "NC_007795": 1280,  # S. aureus
+    "NC_014108": 573, "NC_014107": 573, "NC_014121": 573,  # K. pneumoniae
+    "NC_008710": 470,   # A. baumannii
+    "NC_002516": 287,   # P. aeruginosa
+}
+
+with open("eskape_db/taxonomy/nucl_gb.accession2taxid", "w") as f:
+    f.write("accession\taccession.version\ttaxid\tgi\n")
+    for acc, taxid in accession_map.items():
+        f.write(f"{acc}\t{acc}.1\t{taxid}\t0\n")
+```
+
+This is the correct WSL2 approach. The `touch` placeholder files we used (empty files) caused `mmap` to fail. The accession2taxid file needs a proper header line AND real entries.
+
+**To replicate the Colab build correctly in WSL2:**
+1. Download taxonomy (wget approach above — rsync is blocked)
+2. Download genome .fna.gz files (no header tagging needed)
+3. Add to library WITHOUT tagging
+4. Create `nucl_gb.accession2taxid` with the accession map above (check `unmapped.txt` after any failed build to find missing accessions)
+5. Build
+
+---
+
+### 17.5 What we did to partially work around it
+
+Built `seqid2taxid.map` and fixed prelim_maps manually using Python scripts (`fix_seqid_map.py`, `fix_prelim_maps.py`). The build then processed 24 sequences correctly but hung indefinitely after `Processed 24 sequences (37392452 bp)...` — `taxo.k2d.tmp` was created but never grew. Root cause unknown — possibly WSL2 specific issue with the `build_db` binary on this Kraken-2 version (2.17.1).
+
+---
+
+### 17.6 Decision — use pre-built 8 GB database
+
+After 3 separate blockers (rsync, prelim_map parsing, build hang), we moved to the pre-built standard 8 GB database:
+
+```bash
+mkdir ~/eskape_db_8gb
+cd ~/eskape_db_8gb
+wget https://genome-idx.s3.amazonaws.com/kraken/k2_standard_08gb_20250402.tar.gz
+tar -xzvf k2_standard_08gb_20250402.tar.gz -C ~/eskape_db_8gb/
+```
+
+**Why this is actually better for profiling:**
+- 650 MB database fits easily in 14 GB RAM → few cache misses → profiling shows nothing interesting
+- 8 GB database puts real pressure on the CPU cache → cache misses appear → the bottleneck Kolin sir's project targets becomes visible in the numbers
+- No building required — guaranteed to work
+- Covers all ESKAPE pathogens (they are all common bacteria in the standard DB)
