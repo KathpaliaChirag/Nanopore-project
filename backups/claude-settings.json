@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '=== Project Local Directories ==='; echo '~/.nsys-symbols          — CUDA symbol cache (nsys profiling, first run slow, subsequent instant)'; echo '~/results/nsight/        — nsys profiling output (.nsys-rep, .sqlite, BAM files)'; echo '~/kraken2-build/         — Kraken-2 built from source with -pg flag (NOT YET CREATED)'; echo '================================'",
+            "statusMessage": "Checking local caches..."
+          },
+          {
+            "type": "command",
+            "command": "cd ~/memory && git pull origin hobbbit 2>/dev/null || true",
+            "statusMessage": "Syncing memory repo (hobbbit)..."
+          }
+        ]
+      }
+    ]
+  },
+  "effortLevel": "high",
+  "skipDangerousModePermissionPrompt": true
+}
