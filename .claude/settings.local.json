@@ -6,17 +6,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '=== Project Local Directories ==='; echo '~/.nsys-symbols          — CUDA symbol cache (nsys, NOT YET CREATED)'; echo '~/results/nsight/        — nsys profiling output (NOT YET CREATED)'; echo '/opt/kraken2-build/      — Kraken-2 built from source with -pg (NOT YET CREATED)'; echo '================================'",
-            "statusMessage": "Checking local caches..."
-          },
-          {
-            "type": "command",
             "command": "cd ~/Desktop/summer_project && git pull origin hobbbit 2>/dev/null || true",
             "statusMessage": "Syncing memory repo (hobbbit)..."
           },
           {
             "type": "command",
-            "command": "echo '=== MEMORY RECAP ==='; echo '--- index.md ---'; cat ~/Desktop/summer_project/index.md; echo; echo '--- daily_summary.md (recent) ---'; tail -40 ~/Desktop/summer_project/daily_summary.md",
+            "command": "python3 -c \"\nimport json, os\np = os.path.expanduser('~/Desktop/summer_project')\ncache = 'JUNK/CACHE FILES TO REVIEW:\\n  ~/.nsys-symbols       — CUDA symbol cache (NOT YET CREATED)\\n  ~/results/nsight/     — nsys profiling output (NOT YET CREATED)\\n  /opt/kraken2-build/   — Kraken-2 -pg build (NOT YET CREATED)'\ntry: idx = open(p+'/index.md').read()\nexcept: idx = '(index.md not found)'\ntry: ds = ''.join(open(p+'/daily_summary.md').readlines()[-40:])\nexcept: ds = '(daily_summary.md not found)'\nmsg = cache + '\\n\\n=== MEMORY RECAP ===\\n\\n=== index.md ===\\n' + idx + '\\n=== daily_summary.md (recent) ===\\n' + ds\nprint(json.dumps({'systemMessage': msg}))\n\"",
             "statusMessage": "Loading session context..."
           }
         ]
