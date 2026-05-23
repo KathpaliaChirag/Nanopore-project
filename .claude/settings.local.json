@@ -1,4 +1,28 @@
 {
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '=== Project Local Directories ==='; echo '~/.nsys-symbols          — CUDA symbol cache (nsys, NOT YET CREATED)'; echo '~/results/nsight/        — nsys profiling output (NOT YET CREATED)'; echo '/opt/kraken2-build/      — Kraken-2 built from source with -pg (NOT YET CREATED)'; echo '================================'",
+            "statusMessage": "Checking local caches..."
+          },
+          {
+            "type": "command",
+            "command": "cd ~/Desktop/summer_project && git pull origin hobbbit 2>/dev/null || true",
+            "statusMessage": "Syncing memory repo (hobbbit)..."
+          },
+          {
+            "type": "command",
+            "command": "echo '=== MEMORY RECAP ==='; echo '--- index.md ---'; cat ~/Desktop/summer_project/index.md; echo; echo '--- daily_summary.md (recent) ---'; tail -40 ~/Desktop/summer_project/daily_summary.md",
+            "statusMessage": "Loading session context..."
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "Bash(curl -s https://api.github.com/repos/nanoporetech/dorado/releases/latest)",
