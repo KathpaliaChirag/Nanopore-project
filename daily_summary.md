@@ -44,3 +44,19 @@ One dated entry per session. Append at end of each conversation.
 - Wrote reusable `benchmark_cpu_gpu.sh` + `plot_cpu_gpu.py` (log-scale graph, SVG fallback); chart at ~/results/cpu_vs_gpu.svg
 - Wrote Phase 1e to report.md
 - Pending: add 800/1000.pod5 to scaling curve; Phase 3 (interpret results) + Phase 4 (2-page report for Kolin sir, due 2026-05-25)
+
+---
+
+## 2026-05-25
+
+- Reinstalled nsys 2026.2.1 on Ubuntu 26.04 (post Ubuntu reinstall) via standalone .deb
+- Diagnosed and fixed missing progress bar: nsys on Ubuntu 26.04 intercepts child stderr, breaking dorado's `isatty()` check; fix: `LD_PRELOAD=/tmp/fake_tty.so` (compiled fake_tty.c override)
+- Set ptrace_scope=0 to allow nsys full process tracing
+- Restructured project directory: tools/ (dorado, kraken2, kraken2-build), data/ (pod5, minikraken2), results/; .gitignore updated to track only .md files on hobbbit branch
+- Re-ran fast model nsys profiling on `_15.pod5` (30,275 reads, 44.95s, 26.7M samples/s) — kernel distribution identical to Phase 1a: beam_search 26%, GEMM 16.5%, LSTM 23.2%
+- Re-ran HAC model nsys profiling on `_15.pod5` (30,275 reads, 116.6s, 10.3M samples/s) — LstmKernel 70.0%, consistent with Phase 1b
+- Converted fast model BAM → FASTQ (30,362 reads) using samtools
+- Ran Kraken-2 classification: 30,362 reads, 93.0% classified, 42.2s runtime
+- Ran gprof on Kraken-2: CompactHashTable::Get() = **80.65%** of CPU time — strongest evidence for Kolin sir's Hot-K-mer LRU cache
+- Started perf stat setup for Kraken-2 — identified PMU multiplexing issue (15 events > 6 counters), solving with event groups
+- Pending: complete perf stat (grouped), update report.md Phase 2, run cachegrind

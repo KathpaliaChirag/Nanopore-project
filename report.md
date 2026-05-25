@@ -394,3 +394,138 @@ Reusable scripts in `~/Desktop/summer_project/`:
 
 **Pending:** add 800.pod5 and 1000.pod5 to complete the scaling curve.
 
+---
+
+## Phase 1f — Dorado Fast Model Re-profiling (Post Ubuntu Reinstall)
+
+**Date:** 2026-05-25
+**Tool:** nsys 2026.2.1 (sudo + LD_PRELOAD fake_tty.so)
+**Input:** `FBE01990_24778b97_03e50f91_15.pod5`
+**Model:** `dna_r10.4.1_e8.2_400bps_fast@v5.2.0`
+**GPU:** NVIDIA GeForce RTX 4050 Laptop GPU (6 GB VRAM)
+**Command:**
+```bash
+sudo LD_PRELOAD=/tmp/fake_tty.so nsys profile \
+  --output ~/Desktop/summer_project/results/fast/nsight/dorado_fast_profile \
+  --trace cuda --stats true --resolve-symbols=false --force-overwrite true \
+  -- ~/Desktop/summer_project/tools/dorado/bin/dorado basecaller \
+  dna_r10.4.1_e8.2_400bps_fast@v5.2.0 \
+  ~/Desktop/summer_project/data/pod5/FBE01990_24778b97_03e50f91_15.pod5 \
+  --output-dir ~/Desktop/summer_project/results/fast/nsight/bam_fast --batchsize 64
+```
+
+### Run Summary
+
+| Metric | Value |
+|---|---|
+| Total runtime | 44.95 s (44,950 ms) |
+| Reads basecalled | 30,275 |
+| Throughput | 26.7M samples/sec |
+| Batch size | 64 |
+
+### Top GPU Kernels
+
+| Rank | % Time | Instances | Kernel |
+|---|---|---|---|
+| 1 | 26.0% | 2,186 | `beam_search_step` |
+| 2 | 16.5% | 14,822 | `ampere_h16816gemm_128x64` (Tensor Core GEMM) |
+| 3 | 13.9% | 6,558 | `lstm` (forward, 96-dim) |
+| 4 | 10.1% | 2,186 | `decode_step` |
+| 5 | 9.3% | 4,372 | `lstm` (reverse, 96-dim) |
+| 6 | 8.6% | 2,186 | `compute_posts_step` |
+
+**Verdict:** Identical kernel distribution to Phase 1a — results confirmed on new Ubuntu 26.04 setup.
+
+**Setup note:** `LD_PRELOAD=/tmp/fake_tty.so` required to restore dorado progress bar under nsys on Ubuntu 26.04. nsys intercepts child process stderr, causing `isatty()` to return false. The fake_tty.so override forces fd 2 to report as TTY.
+
+---
+
+## Phase 1g — Dorado HAC Model Re-profiling (Post Ubuntu Reinstall)
+
+**Date:** 2026-05-25
+**Tool:** nsys 2026.2.1 (sudo + LD_PRELOAD fake_tty.so)
+**Input:** `FBE01990_24778b97_03e50f91_15.pod5`
+**Model:** `dna_r10.4.1_e8.2_400bps_hac@v5.2.0`
+**GPU:** NVIDIA GeForce RTX 4050 Laptop GPU (6 GB VRAM)
+
+### Run Summary
+
+| Metric | Fast (Phase 1f) | HAC (Phase 1g) |
+|---|---|---|
+| Total runtime | 44.95 s | 116.6 s |
+| Reads basecalled | 30,275 | 30,275 |
+| Throughput | 26.7M samples/sec | 10.3M samples/sec |
+| Slowdown vs fast | — | **2.59×** |
+
+### Top GPU Kernels
+
+| Rank | % Time | Instances | Kernel |
+|---|---|---|---|
+| 1 | **70.0%** | 14,175 | `cutlass::LstmKernel` |
+| 2 | 8.3% | 2,025 | `beam_search_step` |
+| 3 | 5.9% | 2,025 | `cutlass::LinearLayer` (GEMM) |
+| 4 | 4.3% | 2,025 | `compute_posts_step` |
+| 5 | 3.9% | 2,025 | `decode_step` |
+
+**Verdict:** Consistent with Phase 1b — LstmKernel dominates at 70%, results validated.
+
+---
+
+## Phase 2a — Kraken-2 Classification + gprof Profiling
+
+**Date:** 2026-05-25
+**Tool:** gprof (Kraken-2 compiled with -pg), kraken2/src/classify
+**Input:** 30,362 reads (FASTQ converted from fast model BAM via samtools)
+**Database:** minikraken2_v2_8GB_201904_UPDATE
+**Command:**
+```bash
+# Convert BAM to FASTQ
+samtools fastq results/fast/nsight/bam_fast/.../bam_pass/FBE01990_pass_24778b97_03e50f91_0.bam \
+  > results/fast/nsight/reads.fastq
+
+# Run classification with gprof instrumented binary
+~/Desktop/summer_project/tools/kraken2/src/classify \
+  -H data/minikraken2_v2_8GB_201904_UPDATE/hash.k2d \
+  -t data/minikraken2_v2_8GB_201904_UPDATE/taxo.k2d \
+  -o data/minikraken2_v2_8GB_201904_UPDATE/opts.k2d \
+  -R results/kraken2/kraken2_report.txt \
+  -O results/kraken2/kraken2_output.txt \
+  results/fast/nsight/reads.fastq
+
+# Generate gprof report
+gprof tools/kraken2/src/classify tools/kraken2/src/gmon.out > results/kraken2/gprof_report.txt
+```
+
+### Classification Summary
+
+| Metric | Value |
+|---|---|
+| Reads processed | 30,362 |
+| Runtime | 42.2 s |
+| Classified | 28,236 (93.0%) |
+| Unclassified | 2,126 (7.0%) |
+| Throughput | 43.2K reads/min |
+
+### gprof Flat Profile — Top Hotspots
+
+| % Time | Cumulative (s) | Function |
+|---|---|---|
+| **80.65%** | 9.50 | `CompactHashTable::Get()` — k-mer DB lookup |
+| 9.51% | 10.62 | `MinimizerScanner::NextMinimizer()` — minimizer generation |
+| 3.48% | 11.03 | `ClassifySequence()` — main classification logic |
+| 1.02% | 11.15 | `canonical_representation()` — DNA strand canonicalization |
+| 1.02% | 11.27 | `HyperLogLogPlusMinus::insert()` — cardinality estimation |
+| 1.02% | 11.39 | `AddHitlistString()` — hit accumulation |
+
+### Verdict
+
+**Kraken-2 is memory-bound at the hash table lookup.**
+
+- 80.65% of all CPU time is spent in `CompactHashTable::Get()` — random k-mer lookups into an 8 GB hash table
+- The 8 GB database does not fit in any CPU cache (L1: 64 KB, L2: 512 KB, L3: 16 MB) — every lookup is effectively a RAM access
+- This is the exact function where Kolin sir's Hot-K-mer LRU cache would intercept — high-frequency k-mers cached in L1/L2 would convert RAM accesses to cache hits
+
+**Implication for cache:** Unlike Dorado (compute-bound), Kraken-2 is strongly memory-bound. A Hot-K-mer LRU cache targeting the top-N most frequent k-mers could eliminate the majority of RAM round-trips in `CompactHashTable::Get()`, potentially reducing runtime by 40-60% depending on k-mer frequency distribution.
+
+**Pending:** perf stat (cache miss rates, TLB misses, IPC) to quantify memory pressure numerically.
+
