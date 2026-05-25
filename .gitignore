@@ -1,27 +1,11 @@
-# Raw sequencing data — never commit
-pod5 data/
-*.pod5
-*.fast5
+# Ignore everything
+*
 
-# Dorado outputs
-*.bam
-*.fastq
-*.sam
-*.cram
+# Allow directories
+!*/
 
-# Large model files
-*.pt
-*.onnx
+# Allow markdown files
+!*.md
 
-# Dorado binary (installed separately)
-dorado/
-
-# Dorado temp files (created during model download + pod5 migration)
-.temp_dorado_model-*/
-.tmp_pod5_v3_v4_migration_*/
-
-# Results (local only — too large for git)
-results/
-
-# Claude local settings
-.claude/settings.local.json
+# Allow .gitignore itself
+!.gitignore
