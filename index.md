@@ -30,9 +30,14 @@ Update this every time a new major topic is pushed.
 - Phase 1a: Dorado fast model nsys profiling — 186.8s, 27.2M samples/s, compute-bound (beam_search 26%, GEMM 17%, LSTM 23%)
 - Phase 1b: Dorado HAC model nsys profiling — 502.0s, 10.1M samples/s, CUTLASS LstmKernel 69.8%, 2.69× slower than fast
 - Phase 1c: Dorado optimization analysis — INT8 quantization and beam search rewrite are real targets; cache does not help Dorado
-- Phase 2: Kraken-2 CPU profiling (gprof + cachegrind + perf) — fast vs HAC comparison, 69% CPU in hash lookup, 34% LLC miss rate, memory-bound verdict
+- Phase 1d: CPU vs GPU comparison — 35× speedup, beam_search consistent bottleneck on both
+- Phase 1e: CPU vs GPU scaling (200/400/600 MB) — speedup widens 24×→31× with file size
+- Phase 1f: Fast model re-profiling (post Ubuntu reinstall, _15.pod5) — 44.95s, 30,275 reads, results confirmed
+- Phase 1g: HAC model re-profiling (post Ubuntu reinstall, _15.pod5) — 116.6s, 30,275 reads, LstmKernel 70.0% confirmed
+- Phase 2a: Kraken-2 classification + gprof — 93% classified, CompactHashTable::Get() = 80.65% CPU time, memory-bound verdict
 
 **daily_summary.md** →
 - 2026-05-20
 - 2026-05-21
 - 2026-05-22
+- 2026-05-25
