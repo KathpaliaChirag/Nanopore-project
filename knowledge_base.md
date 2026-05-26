@@ -2383,9 +2383,146 @@ Hyper-V (the Windows hypervisor running WSL2) does not expose all PMU counters t
 
 **Key insight from live testing:** the generic `LLC-*` aliases are blocked, but AMD-native event names `l2_pf_miss_l2_l3` and `l2_pf_miss_l2_hit_l3` work fine. these give L3 visibility through a different PMU register path that Hyper-V doesn't block. use these instead of `LLC-load-misses` for L3 miss data.
 
-**Clock frequency caveat:** perf reports ~0.734 GHz for our Ryzen 5800H (real speed: ~3.2 GHz). Hyper-V virtualizes the TSC. this makes `cycles/second` (i.e. reported GHz) wrong. but IPC = instructions/cycles is a ratio of two PMU counters — both come from real hardware registers — so IPC itself is valid even though the clock frequency is wrong.
+---
 
-For per-function L3 miss breakdown (not just totals), use cachegrind — it simulates the full cache hierarchy in software so Hyper-V cannot block it.
+### 15.3a The Clock Frequency Problem — What Exactly Is Wrong
+
+**verified 2026-05-26 by running `perf stat sleep 1` and cross-checking against `/proc/cpuinfo`.**
+
+Hyper-V virtualizes the PMU cycle counter. the `cycles` register that perf reads is being throttled to a fraction of real hardware rate. it is not consistent — it varies with CPU power state:
+
+```
+sleep 1 run:
+  perf reported:  833,353 cycles over 3.63 ms task-clock → 0.230 GHz
+  real CPU speed: 3,193 MHz (from /proc/cpuinfo)
+  cycles counted at: 833K / (3.63ms × 3193MHz) = ~7% of real rate
+
+kraken-2 run:
+  perf reported:  68.8B cycles over 93.8s task-clock → 0.734 GHz
+  real CPU speed: ~3.2 GHz
+  cycles counted at: ~23% of real rate
+```
+
+the cycle counter is physically wrong. it counts a virtualized/throttled value, not real CPU cycles.
+
+**what this breaks — exactly:**
+
+| number | formula | reliable? | reason |
+|---|---|---|---|
+| reported GHz | cycles ÷ task-clock | **no** | cycles are throttled |
+| IPC | instructions ÷ cycles | **no** | denominator (cycles) is wrong |
+| any "time from cycles" estimate | cycles × ns/cycle | **no** | cycles aren't real |
+| cache miss rate | cache-misses ÷ cache-references | **yes** | ratio of two real PMU events, no cycles involved |
+| task-clock (ms) | OS software timer | **yes** | kernel clock, not PMU |
+| wall time / user / sys | OS timers | **yes** | no PMU involved |
+| branch miss rate | branch-misses ÷ branches | **yes** | ratio, no cycles |
+| raw cache-miss count | real PMU event | **yes** | 301M misses is the real number |
+| raw instruction count | real PMU event | **yes** | instructions counter is not throttled |
+
+**the IPC correction:** in the kraken-2 run, perf showed IPC = 2.26. that's wrong. real cycles = 68.8B × (3.2 / 0.734) ≈ 300B. real IPC = 155B instructions / 300B cycles ≈ 0.52. that makes far more sense for a memory-bound workload (IPC < 1.0 = CPU stalling on memory). the 2.26 figure should not be reported.
+
+**what is safe to report from our kraken-2 perf run:**
+- cache miss rate: 34.24% ✓
+- total cache misses: 301 million ✓
+- task-clock, wall time, user time, sys time ✓
+- raw instruction count: 156 billion ✓
+- IPC: do not report — discard it
+
+---
+
+### 15.3b AMD uProf — What It Is and What It Adds
+
+AMD uProf (micro profiler) is AMD's own profiling tool for Ryzen CPUs. free download from `developer.amd.com/amd-uprof`. installs a Windows driver (`AMDPowerProfiler.sys`) that talks to the Ryzen PMU directly, potentially bypassing Hyper-V's throttling of the cycle counter.
+
+**what uProf gives that perf cannot on our machine:**
+
+| metric | perf on WSL2 | uProf |
+|---|---|---|
+| real cycle counts | throttled (~7–23% of real) | AMD driver reads PMU directly |
+| correct IPC | wrong | should be correct |
+| `stalled-cycles-backend` | `<not supported>` | available via AMD IBS (Instruction Based Sampling) |
+| DRAM bandwidth (GB/s) | not available | yes — actual memory bus utilization |
+| memory access latency | not available | histogram of cache miss latency in ns |
+| TMAM breakdown | not available | full hierarchy (see below) |
+| L3 miss rate per function | not available | yes |
+
+**TMAM (Top-down Microarchitecture Analysis)** — the key uProf feature:
+```
+retiring              ← useful work
+bad speculation       ← branch mispredictions
+frontend bound        ← instruction fetch stalls
+backend bound
+  ├── memory bound
+  │   ├── L1 bound
+  │   ├── L2 bound
+  │   ├── L3 bound
+  │   └── DRAM bound  ← expected for kraken-2
+  └── core bound      ← compute stalls
+```
+right now we know kraken-2 is "memory bound" from the 34.24% miss rate. TMAM would say exactly which level — almost certainly DRAM bound. that's the difference between a vague claim and a precise one.
+
+**whether uProf works in WSL2:** unknown until tested. the driver installs on Windows. it definitely works for Windows-native binaries. for WSL2 binaries, it depends on whether the driver can sample across the Hyper-V boundary. installation and test results logged in §15.3c.
+
+For per-function L3 miss breakdown without uProf, use cachegrind — it simulates the full cache hierarchy in software so Hyper-V cannot block it.
+
+### 15.3c AMD uProf — Installation and Test Results
+
+**download situation (verified 2026-05-26):** AMD gates all uProf downloads behind a browser EULA acceptance page. every direct CDN URL (e.g. `download.amd.com/developer/eula/uprof/...`) redirects back to the product page. cannot be automated — requires manual browser download.
+
+**to download:**
+1. open browser, go to: `https://www.amd.com/en/developer/uprof.html`
+2. click the download button, accept the EULA
+3. get either the Windows installer (`.exe`) or the Linux tarball (`.tar.bz2`)
+4. for WSL2 profiling, the Linux version is more useful — it runs natively inside WSL2
+
+**Windows installer — silent install once downloaded:**
+```powershell
+# run as administrator
+.\AMDuProf_x.y.z_Setup.exe /S
+# installs to C:\Program Files\AMD\AMDuProf\
+# CLI tool at: C:\Program Files\AMD\AMDuProf\bin\AMDuProfCLI.exe
+```
+
+**Linux tarball — install into WSL2:**
+```bash
+tar -xjf AMDuProf_Linux_x64_x.y.z.tar.bz2
+cd AMDuProf_Linux_x64_x.y.z
+sudo ./install.sh
+# CLI at: /opt/AMDuProf/bin/AMDuProfCLI
+```
+
+**checks to run once installed (WSL2 Linux version):**
+```bash
+# 1. verify install
+AMDuProfCLI --version
+
+# 2. list available events — compare to perf list
+AMDuProfCLI collect --list-events
+
+# 3. test IPC on ls (compare against perf's wrong IPC)
+AMDuProfCLI collect --event IPC ls
+
+# 4. test if backend stall counter works (blocked in perf)
+AMDuProfCLI collect --event BackendBound ls
+
+# 5. full TMAM profile on kraken-2
+AMDuProfCLI collect --config tbp \
+    --output-dir /tmp/uprof_kraken \
+    -- ./kraken2 --db /path/to/db reads.fastq
+
+# 6. memory access profile (DRAM bandwidth)
+AMDuProfCLI collect --config memory \
+    --output-dir /tmp/uprof_mem \
+    -- ./kraken2 --db /path/to/db reads.fastq
+```
+
+**what to look for in output:**
+- IPC number — compare to perf's 2.26 (wrong). real should be ~0.5 for a memory-bound workload
+- BackendBound % — should be high for kraken-2 (CPU waiting on memory)
+- DRAM bandwidth (GB/s) — how much of the memory bus is being used
+- TMAM breakdown — which level (L1/L2/L3/DRAM bound) kraken-2 sits at
+
+test results to be filled in once installed.
 
 ### 15.4 The Important Counters for This Project
 
