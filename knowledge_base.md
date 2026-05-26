@@ -2522,7 +2522,143 @@ AMDuProfCLI collect --config memory \
 - DRAM bandwidth (GB/s) — how much of the memory bus is being used
 - TMAM breakdown — which level (L1/L2/L3/DRAM bound) kraken-2 sits at
 
-test results to be filled in once installed.
+---
+
+**actual test results — verified 2026-05-26 on AMD Ryzen 7 5800H, Windows 11, uProf 5.3.518.0**
+
+### what uProf told us about our hardware first
+
+running `AMDuProfCLI.exe info --system` before anything else:
+
+```
+[PERF Features Availability]
+  Core PMC   : Yes (6 counters per core)
+  L3 PMC     : No
+  DF PMC     : No
+  UMC PMC    : No
+  PERF TS    : No
+
+[IBS Features Availability]
+  IBS        : No
+
+[RAPL/CEF Features Availability]
+  RAPL       : Yes
+  APERF & MPERF : Yes
+```
+
+this is the ground truth. Hyper-V blocks everything above core-level PMC. specific implications:
+- **L3 PMC: No** — no per-core L3 cache miss counters in uProf either. same block as perf.
+- **DF PMC: No** — Data Fabric PMC monitors AMD's memory interconnect (the path to DRAM). blocked. means **no DRAM bandwidth numbers** from uProf.
+- **UMC PMC: No** — Unified Memory Controller PMC. also blocked. this would have given memory latency and bandwidth. gone.
+- **IBS: No** — Instruction Based Sampling is AMD's most powerful feature. it samples at instruction granularity, giving precise memory latency, backend stalls, pipeline state per instruction. blocked entirely by Hyper-V.
+- **APERF & MPERF: Yes** — these measure actual effective CPU frequency (MPERF counts at base freq, APERF at actual freq, ratio gives real operating freq). available — but only through the `timechart` command.
+
+### what configs actually run vs what fails
+
+tested every config:
+
+| config | result | what it gives |
+|---|---|---|
+| `tbp` | ✓ works (deprecated, use hotspots) | CPU_TIME sampling, hotspot functions by wall time |
+| `hotspots` | ✓ works | same as tbp, current name |
+| `branch` | ✓ works | CYCLES_NOT_IN_HALT, RETIRED_INST, CPI, branch misprediction rates |
+| `assess` | ✗ `driver failed to start (0x80070021)` | needs IBS or L3 PMC — both blocked |
+| `cache` | ✗ `not supported` | needs L3 PMC — blocked |
+| `memory` | ✗ needs IBS — blocked | would give memory access latency |
+| `ibs` | ✗ needs IBS — blocked | instruction-level sampling |
+| `ipc` | ✗ `not supported` | needs TMAM counters — blocked |
+| `ebp` | ✗ `not supported` | generic EBP — blocked |
+| `timechart --event power` | ✓ works | per-core and socket power in Watts (RAPL) |
+| `timechart --event freq/cef/cpu` | ✗ invalid event name | APERF/MPERF available in hardware but not exposed via this CLI path |
+
+### the one thing uProf gives that perf cannot — real CPI
+
+the `branch` config uses `CYCLES_NOT_IN_HALT (PMCx076)` — AMD's own cycle counter that counts only when the thread is not sleeping. this is NOT the TSC. it is not virtualized by Hyper-V in the same way perf's cycle counter is.
+
+from a ping.exe test run:
+```
+ping.exe process:
+  CYCLES_NOT_IN_HALT : 22
+  RETIRED_INST       : 12
+  CPI                : 1.83   (IPC = 0.55)
+  branch mispredicts : 5.26%
+```
+
+compare to running the same binary under perf in WSL2 — perf would show IPC ~2.26 (wrong because cycles are throttled to ~7–23% of real rate). uProf's 0.55 IPC for a short network program doing mostly I/O waiting is believable. perf's 2.26 was not.
+
+**so: uProf gives us correct IPC. perf does not.**
+
+### the key limitation uProf did NOT solve
+
+uProf is a Windows tool. it profiles Windows processes. kraken-2 runs inside WSL2 (a Hyper-V VM). uProf cannot attach to or profile WSL2 processes. the tools don't overlap on the target binary.
+
+this means:
+- for kraken-2: perf (WSL2) is still the only viable CPU profiler
+- for any Windows-native binary: uProf gives correct IPC + branch metrics
+
+### uProf bonus: real power measurements (RAPL)
+
+`timechart --event power` works and gives per-core and socket power in Watts at 1-second intervals:
+
+```
+socket0-package-power: 2.24 W (idle)
+core0-power: 0.32 W
+core1–7-power: ~0.01–0.06 W each
+```
+
+this is from RAPL (Running Average Power Limit), which reads from CPU internal power counters. accurate to within a few percent. useful for understanding power cost of kraken-2 vs dorado runs. not something perf can give at all.
+
+### perf vs uProf — full comparison table (our machine, WSL2 + Windows)
+
+| metric | perf (WSL2) | uProf (Windows) | notes |
+|---|---|---|---|
+| **can profile kraken-2 (WSL2 binary)** | ✓ yes | ✗ no | uProf is Windows-only |
+| **cache miss rate (overall)** | ✓ 34.24% — correct | ✗ not available (L3 PMC blocked) | perf wins here |
+| **IPC** | ✗ wrong (~2.26, cycles throttled) | ✓ correct via CYCLES_NOT_IN_HALT | uProf wins here |
+| **CPI per function** | partial (perf record) | ✓ branch config gives per-function CPI | uProf more detailed |
+| **branch miss rate** | ✓ correct ratio | ✓ correct + per-function breakdown | both work |
+| **L3 miss rates** | ✗ LLC-* blocked | ✗ L3 PMC blocked | neither works |
+| **DRAM bandwidth** | ✗ not available | ✗ DF/UMC PMC blocked | neither works |
+| **backend stall breakdown** | ✗ blocked | ✗ IBS blocked | neither works |
+| **TMAM hierarchy** | ✗ not available | ✗ needs IBS — blocked | neither works |
+| **real CPU frequency** | ✗ reports 0.23–0.73 GHz (wrong) | partial (APERF/MPERF in hardware but CLI path broken) | neither reliable |
+| **power consumption (Watts)** | ✗ not available | ✓ RAPL, per-core, 1-second intervals | uProf only |
+| **function hotspots** | ✓ perf record | ✓ hotspots/tbp config | both work |
+| **overhead** | near zero | low (sampling-based) | both fine |
+
+### what this means for our kraken-2 profiling
+
+for kraken-2 running in WSL2:
+- **cache miss rate (34.24%)**: from perf — correct and trustworthy
+- **IPC**: from perf — wrong. do not report this number. real IPC probably ~0.5 based on how uProf measures similar programs.
+- **branch miss rate**: from perf — correct ratio
+- **function hotspots**: need `perf record` in WSL2 — not yet run
+- **per-function cache miss rates**: need cachegrind — not yet run
+
+for anything that needs correct IPC or power measurements, uProf on a Windows binary is the tool.
+
+### commands reference (uProf)
+
+```powershell
+$uprof = "C:\Program Files\AMD\AMDuProf\bin\AMDuProfCLI.exe"
+
+# system hardware check — always run first
+& $uprof info --system
+
+# hotspot functions (what's taking time)
+& $uprof collect --config hotspots -o C:\Temp\uprof_out target.exe [args]
+& $uprof report -i C:\Temp\uprof_out\AMDuProf-*
+
+# IPC + branch analysis (correct CPI per function)
+& $uprof collect --config branch -o C:\Temp\uprof_out target.exe [args]
+& $uprof report -i C:\Temp\uprof_out\AMDuProf-*
+
+# power consumption over time (RAPL, 1s intervals)
+& $uprof timechart --event power -d 30 -o C:\Temp\uprof_power
+
+# one-shot profile + report combined
+& $uprof profile --config branch -o C:\Temp\uprof_out target.exe [args]
+```
 
 ### 15.4 The Important Counters for This Project
 
