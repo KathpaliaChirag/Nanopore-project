@@ -1,6 +1,6 @@
 # nanopore pipeline — ESKAPE pathogen profiling
 
-**chirag kathpalia** | B.Tech CSE | research project under Kolin sir
+**chirag kathpalia** | research project under Prof. Kolin Paul
 
 ---
 
