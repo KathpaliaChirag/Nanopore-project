@@ -2362,18 +2362,30 @@ perf stat ls
 
 Common build issue: if `make` fails with `libtraceevent is missing` — run `sudo apt install libtraceevent-dev` and re-run `make`. The other warnings in the build output (missing libbabeltrace, JDK, libpfm4) are harmless — they only disable optional features.
 
-**WSL2 hardware counter limitation:** even after building perf correctly, Hyper-V (the Windows hypervisor that runs WSL2) does not expose all PMU counters to the VM. LLC-specific counters (`LLC-loads`, `LLC-load-misses`) show `<not supported>`. This is a Hyper-V decision — no user-level fix exists on Windows Home. What does work:
+**WSL2 hardware counter limitation — verified 2026-05-26 by running perf list + perf stat live:**
 
-| Counter | Status on WSL2 |
-|---|---|
-| `cycles`, `instructions` | ✓ Works |
-| `cache-misses`, `cache-references` | ✓ Works — gives overall miss rate |
-| `branches`, `branch-misses` | ✓ Works |
-| `task-clock`, `page-faults` | ✓ Always works (software events) |
-| `LLC-loads`, `LLC-load-misses` | ✗ `<not supported>` — Hyper-V blocks these |
-| `L1-dcache-load-misses` | ✗ Usually blocked too |
+Hyper-V (the Windows hypervisor running WSL2) does not expose all PMU counters to the VM. Tested on AMD Ryzen 7 5800H, WSL2 kernel 6.6.87.2-microsoft-standard-WSL2.
 
-For per-function LLC miss data, use cachegrind instead — it simulates the full L1/L2/L3 hierarchy in software and gives per-function and per-line breakdown, which is more detailed for our purpose.
+| Counter | Status | Notes |
+|---|---|---|
+| `cycles`, `instructions` | ✓ works | IPC ratio is valid; clock freq reported (~0.734 GHz) is wrong — TSC virtualized |
+| `cache-misses`, `cache-references` | ✓ works | overall L3 miss rate — the most useful metric |
+| `branches`, `branch-misses` | ✓ works | |
+| `stalled-cycles-frontend` | ✓ works | instruction fetch stalls visible |
+| `task-clock`, `page-faults`, `context-switches` | ✓ always works | software events, no PMU needed |
+| `L1-dcache-loads`, `L1-dcache-load-misses` | ✓ works | L1 data cache visible |
+| `L1-icache-load-misses` | ✓ works | L1 instruction cache visible |
+| `dTLB-load-misses`, `iTLB-load-misses` | ✓ works | TLB misses visible |
+| `l2_pf_miss_l2_l3` | ✓ works | AMD native event — L2 prefetch misses going to L3 |
+| `l2_pf_miss_l2_hit_l3` | ✓ works | AMD native event — L2 misses that hit L3 |
+| `LLC-loads`, `LLC-load-misses`, `LLC-stores` | ✗ `<not supported>` | Hyper-V blocks the generic PMU alias for L3 |
+| `stalled-cycles-backend` | ✗ `<not supported>` | backend stall counter blocked |
+
+**Key insight from live testing:** the generic `LLC-*` aliases are blocked, but AMD-native event names `l2_pf_miss_l2_l3` and `l2_pf_miss_l2_hit_l3` work fine. these give L3 visibility through a different PMU register path that Hyper-V doesn't block. use these instead of `LLC-load-misses` for L3 miss data.
+
+**Clock frequency caveat:** perf reports ~0.734 GHz for our Ryzen 5800H (real speed: ~3.2 GHz). Hyper-V virtualizes the TSC. this makes `cycles/second` (i.e. reported GHz) wrong. but IPC = instructions/cycles is a ratio of two PMU counters — both come from real hardware registers — so IPC itself is valid even though the clock frequency is wrong.
+
+For per-function L3 miss breakdown (not just totals), use cachegrind — it simulates the full cache hierarchy in software so Hyper-V cannot block it.
 
 ### 15.4 The Important Counters for This Project
 
