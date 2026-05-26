@@ -23,5 +23,12 @@ dorado/
 # Results (local only — too large for git)
 results/
 
+# Large binary downloads (install separately)
+*.tar.gz
+*.zip
+
+# Old folder name (moved to resources/)
+tools-guide-claude/
+
 # Claude local settings
 .claude/settings.local.json
