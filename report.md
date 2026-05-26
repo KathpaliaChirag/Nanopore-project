@@ -124,29 +124,43 @@ nsys is NVIDIA's sampling profiler for GPU programs. it records:
 
 it writes a `.nsys-rep` file you open in the nsight GUI, plus a `.sqlite` file you can query directly.
 
-### getting nsight working
+### getting nsight working — commands that failed and why
 
-nsight 2024.2.3 on Windows. several issues hit:
+**verify install (PowerShell):**
+```powershell
+nsys --version
+# NVIDIA Nsight Systems version 2024.2.3.20-245870435v0
+```
 
-1. `--` separator not supported in nsys 2024.2.3 — remove it
-2. `osrt` is not a valid trace type in this version — don't include it
-3. `--stats` flag is ambiguous — use `-o` for output file name instead
-4. must run as Administrator for full CUDA tracing
+**first attempt — what the docs suggest (failed with 3 errors):**
+```powershell
+nsys profile `
+    --output dorado_fast_profile `
+    --trace cuda,nvtx,osrt `
+    --stats true `
+    -- `
+    dorado.exe basecaller fast "pod5 data\FBE01990_24778b97_03e50f91_10.pod5" --batchsize 64
+```
+errors hit:
+1. `--` separator — not supported in nsys 2024.2.3, remove it
+2. `osrt` — not a valid trace type in this version, remove from `--trace`
+3. `--stats true` — flag is ambiguous in this version, remove it
+
+**also needed:** run PowerShell as Administrator — without it CUDA tracing is partial
+
+**working command (run as Administrator in PowerShell):**
+```powershell
+nsys profile -o dorado_fast_profile --trace cuda,nvtx `
+    dorado.exe basecaller fast "pod5 data\FBE01990_24778b97_03e50f91_10.pod5" --batchsize 64
+```
+
+output files produced: `dorado_fast_profile.nsys-rep` (open in Nsight GUI) and `dorado_fast_profile.sqlite` (query directly). total run ~3 hours with nsys overhead on GTX 1650 — fast mode alone takes ~5 min.
 
 ### input
 
 - file: `FBE01990_24778b97_03e50f91_10.pod5` — 104,478 reads, 4 GB
 - dorado mode: fast
 - batchsize: 64
-
-### exact command
-
-```bash
-nsys profile -o dorado_fast_profile --trace cuda,nvtx \
-    dorado.exe basecaller fast pod5_file --batchsize 64
-```
-
-output: `dorado_fast_profile.nsys-rep` and `.sqlite`. total run ~3 hours including nsys overhead on GTX 1650 (fast mode without profiling takes ~5 min).
 
 ### results — NVTX stage breakdown
 
@@ -238,20 +252,57 @@ unlike perf which samples at 1000 Hz, gprof counts every single call. for a tigh
 - database: `eskape_db` (8 GB standard k2 DB, same as perf run)
 - binary: `~/kraken2-build/classify` — compiled from source with `-pg` in `CXXFLAGS`
 
-### exact command
+### commands — full step-by-step including what failed
 
+**step 1 — verify pv is installed (WSL2):**
 ```bash
-pv ~/barcode02.fastq | ~/kraken2-build/classify \
-    -H ~/eskape_db/hash.k2d \
-    -t ~/eskape_db/taxo.k2d \
-    -o ~/eskape_db/opts.k2d \
-    -R ~/kraken2_report.txt \
-    - > ~/kraken2_output.kraken
-
-gprof ~/kraken2-build/classify gmon.out | head -40
+sudo apt install pv
+# output: pv is already the newest version (1.8.5-2build1)
 ```
 
-note: `classify` is the actual executable. `kraken2` is a shell wrapper around it. gmon.out is written automatically when the process exits.
+**step 2 — run kraken-2 with pv progress indicator:**
+```bash
+pv ~/barcode02.fastq | ~/kraken2-build/kraken2 \
+    --db ~/eskape_db \
+    --report ~/kraken2_report.txt \
+    - > ~/kraken2_output.kraken
+```
+terminal output: `Loading database information... done.` then appeared to hang. pv's progress bar was overwritten by kraken-2's stderr message and never re-rendered.
+
+**step 3 — verify it was actually running (open a second terminal):**
+```bash
+ps aux | grep kraken2
+# chira  1680 99.9 76.7 7824108 7820672 pts/0 R+  10:20  9:55
+#   /home/chira/kraken2-build/classify -H /home/chira/eskape_db/hash.k2d ...
+```
+99.9% CPU = running. the actual binary is `classify` — `kraken2` is a shell wrapper that calls it. 76.7% RAM = ~10.7 GB = 8 GB database fully loaded into RAM.
+
+**step 4 — check output file size to confirm progress:**
+```bash
+ls -lh ~/barcode02.fastq
+# .rw-r--r--  720M chira  22 May 15:19  /home/chira/barcode02.fastq
+
+ls -lh ~/kraken2_output.kraken
+# first check (10 min in): 0 bytes — normal, 8 GB database still being paged in via mmap
+# second check: 39M, last modified 10:36 — run complete
+
+# watch it grow every 3 seconds:
+watch -n 3 'ls -lh ~/kraken2_output.kraken'
+```
+output file stays at 0 bytes for ~10 minutes while the OS pages the 8 GB mmap'd database into RAM. this is not a crash. once the first read is classified the file starts growing.
+
+**step 5 — first gprof attempt (wrong binary — fails):**
+```bash
+gprof ~/kraken2-build/kraken2 gmon.out > ~/gprof_report.txt
+# error: gprof: /home/chira/kraken2-build/kraken2: not in executable format
+```
+`kraken2` is a shell script, not an ELF binary. gmon.out is written by the actual `classify` binary. always use `classify` with gprof.
+
+**step 6 — correct gprof command (trim output with head):**
+```bash
+gprof ~/kraken2-build/classify gmon.out | head -40
+```
+`| head -40` shows only the flat profile — the part that matters. without it gprof dumps thousands of lines (full call graph + cross-reference index) that aren't needed for the report.
 
 ### results — flat profile
 

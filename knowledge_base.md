@@ -3056,22 +3056,66 @@ tar -xzvf k2_standard_08gb_20250402.tar.gz -C ~/eskape_db_8gb/
 - **database:** `~/eskape_db` — pre-built 8 GB standard k2 database (same as perf stat run)
 - **platform:** WSL2, Ubuntu 24.04, AMD Ryzen 7 5800H
 
-### 18.2 Commands
+### 18.2 Commands — full sequence including failures
 
+**check pv is installed:**
 ```bash
-# run kraken2 — gmon.out is written automatically on exit
-pv ~/barcode02.fastq | ~/kraken2-build/classify \
-    -H ~/eskape_db/hash.k2d \
-    -t ~/eskape_db/taxo.k2d \
-    -o ~/eskape_db/opts.k2d \
-    -R ~/kraken2_report.txt \
-    - > ~/kraken2_output.kraken
-
-# generate and view flat profile
-gprof ~/kraken2-build/classify gmon.out | head -40
+sudo apt install pv
+# pv is already the newest version (1.8.5-2build1) — already present
 ```
 
-`pv` feeds the FASTQ through a pipe for a progress indicator. the `-` argument to classify reads from stdin. gmon.out is written to the current working directory when the process exits.
+**run kraken-2 with pv progress bar:**
+```bash
+pv ~/barcode02.fastq | ~/kraken2-build/kraken2 \
+    --db ~/eskape_db \
+    --report ~/kraken2_report.txt \
+    - > ~/kraken2_output.kraken
+```
+what happened: terminal printed `Loading database information... done.` then appeared stuck. kraken-2's stderr line overwrote pv's progress bar render so no bar was visible. the `-` argument tells kraken-2 to read from stdin (the pipe from pv).
+
+**verify it was running (second terminal):**
+```bash
+ps aux | grep kraken2
+# chira  1680 99.9 76.7 7824108 7820672 pts/0 R+  10:20  9:55
+#   /home/chira/kraken2-build/classify -H /home/chira/eskape_db/hash.k2d
+#                                      -t /home/chira/eskape_db/taxo.k2d
+#                                      -o /home/chira/eskape_db/opts.k2d
+#                                      -p 1 -T 0 -Q 0
+#                                      -R /home/chira/kraken2_report.txt -g 2 -
+```
+key observations:
+- 99.9% CPU — running, not stuck
+- 76.7% RAM (of 14 GB) = ~10.7 GB — 8 GB hash table fully loaded into RAM
+- actual process name is `classify`, not `kraken2` — `kraken2` is a shell wrapper
+- trailing `-` at end of args = reading from stdin ✓
+
+**check output file size to verify progress:**
+```bash
+ls -lh ~/barcode02.fastq
+# .rw-r--r--  720M chira  22 May 15:19  /home/chira/barcode02.fastq  ← input confirmed
+
+ls -lh ~/kraken2_output.kraken
+# .rw-r--r--  0  chira  26 May 10:20  /home/chira/kraken2_output.kraken  ← 0 bytes for ~10 min
+# later: 39M ← run complete
+
+# monitor continuously:
+watch -n 3 'ls -lh ~/kraken2_output.kraken'
+```
+the output file is created immediately at 0 bytes (shell opens it for redirect before kraken-2 starts). it stays at 0 for ~10 minutes while the OS lazily pages the 8 GB mmap'd database into RAM on first access. once page faulting is done, classification output starts flowing.
+
+**first gprof attempt — fails (wrong binary):**
+```bash
+gprof ~/kraken2-build/kraken2 gmon.out > ~/gprof_report.txt
+# error: gprof: /home/chira/kraken2-build/kraken2: not in executable format
+# also: less ~/gprof_report.txt opened a 0-byte file and suspended [1]
+```
+`~/kraken2-build/kraken2` is a shell script, not an ELF binary. gprof requires the actual compiled binary. gmon.out is written by `classify` (the ELF binary that runs), not by the shell wrapper.
+
+**correct gprof — use classify, trim output:**
+```bash
+gprof ~/kraken2-build/classify gmon.out | head -40
+```
+`| head -40` gives only the flat profile section — the only part needed. full gprof output is thousands of lines: flat profile (~30 lines) + full call graph (hundreds of lines per function) + cross-reference index. `head -40` discards the noise.
 
 ### 18.3 Flat Profile Results
 
