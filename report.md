@@ -1,7 +1,7 @@
 # meeting prep — kolin sir (2026-05-26)
 **prepared by:** chirag kathpalia
 
-this is a full summary of everything profiled so far. what we ran, exact commands, what numbers came out, and where time is actually going. written to read the night before.
+this is a full summary of everything profiled so far. what we ran, exact commands, what numbers came out, and where time is actually going.
 
 ---
 
