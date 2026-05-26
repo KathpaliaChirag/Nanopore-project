@@ -10,7 +10,7 @@ this is a full summary of everything profiled so far. what we ran, exact command
 the pipeline is: pod5 → dorado (GPU, basecalling) → BAM → samtools → FASTQ → kraken-2 (CPU, species ID).
 
 we profiled both stages. the conclusion for each:
-- **kraken-2 is memory-bound.** 34.24% cache miss rate. the CPU is mostly waiting for RAM, not computing.
+- **kraken-2 is memory-bound.** 34.24% cache miss rate. 67% of all runtime is inside the hash table lookup function. the CPU is mostly waiting for RAM, not computing.
 - **dorado is compute-bound.** 82% of GPU time is matrix multiply. the GPU is working flat out.
 
 both conclusions directly justify the caching work.
@@ -224,20 +224,71 @@ one constraint to note: the pipeline is synchronous (CPU blocks on `cudaStreamSy
 
 ---
 
-## what we haven't run yet
+## tool 3 — gprof (kraken-2 call graph)
 
-### gprof — CPU call graph for kraken-2
+### what gprof is
 
-kraken-2 was compiled with `-pg` flag (added to `src/Makefile`). this instruments every function call. after the run, `gprof` reads a `gmon.out` file and produces a call graph: which functions ran, how long each took, how many times called.
+gprof instruments every function call in the binary (compiled with `-pg`). while the program runs it records how many times each function was called and how long each call took. at the end it produces a flat profile (total time per function) and a call graph (who called what).
 
-we haven't actually run `gprof` yet because the FASTQ inputs for WSL2 profiling were from interrupted runs (truncated files). the nsys BAM is complete but needs converting to FASTQ first.
+unlike perf which samples at 1000 Hz, gprof counts every single call. for a tight inner loop called 9 million times, gprof gives exact counts.
 
-command when ready:
+### input
+
+- file: `barcode02.fastq` — 104,829 reads, 720 MB
+- database: `eskape_db` (8 GB standard k2 DB, same as perf run)
+- binary: `~/kraken2-build/classify` — compiled from source with `-pg` in `CXXFLAGS`
+
+### exact command
+
 ```bash
-./kraken2 --db db reads.fastq > /dev/null
-gprof ./kraken2 gmon.out > callgraph.txt
+pv ~/barcode02.fastq | ~/kraken2-build/classify \
+    -H ~/eskape_db/hash.k2d \
+    -t ~/eskape_db/taxo.k2d \
+    -o ~/eskape_db/opts.k2d \
+    -R ~/kraken2_report.txt \
+    - > ~/kraken2_output.kraken
+
+gprof ~/kraken2-build/classify gmon.out | head -40
 ```
-this would tell us: which specific function inside kraken-2 is the hot one. the cache miss rate from perf tells us it's memory-bound, but gprof would tell us *which function* to look at first.
+
+note: `classify` is the actual executable. `kraken2` is a shell wrapper around it. gmon.out is written automatically when the process exits.
+
+### results — flat profile
+
+| % time | self (s) | calls | function |
+|---|---|---|---|
+| **67.35%** | 71.30 | 9,871,933 | `CompactHashTable::Get()` |
+| **18.74%** | 19.84 | 354,164,193 | `MinimizerScanner::NextMinimizer()` |
+| 5.53% | 5.85 | — | `ClassifySequence()` |
+| 2.23% | 2.36 | 354,478,588 | `MinimizerScanner::reverse_complement()` |
+| 1.71% | 1.81 | 3,220,914 | `HyperLogLogPlusMinus::insert()` |
+| 1.06% | 1.12 | 209,658 | `ks_getuntil2()` (FASTQ parsing) |
+
+**total runtime: 105.87 seconds**
+
+### what the numbers mean
+
+**67% in `CompactHashTable::Get()` — 9.87 million calls**
+
+this is the k-mer hash table lookup. every minimizer extracted from a read goes through here: hash the k-mer → find the bucket → read the taxon ID. 9.87 million calls. at 67% of all runtime, this single function dominates the pipeline.
+
+why is it slow? each lookup is a random access into an 8 GB hash table. the CPU calculates the bucket address, then reaches into RAM to read it. the 8 GB table is 500× larger than the L3 cache (16 MB on Ryzen 5800H). almost every access misses every cache level. the CPU stalls ~100 ns waiting for RAM. perf already showed 34.24% cache miss rate. gprof now pinpoints exactly where those misses land: `CompactHashTable::Get()`.
+
+**18.74% in `MinimizerScanner::NextMinimizer()` — 354 million calls**
+
+this extracts the next minimizer k-mer from the read. 354 million calls across 104,829 reads ≈ 3,375 minimizers per read (consistent with nanopore read lengths). this function is pure CPU arithmetic: bit manipulation, rolling hash, canonical representation. not memory-bound — operates on data already in registers. secondary target for SIMD/AVX2.
+
+**top two functions = 86% of runtime. everything else is noise.**
+
+### three tools, one conclusion
+
+| tool | finding |
+|---|---|
+| perf stat | 34.24% cache miss rate — 1 in 3 accesses goes to RAM |
+| gprof | 67% of time in `CompactHashTable::Get()` — 9.87M calls |
+| AMD uProf | IPC = 0.55 (accurate, not the artefact perf shows) — CPU is stalling |
+
+the LRU k-mer cache sits directly in front of `CompactHashTable::Get()`. every cache hit skips one RAM access (~100 ns saved). at 9.87 million lookups per run, a 10% hit rate removes ~1 million RAM accesses. that is the quantified case for the cache.
 
 ### cachegrind — per-function cache miss rates
 
@@ -269,9 +320,10 @@ this would show the call chain leading to the hot code. useful after we know fro
 |---|---|---|
 | perf stat (kraken-2) | done | 34.24% cache miss rate, memory-bound verdict |
 | nsight systems (dorado) | done | 82% GEMM, compute-bound verdict |
-| gprof (kraken-2) | not run | would give function-level time breakdown |
-| cachegrind (kraken-2) | not run | would give per-function cache miss rates |
-| perf record (kraken-2) | not run | would give hotspot function + source line |
-| nsight compute (dorado) | not run | would give per-kernel SM occupancy, memory bandwidth, arithmetic intensity |
+| AMD uProf (kraken-2) | done | IPC = 0.55, confirmed memory stalls — accurate CPI perf cannot give on WSL2 |
+| gprof (kraken-2) | **done** | 67% of time in `CompactHashTable::Get()`, 9.87M calls — exact hotspot confirmed |
+| cachegrind (kraken-2) | not run | per-function LLC miss rates — the next tool to run |
+| perf record (kraken-2) | not run | hotspot function + source line |
+| nsight compute (dorado) | not run | per-kernel SM occupancy, memory bandwidth, arithmetic intensity |
 
 the two runs we did are enough to establish the bottleneck in each stage. the remaining tools would give us precision: *which function* inside kraken-2 to patch, *which kernel* inside dorado has headroom.

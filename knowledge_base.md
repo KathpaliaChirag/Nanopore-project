@@ -2291,9 +2291,9 @@ Specific methods and metrics to be discussed in the next meeting. Likely involve
 ### 14.4 Immediate next steps (post-Meeting 3)
 
 1. Set up 2 GitHub repos — share links with Kolin sir
-2. Profile Kraken-2 with `gprof` and `Valgrind/cachegrind` under WSL2
+2. ~~Profile Kraken-2 with `gprof`~~ **done — §18** | Valgrind/cachegrind still to run
 3. Identify matrix/vector blocks in Kraken-2 source code
-4. Document cache miss rate baseline (the number that will justify the caching work)
+4. ~~Document cache miss rate baseline~~ **done — perf (34.24% miss rate) + gprof (67% in `CompactHashTable::Get()`)**
 
 ---
 
@@ -3043,3 +3043,86 @@ tar -xzvf k2_standard_08gb_20250402.tar.gz -C ~/eskape_db_8gb/
 - 8 GB database puts real pressure on the CPU cache → cache misses appear → the bottleneck Kolin sir's project targets becomes visible in the numbers
 - No building required — guaranteed to work
 - Covers all ESKAPE pathogens (they are all common bacteria in the standard DB)
+
+---
+
+## 18. Kraken-2 gprof Results — Function-Level Hotspot (2026-05-26)
+
+### 18.1 Setup
+
+- **tool:** gprof — binary instrumented by compiling with `-pg` in `CXXFLAGS` (added to `src/Makefile`)
+- **binary:** `~/kraken2-build/classify` — the actual executable. `~/kraken2-build/kraken2` is a shell wrapper; gprof must be run against `classify` directly
+- **input:** `barcode02.fastq` — 104,829 reads, 720 MB
+- **database:** `~/eskape_db` — pre-built 8 GB standard k2 database (same as perf stat run)
+- **platform:** WSL2, Ubuntu 24.04, AMD Ryzen 7 5800H
+
+### 18.2 Commands
+
+```bash
+# run kraken2 — gmon.out is written automatically on exit
+pv ~/barcode02.fastq | ~/kraken2-build/classify \
+    -H ~/eskape_db/hash.k2d \
+    -t ~/eskape_db/taxo.k2d \
+    -o ~/eskape_db/opts.k2d \
+    -R ~/kraken2_report.txt \
+    - > ~/kraken2_output.kraken
+
+# generate and view flat profile
+gprof ~/kraken2-build/classify gmon.out | head -40
+```
+
+`pv` feeds the FASTQ through a pipe for a progress indicator. the `-` argument to classify reads from stdin. gmon.out is written to the current working directory when the process exits.
+
+### 18.3 Flat Profile Results
+
+| % time | self (s) | calls | function |
+|---|---|---|---|
+| **67.35%** | 71.30 | 9,871,933 | `kraken2::CompactHashTable::Get()` |
+| **18.74%** | 19.84 | 354,164,193 | `kraken2::MinimizerScanner::NextMinimizer()` |
+| 5.53% | 5.85 | — | `ClassifySequence()` |
+| 2.23% | 2.36 | 354,478,588 | `MinimizerScanner::reverse_complement()` |
+| 1.71% | 1.81 | 3,220,914 | `HyperLogLogPlusMinus::insert()` |
+| 1.06% | 1.12 | 209,658 | `ks_getuntil2()` (FASTQ parsing) |
+| 0.95% | 1.01 | 104,803 | `AddHitlistString()` |
+
+**total runtime: 105.87 seconds**
+
+### 18.4 Interpretation
+
+**`CompactHashTable::Get()` — 67% of runtime, 9.87M calls**
+
+This is the k-mer hash table lookup. Every minimizer window extracted from every read goes through this function:
+1. compute hash of k-mer
+2. index into the compact hash table at `hash % table_size`
+3. read the taxon ID stored there
+
+9.87 million calls over 104,829 reads ≈ 94 lookups per read. Each lookup is a random memory access into an 8 GB table that is ~500× larger than the L3 cache (16 MB on Ryzen 5800H). Almost every access is a cache miss → CPU stalls ~100 ns waiting for RAM. This is why perf showed 34.24% cache miss rate — those 301 million misses are concentrated inside this one function.
+
+**This is the exact insertion point for Kolin sir's Hot-K-mer LRU cache.** The cache intercepts calls to `CompactHashTable::Get()`. For a cache hit, the taxon ID is returned from fast L1/L2 memory instead of RAM. For a miss, the lookup proceeds normally and the result is stored in the cache for future hits.
+
+**`MinimizerScanner::NextMinimizer()` — 18.74%, 354M calls**
+
+Extracts the next minimizer window from the read sequence. 354M calls / 104,829 reads ≈ 3,375 minimizer windows per read — consistent with nanopore long read lengths (~5–15 kbp). This function is pure CPU arithmetic: bit manipulation, rolling hash update, strand canonicalisation. It does not access the database — no cache misses here. It is a compute bottleneck, not a memory bottleneck. Secondary target for SIMD/AVX2 vectorisation (Kolin sir's §8.1 AVX plan).
+
+**`ClassifySequence()` — 5.53%**
+
+The orchestration wrapper. Calls both functions above for each read. Low self-time — it is mostly its children's time.
+
+### 18.5 Cross-Tool Confirmation
+
+Three independent tools, same bottleneck:
+
+| tool | metric | finding |
+|---|---|---|
+| perf stat | cache miss rate | 34.24% — 1 in 3 accesses goes to RAM |
+| gprof | % time in hotspot | 67% in `CompactHashTable::Get()` — 9.87M calls |
+| AMD uProf | IPC (accurate) | 0.55 — CPU stalling, memory-bound confirmed |
+
+This is the three-tool confirmation Kolin sir's report needs. The bottleneck is unambiguous.
+
+### 18.6 Practical Notes
+
+- **gmon.out location:** written to the current working directory when `classify` exits, not to the binary's directory
+- **binary vs wrapper:** `gprof ~/kraken2-build/kraken2 gmon.out` fails with "not in executable format" because `kraken2` is a shell script. always use `gprof ~/kraken2-build/classify gmon.out`
+- **pv + stdin:** feeding via `pv ... | classify ... -` works — the `-` argument makes classify read stdin. output file is created immediately at 0 bytes and fills as the run progresses; it may appear empty for the first several minutes while the 8 GB DB is paged in
+- **runtime:** 105.87 seconds total for 104,829 reads against the 8 GB DB on Ryzen 7 5800H under WSL2

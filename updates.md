@@ -131,3 +131,27 @@ Next meeting / deadline: **2026-05-17**.
   - Local fast/hac BAM files are truncated (Dorado runs were interrupted)
   - nsys BAM is complete — need to convert to FASTQ with samtools
   - samtools installed in WSL2
+
+---
+
+## 2026-05-26 — Study session 6 — gprof run + hotspot confirmed
+
+- **Goal:** run gprof on Kraken-2 to get function-level time breakdown
+- **gprof run — complete:**
+  - Input: `barcode02.fastq` (720 MB, 104,829 reads), database: 8 GB standard k2 DB
+  - Binary: `~/kraken2-build/classify` (not `kraken2` — which is a shell wrapper, causes "not in executable format" error)
+  - Used `pv ... | classify ... -` for stdin piping with a progress indicator
+  - Total runtime: 105.87 seconds
+- **Key finding: 67% of all runtime is in `CompactHashTable::Get()`**
+  - 9,871,933 calls — the k-mer hash table lookup
+  - Each call is a random access into the 8 GB database → cache miss → ~100 ns RAM stall
+  - Directly where Kolin sir's Hot-K-mer LRU cache intercepts
+- **Secondary finding: 18.74% in `MinimizerScanner::NextMinimizer()`**
+  - 354,164,193 calls — pure CPU arithmetic, SIMD target
+- **Three-tool confirmation of memory-bound verdict:**
+  - perf stat: 34.24% cache miss rate
+  - gprof: 67% in hash lookup
+  - AMD uProf: IPC = 0.55 (accurate, not the WSL2 clock artefact)
+- KB §18 added with full results and interpretation
+- report.md updated: tool 3 section added, summary table updated
+- **Next to run:** cachegrind (per-function LLC miss rates) + ncu (Dorado SM throughput)
