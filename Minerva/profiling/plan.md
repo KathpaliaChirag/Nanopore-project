@@ -71,12 +71,12 @@ git clone https://github.com/brendangregg/FlameGraph ~/FlameGraph
 
 ---
 
-## Phase 2 — Data Setup (as chirag user)
+## Phase 2 — Data Setup (as CK user)
 
 ### 2.1 Transfer data from WSL2
 ```bash
-rsync -avP ~/barcode02.fastq chirag@minerva:~/
-rsync -avP ~/eskape_db/ chirag@minerva:~/k2_standard_08gb/
+rsync -avP ~/barcode02.fastq CK@minerva:~/
+rsync -avP ~/eskape_db/ CK@minerva:~/k2_standard_08gb/
 ```
 
 ### 2.2 Build Kraken-2 with profiling flags

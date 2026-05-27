@@ -110,7 +110,7 @@ sudo chmod +s /usr/local/bin/likwid-pin
 lsmod | grep msr
 # Expected: msr line appears
 
-su - chirag -c "likwid-perfctr -C 0 -g CLOCK -- ls" 2>&1 | tail -5
+su - CK -c "likwid-perfctr -C 0 -g CLOCK -- ls" 2>&1 | tail -5
 # Expected: a table with frequency/clock data — NOT "permission denied"
 ```
 
