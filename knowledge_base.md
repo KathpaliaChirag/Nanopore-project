@@ -3170,3 +3170,40 @@ This is the three-tool confirmation Kolin sir's report needs. The bottleneck is 
 - **binary vs wrapper:** `gprof ~/kraken2-build/kraken2 gmon.out` fails with "not in executable format" because `kraken2` is a shell script. always use `gprof ~/kraken2-build/classify gmon.out`
 - **pv + stdin:** feeding via `pv ... | classify ... -` works — the `-` argument makes classify read stdin. output file is created immediately at 0 bytes and fills as the run progresses; it may appear empty for the first several minutes while the 8 GB DB is paged in
 - **runtime:** 105.87 seconds total for 104,829 reads against the 8 GB DB on Ryzen 7 5800H under WSL2
+
+---
+
+## 19. Minerva — Server Profiling Setup (2026-05-27)
+
+Minerva is the lab server used for deeper profiling that WSL2 cannot provide. Hardware: 2× Intel Xeon Gold 6330 (112 logical CPUs), 251 GB RAM, 2× NVIDIA A40 (45 GB VRAM each), CUDA 12.9, Ubuntu 22.04.4 LTS.
+
+### Why Minerva over WSL2
+
+| WSL2 limitation | Minerva fix |
+|---|---|
+| `LLC-load-misses` = `<not supported>` (Hyper-V blocks) | Native Linux — hardware counters work |
+| perf clock distorted (0.734 GHz) → IPC unreliable | Real clock → accurate IPC |
+| cachegrind slow (8 GB DB swapped out) | 251 GB RAM → DB fits in memory |
+| GTX 1650 — ncu SM metrics incomplete | A40 — full SM throughput metrics |
+
+### sudo Setup Applied (perf_event_paranoid fix + tool installs)
+
+`perf_event_paranoid` was 4 (blocks all hardware counters for non-root). Set to 1 and persisted. nsys was installed but not on PATH — fixed via `/etc/profile.d/nsys.sh`. Installed: valgrind, heaptrack, gperftools, LIKWID, Intel VTune (oneAPI apt repo), DCGM (NVIDIA apt repo), FlameGraph.
+
+Full tool inventory → `Minerva/minerva_stats.md`
+
+### Profiling Plan and Results
+
+All Minerva profiling work lives under `Minerva/profiling/`:
+
+| File | Contents |
+|---|---|
+| `Minerva/profiling/plan.md` | Full pipeline — all commands, order, time estimates |
+| `Minerva/profiling/results_kraken2.md` | Phase 3 results (perf, gprof, VTune, LIKWID, cachegrind) |
+| `Minerva/profiling/results_dorado.md` | Phase 4 results (nsys, ncu, DCGM, fast vs hac) |
+
+### What to Expect
+
+From Kraken-2 on Minerva: real LLC miss rate, IPC ~0.5 confirming WSL2 AMD uProf reading, `DLmr` count for `CompactHashTable::Get()`, memory bandwidth in GB/s vs Xeon 6330 ceiling (~230 GB/s dual-socket), CPI waterfall from VTune showing memory-stall dominant.
+
+From Dorado on Minerva: same GEMM pattern as WSL2 but with full SM throughput % on A40, DCGM power/thermal data, fast vs hac comparison.
