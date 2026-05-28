@@ -157,8 +157,9 @@ Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all u
 
 ```
 ├── README.md                    ← this file
-├── report.md                    ← full profiling report (perf + nsight + gprof + AMD uProf)
-├── report1.md                   ← earlier 2-page profiling report (tables + raw numbers)
+├── final_report.md              ← ★ single consolidated report — all numbers, meeting-ready
+├── report.md                    ← full narrative report with commands + failures (historical)
+├── report1.md                   ← original 2-page profiling report (historical)
 ├── knowledge_base.md            ← deep-dive notes on everything (§0–§21)
 ├── summary.md                   ← quick reference — what goes in, what comes out
 ├── updates.md                   ← chronological session log
