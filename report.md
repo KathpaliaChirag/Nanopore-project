@@ -37,27 +37,7 @@ the profiling setup matters because WSL2 has hardware counter limitations. Hyper
 
 `perf` reads hardware performance counters built into the CPU (the PMU — performance monitoring unit). it's not a simulator. while the program runs, the CPU's own registers count events: cache misses, cycles, instructions, branch mispredictions. perf reads those registers at the end and prints a table. overhead is near zero. runs at full speed.
 
-### getting perf working on WSL2 (this took time)
 
-WSL2 uses Microsoft's custom kernel. Ubuntu's `linux-tools-generic` ships perf only for Ubuntu's own kernels. running `perf stat ls` gave:
-
-```
-WARNING: perf not found for kernel 6.6.87.2-microsoft
-```
-
-fix: build perf from source directly from Microsoft's WSL2 kernel repo.
-
-```bash
-git clone https://github.com/microsoft/WSL2-Linux-Kernel --depth=1 --branch linux-msft-wsl-6.6.87.2
-cd WSL2-Linux-Kernel/tools/perf
-sudo apt install libtraceevent-dev flex bison libelf-dev libdw-dev
-make
-sudo cp perf /usr/local/bin/perf
-```
-
-the critical dependency is `libtraceevent-dev`. without it the build fails silently and gives a broken perf binary. everything else (missing libbabeltrace, JDK, libpfm4) is harmless.
-
-### input
 
 - file: `barcode02.fastq` — 104,829 reads, 357.62 Mbp
 - database: `k2_standard_08gb` — 8 GB pre-built standard kraken-2 DB
@@ -66,7 +46,7 @@ the critical dependency is `libtraceevent-dev`. without it the build fails silen
 ### exact command
 
 ```bash
-perf stat -e task-clock,cache-misses,cache-references,instructions,cycles \
+perf stat -e task-clock,cache-misses,cache-references, instructions,cycles \
     kraken2 --db /path/to/k2_standard_08gb \
     --report report.txt barcode02.fastq > output.kraken
 ```
