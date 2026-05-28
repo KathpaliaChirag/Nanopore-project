@@ -35,9 +35,11 @@ Update this every time a new major topic is pushed.
 - Phase 1f: Fast model re-profiling (post Ubuntu reinstall, _15.pod5) — 44.95s, 30,275 reads, results confirmed
 - Phase 1g: HAC model re-profiling (post Ubuntu reinstall, _15.pod5) — 116.6s, 30,275 reads, LstmKernel 70.0% confirmed
 - Phase 2a: Kraken-2 classification + gprof — 93% classified, CompactHashTable::Get() = 80.65% CPU time, memory-bound verdict
+- Phase 2b: Matmul 21-variant CH3 perf-stat sweep (N=1024) — full primitive matrix T/O/A/P/U + transposed/BLAS/Strassen refs; BLAS 165× speedup, tiled_omp_avx best hand-written at 94×; naive LQ-stall/FP-disp = 196.7% = direct memory-bound proof; includes Critical Self-Review grading each claim
 
 **daily_summary.md** →
 - 2026-05-20
 - 2026-05-21
 - 2026-05-22
 - 2026-05-25
+- 2026-05-28

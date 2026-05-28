@@ -60,3 +60,19 @@ One dated entry per session. Append at end of each conversation.
 - Ran gprof on Kraken-2: CompactHashTable::Get() = **80.65%** of CPU time — strongest evidence for Kolin sir's Hot-K-mer LRU cache
 - Started perf stat setup for Kraken-2 — identified PMU multiplexing issue (15 events > 6 counters), solving with event groups
 - Pending: complete perf stat (grouped), update report.md Phase 2, run cachegrind
+
+---
+
+## 2026-05-28
+
+- Designed 21-variant matmul implementation set covering 5 optimization primitives (T/O/A/P/U) + 3 references (transposed, OpenBLAS, Strassen) — singles → doubles → triples → quad → ultimate → ref
+- Wrote all 21 source files under `results/pfz_batch1/src/` with `gcc -O2 -g -march=native` compile + Makefile + run_ch3.sh script
+- Installed `libopenblas-dev` to enable `matmul_blas.c` (cblas_dgemm reference)
+- Verified `perf_event_paranoid = -1` → AMD IBS and `ls_any_fills_from_sys.*` / `de_dis_dispatch_token_stalls1.*` work in per-thread mode without sudo
+- Cleared all previous CH3/CH4/CH5 batch1 results, ran fresh CH3 sweep (4 experiments × 21 variants = 84 perf_stat outputs)
+- Key results: BLAS 0.012 s / 179 GFlops/s = **165× speedup over naive**; best hand-written `tiled_omp_avx` 0.021 s / 102 GFlops/s = 94×; `ultimate` (5-stack) is slower than `tiled_omp_avx` (3-stack) — stacking optimizations is not monotonic
+- Naive's load-queue-stall-per-FP-dispatch = **196.7%** (vs ikj 3.5%) — direct hardware proof of memory-bound stall, single number that replaces the old IPC argument
+- Identified inconsistency in my own analysis: kernel-internal time vs `perf stat` elapsed differ by ~25 ms (init), which is 75% of "elapsed" for fast variants like BLAS → fixed all tables to use binary-internal `clock_gettime`
+- Wrote Phase 2b to report.md with all 5 tables at full precision (CH3-A wall/IPC, CH3-B cache, CH3-C r5 stability, CH3-D LQ stalls, CH3-E parallel efficiency); added Critical Self-Review section grading each claim ✅/⚠/❓/❌
+- Surprises: `unroll` is the fastest single-optimization variant; `prefetch` beats explicit `avx`; `transposed` 4× slower than `ikj`; OMP only reaches 7-12 of 16 effective CPUs (BLAS reaches 13.4)
+- Pending: rerun CH4 (perf record cycles/cache/IBS, perf annotate, perf diff) and CH5 (perf mem with `--sort mem`, perf c2c, perf bench mem) on all 21 variants
