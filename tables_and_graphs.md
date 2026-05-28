@@ -1,7 +1,7 @@
 # Nanopore Pipeline — All Stats, Tables & Graphs
 **Chirag Kathpalia · IIT Delhi · Prof. Kolin Paul · 2026-05-28**
 
-> Mermaid charts render on GitHub. Emoji heatmaps work everywhere.
+> Mermaid charts render on GitHub. Colour heatmaps (🟦🟩🟨🟧🟥) work everywhere.
 > Every number is real measured data — no estimates unless labelled.
 
 ---
@@ -613,66 +613,66 @@ xychart-beta
 
 ## 7. Heatmaps — Miss Rates Across All N
 
-**Colour key:**  < 2% ·  2–5% ·  5–10% ·  10–20% ·  > 20%
+**Colour key:** 🟦 < 2% · 🟩 2–5% · 🟨 5–10% · 🟧 10–20% · 🟥 > 20%
 
 ### 7.1 L3 Cache Miss Rate Heatmap (%)
 
 | Binary | N=1024 | N=2048 | N=10000 | Trend |
 |---|:---:|:---:|:---:|---|
-| naive_ijk |  22.0% |  27.6% |  >50% est. | worsens severely |
-| tiled_avx2 |  12.3% |  15.9% |  18.53% | worsens with N  |
-| omp_tiled |  3.3% |  3.6% |  3.70% | stable |
-| kij_order |  2.2% |  4.3% |  3.04% | degrades at N=2048 |
-| tiled |  4.1% |  3.7% |  2.92% | improves slightly |
-| ikj_order |  6.0% |  3.5% |  2.12% | improves with N |
-| omp_parallel |  5.9% |  1.9% |  2.26% | improves with N |
-| auto_vec_O3 |  6.6% |  3.3% |  2.24% | improves with N |
-| unrolled_ikj |  4.9% |  1.5% |  1.97% | improves with N |
-| avx2_manual |  2.3% |  2.5% |  1.64% | stable / slight improve |
-| transpose_B |  1.8% |  1.7% |  1.94% | flat — best single-thread |
-| prefetch_ikj |  4.2% |  2.0% |  1.23% | best rate but slowest time |
+| naive_ijk | 🟥 22.0% | 🟥 27.6% | 🟥 >50% est. | worsens severely |
+| tiled_avx2 | 🟧 12.3% | 🟧 15.9% | 🟧 18.53% | worsens with N |
+| omp_tiled | 🟩 3.3% | 🟩 3.6% | 🟩 3.70% | stable |
+| kij_order | 🟦 2.2% | 🟩 4.3% | 🟩 3.04% | degrades at N=2048 |
+| tiled | 🟩 4.1% | 🟩 3.7% | 🟩 2.92% | improves slightly |
+| ikj_order | 🟨 6.0% | 🟩 3.5% | 🟦 2.12% | improves with N |
+| omp_parallel | 🟨 5.9% | 🟦 1.9% | 🟦 2.26% | improves with N |
+| auto_vec_O3 | 🟨 6.6% | 🟩 3.3% | 🟦 2.24% | improves with N |
+| unrolled_ikj | 🟩 4.9% | 🟦 1.5% | 🟦 1.97% | improves with N |
+| avx2_manual | 🟦 2.3% | 🟦 2.5% | 🟦 1.64% | stable / slight improve |
+| transpose_B | 🟦 1.8% | 🟦 1.7% | 🟦 1.94% | flat — best single-thread |
+| prefetch_ikj | 🟩 4.2% | 🟦 2.0% | 🟦 1.23% | best rate but slowest time |
 
 ---
 
 ### 7.2 L2 Cache Miss Rate Heatmap (%)
 
-**Key:**  < 1% ·  1–3% ·  3–6% ·  6–15% ·  > 15%
+**Key:** 🟦 < 1% · 🟩 1–3% · 🟨 3–6% · 🟧 6–15% · 🟥 > 15%
 
 | Binary | N=1024 | N=2048 | N=10000 | Trend |
 |---|:---:|:---:|:---:|---|
-| naive_ijk |  23.5% |  43.9% |  >60% est. | catastrophic |
-| omp_parallel |  10.6% |  2.2% |  2.2% | improves a lot |
-| unrolled_ikj |  8.2% |  1.5% |  1.7% | improves with N |
-| auto_vec_O3 |  9.1% |  3.2% |  2.0% | improves with N |
-| ikj_order |  7.7% |  3.5% |  1.9% | improves with N |
-| omp_tiled |  2.9% |  3.7% |  3.8% | stable |
-| avx2_manual |  3.0% |  3.5% |  0.9% | improves at large N |
-| kij_order |  1.9% |  6.3% |  3.2% | degrades at N=2048 |
-| tiled |  0.9% |  1.0% |  1.0% | flat — tiling works |
-| tiled_avx2 |  0.7% |  0.9% |  2.0% | good but L3 suffers |
-| transpose_B |  1.0% |  1.3% |  0.9% | stable — very low |
-| prefetch_ikj |  5.7% |  1.6% |  0.4% | lowest L2 at large N |
+| naive_ijk | 🟥 23.5% | 🟥 43.9% | 🟥 >60% est. | catastrophic |
+| omp_parallel | 🟧 10.6% | 🟩 2.2% | 🟩 2.2% | improves a lot |
+| unrolled_ikj | 🟧 8.2% | 🟦 1.5% | 🟩 1.7% | improves with N |
+| auto_vec_O3 | 🟧 9.1% | 🟨 3.2% | 🟩 2.0% | improves with N |
+| ikj_order | 🟧 7.7% | 🟨 3.5% | 🟩 1.9% | improves with N |
+| omp_tiled | 🟩 2.9% | 🟨 3.7% | 🟨 3.8% | stable |
+| avx2_manual | 🟨 3.0% | 🟨 3.5% | 🟦 0.9% | improves at large N |
+| kij_order | 🟩 1.9% | 🟧 6.3% | 🟨 3.2% | degrades at N=2048 |
+| tiled | 🟦 0.9% | 🟦 1.0% | 🟦 1.0% | flat — tiling works |
+| tiled_avx2 | 🟦 0.7% | 🟦 0.9% | 🟩 2.0% | good but L3 suffers |
+| transpose_B | 🟩 1.0% | 🟩 1.3% | 🟦 0.9% | stable — very low |
+| prefetch_ikj | 🟨 5.7% | 🟩 1.6% | 🟦 0.4% | lowest L2 at large N |
 
 ---
 
-### 7.3 Wall Time Heatmap — Relative (fastest in row = )
+### 7.3 Wall Time Heatmap — Relative (fastest in row = 🟦)
 
-**Key:**  fastest ·  < 2× ·  2–5× ·  5–15× ·  > 15×
+**Key:** 🟦 fastest · 🟩 < 2× · 🟨 2–5× · 🟧 5–15× · 🟥 > 15×
 
 | Binary | N=1024 | N=2048 | N=10000 |
 |---|:---:|:---:|:---:|
-| omp_tiled |  1.79× |  1.55× |  1.0×  |
-| tiled_avx2 |  1.03× |  1.0×  |  2.10× |
-| avx2_manual |  1.0×  |  1.54× |  4.11× |
-| tiled |  1.31× |  1.25× |  2.66× |
-| ikj_order |  1.21× |  1.45× |  3.74× |
-| auto_vec_O3 |  1.20× |  1.46× |  3.76× |
-| unrolled_ikj |  1.28× |  1.82× |  4.76× |
-| omp_parallel |  1.42× |  2.47× |  2.58× |
-| kij_order |  1.46× |  3.42× |  10.47× |
-| prefetch_ikj |  2.97× |  3.27× |  8.24× |
-| transpose_B |  5.30× |  5.51× |  14.55× |
-| naive_ijk |  30.74× |  48.21× | — (skipped) |
+| omp_tiled | 🟩 1.79× | 🟩 1.55× | 🟦 1.0× |
+| tiled_avx2 | 🟦 1.03× | 🟦 1.0× | 🟩 2.10× |
+| avx2_manual | 🟦 1.0× | 🟩 1.54× | 🟨 4.11× |
+| tiled | 🟩 1.31× | 🟩 1.25× | 🟩 2.66× |
+| ikj_order | 🟩 1.21× | 🟩 1.45× | 🟨 3.74× |
+| auto_vec_O3 | 🟩 1.20× | 🟩 1.46× | 🟨 3.76× |
+| unrolled_ikj | 🟩 1.28× | 🟩 1.82× | 🟨 4.76× |
+| omp_parallel | 🟩 1.42× | 🟨 2.47× | 🟩 2.58× |
+| kij_order | 🟩 1.46× | 🟨 3.42× | 🟧 10.47× |
+| prefetch_ikj | 🟨 2.97× | 🟨 3.27× | 🟧 8.24× |
+| transpose_B | 🟧 5.30× | 🟧 5.51× | 🟧 14.55× |
+| naive_ijk | 🟥 30.74× | 🟥 48.21× | — (skipped) |
 
 ---
 
