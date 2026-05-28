@@ -7,5 +7,9 @@
 # Allow markdown files
 !*.md
 
+# Allow generated chart images under matrix_mul/
+!matrix_mul/*.png
+!matrix_mul/*.svg
+
 # Allow .gitignore itself
 !.gitignore

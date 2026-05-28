@@ -544,6 +544,12 @@ Three detailed per-N reports live in `matrix_mul/`:
 - [`report_n2048.md`](matrix_mul/report_n2048.md) — N=2048 (96 MB total, 6× L3; DRAM traffic begins, OMP bandwidth contention starts)
 - [`report_n4096.md`](matrix_mul/report_n4096.md) — N=4096 (384 MB total, 24× L3; naive takes 11.5 min, `omp_avx` LQ-stall = 368%)
 
+### Visual Summary
+
+![21-variant matmul sweep — 4-panel summary](matrix_mul/matmul_summary.svg)
+
+*x-axis: 21 variants sorted slowest→fastest (left to right). One line per N value. Panels: (top-left) wall time log-scale, (top-right) GFlops/s log-scale, (bottom-left) L1 dcache miss%, (bottom-right) load-queue-stall / FP-dispatch (symlog). PNG version also available: [`matmul_summary.png`](matrix_mul/matmul_summary.png).*
+
 Headline cross-N summary (best of 21 vs naive):
 
 | N | naive | best hand-written | BLAS | naive→BLAS |
