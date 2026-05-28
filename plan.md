@@ -856,30 +856,45 @@ ncu \
 
 ```
 Day 1 (Setup):
-  [ ] Windows/WSL2: install Nsight Systems on Windows, verify nsys --version
-      Native Linux: download and install Nsight Systems Linux package, verify nsys --version
-  [ ] WSL2: apt install build-essential valgrind linux-tools-common linux-tools-generic libtraceevent-dev + build perf from WSL2-Linux-Kernel source (see Phase 0.1)
-      Native Linux: apt install build-essential valgrind linux-tools-common linux-tools-$(uname -r)
-  [ ] Clone Kraken-2, edit Makefile to add -pg to CXXFLAGS, build with install_kraken2.sh
-  [ ] WSL2: copy barcode02.fastq and eskape_db from Windows into WSL2 home directory
-      Native Linux: confirm barcode02.fastq and eskape_db are accessible, note their paths
-  [ ] Test: run kraken2 once WITHOUT profiling to confirm it works before adding tools
-  [ ] WSL2: verify perf works — run "perf stat ls" — confirm cycles/instructions/cache-misses show numbers (LLC counters will show <not supported> — that is expected and fine)
+  [x] Windows/WSL2: install Nsight Systems on Windows, verify nsys --version
+  [x] WSL2: build perf from WSL2-Linux-Kernel source (see §15.3)
+  [x] Clone Kraken-2, edit Makefile to add -pg to CXXFLAGS, build with install_kraken2.sh
+  [x] Copy barcode02.fastq and eskape_db into WSL2
+  [x] Test: kraken2 runs without profiling tools
 
 Day 2 (Dorado profiling):
-  [ ] Run Dorado fast mode under nsys (~5 min + overhead)
-  [ ] Open .nsys-rep in Nsight Systems GUI — note top kernels + memory transfer %
-  [ ] Run Nsight Compute on the top kernel — note SM throughput + DRAM throughput
-  [ ] Write up Page 2 of the report from these numbers
+  [x] Run Dorado fast mode under nsys — GEMM = 82% of GPU time
+  [x] Top 3 kernels identified (Tensor Core GEMM dominant)
+  [x] cudaStreamSynchronize = 98.9% of CUDA API time
+  [x] Written up in report.md (GPU section)
 
 Day 3 (Kraken-2 profiling):
-  [ ] Run gprof version of kraken2 — note top 5 functions + % time
-  [ ] Run cachegrind — note LLd miss rate + top miss functions (will take ~20 min — normal)
-  [ ] Run perf stat (hardware if available, software fallback) — note IPC and miss counts
-  [ ] Write up Page 1 of the report from these numbers
+  [x] gprof: CompactHashTable::Get() = 67%, 9.87M calls — confirmed hotspot
+  [x] perf stat (WSL2): 34.24% cache miss rate, 301M misses — memory-bound
+  [x] AMD uProf (local): IPC = 0.55 — accurate (Hyper-V doesn't distort native profiler)
+  [x] Written up in report.md (CPU section)
 
 Day 4 (Report):
-  [ ] Combine into 2-page report
-  [ ] Push to GitHub repo
-  [ ] Share with Kolin sir
+  [x] Combine into 2-page report (report1.md) + full report (report.md)
+  [x] Pushed to GitHub
+  [x] Presented to Kolin sir 2026-05-26
+
+Day 5 (Matrix multiply benchmarks):
+  [x] Built 12 C implementations (naive_ijk through prefetch_ikj)
+  [x] perf stat at N=1024, 2048, 10000 — 22 result files
+  [x] Key findings documented in All_Matric_Mul_perf_stats/PERF_REPORT.md
+  [x] omp_tiled winner (112s at N=10000), prefetch_ikj paradox confirmed
+
+Day 6 (Lab server setup):
+  [x] Luna access confirmed — perf_event_paranoid=1, hardware counters work
+  [x] Luna_vs_Minerva.md comparison written
+  [x] Luna/user_management.md written (student account guide)
+  [x] All Luna docs in Luna/ directory
+
+Next steps:
+  [ ] Re-run matmul on Luna — accurate IPC (no Hyper-V), compare Intel vs AMD
+  [ ] Run Kraken-2 perf + gprof + TMA on Luna — confirm IPC, get real LLC miss rate
+  [ ] Run Nsight Compute on Dorado GEMM kernel on Luna L40S
+  [ ] Implement Hot-K-mer LRU cache for CompactHashTable::Get()
+  [ ] Run cachegrind on Luna (Minerva disk full)
 ```

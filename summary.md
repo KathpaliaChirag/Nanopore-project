@@ -198,7 +198,7 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 - **Kraken-2 (CPU):** Hot-K-mer LRU cache — pin frequent k-mer lookups in L3 cache. Uses Intel TBB (lock-free) + AVX-512 SIMD (batch lookups).
 - **Dorado (GPU):** Signal-to-Base cache in CUDA shared memory — LSH fuzzy matching to skip NN forward pass for near-duplicate signal windows.
 
-**Immediate deliverable:** 2-page profile report using `perf` (Kraken-2) + Nsight (Dorado) by ~2026-05-25.
+**Immediate deliverable:** ~~2-page profile report using `perf` (Kraken-2) + Nsight (Dorado) by ~2026-05-25.~~ **Delivered 2026-05-26** — see `report.md` (full) and `report1.md` (2-page).
 
 ### Goal 3 — Time & Accuracy Improvement (assigned 2026-05-18, §14)
 
@@ -223,7 +223,9 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 
 ---
 
-## Hardware Constraints (This Machine)
+## Hardware Constraints
+
+### Local Machine
 
 | Component | Spec | Impact |
 |---|---|---|
@@ -234,6 +236,15 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 
 **Use Colab for:** Kraken-2 (Linux native, small DB fits easily), future sup mode testing
 **Use local for:** Dorado fast/hac, Nsight profiling
+
+### Lab Servers
+
+| Server | CPU | L3 | RAM | GPU | Disk | Status |
+|---|---|---|---|---|---|---|
+| **Minerva** | Xeon Gold 6330, 56c/112t @ 2 GHz | 66 MB | 251 GB | 2× A40 (45 GB) | **100% full** | ⚠ no new data |
+| **Luna** | Xeon Platinum 8468, 96c/192t @ 3.8 GHz | 210 MB | 503 GB | 2× L40S (46 GB) | 74% (236 GB free) | ✓ primary |
+
+Luna: `perf_event_paranoid = 1` confirmed — hardware counters work for all users. AVX-512 + AMX (matrix multiply unit) on Sapphire Rapids. Luna is the primary server for all future benchmarks.
 
 ---
 
@@ -246,15 +257,18 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 | Kraken-2 | Species classification | FASTQ | Species report |
 | pod5 (Python) | Inspect POD-5 metadata | POD-5 | Metadata |
 | nvidia-smi | Check GPU utilization | — | GPU stats |
-| perf | CPU profiling (Linux) | running process | Cache miss rates, hotspots |
-| Nsight | GPU profiling | running process | Kernel timings |
-| gprof | CPU call-graph profiling | compiled binary | Function-level time breakdown |
-| Valgrind / cachegrind | Cache + memory analysis | running process | Cache miss rates, access patterns |
+| perf | CPU profiling (Linux) | running process | Cache miss rates, IPC, hotspots |
+| Nsight Systems | GPU timeline profiling | running process | Kernel timings, memory transfers |
+| Nsight Compute | GPU kernel-level profiling | running process | SM throughput, arithmetic intensity |
+| gprof | CPU call-graph profiling | compiled binary (-pg) | Function-level time breakdown |
+| AMD uProf | CPU profiling (AMD native) | running process | Accurate IPC, DRAM bandwidth, TMA |
+| Valgrind / cachegrind | Cache + memory analysis | compiled binary | Per-function LLC miss rates |
 
 ---
 
 ## Key Findings So Far
 
+### Pipeline execution
 1. GTX 1650 can run Dorado `fast` (~5 min) and `hac` (~71 min) on 104k reads
 2. `hac` reduces unclassified reads from 6.5 MB → 896 KB vs `fast` (better barcode detection)
 3. Custom ESKAPE DB = 650 MB, built in 30 seconds, runs on Colab
@@ -263,12 +277,30 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 6. Dorado ignores `--batchsize` flag and runs at 64 regardless on this GPU
 7. ONT no longer distributes Dorado on GitHub — download from `cdn.oxfordnanoportal.com`
 
+### Kraken-2 profiling (CPU bottleneck confirmed)
+8. **perf stat (WSL2):** 34.24% cache miss rate, 301M misses — memory-bound verdict
+9. **gprof:** 67% of runtime in `CompactHashTable::Get()` — 9.87M calls, confirmed hotspot
+10. **AMD uProf (local Ryzen):** IPC = 0.55 — accurate reading (perf IPC inflated in WSL2/Hyper-V)
+11. Hot-K-mer LRU cache target justified: at 301M misses/run, 20% hit rate saves ~6 s
+
+### Dorado profiling (GPU bottleneck confirmed)
+12. **Nsight Systems:** GEMM = 82% of GPU time (Tensor Cores, FP16) — compute-bound
+13. **cudaStreamSynchronize:** 98.9% of CUDA API time — CPU blocks waiting for GPU after each batch
+14. Memory transfers minor — GPU is not data-starved
+15. Signal-to-Base cache target: 30% hit rate on 82% GEMM time ≈ 25% total GPU time saved
+
+### Matrix multiply benchmark study (cache-blocking empirics)
+16. naive_ijk vs tiled_avx2: **29.7× slower** at N=1024, **48.2×** at N=2048 — gap widens with N
+17. omp_tiled at N=10000: **2.1× faster than tiled_avx2** — 2.4 GB working set finally justifies 4-thread DRAM pipelining
+18. prefetch_ikj paradox: lowest L3 miss% (1.23%) but 9.3× more instructions than ikj_order — software prefetch adds overhead when hardware prefetcher already covers sequential access
+19. tiled variants: sub-8× scaling (1024→2048) vs expected O(N³) 8× — tile stays in L2 regardless of N
+
 ---
 
 ## Open Questions
 
 - What does **MBR** stand for exactly?
-- Is there a **lab server** we can SSH into for profiling (perf + Nsight)?
+- ~~Is there a **lab server** we can SSH into for profiling (perf + Nsight)?~~ **Answered:** yes — Minerva (Xeon Gold 6330, 2× A40) and Luna (Xeon Platinum 8468, 2× L40S). Both documented in `Minerva/` and `Luna/`. Luna is primary.
 - What is **CROC** tool used for in this project (BEDROC metric)?
 - Which barcodes correspond to which patient samples / pathogens?
 - Accuracy improvement specifics — methods to be discussed in next meeting

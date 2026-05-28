@@ -3207,3 +3207,118 @@ All Minerva profiling work lives under `Minerva/profiling/`:
 From Kraken-2 on Minerva: real LLC miss rate, IPC ~0.5 confirming WSL2 AMD uProf reading, `DLmr` count for `CompactHashTable::Get()`, memory bandwidth in GB/s vs Xeon 6330 ceiling (~230 GB/s dual-socket), CPI waterfall from VTune showing memory-stall dominant.
 
 From Dorado on Minerva: same GEMM pattern as WSL2 but with full SM throughput % on A40, DCGM power/thermal data, fast vs hac comparison.
+
+---
+
+## 20. Matrix Multiply Benchmark Suite (2026-05-28)
+
+12 C implementations built in `All_Matric_Mul_perf_stats/` to empirically study how cache access patterns, loop reordering, SIMD, and thread parallelism interact with real hardware. All profiled with WSL2 `perf stat` at N=1024, 2048, and 10000. Source: `All_Matric_Mul_perf_stats/PERF_REPORT.md`.
+
+### Implementations (ranked by N=10000 wall time)
+
+| Binary | Wall time (N=10000) | Strategy |
+|---|---|---|
+| omp_tiled | 112,506 ms | 4-thread OpenMP + 64-block tiling |
+| tiled_avx2 | 236,546 ms | AVX2 SIMD + tiling |
+| omp_parallel | 290,699 ms | 4-thread OpenMP, no tiling |
+| tiled | 298,841 ms | Loop tiling only (TILE=64) |
+| ikj_order | 420,796 ms | Cache-friendly loop reorder |
+| auto_vec_O3 | 423,079 ms | Compiler auto-vectorize (-O3) |
+| avx2_manual | 462,351 ms | AVX2, no tiling |
+| unrolled_ikj | 535,330 ms | 4× manual unroll + ikj |
+| prefetch_ikj | 927,112 ms | Software prefetch + ikj |
+| kij_order | 1,177,606 ms | kij loop order |
+| transpose_B | 1,636,624 ms | Explicit B transpose + ijk |
+
+### Key Findings
+
+**Loop order matters more than SIMD at large N:**
+- ikj_order (420s) vs naive_ijk (not listed — orders of magnitude worse): accessing B column-wise in ijk causes L2/L3 thrashing. ikj accesses B row-wise, staying cache-friendly.
+- avx2_manual (462s) is slower than ikj_order (420s) because AVX2 without tiling still streams through the same cache-hostile access pattern, just with wider registers.
+
+**Tiling effect (tiled, TILE=64):**
+- 1024→2048 scaling: tiled scales at ~4.6× vs expected O(N³) 8×. Tile fits in L2 regardless of N — the L2 working set doesn't grow with matrix size.
+- tiled_avx2 at N=10000: L3 miss% jumps to 18.53% because TILE=64 footprint × 3 (A, B, C blocks) overflows L2 cache. Recommend TILE=32 for larger N.
+
+**OpenMP (omp_tiled is the winner at N=10000):**
+- At N=1024/2048: omp_parallel is *slower* than single-threaded ikj_order — thread spawn overhead exceeds benefit for small working sets.
+- At N=10000 (2.4 GB working set): omp_tiled wins at 112s (2.1× faster than tiled_avx2). Only at this scale do 4 threads provide benefit — each thread runs independent DRAM requests in parallel, effectively multiplying available memory bandwidth.
+
+**Software prefetch paradox (prefetch_ikj — slowest despite lowest miss rates):**
+- L3 miss%: 1.23% (vs ikj_order's 2.12%) — prefetch does reduce misses
+- But: instructions = 5.39 *trillion* vs ikj_order's 579 billion (9.3× more)
+- Wall time: 927s vs 420s (2.2× slower)
+- Conclusion: the hardware prefetcher already handles sequential access patterns efficiently. Adding `__builtin_prefetch()` calls for a stride-1 pattern only generates redundant instruction overhead. Software prefetch helps only when the access pattern is irregular (random hash table lookups like Kraken-2).
+
+**Scaling ratios (1024→2048→10000):**
+- Expected O(N³) scaling: 1024→2048 = 8×, 2048→10000 = 116.4×
+- Tiled variants achieve sub-8× for 1024→2048 (tile stays in L2) but pay full 116× for 2048→10000 when the working set finally exceeds L2
+- omp_tiled at 2048→10000: only 29× (vs expected 116×) — parallelism hides DRAM latency
+
+### Relevance to Kraken-2 Cache
+
+These benchmarks directly inform the Hot-K-mer LRU cache design:
+- `CompactHashTable::Get()` performs random 35-mer hash lookups — the access pattern software prefetch is actually designed for (unlike the sequential matmul access)
+- The 34.24% cache miss rate from perf confirms the hash table is too large for L3 (650 MB > L3 cache on any client CPU)
+- Tiling strategies don't apply directly to hash lookup, but the data shows that keeping the working set in L2/L3 is the decisive factor — exactly what the LRU cache achieves by pinning hot k-mers in fast memory
+
+---
+
+## 21. Luna Server — Specs, Access, and Profiling Readiness (2026-05-28)
+
+Luna is the primary lab server for all future benchmarks. Hardware confirmed via `lscpu`, `free -h`, `nvidia-smi`, `df -h` audit on 2026-05-28.
+
+### Hardware
+
+| Component | Spec |
+|---|---|
+| CPU | 2× Intel Xeon Platinum 8468 (Sapphire Rapids) |
+| Logical CPUs | 192 (96 cores × 2 sockets × 2 HT) |
+| Clock | 3.8 GHz base |
+| L3 cache | **210 MB total** (105 MB per socket) |
+| RAM | **503 GB** |
+| GPU | **2× NVIDIA L40S** (46 GB VRAM each, ~91.6 TFLOPS FP32) |
+| Disk | 74% full (236 GB free) |
+| OS | Ubuntu 22.04 |
+| NUMA | 2 nodes (even CPUs = socket 0, odd = socket 1) |
+
+### Why Luna Over Minerva
+
+| Dimension | Luna | Minerva |
+|---|---|---|
+| CPU clock | 3.8 GHz | 2.0 GHz |
+| L3 cache | 210 MB (3.2×) | 66 MB |
+| RAM | 503 GB (2×) | 251 GB |
+| GPU | L40S, 91.6 TFLOPS (2.5×) | A40, 37.4 TFLOPS |
+| Disk | 74% (healthy) | **100% FULL** |
+| ISA extras | AVX-512 + **AMX** | AVX-512 only |
+| perf_event_paranoid | **1 (all counters work)** | 1 (set manually) |
+
+AMX (Advanced Matrix Extensions) — hardware tile matrix multiply unit built into Sapphire Rapids. Directly accelerates GEMM workloads in hardware, distinct from AVX-512. Dorado and potential matmul benchmarks can leverage this.
+
+### Profiling Readiness (confirmed 2026-05-28)
+
+| Tool | Status |
+|---|---|
+| perf | ✓ works (`paranoid=1`) — LLC-load-misses, stalled-cycles-backend, TMA all available |
+| gprof | ✓ build-essential present |
+| valgrind | ✓ installed |
+| make, gcc | ✓ confirmed |
+| nsys / ncu | ⚠ not in PATH — need `/etc/profile.d/nsys.sh` fix (same as Minerva) |
+| numactl | ✓ installed |
+
+### TMA on Luna
+
+Sapphire Rapids PMU supports full Top-down Microarchitecture Analysis. Hardware events available:
+- `tma_memory_bound`, `tma_dram_bound`, `tma_l3_bound`, `tma_l1_bound`
+- These directly classify the Kraken-2 bottleneck tier (L1/L2/L3/DRAM) without inference
+
+### Accounts
+
+| User | Role |
+|---|---|
+| chayanika | admin (lab manager) |
+| CK | Chirag K (this user) |
+| student | to be created — restricted access guide in `Luna/user_management.md` |
+
+Full documentation: `Luna/luna_stats.md`, `Luna/user_management.md`, `Luna_vs_Minerva.md`.
