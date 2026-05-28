@@ -35,7 +35,12 @@ Update this every time a new major topic is pushed.
 - Phase 1f: Fast model re-profiling (post Ubuntu reinstall, _15.pod5) — 44.95s, 30,275 reads, results confirmed
 - Phase 1g: HAC model re-profiling (post Ubuntu reinstall, _15.pod5) — 116.6s, 30,275 reads, LstmKernel 70.0% confirmed
 - Phase 2a: Kraken-2 classification + gprof — 93% classified, CompactHashTable::Get() = 80.65% CPU time, memory-bound verdict
-- Phase 2b: Matmul 21-variant CH3 perf-stat sweep (N=1024) — full primitive matrix T/O/A/P/U + transposed/BLAS/Strassen refs; BLAS 165× speedup, tiled_omp_avx best hand-written at 94×; naive LQ-stall/FP-disp = 196.7% = direct memory-bound proof; includes Critical Self-Review grading each claim
+- Phase 2b: Matmul 21-variant CH3 perf-stat sweep at **N=1024, 2048, 4096** — full primitive matrix T/O/A/P/U + transposed/BLAS/Strassen refs. Detailed per-N reports in `matrix_mul/` (see below). report.md has only the cross-N summary now.
+
+**matrix_mul/** → 21-variant matmul perf-stat sweep, per-N standalone reports
+- `report_n1024.md` — N=1024 (24 MB working set, fits L3): naive→ikj 11× speedup is purely access-pattern; tiling has nothing to add at this size; BLAS 165× best
+- `report_n2048.md` — N=2048 (96 MB, 6× L3): DRAM traffic begins, OMP LQ-stall jumps 10%→89% (parallel bandwidth contention emerges); BLAS lead narrows to 1.39×
+- `report_n4096.md` — N=4096 (384 MB, 24× L3): naive takes 11.5 min (IPC=0.041); **tiling-pays-off crossover identified** — `tiled_omp_avx` is 5.5× faster than `omp_avx` because tiling cures the parallel bandwidth-contention failure mode (LQ-stall 368%→18.7%); BLAS lead 2.33×, Strassen finally shows O(N^2.807)
 
 **daily_summary.md** →
 - 2026-05-20
