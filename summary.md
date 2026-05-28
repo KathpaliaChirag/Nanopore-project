@@ -187,12 +187,17 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 
 ## Research Goals
 
-~~### Goal 1 — Memory-efficient Kraken-2 (§4.3)~~  
+> [!NOTE]
+> Goals below marked 🟥 are superseded — kept for history. Active goals are marked 🟩 further down.
+
+---
+
+🟥 ~~### Goal 1 — Memory-efficient Kraken-2 (§4.3)~~  
 ~~**Problem:** 180 GB DB doesn't fit in RAM on edge/clinical devices.~~  
 ~~**Approach:** Reduce DB size using Bloom filters or learned indexes.~~  
 ~~**Metric:** accuracy vs memory trade-off curve.~~
 
-~~### Goal 2 — Kolin sir's Caching Layer (§8)~~  
+🟥 ~~### Goal 2 — Kolin sir's Caching Layer (§8)~~  
 ~~**Problem:** pipeline recomputes results for near-identical reads (same species, same region).~~  
 ~~**Solution:** build two caches:~~  
 ~~- **Kraken-2 (CPU):** Hot-K-mer LRU cache — pin frequent k-mer lookups in L3 cache. Uses Intel TBB (lock-free) + AVX-512 SIMD (batch lookups).~~  
@@ -201,7 +206,7 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 ~~**Immediate deliverable:** 2-page profile report using `perf` (Kraken-2) + Nsight (Dorado) by ~2026-05-25.~~  
 **Delivered 2026-05-26** — see `final_report.md` (meeting-ready), `report.md` (full narrative).
 
-~~### Goal 3 — Time & Accuracy Improvement (assigned 2026-05-18, §14)~~
+🟥 ~~### Goal 3 — Time & Accuracy Improvement (assigned 2026-05-18, §14)~~
 
 ~~**Two axes from Kolin sir's Meeting 3 direction:**~~
 
@@ -217,23 +222,17 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 ~~**Accuracy improvement:**~~  
 ~~- Improve classification accuracy through the full pipeline (methods TBD in follow-up meetings)~~
 
-~~### Team / GitHub Structure (assigned 2026-05-18)~~  
+🟥 ~~### Team / GitHub Structure (assigned 2026-05-18)~~  
 ~~- **Repo 1:** Chirag K + Chirag S — code, experiments, meeting minutes~~  
 ~~- **Repo 2:** Rishabh + Rohit — their work and contributions~~  
 ~~- Both repos must stay up to date and be accessible to Kolin sir at all times~~
 
 ---
 
-### Updated Goals — Summer 2026 (decided Meeting 4, 2026-05-28)
+> [!IMPORTANT]
+> **Summer 2026 direction decided — Meeting 4, 2026-05-28.** Primary focus: Kraken-2 optimisation only. Dorado/GPU work deprioritised.
 
-**Primary target: Kraken-2 optimisation only.** Dorado/GPU work deprioritised.
-
-| Team | Track | Deliverable |
-|---|---|---|
-| Chirag K + Chirag S | Kraken-2 memory optimisation | Report due 2026-05-31, then implementation |
-| Rohit + Rishabh | SNN (spiking neural networks) for Dorado basecalling | Research phase — no report yet |
-
-### Goal 1 — Kraken-2 Optimisation (active)
+🟩 ### Goal 1 — Kraken-2 Optimisation (active, summer 2026)
 
 **Confirmed bottleneck:** `CompactHashTable::Get()` — 67% of runtime, 9.87M calls, IPC = 0.55, 34% cache miss rate, ~30 L3 misses per call.
 
@@ -247,13 +246,18 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 - **Sequential ESKAPE pipeline** — query E/S/K/A/P/E one at a time, short-circuit on dominant match; smaller active DB per query fits in cache
 - **Hot-k-mer LRU cache** — pin most frequent k-mers in L3; barcode02 = 100% P. aeruginosa so k-mer access is highly non-uniform
 
-### Goal 2 — SNN for Dorado (Rohit + Rishabh, research phase)
+🟩 ### Goal 2 — SNN for Dorado (Rohit + Rishabh, research phase)
 Explore spiking neural networks as replacement/accelerator for Dorado basecaller. Can spike timing from raw nanopore signal replace some or all of the Transformer forward pass? No deliverable date yet.
 
-### Team / GitHub Structure (assigned 2026-05-18)
+🟩 ### Team / GitHub Structure (unchanged)
 - **Repo 1:** Chirag K + Chirag S — code, experiments, meeting minutes
 - **Repo 2:** Rishabh + Rohit — their work and contributions
 - Both repos must stay up to date and be accessible to Kolin sir at all times
+
+| Team | Track | Deliverable |
+|---|---|---|
+| Chirag K + Chirag S | Kraken-2 memory optimisation | Report due 2026-05-31, then implementation |
+| Rohit + Rishabh | SNN (spiking neural networks) for Dorado basecalling | Research phase — no report yet |
 
 ---
 
