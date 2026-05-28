@@ -1,0 +1,15 @@
+N=10000  Npad=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './avx2_manual 10000':
+
+      761140798281      L1-dcache-loads                                                       
+      250588263931      L1-dcache-load-misses            #   32.92% of all L1-dcache accesses 
+      251523713328      l2_request_g1.all_no_prefetch:u                                       
+        2223513887      l2_cache_misses_from_dc_misses:u                                      
+      391043036939      cache-references:u                                                    
+        6422414789      cache-misses:u                   #    1.64% of all cache refs         
+
+     456.570455473 seconds time elapsed
+
+     438.806240000 seconds user
+       3.972606000 seconds sys

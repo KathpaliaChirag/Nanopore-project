@@ -1,0 +1,15 @@
+N=10000  prefetch_dist=8  C[0][0]=2540.939230
+
+ Performance counter stats for './prefetch_ikj 10000':
+
+     3007903430014      L1-dcache-loads                                                       
+      250729084033      L1-dcache-load-misses            #    8.34% of all L1-dcache accesses 
+      252245612852      l2_request_g1.all_no_prefetch:u                                       
+        1065003674      l2_cache_misses_from_dc_misses:u                                      
+      449995883379      cache-references:u                                                    
+        5532581043      cache-misses:u                   #    1.23% of all cache refs         
+
+     920.458390644 seconds time elapsed
+
+     892.706433000 seconds user
+       5.842314000 seconds sys

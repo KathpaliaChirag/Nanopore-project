@@ -1,0 +1,15 @@
+N=10000  tile=64  C[0][0]=2540.939230
+
+ Performance counter stats for './tiled_avx2 10000':
+
+      610021182251      L1-dcache-loads                                                       
+       62754763751      L1-dcache-load-misses            #   10.29% of all L1-dcache accesses 
+       62905246096      l2_request_g1.all_no_prefetch:u                                       
+        1227397010      l2_cache_misses_from_dc_misses:u                                      
+      131234046782      cache-references:u                                                    
+       24321593389      cache-misses:u                   #   18.53% of all cache refs         
+
+     233.665622386 seconds time elapsed
+
+     222.669235000 seconds user
+       3.823546000 seconds sys

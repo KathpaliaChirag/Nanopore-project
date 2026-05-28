@@ -1,0 +1,16 @@
+N=10000  prefetch_dist=8  C[0][0]=2540.939230
+
+ Performance counter stats for './prefetch_ikj 10000':
+
+         900120.46 msec task-clock:u                     #    0.971 CPUs utilized             
+     5389995564973      instructions:u                   #    3.13  insn per cycle            
+                                                  #    0.00  stalled cycles per insn   
+     1721901950305      cycles:u                         #    1.913 GHz                       
+      128326850644      branches:u                       #  142.566 M/sec                     
+         102442877      branch-misses:u                  #    0.08% of all branches           
+        9001237825      stalled-cycles-frontend:u        #    0.52% frontend cycles idle      
+
+     927.111777039 seconds time elapsed
+
+     894.239455000 seconds user
+       5.818578000 seconds sys

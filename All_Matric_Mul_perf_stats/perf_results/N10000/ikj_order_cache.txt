@@ -1,0 +1,15 @@
+N=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './ikj_order 10000':
+
+      783606550119      L1-dcache-loads                                                       
+      189953753473      L1-dcache-load-misses            #   24.24% of all L1-dcache accesses 
+      191355540184      l2_request_g1.all_no_prefetch:u                                       
+        3553289131      l2_cache_misses_from_dc_misses:u                                      
+      325802510846      cache-references:u                                                    
+        6895824215      cache-misses:u                   #    2.12% of all cache refs         
+
+     404.514643692 seconds time elapsed
+
+     390.170530000 seconds user
+       5.716669000 seconds sys

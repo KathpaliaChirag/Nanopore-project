@@ -1,0 +1,16 @@
+N=10000  tile=64  C[0][0]=2540.939230
+
+ Performance counter stats for './tiled 10000':
+
+         290323.71 msec task-clock:u                     #    0.971 CPUs utilized             
+      920308395216      instructions:u                   #    1.67  insn per cycle            
+                                                  #    0.00  stalled cycles per insn   
+      552327887363      cycles:u                         #    1.902 GHz                       
+       59718750947      branches:u                       #  205.697 M/sec                     
+         255607896      branch-misses:u                  #    0.43% of all branches           
+        2772171878      stalled-cycles-frontend:u        #    0.50% frontend cycles idle      
+
+     298.840707177 seconds time elapsed
+
+     285.442742000 seconds user
+       4.858765000 seconds sys

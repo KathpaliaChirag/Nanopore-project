@@ -1,0 +1,15 @@
+N=10000  tile=64  threads=4  C[0][0]=2540.939230
+
+ Performance counter stats for './omp_tiled 10000':
+
+     1103151406332      L1-dcache-loads                                                       
+      169323328296      L1-dcache-load-misses            #   15.35% of all L1-dcache accesses 
+      170063301490      l2_request_g1.all_no_prefetch:u                                       
+        6399881969      l2_cache_misses_from_dc_misses:u                                      
+      278545027861      cache-references:u                                                    
+       10318370903      cache-misses:u                   #    3.70% of all cache refs         
+
+     118.198029741 seconds time elapsed
+
+     434.514610000 seconds user
+       7.656936000 seconds sys

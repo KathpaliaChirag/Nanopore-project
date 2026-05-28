@@ -1,0 +1,16 @@
+N=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './unrolled_ikj 10000':
+
+         519621.60 msec task-clock:u                     #    0.971 CPUs utilized             
+      891395376802      instructions:u                   #    0.91  insn per cycle            
+                                                  #    0.01  stalled cycles per insn   
+      982255143981      cycles:u                         #    1.890 GHz                       
+       35126548731      branches:u                       #   67.600 M/sec                     
+         101956152      branch-misses:u                  #    0.29% of all branches           
+        9595880993      stalled-cycles-frontend:u        #    0.98% frontend cycles idle      
+
+     535.329814762 seconds time elapsed
+
+     513.259246000 seconds user
+       6.313381000 seconds sys

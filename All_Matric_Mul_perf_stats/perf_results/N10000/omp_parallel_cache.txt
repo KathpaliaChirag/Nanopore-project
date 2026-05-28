@@ -1,0 +1,15 @@
+N=10000  threads=4  C[0][0]=2540.939230
+
+ Performance counter stats for './omp_parallel 10000':
+
+     1512018597649      L1-dcache-loads                                                       
+      252628124078      L1-dcache-load-misses            #   16.71% of all L1-dcache accesses 
+      253886483720      l2_request_g1.all_no_prefetch:u                                       
+        5512194832      l2_cache_misses_from_dc_misses:u                                      
+      409120202983      cache-references:u                                                    
+        9250759044      cache-misses:u                   #    2.26% of all cache refs         
+
+     262.580884196 seconds time elapsed
+
+     994.944442000 seconds user
+       7.211965000 seconds sys

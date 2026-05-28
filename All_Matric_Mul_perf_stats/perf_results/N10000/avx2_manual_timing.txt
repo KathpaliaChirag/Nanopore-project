@@ -1,0 +1,16 @@
+N=10000  Npad=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './avx2_manual 10000':
+
+         448602.45 msec task-clock:u                     #    0.970 CPUs utilized             
+      859895395833      instructions:u                   #    1.01  insn per cycle            
+                                                  #    0.01  stalled cycles per insn   
+      850679860113      cycles:u                         #    1.896 GHz                       
+       35126261696      branches:u                       #   78.302 M/sec                     
+         101342393      branch-misses:u                  #    0.29% of all branches           
+       10918482408      stalled-cycles-frontend:u        #    1.28% frontend cycles idle      
+
+     462.351202011 seconds time elapsed
+
+     444.215876000 seconds user
+       4.366702000 seconds sys

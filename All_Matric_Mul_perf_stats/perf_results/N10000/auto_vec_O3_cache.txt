@@ -1,0 +1,15 @@
+N=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './auto_vec_O3 10000':
+
+      783532813180      L1-dcache-loads                                                       
+      189932480684      L1-dcache-load-misses            #   24.24% of all L1-dcache accesses 
+      191383316170      l2_request_g1.all_no_prefetch:u                                       
+        3871818202      l2_cache_misses_from_dc_misses:u                                      
+      325716889728      cache-references:u                                                    
+        7288182166      cache-misses:u                   #    2.24% of all cache refs         
+
+     425.677657620 seconds time elapsed
+
+     406.908668000 seconds user
+       5.732309000 seconds sys

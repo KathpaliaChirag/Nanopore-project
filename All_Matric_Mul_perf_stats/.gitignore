@@ -1,0 +1,16 @@
+# Compiled binaries
+naive_ijk
+ikj_order
+kij_order
+transpose_B
+tiled
+omp_parallel
+omp_tiled
+unrolled_ikj
+avx2_manual
+auto_vec_O3
+tiled_avx2
+prefetch_ikj
+
+# Claude internal
+.claude/

@@ -1,0 +1,16 @@
+N=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './transpose_B 10000':
+
+        1591332.65 msec task-clock:u                     #    0.972 CPUs utilized             
+     2452459040624      instructions:u                   #    0.80  insn per cycle            
+                                                  #    0.00  stalled cycles per insn   
+     3047063934539      cycles:u                         #    1.915 GHz                       
+       65940116354      branches:u                       #   41.437 M/sec                     
+         103380547      branch-misses:u                  #    0.16% of all branches           
+       10917021201      stalled-cycles-frontend:u        #    0.36% frontend cycles idle      
+
+    1636.623934411 seconds time elapsed
+
+    1582.801490000 seconds user
+       8.391861000 seconds sys

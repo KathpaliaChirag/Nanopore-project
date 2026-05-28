@@ -1,0 +1,16 @@
+N=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './auto_vec_O3 10000':
+
+         410252.89 msec task-clock:u                     #    0.970 CPUs utilized             
+      577476665748      instructions:u                   #    0.74  insn per cycle            
+                                                  #    0.02  stalled cycles per insn   
+      776640076790      cycles:u                         #    1.893 GHz                       
+       18979491858      branches:u                       #   46.263 M/sec                     
+          51621231      branch-misses:u                  #    0.27% of all branches           
+        9568105592      stalled-cycles-frontend:u        #    1.23% frontend cycles idle      
+
+     423.079096007 seconds time elapsed
+
+     404.363876000 seconds user
+       5.861920000 seconds sys

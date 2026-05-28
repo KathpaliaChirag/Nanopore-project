@@ -1,0 +1,15 @@
+N=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './transpose_B 10000':
+
+      757199204211      L1-dcache-loads                                                       
+      250720490845      L1-dcache-load-misses            #   33.11% of all L1-dcache accesses 
+      252893076434      l2_request_g1.all_no_prefetch:u                                       
+        2284701568      l2_cache_misses_from_dc_misses:u                                      
+      387962311982      cache-references:u                                                    
+        7526577591      cache-misses:u                   #    1.94% of all cache refs         
+
+    1626.538466454 seconds time elapsed
+
+    1572.663920000 seconds user
+       7.700809000 seconds sys

@@ -1,0 +1,15 @@
+N=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './kij_order 10000':
+
+     1142339067104      L1-dcache-loads                                                       
+      254093872262      L1-dcache-load-misses            #   22.24% of all L1-dcache accesses 
+      255136225024      l2_request_g1.all_no_prefetch:u                                       
+        8099912905      l2_cache_misses_from_dc_misses:u                                      
+      383414285003      cache-references:u                                                    
+       11652559317      cache-misses:u                   #    3.04% of all cache refs         
+
+    1196.691133013 seconds time elapsed
+
+    1160.860220000 seconds user
+       5.408218000 seconds sys

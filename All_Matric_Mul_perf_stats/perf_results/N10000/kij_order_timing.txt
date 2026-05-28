@@ -1,0 +1,16 @@
+N=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './kij_order 10000':
+
+        1149340.57 msec task-clock:u                     #    0.976 CPUs utilized             
+      859795747680      instructions:u                   #    0.39  insn per cycle            
+                                                  #    0.01  stalled cycles per insn   
+     2198650938346      cycles:u                         #    1.913 GHz                       
+       35126983681      branches:u                       #   30.563 M/sec                     
+         102567635      branch-misses:u                  #    0.29% of all branches           
+        8598369556      stalled-cycles-frontend:u        #    0.39% frontend cycles idle      
+
+    1177.606291603 seconds time elapsed
+
+    1144.688353000 seconds user
+       4.603634000 seconds sys

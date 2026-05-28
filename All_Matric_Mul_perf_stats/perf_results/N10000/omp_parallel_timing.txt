@@ -1,0 +1,16 @@
+N=10000  threads=4  C[0][0]=2540.939230
+
+ Performance counter stats for './omp_parallel 10000':
+
+        1110855.34 msec task-clock:u                     #    3.821 CPUs utilized             
+      892032365079      instructions:u                   #    0.43  insn per cycle            
+                                                  #    0.06  stalled cycles per insn   
+     2083897467239      cycles:u                         #    1.876 GHz                       
+       35331160378      branches:u                       #   31.805 M/sec                     
+         103829308      branch-misses:u                  #    0.29% of all branches           
+       55125747094      stalled-cycles-frontend:u        #    2.65% frontend cycles idle      
+
+     290.699461526 seconds time elapsed
+
+    1103.132003000 seconds user
+       7.718039000 seconds sys

@@ -1,0 +1,15 @@
+N=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './unrolled_ikj 10000':
+
+     1142049976108      L1-dcache-loads                                                       
+      253731720416      L1-dcache-load-misses            #   22.22% of all L1-dcache accesses 
+      254916824486      l2_request_g1.all_no_prefetch:u                                       
+        4259666288      l2_cache_misses_from_dc_misses:u                                      
+      413716294088      cache-references:u                                                    
+        8144164015      cache-misses:u                   #    1.97% of all cache refs         
+
+     528.029014131 seconds time elapsed
+
+     506.261498000 seconds user
+       6.043789000 seconds sys

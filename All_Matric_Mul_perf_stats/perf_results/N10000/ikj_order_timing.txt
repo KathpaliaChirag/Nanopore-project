@@ -1,0 +1,16 @@
+N=10000  C[0][0]=2540.939230
+
+ Performance counter stats for './ikj_order 10000':
+
+         412823.12 msec task-clock:u                     #    0.981 CPUs utilized             
+      577501693651      instructions:u                   #    0.74  insn per cycle            
+                                                  #    0.02  stalled cycles per insn   
+      779444397353      cycles:u                         #    1.888 GHz                       
+       18979479479      branches:u                       #   45.975 M/sec                     
+          51713139      branch-misses:u                  #    0.27% of all branches           
+        9795720489      stalled-cycles-frontend:u        #    1.26% frontend cycles idle      
+
+     420.796414345 seconds time elapsed
+
+     406.174440000 seconds user
+       6.599868000 seconds sys

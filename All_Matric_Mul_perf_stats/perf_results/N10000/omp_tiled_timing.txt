@@ -1,0 +1,16 @@
+N=10000  tile=64  threads=4  C[0][0]=2540.939230
+
+ Performance counter stats for './omp_tiled 10000':
+
+         420695.95 msec task-clock:u                     #    3.739 CPUs utilized             
+     1317321680848      instructions:u                   #    1.66  insn per cycle            
+                                                  #    0.00  stalled cycles per insn   
+      794422792956      cycles:u                         #    1.888 GHz                       
+      129187591102      branches:u                       #  307.081 M/sec                     
+         253370194      branch-misses:u                  #    0.20% of all branches           
+        4661533526      stalled-cycles-frontend:u        #    0.59% frontend cycles idle      
+
+     112.505829267 seconds time elapsed
+
+     413.430496000 seconds user
+       7.257799000 seconds sys

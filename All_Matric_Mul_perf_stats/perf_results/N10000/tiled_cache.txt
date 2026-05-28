@@ -1,0 +1,15 @@
+N=10000  tile=64  C[0][0]=2540.939230
+
+ Performance counter stats for './tiled 10000':
+
+      804924870823      L1-dcache-loads                                                       
+      174047815571      L1-dcache-load-misses            #   21.62% of all L1-dcache accesses 
+      174367971434      l2_request_g1.all_no_prefetch:u                                       
+        1789341362      l2_cache_misses_from_dc_misses:u                                      
+      274774971425      cache-references:u                                                    
+        8036089969      cache-misses:u                   #    2.92% of all cache refs         
+
+     299.039039519 seconds time elapsed
+
+     285.626126000 seconds user
+       4.806806000 seconds sys

@@ -32,3 +32,9 @@ tools-guide-claude/
 
 # Claude local settings
 .claude/settings.local.json
+
+# AMDuProf profiling session output
+AMDuProf-*/
+
+# gprof output
+gmon.out
