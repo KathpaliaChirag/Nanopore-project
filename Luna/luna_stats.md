@@ -85,7 +85,7 @@ NUMA node1:     1,3,5,7,...191   (odd CPUs  — socket 1)
 | CPUs per node | 96 logical (48 physical) |
 | Interleaved assignment | Yes — even=node0, odd=node1 |
 
-> **Note:** numactl not installed as of 2026-05-28. Install with `sudo apt install numactl` to get memory bandwidth per node and NUMA-aware pinning.
+> numactl installed 2026-05-29. Run `numactl --hardware` to see memory bandwidth per node and NUMA-aware pinning options.
 
 ---
 
@@ -227,26 +227,31 @@ perf_event_paranoid = 1   ← verified 2026-05-28 22:19 UTC
 
 ## Profiling Tool Inventory
 
-> Audited: 2026-05-28
+> Audited: 2026-05-29 (updated after student user setup)
 
 | Tool | Version / Path | Status | Notes |
 |---|---|---|---|
-| **perf** | `/usr/bin/perf` |  Installed | paranoid=1  — full hardware counters enabled |
-| **gcc** | `/usr/bin/gcc` |  Installed | |
-| **g++** | `/usr/bin/g++` |  Installed | |
-| **python3** | `/usr/bin/python3` |  Installed | |
-| **make** | `/usr/bin/make` |  Installed | |
-| **perl** | `/usr/bin/perl` |  Installed | |
-| **btop** | installed 2026-05-28 |  Installed | Use `btop --utf-force` |
-| nvcc (CUDA compiler) | — |  Not in PATH | Check: `find /usr /opt -name nvcc 2>/dev/null` |
-| nsys (Nsight Systems) | — |  Not in PATH | Check: `find /usr /opt -name nsys 2>/dev/null` |
-| ncu (Nsight Compute) | — |  Not in PATH | Check: `find /usr /opt -name ncu 2>/dev/null` |
-| valgrind | — |  Not installed | `sudo apt install valgrind` |
-| likwid-perfctr | — |  Not installed | See install_tools.md |
-| numactl | — |  Not installed | `sudo apt install numactl` |
+| **perf** | `/usr/bin/perf` v6.8.12 | Installed | paranoid=1 — full hardware counters enabled |
+| **gprof** | `/usr/bin/gprof` | Installed | part of binutils, use with -pg -g compile flags |
+| **gcc** | `/usr/bin/gcc` | Installed | |
+| **g++** | `/usr/bin/g++` | Installed | |
+| **python3** | `/usr/bin/python3` | Installed | |
+| **make** | `/usr/bin/make` | Installed | |
+| **perl** | `/usr/bin/perl` | Installed | |
+| **btop** | installed 2026-05-28 | Installed | Use `btop --utf-force` |
+| **kraken2** | `~/tools/kraken2/kraken2` v2.1.3 | Installed | built from source 2026-05-29 |
+| **dorado** | `~/tools/dorado/bin/dorado` v1.4.0+ba44a013 | Installed | pre-built binary, GPU-accelerated |
+| **flamegraph.pl** | `~/tools/FlameGraph/flamegraph.pl` | Installed | use with stackcollapse-perf.pl |
+| **numactl** | `/usr/bin/numactl` | Installed | |
+| **valgrind** | `/usr/bin/valgrind` v3.18.1 | Installed | includes cachegrind |
+| **gperftools** | installed via apt | Installed | google-perftools + libgoogle-perftools-dev |
+| nvcc (CUDA compiler) | — | Not in PATH | Check: `find /usr /opt -name nvcc 2>/dev/null` |
+| nsys (Nsight Systems) | — | Not in PATH | Check: `find /usr /opt -name nsys 2>/dev/null` |
+| ncu (Nsight Compute) | — | Not in PATH | Check: `find /usr /opt -name ncu 2>/dev/null` |
+| likwid-perfctr | — | Not installed | See install_tools.md |
 | VTune | — | Unknown | Check: `find /opt /usr -name vtune 2>/dev/null` |
 
-> **nvcc/nsys/ncu missing from PATH** — these may be installed but not on PATH (same issue as Minerva with nsys). Check:
+> **nvcc/nsys/ncu missing from PATH** — likely installed but not on PATH. Check:
 > ```bash
 > find /usr /opt -name "nvcc" 2>/dev/null
 > find /usr /opt -name "nsys" 2>/dev/null
