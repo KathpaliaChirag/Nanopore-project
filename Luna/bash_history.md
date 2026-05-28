@@ -305,9 +305,109 @@ source ~/.bashrc
 
 ---
 
+### 17. Install sysstat for per-core CPU monitoring
+**Run as:** `student`
+```bash
+# sysstat provides mpstat — shows per-core CPU utilization in real time.
+# Needed to see how many of the 96 cores Kraken2 actually uses during a run.
+sudo apt install -y sysstat
+```
+**Status:** Done
+
+---
+
+### 18. Dorado basecalling — all three models
+**Run as:** `student`
+```bash
+# Basecalls the pod5 file with all three accuracy tiers.
+# fast: lowest quality, fastest. hac: production standard. sup: highest accuracy.
+# --emit-fastq outputs FASTQ instead of BAM — needed as Kraken2 input.
+dorado basecaller fast ~/data/pod5/FBE01990_24778b97_03e50f91_10.pod5 --emit-fastq > ~/results/basecalling/reads_fast.fastq
+dorado basecaller hac  ~/data/pod5/FBE01990_24778b97_03e50f91_10.pod5 --emit-fastq > ~/results/basecalling/reads_hac.fastq
+dorado basecaller sup  ~/data/pod5/FBE01990_24778b97_03e50f91_10.pod5 --emit-fastq > ~/results/basecalling/reads_sup.fastq
+```
+**Status:** Done — fast: 104,832 reads, hac: 104,918 reads, sup: 104,980 reads
+
+---
+
+### 19. Kraken2 classification — all three models
+**Run as:** `student`
+```bash
+kraken2 --db ~/data/kraken2_db --threads 96 \
+  --report ~/results/classification/report_fast.txt \
+  --output ~/results/classification/output_fast.txt \
+  ~/results/basecalling/reads_fast.fastq
+
+kraken2 --db ~/data/kraken2_db --threads 96 \
+  --report ~/results/classification/report_hac.txt \
+  --output ~/results/classification/output_hac.txt \
+  ~/results/basecalling/reads_hac.fastq
+
+kraken2 --db ~/data/kraken2_db --threads 96 \
+  --report ~/results/classification/report_sup.txt \
+  --output ~/results/classification/output_sup.txt \
+  ~/results/basecalling/reads_sup.fastq
+```
+**Status:** Done — fast: 82.66%, hac: 95.77%, sup: 97.09% classified
+
+---
+
+### 20. Set perf_event_paranoid to 0
+**Run as:** `student`
+```bash
+# Lowers the perf security level so hardware counters are accessible to all users.
+# paranoid=1 blocks CPU events for users without CAP_PERFMON — student has neither.
+sudo sh -c 'echo 0 > /proc/sys/kernel/perf_event_paranoid'
+echo 'kernel.perf_event_paranoid = 0' | sudo tee -a /etc/sysctl.conf
+```
+**Status:** Done — paranoid set to 0, made permanent in /etc/sysctl.conf
+
+---
+
+### 21. perf stat baseline — hac model (comprehensive)
+**Run as:** `student`
+```bash
+# Full hardware counter profiling of Kraken2 hac run.
+# Covers IPC, cache hierarchy miss rates, per-level stall cycles, branch prediction.
+# stalled-cycles-backend replaced with cycle_activity.stalls_* (Sapphire Rapids).
+perf stat \
+  -e cycles,instructions \
+  -e cache-misses,cache-references \
+  -e LLC-load-misses,LLC-loads \
+  -e L1-dcache-load-misses,L1-dcache-loads \
+  -e branch-misses,branch-instructions \
+  -e cycle_activity.stalls_total \
+  -e cycle_activity.stalls_l1d_miss \
+  -e cycle_activity.stalls_l2_miss \
+  -e cycle_activity.stalls_l3_miss \
+  -e memory_activity.stalls_l3_miss \
+  kraken2 --db ~/data/kraken2_db --threads 96 \
+  --report ~/results/profiling/perf_report_hac_full.txt \
+  --output ~/results/profiling/perf_output_hac_full.txt \
+  ~/results/basecalling/reads_hac.fastq
+```
+**Status:** Done — IPC 1.58, LLC miss rate 81.9%, 48.7% stall cycles. See results_kraken2.md.
+
+---
+
+### 22. TMA breakdown — hac model
+**Run as:** `student`
+```bash
+# TMA (Top-down Microarchitecture Analysis) gives a high-level slot breakdown.
+# Uses -M flag (metrics), not -e (events) — different perf subsystem.
+perf stat -M tma_memory_bound,tma_core_bound \
+  kraken2 --db ~/data/kraken2_db --threads 96 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq
+```
+**Status:** Done — memory_bound 25.4%, core_bound 21.7%. See results_kraken2.md.
+
+---
+
 ## Next Steps
 
-- Run Dorado basecalling on the pod5 file (GPU run on L40S)
-- Run Kraken2 classification on the basecalled reads
-- Profile Kraken2 with perf stat for baseline metrics
-- Check if nsys/ncu are in PATH for Dorado GPU profiling
+- perf record + flamegraph to confirm CompactHashTable::Get() as hotspot on Luna
+- Second Kraken2 pass after DB is in page cache to isolate classification-only time
+- NUMA analysis with numactl
+- perf stat for fast and sup models for comparison
+- nsys profiling of Dorado GPU run
