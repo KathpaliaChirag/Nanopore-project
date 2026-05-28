@@ -119,7 +119,9 @@ Contrast: perf reported IPC = 2.26 (unreliable). AMD uProf gives the real number
 **Cache design justification:**
 - One LRU hit = one RAM lookup avoided = ~100 ns saved
 - Clinical samples have dominant species → same k-mers repeat heavily across reads in one barcode
-- At 9.87M lookups/run, a 20% hit rate skips ~2M RAM accesses ≈ **~6 seconds saved per run**
+- 301M total L3 misses ÷ 9.87M calls = ~30 L3 misses per `Get()` call on average
+- A 20% hit rate on 9.87M calls = ~2M calls skipped; each hit avoids ~30 L3 misses → ~60M fewer RAM accesses
+- At ~100 ns per miss: 60M × 100 ns ≈ **~6 seconds saved per run** (assumes one LRU hit eliminates all misses for that call — will validate with k-mer reuse measurement on actual FASTQ)
 - Cache lives in front of `CompactHashTable::Get()`. Hot k-mers stay in L3 cache. Cold k-mers fall through to the hash table as normal.
 
 ---
