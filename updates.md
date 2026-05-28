@@ -155,3 +155,80 @@ Next meeting / deadline: **2026-05-17**.
 - KB §18 added with full results and interpretation
 - report.md updated: tool 3 section added, summary table updated
 - **Next to run:** cachegrind (per-function LLC miss rates) + ncu (Dorado SM throughput)
+
+---
+
+## 2026-05-27 — Study session 7 — Matrix multiply perf benchmarks (WSL2)
+
+- **Goal:** build a suite of matrix multiply implementations to study cache behaviour with `perf stat`
+- **12 C implementations written and built** (`All_Matric_Mul_perf_stats/`):
+  - `naive_ijk` — baseline, column-stride B access (worst cache)
+  - `ikj_order` — hoist A[i][k], stream B-row sequentially (25× speedup, zero complexity)
+  - `kij_order` — outer k loop; good at small N, degrades at large N
+  - `transpose_B` — copies B^T so both rows stream; lowest L3 miss rate, slow due to setup cost
+  - `tiled` — 64×64 cache blocking; sub-linear scaling (tiles stay in L2)
+  - `omp_parallel` — 4-thread outer-i parallelism
+  - `omp_tiled` — 4-thread tiled with `collapse(2)`
+  - `unrolled_ikj` — manual 4× unroll of j-loop
+  - `avx2_manual` — `_mm256_fmadd_pd` intrinsics, 32-byte aligned alloc, 4 doubles/instruction
+  - `auto_vec_O3` — compiler auto-vectorisation with `-O3 -march=native`
+  - `tiled_avx2` — tiling + AVX2 combined (fastest at large N)
+  - `prefetch_ikj` — `__builtin_prefetch` on B; demonstrates software prefetch hurts sequential access
+- **Makefile:** `SIZE ?= 1024`, `THREADS ?= 4`, `make run_perf`, `make tile32` targets
+- **perf stat runs completed for N=1024 and N=2048** — timing pass + cache hierarchy pass (separate to avoid PMU multiplexing dropout)
+  - Working events on WSL2: cache-misses, L1-dcache-loads/misses, L2 AMD-specific events, branches
+  - Blocked by Hyper-V: LLC-load-misses, stalled-cycles-backend — confirmed same issue as Kraken-2/Dorado
+  - IPC unreliable on WSL2 (same Hyper-V clock throttle as before, marked † throughout)
+- **N=10000 background run launched** — naive_ijk excluded (~4 hrs), 11 remaining binaries × 2 passes
+- **PERF_REPORT.md written** with:
+  - IPC warning section (Hyper-V throttle, same as KB §15.4)
+  - RAM requirements table: N=1024→24MB, 2048→96MB, 10000→2.24GB
+  - Tables 1-A/B (N=1024 timing + cache hierarchy), Tables 2-A/B (N=2048)
+  - Cross-size comparison: wall time slowdown, L3 miss growth, L2/L3 rates, branch miss %
+  - Analysis sections A–G covering each variant
+- **Key N=1024/2048 findings:**
+  - `naive_ijk` is 29.7× slower than `tiled_avx2` at N=1024, widens to 48.2× at N=2048
+  - `omp_parallel` is *slower* than single-thread `ikj_order` at both sizes — memory bus is the bottleneck, not compute
+  - `tiled` and `tiled_avx2` scale sub-8× (7.4–7.5×) vs expected O(N³) 8× — tiling amortises cache cost
+  - `kij_order` degrades super-linearly (18.1× slowdown 1024→2048) — C-row write conflicts
+  - `prefetch_ikj` has highest IPC† but 2.3× slower than plain `ikj_order` — software prefetch adds 9× instruction blowup for sequential access that the hardware prefetcher already handles
+
+---
+
+## 2026-05-28 — Study session 8 — N=10000 results + Luna server setup
+
+### N=10000 results (completed overnight)
+- **All 11 binaries completed** — 22 raw result files in `perf_results/N10000/`
+- **Table 3-A filled in PERF_REPORT.md** — complete results for all binaries
+- **Key N=10000 findings:**
+  - `omp_tiled` is the winner at N=10000 (**112,506ms**) — only 29× slowdown from N=2048 vs expected 116×; tiling + 4 threads finally pays off with 2.4 GB working set
+  - `tiled_avx2` is 2nd (236,546ms) but L3 miss rate jumps to **18.53%** (from 15.9% at N=2048) — tile footprint causing L3 eviction at large N; `TILE=32` recommended
+  - `prefetch_ikj` has the **lowest L3 miss% (1.23%)** and lowest L1 miss% (8.34%) — prefetches genuinely work — but emits **9.3× more instructions** than `ikj_order`, making it 2.2× slower
+  - `kij_order` degrades super-linearly: 137.6× slowdown vs expected 116.4×
+  - `omp_parallel` finally helps at large N: 47.1× slowdown vs 116× expected (4 threads can pipeline DRAM at 2.4 GB scale)
+- Comparison Table 1 updated with N=10000 column and 2048→10000 slowdown ratios
+
+### Luna server (dell-R760) — fully documented
+- **Specs captured** (`Luna/luna_stats.md`):
+  - CPU: 2× Intel Xeon Platinum 8468 (Sapphire Rapids) — 96 cores / 192 logical CPUs @ 3.8 GHz
+  - Cache: L2 2 MB/core, **L3 210 MB total** (3.2× Minerva's 66 MB)
+  - RAM: **503 GB** (2× Minerva)
+  - GPU: **2× NVIDIA L40S** (Ada Lovelace, 46 GB VRAM each, ~91.6 TFLOPS FP32 — 2.5× Minerva's A40)
+  - SIMD: AVX-512 + **AMX** (hardware tile matrix multiply — unique to Sapphire Rapids)
+  - Disk: 938 GB root, 236 GB free (74%) — healthy vs Minerva's critical 100%
+  - `perf_event_paranoid = 1` confirmed (2026-05-28 22:19 UTC) — hardware counters enabled for all users
+- **`Luna/install_tools.md`** — btop locale fix, perf paranoid fix, numactl, LIKWID, VTune, DCGM, valgrind; Luna-specific AVX-512 + AMX build flags
+- **`Luna/user_guide.md`** — login, key differences vs Minerva, first-login checks, how to copy and run matmul benchmarks
+- **`Luna/user_management.md`** — how to create `student` account with restricted access (same process as Minerva: `useradd`, `passwd`, `chmod 700`); Luna-specific: resource limits, disk quota, GPU access notes
+- **`Luna/profiling/plan.md`** — 4-phase profiling plan: matmul re-run (full hardware counters), Kraken-2 with LLC+TMA+NUMA, Dorado on L40S, AMX matrix multiply
+- **`Luna/profiling/results_*.md`** — empty result templates for matmul, Kraken-2, Dorado with WSL2/Minerva baselines pre-filled
+
+### Luna vs Minerva comparison
+- **`Luna_vs_Minerva.md`** created — full side-by-side: CPU, cache, RAM, GPU, storage, profiling readiness
+- **Verdict: Luna wins on every hardware dimension** — higher clock (3.8 vs 2.0 GHz), bigger L3 (210 vs 66 MB), more RAM (503 vs 251 GB), faster GPUs (L40S vs A40), healthy disk (Luna at 74%, Minerva at 100%)
+- Only current edge for Minerva: nsys/ncu already in PATH (Luna needs same fix applied to Minerva)
+- **Tool audit from Luna (chayanika, 2026-05-28 22:19 UTC):** gcc/g++/python3/make/perl/perf all in PATH; valgrind/nvcc/nsys/ncu/numactl/likwid not in PATH — same install queue as Minerva had
+
+### GitHub
+- All new files committed and pushed to `KathpaliaChirag/Nanopore-project` (main)
+- `.gitignore` updated: compiled binaries excluded, AMDuProf profiling sessions excluded, `gmon.out` excluded
