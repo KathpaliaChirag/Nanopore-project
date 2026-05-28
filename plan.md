@@ -1,944 +1,468 @@
-# Profiling Plan — Nanopore Pipeline (Dorado + Kraken-2)
-## Goal: Produce a baseline profiling report for Kolin sir
-
-> This document is a learning + execution guide. Read it top to bottom.
-> Each tool section goes: what it is → how to set it up → what to run → what to note (beginner → intermediate → advanced).
-> Everything ties back to one question: **where is the pipeline slow and why?**
->
-> At every step, instructions are split:
-> - **Windows/WSL2** — for Chirag's setup
-> - **Native Linux** — for anyone running Ubuntu/Debian directly (Rishabh, Rohit, or lab server)
+# Kraken-2 Optimisation Plan
+**Authors:** Chirag K + Chirag Suthar  
+**Supervisor:** Kolin sir, Chayanika mam  
+**Direction set:** Meeting 4, 2026-05-28  
+**Immediate deliverable:** `kraken2_optimisation_report.md` — due 2026-05-31  
+**Full plan (research-grade, professor-verifiable):** `C:\Users\chira\.claude\plans\snappy-plotting-fox.md`
 
 ---
 
-## The Big Picture (read this first)
+## CURRENT STATUS
 
-Before touching any tool, understand what you are trying to find out.
+### What is proven (no need to redo)
 
-The pipeline is:
-```
-POD-5 file
-    ↓  Dorado (GPU) — basecalling
-BAM / FASTQ
-    ↓  Kraken-2 (CPU) — species identification
-Species report
-```
+| Tool | Finding |
+|---|---|
+| perf stat (WSL2) | 34.24% cache miss rate, 301M misses per run |
+| gprof (WSL2) | `CompactHashTable::Get()` = 67% of runtime, 9.87M calls |
+| AMD uProf (local) | IPC = 0.55 — CPU stalling on memory, not computing |
 
-Both steps are slow. You do not know *why* yet. There are two possible reasons for any program being slow:
+**Derived:** 301M misses ÷ 9.87M calls = ~30 L3 misses per Get() call. At 100 ns/miss → **~30 s of L3 miss latency per run** (baseline: 105.87 s total).
 
-1. **Compute-bound** — the CPU/GPU is doing too many calculations. Fix: SIMD, better algorithms.
-2. **Memory-bound** — the CPU/GPU is waiting for data to arrive from RAM or disk. Fix: caching, better data layout.
+**Platform limitations:** WSL2/Hyper-V blocks LLC-load-misses and stalled-cycles-backend hardware counters. All accurate profiling goes on **Luna (bare metal, perf_event_paranoid=1)**.
 
-The profiling tools tell you which one it is. You cannot guess — the answer is almost always surprising.
+### Key hardware advantage on Luna
 
-**Your job in this plan:** run the tools, collect the numbers, understand what they mean. That is the 2-page report Kolin sir wants.
+Luna's 210 MB L3 cache means a single-pathogen ESKAPE DB (~108 MB = 650 MB ÷ 6) fits **entirely in L3**. This is the physical foundation for Proposal B.
 
 ---
 
-## Phase 0 — Setup (do this once)
+## PLATFORM MAP
 
-### 0.1 Linux environment setup
+| Capability | WSL2/Ryzen | Minerva | Luna |
+|---|---|---|---|
+| cache-misses (overall) | ✅ done | ✅ | ✅ |
+| LLC-load-misses (real) | ❌ Hyper-V | ✅ | ✅ |
+| stalled-cycles-backend | ❌ Hyper-V | ✅ | ✅ |
+| TMA (dram_bound, l3_bound) | ❌ | partial | ✅ Sapphire Rapids |
+| cachegrind per-function | ✅ (slow, swapped) | ❌ disk full | ✅ fast (503 GB) |
+| perf record / source annot. | partial | ✅ | ✅ |
+| NUMA analysis | ❌ single socket | ✅ | ✅ 2 NUMA nodes |
+| AVX-512 + AMX | ❌ (AVX2 only) | ✅ | ✅ |
+| L3 size | 16 MB | 66 MB | **210 MB ← key** |
+| **Status** | baseline done | disk full | **PRIMARY** |
 
-**If Windows/WSL2:**
-Open WSL2 (search "Ubuntu" or "WSL" in Start menu) and run:
+---
+
+## STEP 1 — KRAKEN-2 SOURCE STUDY (before any coding)
+
+Clone and annotate on Luna:
 ```bash
-# Confirm you are inside WSL2 (not PowerShell)
-uname -a   # should print "Linux"
-
-cat /etc/os-release   # shows your distro
-
-# Update packages
-sudo apt update && sudo apt upgrade -y
-
-# Install all tools you will need
-sudo apt install -y \
-    build-essential \
-    git \
-    binutils \
-    valgrind \
-    linux-tools-common \
-    linux-tools-generic \
-    cmake \
-    wget \
-    curl
+git clone https://github.com/DerrickWood/kraken2.git ~/kraken2-src
 ```
 
-**If native Linux (Ubuntu/Debian):**
-Open a terminal and run the exact same commands — no difference here.
-```bash
-uname -a   # confirm you are on Linux
+**Files to read completely:**
 
-sudo apt update && sudo apt upgrade -y
+| File | Why |
+|---|---|
+| `src/compact_hash.h` | CompactHashTable class — the data structure we're optimising |
+| `src/compact_hash.cc` | CompactHashTable::Get() — the 67% bottleneck |
+| `src/classify.cc` | ClassifySequence() — the insertion point for the LRU cache |
+| `src/kmer_counter.cc` | MinimizerScanner — 18.74% secondary bottleneck |
+| `src/kraken2_data.h` | Core types (taxid_t, uint64_t) — data size affects memory layout |
+| `src/utilities.h` | Helpers — potential SIMD opportunities |
 
-sudo apt install -y \
-    build-essential \
-    git \
-    binutils \
-    valgrind \
-    linux-tools-common \
-    linux-tools-$(uname -r) \
-    cmake \
-    wget \
-    curl
+**Questions to answer from source (annotate findings):**
+- [ ] Exact bit split: key_bits vs taxon_id_bits per entry?
+- [ ] What hash function maps key → table index? (MurmurHash? custom?)
+- [ ] Is there any existing prefetch call in Get()?
+- [ ] Actual load factor of the 8 GB DB? (affects probe chain length)
+- [ ] Is the DB loaded via mmap() or malloc()? (affects NUMA allocation policy)
+- [ ] Does MinimizerScanner compute canonical k-mers correctly? (min(kmer, revcomp))
+- [ ] Any lock or thread synchronisation inside Get()? (expect: none, DB is read-only)
+- [ ] How is `--threads` handled — do threads share one CompactHashTable instance?
+
+**Inferred Get() algorithm (verify in source):**
+```cpp
+taxid_t CompactHashTable::Get(uint64_t key) const {
+    uint64_t idx = key % size_;            // O(1) position
+    uint64_t probe_key = key & key_mask_;  // bits stored in entry
+    while (true) {
+        uint64_t entry = table_[idx];      // ← L3 miss here (random 8 GB jump)
+        if (entry == 0) return 0;          // empty = not in DB
+        if ((entry >> value_bits_) == probe_key)
+            return entry & value_mask_;    // hit
+        idx = (idx + 1) % size_;           // linear probe
+    }
+}
 ```
-> Note: `linux-tools-$(uname -r)` installs the perf version matched to your exact kernel — more reliable than `linux-tools-generic` on native Linux.
 
-**What to note (beginner):** just confirm each install succeeds with no errors.
+Cache hostility: `table_[idx]` jumps to a pseudo-random location in an 8 GB flat array. L3 cache = 16 MB local, 210 MB on Luna → L3 miss rate ~97% for the 8 GB DB.
 
-**Check perf works (both WSL2 and Linux):**
-```bash
-perf stat ls
-```
+---
 
-**If Windows/WSL2:** you will likely see:
-```
-WARNING: perf not found for kernel 6.6.87.2-microsoft
-```
-This is because WSL2 uses a Microsoft-custom kernel and Ubuntu's `linux-tools-generic` package only covers Ubuntu's own kernels. The fix is to **build perf from the WSL2 kernel source**. Run these steps inside WSL2:
+## STEP 2 — LUNA DEEP PROFILING (produces 2026-05-31 deliverable)
+
+### Prerequisites
 
 ```bash
-# Step 1 — install build dependencies
-sudo apt install -y flex bison libelf-dev libdw-dev libaudit-dev \
-    libslang2-dev python3-dev libunwind-dev libbpf-dev \
-    libcap-dev libnuma-dev libzstd-dev libtraceevent-dev
+# Build Kraken-2 on Luna
+git clone https://github.com/DerrickWood/kraken2.git ~/kraken2-src
+cd ~/kraken2-src && ./install_kraken2.sh ~/kraken2-build
 
-# Step 2 — clone matching kernel source (shallow, only latest snapshot)
-git clone --depth=1 \
-    --branch linux-msft-wsl-6.6.87.2 \
-    https://github.com/microsoft/WSL2-Linux-Kernel.git \
-    ~/WSL2-Linux-Kernel
-
-# If that tag fails, find the right tag name first:
-# git ls-remote --tags https://github.com/microsoft/WSL2-Linux-Kernel | grep 6.6.87
-
-# Step 3 — build perf (takes ~10-15 min)
-cd ~/WSL2-Linux-Kernel/tools/perf
-make -j$(nproc)
-
-# Step 4 — install and clear shell cache
-sudo cp perf /usr/local/bin/perf
-rehash        # clears zsh command cache so it finds the new perf
-which perf    # should print /usr/local/bin/perf
-
-# Step 5 — verify
-perf stat ls
+# Transfer data (from local or Minerva)
+scp -r ~/eskape_db CK@luna:~/eskape_db
+scp ~/barcode02.fastq CK@luna:~/barcode02.fastq
 ```
 
-> Note: the build will print several "Warning: Kernel ABI header differences" lines and optional-feature warnings (no libbabeltrace, no JDK, etc.). These are harmless — they only disable features we do not need. The only fatal error to watch for is `libtraceevent is missing` — fix it with `sudo apt install libtraceevent-dev` and re-run `make`.
+### Phase A — Cold vs Warm perf stat (memory-bound vs I/O-bound)
 
-**Important WSL2 caveat:** even with the correct perf binary, Hyper-V (the Windows hypervisor) does not expose all hardware PMU counters to the WSL2 VM. Specifically, `LLC-loads` and `LLC-load-misses` will show `<not supported>`. What does work:
-- `cache-misses`, `cache-references` (overall cache miss rate — sufficient for the report)
-- `instructions`, `cycles`, `branches`, `branch-misses` (IPC calculation works fine)
-- All software events: `task-clock`, `page-faults`, `context-switches`
-
-For per-function LLC miss data (which `LLC-load-misses` would give), use **cachegrind** — it simulates the full L1/L2/L3 hierarchy in software and gives per-function breakdown, which is actually more detailed than perf for our purpose.
-
-**If native Linux:** hardware counters almost always work. If you see permission denied, fix with:
 ```bash
-sudo sysctl kernel.perf_event_paranoid=1
+# COLD (flush page cache first)
+sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+time perf stat -e LLC-load-misses,LLC-loads,stalled-cycles-backend,\
+stalled-cycles-frontend,page-faults,instructions,cycles \
+  ~/kraken2-build/kraken2 --db ~/eskape_db --report /tmp/r.txt ~/barcode02.fastq \
+  > /dev/null 2>&1 | tee ~/luna_perf_cold.txt
+
+# WARM (page cache already hot)
+time perf stat -e LLC-load-misses,LLC-loads,stalled-cycles-backend,\
+stalled-cycles-frontend,page-faults,instructions,cycles \
+  ~/kraken2-build/kraken2 --db ~/eskape_db --report /tmp/r.txt ~/barcode02.fastq \
+  > /dev/null 2>&1 | tee ~/luna_perf_warm.txt
 ```
-Then re-run `perf stat ls` — should show all counters including LLC.
 
----
+**Decision logic:**
+- `page-faults` cold >> warm AND `LLC-load-misses` drops warm → first run is I/O-bound
+- `LLC-load-misses` stays high in warm run → **memory-bound** (RAM latency, not disk) — expected
+- `stalled-cycles-backend` > 60% → confirmed memory-bound
 
-### 0.2 Nsight Systems (for Dorado GPU profiling)
+### Phase B — TMA (Top-Down Microarchitecture Analysis)
 
-Nsight Systems is NVIDIA's free profiling tool for GPU programs. It records a full timeline of GPU kernels, memory transfers, and CPU activity.
+Luna has Sapphire Rapids hardware TMA counters — turns "memory-bound" from inference into hardware fact.
 
-**If Windows/WSL2:**
-- Download the **Windows** installer from `developer.nvidia.com/nsight-systems`
-- Install on Windows (not inside WSL2 — the GPU is on the Windows side)
-- After install, verify in PowerShell:
-```powershell
-nsys --version
-# Should print: NVIDIA Nsight Systems version 2024.x.x
-```
-- You will also get the **Nsight Systems GUI** — a visual timeline viewer. It opens `.nsys-rep` files.
-
-**If native Linux:**
-- Download the **Linux** installer (`.deb` or `.run`) from `developer.nvidia.com/nsight-systems`
-- Install with:
 ```bash
-# If .deb package
-sudo dpkg -i NsightSystems-linux-*.deb
-
-# If .run package
-chmod +x NsightSystems-linux-*.run
-sudo ./NsightSystems-linux-*.run
-
-# Verify
-nsys --version
+perf stat -e tma_retiring,tma_bad_speculation,tma_frontend_bound,tma_backend_bound,\
+tma_memory_bound,tma_core_bound,tma_l1_bound,tma_l2_bound,tma_l3_bound,tma_dram_bound \
+  ~/kraken2-build/kraken2 --db ~/eskape_db --report /dev/null ~/barcode02.fastq \
+  > /dev/null 2>&1 | tee ~/luna_tma.txt
 ```
-- The GUI is included — launch with `nsys-ui` from terminal or find it in your app launcher.
-- Dorado runs natively on Linux, so you can wrap it directly (no WSL needed).
 
-**What to note (beginner):** the version number printed by `nsys --version`. Write it down for the report.
+Expected: `tma_dram_bound` dominant (>50% of stall cycles).
 
----
+### Phase C — cachegrind per-function LLC miss rates
 
-### 0.3 Get Kraken-2 source code (needed for gprof)
-
-gprof requires the program to be compiled with a special flag (`-pg`). Pre-installed Kraken-2 binaries do not have this. You need to build it from source.
-
-**If Windows/WSL2:**
 ```bash
-# Run inside WSL2
-cd ~
-git clone https://github.com/DerrickWood/kraken2.git
-cd kraken2
+# Use smaller input (cachegrind is 10-50x slower)
+head -n 100000 ~/barcode02.fastq > ~/barcode02_small.fastq
 
-# Edit the Makefile — find the CXXFLAGS line and add -pg
-# It currently looks like: CXXFLAGS = -O2 -Wall
-# Change it to:            CXXFLAGS = -O2 -Wall -pg
-nano Makefile
-# (Ctrl+W to search for "CXXFLAGS", add -pg, Ctrl+X then Y to save)
+valgrind --tool=cachegrind \
+  --cachegrind-out-file=~/cg_kraken2.out \
+  --LL=210000000,16,64 \
+  ~/kraken2-build/kraken2 --db ~/eskape_db --report /dev/null ~/barcode02_small.fastq \
+  > /dev/null
 
-# Build
-./install_kraken2.sh ~/kraken2-build
+cg_annotate --auto=yes ~/cg_kraken2.out | head -100 > ~/cachegrind_report.txt
 ```
 
-**If native Linux:**
-Exact same steps — no difference. Just run in your regular terminal:
+**Note:** `--LL=210000000,16,64` simulates Luna's actual 210 MB L3. Run `getconf LEVEL3_CACHE_SIZE` on Luna to verify.
+
+**Expected:** `CompactHashTable::Get()` dominates `DLmr` (LLC data read misses), ~70-85% of total.
+
+### Phase D — Source-line hotspot inside CompactHashTable::Get()
+
 ```bash
-cd ~
-git clone https://github.com/DerrickWood/kraken2.git
-cd kraken2
-nano Makefile   # add -pg to CXXFLAGS line
-./install_kraken2.sh ~/kraken2-build
+# Build with -g (debug symbols) + keep -O2 for realistic profile
+perf record -g --call-graph dwarf -e LLC-load-misses \
+  ~/kraken2-build/kraken2 --db ~/eskape_db --report /dev/null ~/barcode02.fastq > /dev/null
+
+perf annotate --stdio CompactHashTable::Get > ~/perf_annotate_cht.txt
 ```
 
-**What to note (beginner):** whether the build succeeds. If errors appear, copy them — they are almost always a missing library that `apt install` fixes (e.g., `sudo apt install zlib1g-dev`).
+Look for: which exact line (`table_[idx]`? hash computation? probe loop?) has highest sample count.
 
----
+### Phase E — NUMA analysis
 
-## Phase 1 — Dorado Profiling with Nsight Systems (GPU)
-
-### What is Nsight Systems?
-
-Nsight Systems records a **timeline** of everything that happens while your program runs:
-- Which GPU kernels ran, for how long
-- When data moved between CPU RAM and GPU memory
-- What the CPU was doing at the same time
-
-Think of it like a flight recorder for your GPU. After the run it gives you a visual timeline you can zoom into.
-
-### Why does this matter for the project?
-
-Dorado runs a neural network (Transformer) on the GPU. If you find that 80% of time is in attention kernels and only 5% in data transfer — the bottleneck is compute, not I/O. That tells you exactly where a cache would help and where it would not.
-
----
-
-### 1.1 Run Dorado under Nsight Systems
-
-**If Windows/WSL2:**
-Open PowerShell (not WSL — Dorado uses the Windows GPU directly):
-```powershell
-# Set your paths
-$nsys   = "C:\Program Files\NVIDIA Corporation\Nsight Systems 2024.x.x\target-windows-x64\nsys.exe"
-$dorado = "C:\Users\chira\OneDrive\Desktop\Nanopore project\dorado\dorado-1.4.0-win64\bin\dorado.exe"
-$pod5   = "C:\Users\chira\OneDrive\Desktop\Nanopore project\Nanopore project\pod5 data\FBE01990_24778b97_03e50f91_10.pod5"
-$outdir = "C:\Users\chira\OneDrive\Desktop\Nanopore project\Nanopore project\results\nsight"
-
-# Create output folder
-New-Item -ItemType Directory -Force $outdir
-
-# Run Dorado wrapped in nsys
-& $nsys profile `
-    --output "$outdir\dorado_fast_profile" `
-    --trace cuda,nvtx,osrt `
-    --stats true `
-    -- `
-    & $dorado basecaller fast $pod5 --output-dir "$outdir\bam" --batchsize 64
-```
-
-**If native Linux:**
-Open a terminal. Dorado has a Linux binary — download the Linux version from `cdn.oxfordnanoportal.com` if you have not already.
 ```bash
-# Set your paths
-NSYS="nsys"   # nsys is on PATH after install
-DORADO=~/dorado/bin/dorado   # adjust to where you installed it
-POD5=~/data/FBE01990_24778b97_03e50f91_10.pod5   # adjust to your pod5 path
-OUTDIR=~/results/nsight
+numactl --hardware   # check topology
 
-mkdir -p $OUTDIR
+# Default run (may be cross-NUMA)
+/usr/bin/time -v ~/kraken2-build/kraken2 --db ~/eskape_db --report /dev/null ~/barcode02.fastq > /dev/null
 
-# Run Dorado wrapped in nsys
-nsys profile \
-    --output $OUTDIR/dorado_fast_profile \
-    --trace cuda,nvtx,osrt \
-    --stats true \
-    -- \
-    $DORADO basecaller fast $POD5 --output-dir $OUTDIR/bam --batchsize 64
+# NUMA-bound run
+numactl --cpunodebind=0 --membind=0 \
+  ~/kraken2-build/kraken2 --db ~/eskape_db --report /dev/null ~/barcode02.fastq > /dev/null
 ```
 
-Both produce the same output: `dorado_fast_profile.nsys-rep` + a terminal stats summary.
+If speedup > 5% with `numactl`: cross-NUMA traffic is significant → add to Proposal F.
 
-This will:
-1. Run Dorado fast mode (~5 min)
-2. Record everything into `dorado_fast_profile.nsys-rep`
-3. Print a summary table in the terminal when done
+### Phase F — DRAM bandwidth
 
----
-
-### 1.2 What to note — Beginner level
-
-When the run finishes, the terminal prints a stats summary (same on both Windows and Linux):
-```
-Time (%)  Total Time (ns)  Instances  Avg (ns)   Name
---------  ---------------  ---------  ---------  ----
-   xx.x%   xxxxxxxxxx           xxx   xxxxxxxxx  <kernel name>
-   ...
-```
-
-**Note:**
-- The top 3 kernels by time percentage — what are their names?
-- Total runtime of the Dorado run
-- How much time is CUDA kernel execution vs CPU time
-
-**What these mean at beginner level:**
-- High % on one kernel = that kernel is the bottleneck
-- Many small kernels = overhead from launching too many small GPU operations
-
----
-
-### 1.3 What to note — Intermediate level
-
-Open the `.nsys-rep` file in the Nsight Systems GUI.
-
-**If Windows/WSL2:** double-click the `.nsys-rep` file in Explorer — Nsight Systems GUI opens it.
-
-**If native Linux:** run `nsys-ui` from terminal, then File → Open → select the `.nsys-rep` file.
-
-You will see a timeline with multiple rows. Look at:
-
-**Row: CUDA HW (your GPU)**
-- Green blocks = GPU kernels running
-- Gaps between blocks = GPU is idle (bad — CPU is not feeding it fast enough)
-- **Note: what % of time is the GPU actually doing work vs sitting idle?**
-
-**Row: Memory transfers (DtoH / HtoD)**
-- DtoH = Device to Host = GPU → CPU RAM
-- HtoD = Host to Device = CPU RAM → GPU
-- **Note: how much time is spent on memory transfers vs actual computation?**
-- If memory transfer time > 20% of total — memory bandwidth is a bottleneck
-
-**Zoom into a single kernel (click on it):**
-- Duration: how long did one call take?
-- Grid/Block size: how many GPU threads were launched?
-- **Note: the name of the longest single kernel**
-
----
-
-### 1.4 What to note — Advanced level
-
-Run Nsight Compute to get per-kernel throughput metrics.
-
-**If Windows/WSL2:**
-```powershell
-$ncu    = "C:\Program Files\NVIDIA Corporation\Nsight Compute 2024.x.x\ncu.exe"
-$dorado = "C:\Users\chira\OneDrive\Desktop\Nanopore project\dorado\dorado-1.4.0-win64\bin\dorado.exe"
-$pod5   = "C:\Users\chira\OneDrive\Desktop\Nanopore project\Nanopore project\pod5 data\FBE01990_24778b97_03e50f91_10.pod5"
-$outdir = "C:\Users\chira\OneDrive\Desktop\Nanopore project\Nanopore project\results\nsight"
-
-& $ncu --target-processes all `
-    --metrics sm__throughput.avg.pct_of_peak_sustained_elapsed,`
-             dram__throughput.avg.pct_of_peak_sustained_elapsed `
-    --output "$outdir\ncu_report" `
-    -- & $dorado basecaller fast $pod5 --output-dir "$outdir\bam2"
-```
-
-**If native Linux:**
 ```bash
-ncu --target-processes all \
-    --metrics sm__throughput.avg.pct_of_peak_sustained_elapsed,\
-dram__throughput.avg.pct_of_peak_sustained_elapsed \
-    --output ~/results/nsight/ncu_report \
-    -- $DORADO basecaller fast $POD5 --output-dir ~/results/nsight/bam2
+perf stat -e uncore_imc/cas_count_read/,uncore_imc/cas_count_write/ \
+  ~/kraken2-build/kraken2 --db ~/eskape_db --report /dev/null ~/barcode02.fastq > /dev/null
+# CAS events × 64 bytes = total DRAM bytes transferred
 ```
 
-**What to note:**
-- `sm__throughput` — what % of peak GPU compute are you using? (100% = compute-bound, <50% = memory-bound)
-- `dram__throughput` — what % of peak memory bandwidth are you using?
-- These two numbers together tell you if Dorado on your GPU is compute-bound or memory-bound
-
-**Why this matters for Kolin sir's cache:**
-- If memory-bound: a cache that reduces data movement will help a lot
-- If compute-bound: need algorithmic changes, not just caching
+Latency-bound: DRAM utilisation < 30% but LLC miss latency high → LRU cache is the right fix.  
+Bandwidth-bound: DRAM utilisation > 70% → need to reduce data volume (Bloom filter, DB compression).
 
 ---
 
-## Phase 2 — Kraken-2 Profiling (CPU)
+## STEP 3 — K-MER REUSE MEASUREMENT
 
-Three tools, each giving different information. Run all three — they complement each other.
+Validates LRU cache ROI. Run on Luna (or locally):
 
-**If Windows/WSL2:** run everything inside WSL2.
-**If native Linux:** run everything directly in your terminal — no difference in commands.
-
-The only difference is how you get your data files:
-
-**If Windows/WSL2 — copy files from Windows into WSL2:**
 ```bash
-# FASTQ from Dorado output (adjust path to wherever yours is)
-cp "/mnt/c/Users/chira/OneDrive/Desktop/Nanopore project/Nanopore project/results/hac/barcode02.fastq" ~/
-
-# ESKAPE database
-cp -r "/mnt/c/Users/chira/OneDrive/Desktop/Nanopore project/Nanopore project/eskape_db" ~/
+python3 ~/kmer_reuse.py ~/barcode02.fastq 35 > ~/kmer_reuse_results.txt
 ```
 
-**If native Linux — files are already local:**
+Script is at `scripts/kmer_reuse.py` (see full plan for complete 80-line version).
+
+**Expected for barcode02 (100% P. aeruginosa):**
+- P. aeruginosa genome ≈ 6 MB ≈ 5.6M unique 35-mers
+- 104,829 reads × ~350 k-mers/read ≈ 36M total lookups
+- Reuse rate: 36M / 5.6M ≈ **6.4× average** → **~84% of lookups are repeatable from cache**
+- Top-1024 k-mers: captures ~5-15% of lookups (power-law distribution)
+
+---
+
+## STEP 4 — OPTIMISATION PROPOSALS
+
+### Proposal A — Thread-Local LRU Cache ★★★ HIGH PRIORITY
+
+**Target:** CompactHashTable::Get() (67% runtime)  
+**Complexity:** Low (~100 lines)  
+**Expected speedup:** 15–50% runtime reduction  
+**Accuracy risk:** Zero (cache stores exact results from Get())
+
+Direct-mapped cache (power-of-2 size, `key & MASK` addressing — no multiplication):
+
+```cpp
+// src/kmer_cache.h
+template<int CAPACITY = 4096>
+class KmerCache {
+    static_assert((CAPACITY & (CAPACITY-1)) == 0, "must be power of 2");
+    struct Entry { uint64_t key; uint32_t value; bool valid; };
+    std::array<Entry, CAPACITY> table_;
+    static constexpr uint64_t MASK = CAPACITY - 1;
+public:
+    KmerCache() { table_.fill({0, 0, false}); }
+    uint32_t get(uint64_t key) const {
+        auto& e = table_[key & MASK];
+        return (e.valid && e.key == key) ? e.value : UINT32_MAX;
+    }
+    void put(uint64_t key, uint32_t value) {
+        table_[key & MASK] = {key, value, true};
+    }
+};
+```
+
+```cpp
+// In src/classify.cc — wrap CompactHashTable::Get()
+thread_local KmerCache<4096> kmer_cache;  // 4096 × 16 bytes = 64 KB fits in L2
+
+taxid_t get_with_cache(const CompactHashTable &cht, uint64_t minimizer) {
+    uint32_t cached = kmer_cache.get(minimizer);
+    if (cached != UINT32_MAX) return static_cast<taxid_t>(cached);
+    taxid_t result = cht.Get(minimizer);
+    kmer_cache.put(minimizer, result);
+    return result;
+}
+```
+
+`thread_local` eliminates all locking — each thread has its own cache, no synchronisation needed.
+
+**Benchmark:** cache sizes 1024, 2048, 4096, 8192, 16384 on Luna with warm DB.
+
+---
+
+### Proposal B — Sequential ESKAPE Query Pipeline ★★★ HIGH PRIORITY
+
+**Target:** Reduce active DB size to fit in Luna's L3  
+**Complexity:** Medium (DB build scripts + shell wrapper)  
+**Expected speedup:** 3–5× for dominant-species samples; same as baseline worst case  
+**Accuracy risk:** Medium (shared k-mers; needs validation)
+
+**The cache math:** 650 MB ESKAPE DB ÷ 6 pathogens ≈ **108 MB per pathogen < 210 MB L3**.  
+After first read, subsequent lookups hit L3 (10 ns) instead of DRAM (100 ns) → **10× per-lookup speedup**.
+
+Order pathogens by clinical prevalence from AIIMS data: P. aeruginosa first (dominates barcodes 01-07, 14).
+
 ```bash
-# Just set variables pointing to where your files are
-FASTQ=~/data/barcode02.fastq      # adjust to your path
-DB=~/data/eskape_db               # adjust to your path
+for pathogen in p_aeruginosa k_pneumoniae s_aureus e_faecium a_baumannii e_cloacae; do
+    ~/kraken2-build/kraken2 --db ~/eskape_db_${pathogen} \
+        --report /tmp/report_${pathogen}.txt $INPUT > /dev/null
+    top_pct=$(awk '$4=="S" {print $1}' /tmp/report_${pathogen}.txt | sort -rn | head -1)
+    if (( $(echo "$top_pct > 80" | bc -l) )); then
+        echo "DOMINANT: $pathogen ($top_pct%)"; break
+    fi
+done
 ```
 
-All commands below use `~/barcode02.fastq` and `~/eskape_db` — adjust if your paths differ.
+**Accuracy validation required:** compare per-read classification between combined DB and sequential pipeline on all 14 AIIMS barcodes. Acceptable: dominant species call matches, confidence within ±2%.
 
 ---
 
-## Tool A — gprof (Call Graph Profiling)
+### Proposal D — Batch Prefetch Pipelining ★★★ HIGH IMPACT
 
-### What is gprof?
+**Target:** Hide DRAM latency (100 ns) by issuing prefetch for N k-mers before fetching any result  
+**Complexity:** Medium (~50 lines; requires modifying classification loop)  
+**Expected speedup:** 1.34–2.68× total (2–4× on CompactHashTable::Get())  
+**Accuracy risk:** Zero
 
-gprof tells you: **which functions in Kraken-2 take the most CPU time.**
+```cpp
+const int BATCH = 8;
 
-Think of it as a stopwatch attached to every function. After the run it prints a table like:
+void ClassifyBatch(const CompactHashTable &cht,
+                   const uint64_t *minimizers, int n, taxid_t *results) {
+    uint64_t table_idxs[BATCH];
+    // Stage 1: issue all prefetches
+    for (int i = 0; i < n; i++) {
+        table_idxs[i] = minimizers[i] % cht.size_;
+        __builtin_prefetch(&cht.table_[table_idxs[i]], 0, 0);
+    }
+    // Stage 2: perform lookups (memory may already be in cache)
+    for (int i = 0; i < n; i++) {
+        results[i] = cht.GetByIndex(table_idxs[i], minimizers[i]);
+    }
+}
 ```
-  %   cumulative   self              self     total
- time   seconds   seconds    calls   ms/call  ms/call  name
- 60.00      3.60     3.60  1234567     0.00     0.00  lookup_kmer_in_db
- 20.00      4.80     1.20   104478     0.01     0.01  hash_kmer
- ...
-```
 
-That tells you: 60% of Kraken-2's time is in `lookup_kmer_in_db`. That is where you focus.
-
-### What it helps in the project
-
-If `lookup_kmer_in_db` is the hotspot — that is exactly where Kolin sir's Hot-K-mer LRU cache sits. The gprof output is the justification for building that cache.
+Requires accumulating BATCH minimizers from MinimizerScanner before calling Get(). Complementary to Proposal A — prefetch benefits cache misses that Proposal A doesn't catch.
 
 ---
 
-### A.1 Run gprof
+### Proposal E — Single-Line Prefetch in Get() ★ LOW COMPLEXITY
 
-**If Windows/WSL2 — run inside WSL2:**
+**Target:** Issue prefetch at start of Get() to reduce first-access latency  
+**Complexity:** 1 line  
+**Expected speedup:** 2–8% total
+
+```cpp
+taxid_t CompactHashTable::Get(uint64_t key) const {
+    uint64_t idx = key % size_;
+    __builtin_prefetch(&table_[idx], 0, 1);  // ← add this line
+    // rest of probe loop unchanged
+    ...
+}
+```
+
+Unlike matrix-multiply (where hardware prefetcher already handles sequential access), Kraken-2's random access defeats the hardware prefetcher → software prefetch is NOT redundant here.
+
+---
+
+### Proposal F — NUMA Binding ★ ZERO CODE
+
+**Target:** Eliminate cross-NUMA memory latency (+40 ns per miss)  
+**Complexity:** Zero (command-line flag)  
+**Expected speedup:** 5–20% on Luna (dual-socket)
+
 ```bash
-# Make sure you built Kraken-2 with -pg (Phase 0.3)
-# Make sure barcode02.fastq and eskape_db are copied to ~/ (see Phase 2 intro above)
-
-# Run Kraken-2 — the -pg build automatically generates gmon.out
-~/kraken2-build/kraken2 \
-    --db ~/eskape_db \
-    --report ~/kraken2_report.txt \
-    ~/barcode02.fastq \
-    > ~/kraken2_output.kraken
-
-# Generate the gprof report
-gprof ~/kraken2-build/kraken2 gmon.out > ~/gprof_report.txt
-
-# View it
-less ~/gprof_report.txt
+numactl --cpunodebind=0 --membind=0 \
+    ~/kraken2-build/kraken2 --db ~/eskape_db ~/barcode02.fastq > output.kraken
 ```
 
-**If native Linux — same commands, just run in your terminal:**
-```bash
-# Same — just make sure paths point to your files
-~/kraken2-build/kraken2 \
-    --db ~/eskape_db \
-    --report ~/kraken2_report.txt \
-    ~/barcode02.fastq \
-    > ~/kraken2_output.kraken
-
-gprof ~/kraken2-build/kraken2 gmon.out > ~/gprof_report.txt
-less ~/gprof_report.txt
-```
-
-No difference between WSL2 and Linux for this tool.
+Verify by measuring wall time with and without `numactl` on Luna.
 
 ---
 
-### A.2 What to note — Beginner level
+### Proposal G — Bloom Filter Pre-Screen ★★ MEDIUM PRIORITY
 
-Look at the **Flat Profile** section at the top of `gprof_report.txt`:
-```
-Flat profile:
-Each sample counts as 0.01 seconds.
-  %   cumulative   self     ...   name
- time   seconds   seconds  ...
- XX.X      X.XX     X.XX   ...   function_name
-```
+**Target:** Skip hash table lookups for k-mers not in DB (reduces misses for unclassified reads)  
+**Complexity:** Medium (build filter at DB construction, load and query in classify.cc)
 
-**Note:**
-- Top 5 functions by % time
-- The total runtime (`cumulative seconds` on the last line)
-- What is the single biggest function?
+**Impact on barcodes 09-12 (50-60% unclassified):** eliminates 50-60% of hash table lookups.
+
+XOR filter (1.23 bits/key) for 47M entries = ~57.8 MB — fits in Luna's 210 MB L3.  
+Standard Bloom filter at 1% FP rate requires ~329 MB — too large for L3.
 
 ---
 
-### A.3 What to note — Intermediate level
+### Proposal C — MinimizerScanner SIMD Vectorisation ★★ RESEARCH TIER
 
-Look at the **Call Graph** section below the flat profile.
+**Target:** MinimizerScanner::NextMinimizer() (18.74% runtime, 354M calls)  
+**Hardware:** AVX-512 on Luna (8× uint64_t per instruction), AVX2 on Ryzen (4×)
 
-It shows for each function: who called it, how many times, how long each call took.
-```
-index  % time   self  children  called  name
-                0.36    2.89  1234567  lookup_kmer_in_db [1]
-                0.00    0.00  1234567      hash_kmer [3]
-```
+Process 4–8 minimizer windows in parallel per iteration. If Kraken-2 uses ntHash, a vectorized ntHash library (with published AVX2 implementation) may be a near-drop-in replacement.
 
-**Note:**
-- `self` = time spent inside the function itself
-- `children` = time spent in functions it called
-- `called` = number of times it was called
-- **If a function has very high `called` count and even small `self` time — it is a hot loop**
-
-**Calculate:** `self_seconds / called` = average time per call. If this is tiny (microseconds) but called millions of times — that inner loop is where SIMD would help.
+Expected: 2–4× speedup on the scanning function → **~4-8% total pipeline improvement**.
 
 ---
 
-### A.4 What to note — Advanced level
+### Proposal I — Learned Index (Research Horizon)
 
-Find the k-mer lookup function in the call graph. Note:
-- How many times is it called? (should be ~35 × number of reads × avg read length)
-- What is `self` time vs `children` time?
-- Is the hash function itself a significant fraction?
-
-Cross-reference with cachegrind (Tool B) — if the lookup function has high cache miss rate AND appears at top of gprof — you have confirmed the bottleneck with two independent tools. That is strong evidence for the report.
+Replace CompactHashTable with a small neural network (Kraska et al. 2017 SIGMOD) that maps minimizer hash → table position. Learned index for 47M entries ≈ 1-10 MB (fits in L3). Reduces random DRAM jumps from O(probe_length) to near O(1). Publishable result if it outperforms LRU cache.
 
 ---
 
-## Tool B — Valgrind / Cachegrind (Cache Miss Analysis)
+## STEP 5 — IMPLEMENTATION TIMELINE
 
-### What is Cachegrind?
-
-Cachegrind simulates the CPU cache and counts every cache miss your program causes.
-
-A **cache miss** happens when the CPU needs data that is not in the fast L1/L2/L3 cache — it has to go to slow RAM. For Kraken-2, looking up a k-mer in a 180 GB hash table causes massive cache misses because the data is scattered randomly across memory.
-
-Think of it like this: L1 cache access = 1 ns. RAM access = 100 ns. If Kraken-2 misses cache on every k-mer lookup, it is 100x slower than it could be.
-
-### What it helps in the project
-
-Cachegrind gives you the **exact cache miss count per function**. If `lookup_kmer_in_db` has 10 million LLC (Last Level Cache) misses — that number goes directly into the profiling report and justifies building a cache.
-
----
-
-### B.1 Run Cachegrind
-
-**If Windows/WSL2 — run inside WSL2:**
-```bash
-# Warning: Valgrind runs 10-50x slower than normal — that is expected
-# Use a single barcode FASTQ (small input) to keep runtime under 10-15 min
-
-valgrind \
-    --tool=cachegrind \
-    --cachegrind-out-file=~/cachegrind.out \
-    ~/kraken2-build/kraken2 \
-        --db ~/eskape_db \
-        --report ~/kraken2_report_cg.txt \
-        ~/barcode02.fastq \
-        > ~/kraken2_output_cg.kraken
-
-# Generate the human-readable report
-cg_annotate ~/cachegrind.out > ~/cachegrind_report.txt
-
-# View it
-less ~/cachegrind_report.txt
-```
-
-**If native Linux — same commands, same output:**
-```bash
-valgrind \
-    --tool=cachegrind \
-    --cachegrind-out-file=~/cachegrind.out \
-    ~/kraken2-build/kraken2 \
-        --db ~/eskape_db \
-        --report ~/kraken2_report_cg.txt \
-        ~/barcode02.fastq \
-        > ~/kraken2_output_cg.kraken
-
-cg_annotate ~/cachegrind.out > ~/cachegrind_report.txt
-less ~/cachegrind_report.txt
-```
-
-No difference between WSL2 and Linux for this tool.
-
----
-
-### B.2 What to note — Beginner level
-
-At the top of `cachegrind_report.txt` you will see a summary:
-```
-I   refs:      xxx,xxx,xxx        (instructions executed)
-I1  misses:    xxx,xxx            (L1 instruction cache misses)
-LLi misses:    xxx,xxx            (Last-level instruction cache misses)
-D   refs:      xxx,xxx,xxx        (data reads+writes)
-D1  misses:    xxx,xxx,xxx        (L1 data cache misses)
-LLd misses:    xxx,xxx,xxx        (Last-level data cache misses — THIS IS THE KEY NUMBER)
-LL  misses:    xxx,xxx,xxx        (total last-level cache misses)
-```
-
-**Note:**
-- `LLd misses` — Last Level Data cache misses. This is the most important number.
-- `LLd miss rate` = LLd misses / D refs × 100%. Write this down.
-- A miss rate above 5% is high. Above 20% is severe.
-
----
-
-### B.3 What to note — Intermediate level
-
-Below the summary, cachegrind lists miss counts **per function**, annotated with source lines.
-```
-         Ir    I1mr   ILmr    Dr    D1mr   DLmr    Dw    D1mw   DLmw   file:function
-xxx,xxx,xxx       0      0   xxx   x,xxx  x,xxx     xx      0      0   kraken2.cpp:lookup_kmer
-```
-
-**Note:**
-- `DLmr` — data reads that missed the last-level cache
-- `DLmw` — data writes that missed the last-level cache
-- Find which function has the highest `DLmr` count
-- **That function is where you have a memory access pattern problem**
-
----
-
-### B.4 What to note — Advanced level
-
-Cachegrind also shows **line-level annotation** — it points to the exact line of code causing misses.
-
-**Both WSL2 and Linux — same command:**
-```bash
-cg_annotate --auto=yes ~/cachegrind.out > ~/cachegrind_annotated.txt
-less ~/cachegrind_annotated.txt
-```
-
-Find the inner loop of the k-mer lookup. It will show which line is causing cache misses.
-
-**What to look for:**
-- Is the miss happening on the hash table read (`table[hash % size]`)? — classic random access miss
-- Is it happening on the k-mer string itself? — data layout issue
-- If the hash table access is the culprit — this is exactly what blocking and caching fixes
-
-**Cross-reference with gprof:** same function, high time in gprof + high cache misses in cachegrind = confirmed bottleneck.
-
----
-
-## Tool C — perf (Hardware Counters)
-
-### What is perf?
-
-perf reads the CPU's built-in hardware performance counters — tiny registers that count events like cache misses, branch mispredictions, and instructions per cycle.
-
-Unlike Valgrind (which simulates the cache), perf reads the actual hardware — real numbers from real execution.
-
-**Key difference between WSL2 and Linux here:**
-- **Native Linux:** hardware counters almost always work — you get the full picture including `LLC-loads` and `LLC-load-misses`.
-- **Windows/WSL2:** `linux-tools-generic` does not cover the Microsoft custom kernel. The fix is to build perf from the WSL2 kernel source (see Phase 0.1 for full instructions — we did this). After building: `cycles`, `instructions`, `cache-misses`, `cache-references`, `branches`, and `branch-misses` all work. `LLC-loads` and `LLC-load-misses` show `<not supported>` because Hyper-V does not expose those specific PMU counters to the VM. Use cachegrind for per-function LLC data instead.
-
----
-
-### C.1 Try running perf
-
-**Both WSL2 and Linux — same command to test:**
-```bash
-perf stat -e cache-misses,LLC-load-misses,instructions,cycles \
-    ~/kraken2-build/kraken2 \
-        --db ~/eskape_db \
-        --report ~/kraken2_report_perf.txt \
-        ~/barcode02.fastq \
-        > /dev/null
-```
-
-**Outcome A — hardware counters work (likely on native Linux, possible on WSL2):**
-```
-Performance counter stats:
-
-    10,234,567    cache-misses
-     8,123,456    LLC-load-misses
- 1,234,567,890    instructions
-   456,789,012    cycles
-
-       3.456789 seconds time elapsed
-```
-→ Note all numbers. This is the best possible output.
-
-**Outcome B — hardware counters blocked (common on WSL2):**
-```
-Error: The sys_perf_event_open() syscall returned with 1 (Operation not permitted)
-```
-→ Fall back to software events — these always work on both WSL2 and Linux:
-```bash
-perf stat -e task-clock,page-faults,context-switches \
-    ~/kraken2-build/kraken2 \
-        --db ~/eskape_db \
-        --report ~/kraken2_report_perf.txt \
-        ~/barcode02.fastq \
-        > /dev/null
-```
-`task-clock` = CPU time used. `page-faults` = how many times data had to be loaded from disk.
-
-**If native Linux and still getting permission denied:**
-```bash
-# One-time fix — lower the paranoia level
-sudo sysctl kernel.perf_event_paranoid=1
-# Then retry the perf stat command above
-```
-
----
-
-### C.2 What to note — Beginner level
-
-Whichever outcome you get, note:
-- Total wall-clock time (`seconds time elapsed`)
-- If hardware counters work: `cache-misses` and `LLC-load-misses` counts
-- If only software events: `page-faults` count (high page faults = DB not fitting in RAM, disk reads happening)
-- **Note whether you got hardware or software events** — this goes in the report as a setup detail
-
----
-
-### C.3 What to note — Intermediate level
-
-If hardware perf works (native Linux most likely), calculate:
-
-**Cache miss rate:**
-```
-LLC miss rate = LLC-load-misses / instructions × 100
-```
-Above 1% is notable. Above 5% is severe for a lookup-heavy program like Kraken-2.
-
-**Instructions per cycle (IPC):**
-```
-IPC = instructions / cycles
-```
-IPC < 1.0 = memory-bound (CPU is stalling waiting for data to arrive from RAM)
-IPC > 2.0 = compute-bound (CPU is doing lots of arithmetic)
-
-**Note both numbers — they directly classify the bottleneck.**
-
----
-
-### C.4 What to note — Advanced level
-
-Use `perf record` for line-level hotspots.
-
-**Both WSL2 and Linux — same command (works better on native Linux):**
-```bash
-perf record -g \
-    ~/kraken2-build/kraken2 \
-        --db ~/eskape_db \
-        --report /dev/null \
-        ~/barcode02.fastq \
-        > /dev/null
-
-perf report
-```
-
-This opens an interactive view. Navigate with arrow keys, press `a` to annotate source lines.
-
-**Note:** the top 3 source lines by sample count. These are where SIMD/blocking changes would land.
-
-**If on WSL2 and `perf record` fails:** skip this step — cachegrind already gives line-level data via `cg_annotate --auto=yes`.
-
----
-
-## Phase 3 — Making Sense of the Numbers
-
-After running all tools, you will have:
-
-| Number | Source | What it tells you |
+| Phase | Dates | Tasks |
 |---|---|---|
-| Top 3 hotspot functions | gprof flat profile | Where Kraken-2 spends its time |
-| LLd miss rate (%) | cachegrind summary | How often it waits for RAM |
-| Exact lines causing misses | cachegrind annotated | Where to apply blocking/caching |
-| LLC-load-misses count | perf (if hardware works) | Hardware confirmation of cache misses |
-| IPC | perf (if hardware works) | Memory-bound vs compute-bound verdict |
-| Top GPU kernels (%) | Nsight Systems | Where Dorado spends GPU time |
-| Memory transfer % | Nsight Systems | Is GPU starved of data? |
-| SM throughput % | Nsight Compute | Is GPU at compute capacity? |
+| **Phase 0** (now) | 2026-05-28 to 05-31 | Source study, Luna profiling A-F, k-mer reuse, fill report |
+| **Phase 1** | June 1–7 | Proposal F (numactl, 0 code) → Proposal E (1-line prefetch) → Proposal A (LRU cache) |
+| **Phase 2** | June 8–21 | Proposal D (batch prefetch) → Proposal B (sequential ESKAPE, accuracy validation) → Proposal G (Bloom filter) |
+| **Phase 3+** | June 22+ | Proposal C (SIMD) → Proposal H (DB partitioning) → Proposal I (learned index) |
 
 ---
 
-### How to read the verdict
-
-**If Kraken-2 is memory-bound (IPC < 1, LLd miss rate > 10%):**
-→ Kolin sir's Hot-K-mer LRU cache is the right fix
-→ Reducing DB size (Bloom filters) also helps
-→ Cache blocking on hash table access is worth trying
-
-**If Kraken-2 is compute-bound (IPC > 2, low miss rate):**
-→ SIMD / AVX2 on the hash function is the right fix
-→ Caching helps less
-
-**If Dorado is memory-bound (SM throughput < 50%, high DtoH/HtoD time):**
-→ Signal-to-Base cache in CUDA shared memory is the right fix
-
-**If Dorado is compute-bound (SM throughput > 80%):**
-→ Need algorithmic changes — cache alone won't help much
-
----
-
-## Phase 4 — The 2-Page Report Structure
-
-```
-Page 1: Kraken-2 CPU Profile
-  - Setup: WSL2 or Linux, Kraken-2 built from source with -pg,
-           ESKAPE DB (650 MB), barcode02.fastq input, note if perf gave hardware or software events
-  - gprof results: top 5 functions + % time table
-  - cachegrind results: LLd miss rate + top miss-causing functions
-  - perf results: IPC + LLC miss count (or page-faults if hardware counters unavailable)
-  - Verdict: memory-bound or compute-bound, with the numbers
-
-Page 2: Dorado GPU Profile
-  - Setup: Windows or Linux, GPU model + VRAM, fast mode, 104k reads
-  - Nsight Systems: top 3 kernels + % time, memory transfer %
-  - SM throughput + DRAM throughput (from Nsight Compute if run)
-  - Verdict: where GPU time goes, memory or compute bound
-  - Connection to cache: what % of time a cache could theoretically recover
-```
-
----
-
-## Quick Reference — Command Cheatsheet
+## STEP 6 — VALIDATION PROTOCOL
 
 ```bash
-# === Kraken-2 profiling (WSL2 or native Linux — same commands) ===
-
-# gprof
-~/kraken2-build/kraken2 --db ~/eskape_db --report ~/report.txt ~/barcode02.fastq > /dev/null
-gprof ~/kraken2-build/kraken2 gmon.out > ~/gprof_report.txt
-
-# cachegrind
-valgrind --tool=cachegrind --cachegrind-out-file=~/cg.out \
-    ~/kraken2-build/kraken2 --db ~/eskape_db --report ~/report.txt ~/barcode02.fastq > /dev/null
-cg_annotate --auto=yes ~/cg.out > ~/cachegrind_report.txt
-
-# perf — try hardware first
-perf stat -e cache-misses,LLC-load-misses,instructions,cycles \
-    ~/kraken2-build/kraken2 --db ~/eskape_db --report ~/report.txt ~/barcode02.fastq > /dev/null
-
-# perf — fallback software events (always works)
-perf stat -e task-clock,page-faults,context-switches \
-    ~/kraken2-build/kraken2 --db ~/eskape_db --report ~/report.txt ~/barcode02.fastq > /dev/null
-
-# perf hotspots (native Linux recommended)
-perf record -g ~/kraken2-build/kraken2 --db ~/eskape_db --report ~/report.txt ~/barcode02.fastq > /dev/null
-perf report
+# 5 runs, cold cache each time
+for i in {1..5}; do
+    sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+    /usr/bin/time -v ~/kraken2-build/kraken2 \
+        --db ~/eskape_db --report /tmp/report_${i}.txt ~/barcode02.fastq \
+        > /dev/null 2>&1 | grep "wall clock" >> timing_${version}.txt
+done
 ```
 
-```powershell
-# === Dorado profiling — Windows/WSL2 (run in PowerShell) ===
+**Metrics per run:** wall time, LLC-load-misses, stalled-cycles-backend, cache hit rate (from instrumented build), classification accuracy (diff report files).
 
-nsys profile --output results\nsight\dorado_fast_profile --trace cuda,nvtx,osrt --stats true `
-    -- dorado.exe basecaller fast "pod5 data\file.pod5" --output-dir results\nsight\bam
-
-ncu --metrics sm__throughput.avg.pct_of_peak_sustained_elapsed,dram__throughput.avg.pct_of_peak_sustained_elapsed `
-    --output results\nsight\ncu_report `
-    -- dorado.exe basecaller fast "pod5 data\file.pod5" --output-dir results\nsight\bam2
-```
-
+**Accuracy check:**
 ```bash
-# === Dorado profiling — native Linux (run in terminal) ===
-
-nsys profile \
-    --output ~/results/nsight/dorado_fast_profile \
-    --trace cuda,nvtx,osrt \
-    --stats true \
-    -- ~/dorado/bin/dorado basecaller fast ~/data/file.pod5 --output-dir ~/results/nsight/bam
-
-ncu \
-    --metrics sm__throughput.avg.pct_of_peak_sustained_elapsed,dram__throughput.avg.pct_of_peak_sustained_elapsed \
-    --output ~/results/nsight/ncu_report \
-    -- ~/dorado/bin/dorado basecaller fast ~/data/file.pod5 --output-dir ~/results/nsight/bam2
+diff baseline.kraken optimized.kraken  # expect zero diff for Proposals A/D/E/F
 ```
 
 ---
 
-## What Order to Do This In
+## FILES TO CREATE / MODIFY
 
-```
-Day 1 (Setup):
-  [x] Windows/WSL2: install Nsight Systems on Windows, verify nsys --version
-  [x] WSL2: build perf from WSL2-Linux-Kernel source (see §15.3)
-  [x] Clone Kraken-2, edit Makefile to add -pg to CXXFLAGS, build with install_kraken2.sh
-  [x] Copy barcode02.fastq and eskape_db into WSL2
-  [x] Test: kraken2 runs without profiling tools
-
-Day 2 (Dorado profiling):
-  [x] Run Dorado fast mode under nsys — GEMM = 82% of GPU time
-  [x] Top 3 kernels identified (Tensor Core GEMM dominant)
-  [x] cudaStreamSynchronize = 98.9% of CUDA API time
-  [x] Written up in report.md (GPU section)
-
-Day 3 (Kraken-2 profiling):
-  [x] gprof: CompactHashTable::Get() = 67%, 9.87M calls — confirmed hotspot
-  [x] perf stat (WSL2): 34.24% cache miss rate, 301M misses — memory-bound
-  [x] AMD uProf (local): IPC = 0.55 — accurate (Hyper-V doesn't distort native profiler)
-  [x] Written up in report.md (CPU section)
-
-Day 4 (Report):
-  [x] Combine into 2-page report (report1.md) + full report (report.md)
-  [x] Pushed to GitHub
-  [x] Presented to Kolin sir 2026-05-26
-
-Day 5 (Matrix multiply benchmarks):
-  [x] Built 12 C implementations (naive_ijk through prefetch_ikj)
-  [x] perf stat at N=1024, 2048, 10000 — 22 result files
-  [x] Key findings documented in All_Matric_Mul_perf_stats/PERF_REPORT.md
-  [x] omp_tiled winner (112s at N=10000), prefetch_ikj paradox confirmed
-
-Day 6 (Lab server setup):
-  [x] Luna access confirmed — perf_event_paranoid=1, hardware counters work
-  [x] Luna_vs_Minerva.md comparison written
-  [x] Luna/user_management.md written (student account guide)
-  [x] All Luna docs in Luna/ directory
-
-Next steps:
-  [ ] Re-run matmul on Luna — accurate IPC (no Hyper-V), compare Intel vs AMD
-  [ ] Run Kraken-2 perf + gprof + TMA on Luna — confirm IPC, get real LLC miss rate
-  [ ] Run cachegrind on Luna for per-function LLC miss rates (Minerva disk full)
-  [ ] Run `perf record` / `perf report` for source-line hotspot inside CompactHashTable::Get()
-  [ ] Measure k-mer reuse distribution from barcode02.fastq — quantify actual hit rate potential
-  [ ] Distinguish memory-bound vs I/O-bound (page fault analysis, DRAM bandwidth via numactl/perf mem)
-  [ ] Propose 2–3 concrete optimisation ideas with complexity + speedup estimates
-  [ ] Write kraken2_optimisation_report.md → push to GitHub (due 2026-05-31)
-  [ ] Run Nsight Compute on Dorado GEMM kernel on Luna L40S (deprioritised — after Kraken-2 work)
+| File | Action |
+|---|---|
+| `plan_old.md` | ← was `plan.md` (done) |
+| `plan.md` | ← this file (done) |
+| `kraken2_optimisation_report.md` | Fill sections 2–5 from Luna results (due 2026-05-31) |
+| `scripts/kmer_reuse.py` | Create — k-mer reuse analysis script |
+| `scripts/sequential_eskape.sh` | Create — sequential ESKAPE pipeline wrapper |
+| `src/kmer_cache.h` | Create — Proposal A LRU cache class |
+| `src/classify.cc` | Modify — wrap Get() with cache (Proposal A) |
+| `src/compact_hash.cc` | Modify — add prefetch call (Proposal E) |
+| `src/compact_hash.h` | Modify — expose GetByIndex() for Proposal D |
 
 ---
 
-## Summer 2026 Direction (decided 2026-05-28, Meeting 4)
+## IMMEDIATE ACTIONS (2026-05-28 to 05-30)
 
-**Primary focus: Kraken-2 optimisation only.**
-Dorado / GPU work is deprioritised until Kraken-2 work is complete.
+- [ ] SSH to Luna, run Phase A (perf stat cold/warm)
+- [ ] Run Phase B (TMA)
+- [ ] Run Phase C (cachegrind with `--LL=210000000,16,64`)
+- [ ] Run Phase D (perf record + source annotation)
+- [ ] Run Phase E (NUMA numactl comparison)
+- [ ] Run Phase F (DRAM bandwidth via uncore_imc)
+- [ ] Run k-mer reuse script on barcode02.fastq (k=35)
+- [ ] Read compact_hash.h, compact_hash.cc, classify.cc (annotate answers to 8 questions above)
+- [ ] Fill result tables in `kraken2_optimisation_report.md`
+- [ ] Push complete report to GitHub by 2026-05-31
 
-### Work split
+---
 
-| Team | Task | Deadline |
-|---|---|---|
-| Chirag K + Chirag S | Deep Kraken-2 analysis + 2–3 optimisation proposals | 2026-05-31 |
-| Rohit + Rishabh | SNN (spiking neural network) approach for Dorado basecalling | TBD — research phase |
+## RESEARCH POSITIONING
 
-### 3-day deliverable (Chirag K + Chirag S, due 2026-05-31)
+**Novel contributions (not published):**
+1. Hot-K-mer LRU cache for Kraken-2 clinical metagenomics (non-uniform access exploited)
+2. Sequential ESKAPE pipeline exploiting Luna's 210 MB L3 to fit per-pathogen DB
+3. Batch prefetch pipelining for compact hash table in bioinformatics context
+4. TMA-based profiling of Kraken-2 on Sapphire Rapids (hardware characterisation)
 
-The skeleton is in `kraken2_optimisation_report.md`. Sections to complete:
+**Academic framing:**
+> "We show that clinical metagenomics samples exhibit a highly non-uniform k-mer access distribution — one species dominates — enabling a lightweight thread-local cache to recover 15-50% of runtime lost to cache misses in Kraken-2's compact hash table. We further demonstrate that per-species database partitioning allows the active database slice to fit in modern server L3 caches (Luna: 210 MB L3 vs 108 MB per-pathogen DB), reducing per-lookup latency from DRAM (~100 ns) to L3 (~10 ns) for dominant-species queries."
 
-1. **Deeper profiling** — run on Luna (not WSL2):
-   - `perf stat` with LLC-load-misses, stalled-cycles-backend, DRAM bandwidth counters
-   - `perf record` + `perf report` → source-line hotspot inside `CompactHashTable::Get()`
-   - `cachegrind` → per-function LLC miss rates
-   - `numactl --hardware` → confirm NUMA topology; `perf mem` for memory access latency breakdown
+**Target venues:** ISMB, RECOMB, Bioinformatics journal, FAST/EuroSys.
 
-2. **Memory-bound vs I/O-bound distinction**
-   - Page fault count from perf (high = I/O-bound, reading from disk)
-   - DRAM bandwidth utilisation (are we saturating the memory bus?)
-   - If DRAM BW saturated → memory-bound; if page faults dominate → I/O-bound
+---
 
-3. **K-mer reuse measurement**
-   - Parse barcode02.fastq → extract all 35-mers → count duplicates
-   - Compute hit rate if top-N k-mers were cached
-   - This validates or invalidates the LRU cache ROI estimate
-
-4. **2–3 concrete optimisation proposals**
-   - Idea A: Sequential ESKAPE query pipeline (query E, S, K, A, P, E one-by-one; short-circuit)
-   - Idea B: Hot-k-mer LRU cache — pin top-K frequent k-mers from clinical distribution
-   - Idea C: (TBD from deeper profiling)
-   - Each idea: algorithm description, implementation complexity, expected speedup estimate
-```
+*Full plan with complete code, derivations, and professor-verifiable analysis: `C:\Users\chira\.claude\plans\snappy-plotting-fox.md`*  
+*Previous plan (baseline profiling, gprof/cachegrind commands, matmul study): `plan_old.md`*
