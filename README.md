@@ -157,7 +157,9 @@ Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all u
 
 ```
 ├── README.md                    ← this file
-├── final_report.md              ← ★ single consolidated report — all numbers, meeting-ready
+├── final_report.md              ← single consolidated report — all numbers, meeting-ready
+├── tables_and_graphs.md         ← all stats with Mermaid pie/bar charts (renders on GitHub)
+├── tables_and_graphs_basic.md   ← same stats, plain ASCII bars (works everywhere)
 ├── report.md                    ← full narrative report with commands + failures (historical)
 ├── report1.md                   ← original 2-page profiling report (historical)
 ├── knowledge_base.md            ← deep-dive notes on everything (§0–§21)

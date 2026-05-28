@@ -9,12 +9,12 @@
 
 | Limitation on WSL2 | Status on Luna |
 |---|---|
-| IPC unreliable (Hyper-V throttles cycles) | ✓ **Accurate IPC** |
-| `LLC-load-misses` = not supported | ✓ **Works** |
-| `stalled-cycles-backend` = not supported | ✓ **Works** |
-| TMA metrics unavailable | ✓ **Full TMA (Sapphire Rapids)** |
-| NUMA analysis impossible | ✓ **2-socket NUMA available** |
-| AVX-512 not on Ryzen | ✓ **AVX-512 + AMX** |
+| IPC unreliable (Hyper-V throttles cycles) |  **Accurate IPC** |
+| `LLC-load-misses` = not supported |  **Works** |
+| `stalled-cycles-backend` = not supported |  **Works** |
+| TMA metrics unavailable |  **Full TMA (Sapphire Rapids)** |
+| NUMA analysis impossible |  **2-socket NUMA available** |
+| AVX-512 not on Ryzen |  **AVX-512 + AMX** |
 
 ---
 

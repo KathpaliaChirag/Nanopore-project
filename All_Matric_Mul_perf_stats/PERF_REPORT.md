@@ -8,7 +8,7 @@
 
 ---
 
-## ⚠️ IPC Reliability Warning (Read First)
+##  IPC Reliability Warning (Read First)
 
 **The IPC values in this report are unreliable and must NOT be treated as ground truth.**
 
@@ -18,14 +18,14 @@ This is the same issue documented for the Kraken-2 and Dorado profiling runs (se
 
 | Counter | Status in WSL2 | Notes |
 |---|---|---|
-| `instructions` | ✓ Correct | Hardware PMU counter, not throttled |
-| `cycles` | ✗ Wrong | ~7–23% of real — Hyper-V throttles this |
-| **IPC = insn/cycles** | ✗ Wrong | Inflated by 4–14× |
-| `cache-misses`, `cache-references` | ✓ Correct | Real PMU event, ratio-safe |
-| `task-clock` wall ms | ✓ Correct | OS software timer |
-| `L1-dcache-loads/misses` | ✓ Correct | Real PMU event |
-| `L2/L3 request counts` | ✓ Correct | Real PMU event |
-| `branch-misses` | ✓ Correct | Ratio of two real PMU events |
+| `instructions` |  Correct | Hardware PMU counter, not throttled |
+| `cycles` |  Wrong | ~7–23% of real — Hyper-V throttles this |
+| **IPC = insn/cycles** |  Wrong | Inflated by 4–14× |
+| `cache-misses`, `cache-references` |  Correct | Real PMU event, ratio-safe |
+| `task-clock` wall ms |  Correct | OS software timer |
+| `L1-dcache-loads/misses` |  Correct | Real PMU event |
+| `L2/L3 request counts` |  Correct | Real PMU event |
+| `branch-misses` |  Correct | Ratio of two real PMU events |
 
 **Safe to compare:** wall time, cache miss counts, L1/L2/L3 miss rates, branch miss %.  
 **On Minerva:** native Linux hardware counters work — IPC will be accurate there.
@@ -162,7 +162,7 @@ Expected O(N³) scaling: 1024→2048 = **8×**, 2048→10000 = **116.4×**
 | Binary | N=1024 | N=2048 | N=10000 | Slowdown 1024→2048 | Slowdown 2048→10000 |
 |---|---|---|---|---|---|
 | `naive_ijk` | 9,961 | 120,536 | (skipped) | **12.1×** | — |
-| `ikj_order` | 393 | 3,620 | 420,796 | 9.2× | 116.2× ✓ |
+| `ikj_order` | 393 | 3,620 | 420,796 | 9.2× | 116.2×  |
 | `kij_order` | 472 | 8,556 | 1,177,606 | **18.1×** | **137.6×** |
 | `transpose_B` | 1,717 | 13,774 | 1,636,624 | 8.0× | 118.8× |
 | `tiled` | 425 | 3,125 | 298,841 | 7.4× | **95.6×** ↓ |
@@ -170,12 +170,12 @@ Expected O(N³) scaling: 1024→2048 = **8×**, 2048→10000 = **116.4×**
 | `omp_tiled` | 579 | 3,878 | 112,506 | 6.7× | **29.0×** ↓↓↓ |
 | `unrolled_ikj` | 415 | 4,542 | 535,330 | 10.9× | 117.9× |
 | `avx2_manual` | 324 | 3,860 | 462,351 | 11.9× | 119.8× |
-| `auto_vec_O3` | 389 | 3,645 | 423,079 | 9.4× | 116.1× ✓ |
+| `auto_vec_O3` | 389 | 3,645 | 423,079 | 9.4× | 116.1×  |
 | `tiled_avx2` | **335** | **2,500** | 236,546 | 7.5× | **94.6×** ↓ |
-| `prefetch_ikj` | 961 | 8,173 | 927,112 | 8.5× | 113.4× ✓ |
+| `prefetch_ikj` | 961 | 8,173 | 927,112 | 8.5× | 113.4×  |
 
 > **Speedup `naive_ijk` vs `tiled_avx2`:** 9,961 ÷ 335 = **29.7×** at N=1024, 120,536 ÷ 2,500 = **48.2×** at N=2048, estimated ~3,500× at N=10000 (naive skipped; projected from scaling).  
-> ✓ = matches expected O(N³). ↓ = sub-linear scaling = getting *proportionally faster* at larger N.  
+>  = matches expected O(N³). ↓ = sub-linear scaling = getting *proportionally faster* at larger N.  
 > **omp_tiled** is the standout: 29.0× slowdown vs 116× expected — at N=10000 it's **2.1× faster than tiled_avx2** (112,506ms vs 236,546ms). This is where OpenMP finally earns its keep: 2.4 GB working set means all 4 threads can maintain independent DRAM requests, whereas at small N the memory bus was the bottleneck for all threads combined.  
 > `kij_order` degrades super-linearly (137.6× vs 116.4×) — outer-k loop's write-back conflicts with C-rows worsen as N grows.
 
@@ -341,12 +341,12 @@ mem-loads,mem-stores \
 
 | Metric | WSL2 | Minerva |
 |---|---|---|
-| Accurate IPC | ✗ throttled | ✓ |
-| LLC-load-misses | ✗ not supported | ✓ |
-| stalled-cycles-backend | ✗ not supported | ✓ memory stall % |
-| mem-loads / mem-stores | ✗ not supported | ✓ DRAM traffic counts |
-| L1/L2/L3 miss rates | ✓ works (this report) | ✓ |
-| Wall time | ✓ works (this report) | ✓ |
+| Accurate IPC |  throttled |  |
+| LLC-load-misses |  not supported |  |
+| stalled-cycles-backend |  not supported |  memory stall % |
+| mem-loads / mem-stores |  not supported |  DRAM traffic counts |
+| L1/L2/L3 miss rates |  works (this report) |  |
+| Wall time |  works (this report) |  |
 
 Expected Minerva results:
 - `naive_ijk` IPC: well below 1.0 (27% L3 miss rate confirms DRAM-bound)

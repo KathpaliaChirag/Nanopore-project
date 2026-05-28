@@ -10,11 +10,11 @@
 
 | Metric | WSL2 value | Reliability |
 |---|---|---|
-| Cache miss rate | 34.24% | ✓ correct |
+| Cache miss rate | 34.24% |  correct |
 | IPC | 2.26 (reported) → ~0.52 (corrected) | WSL2 wrong; uProf gave 0.55 |
 | LLC-load-misses | `<not supported>` | blocked by Hyper-V |
-| Total runtime | 105.87 s | ✓ correct |
-| Hotspot | `CompactHashTable::Get()` 67% | ✓ from gprof |
+| Total runtime | 105.87 s |  correct |
+| Hotspot | `CompactHashTable::Get()` 67% |  from gprof |
 
 ---
 

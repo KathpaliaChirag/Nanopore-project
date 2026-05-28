@@ -22,15 +22,15 @@ Next meeting / deadline: **2026-05-17**.
 
 - Set up `knowledge_base.md` and `updates.md`.
 - Started **Topic 1: Nanopore sequencing**.
-  - Chunk 1/4 ✓ — what sequencing means + how nanopore reads DNA electrically (KB §1.1)
-  - Chunk 2/4 ✓ — device structure: flow cell → membrane → channels → pores; parallel reads (KB §1.2)
-  - Chunk 3/4 ✓ — k-mer window (5–6 bp), 4096 patterns, "voice" of DNA, why NN is needed (segmentation + classification) (KB §1.3)
-  - Chunk 4/4 ✓ — POD-5 raw signal format, squiggle visualization (KB §1.4 — Claude wrote, user to review later)
+  - Chunk 1/4  — what sequencing means + how nanopore reads DNA electrically (KB §1.1)
+  - Chunk 2/4  — device structure: flow cell → membrane → channels → pores; parallel reads (KB §1.2)
+  - Chunk 3/4  — k-mer window (5–6 bp), 4096 patterns, "voice" of DNA, why NN is needed (segmentation + classification) (KB §1.3)
+  - Chunk 4/4  — POD-5 raw signal format, squiggle visualization (KB §1.4 — Claude wrote, user to review later)
   - **Topic 1 complete.** Ready for Topic 2 (sample prep pipeline).
 - Started **Topic 2: Sample preparation pipeline**.
-  - Chunk 1/4 ✓ — why prep exists + A-T/G-C pairing recap (KB §2.1 intro + §2.3 — Claude wrote)
+  - Chunk 1/4  — why prep exists + A-T/G-C pairing recap (KB §2.1 intro + §2.3 — Claude wrote)
   - **Workflow shift:** Claude writes KB directly from now on; user asks questions / adds notes; Claude checks in each chunk.
-  - Chunk 2/4 ✓ — fragmentation, end prep, Y-adapter structure (motor protein, leader, tether/docking), ligation, kit names LSK/RAD (KB §2.1 deep dive)
+  - Chunk 2/4  — fragmentation, end prep, Y-adapter structure (motor protein, leader, tether/docking), ligation, kit names LSK/RAD (KB §2.1 deep dive)
   - Chunk 3/4 — how the adapter actually gets DNA into the pore (mechanics of capture) — *deferred to day 2*
 
 ---
@@ -41,7 +41,7 @@ Next meeting / deadline: **2026-05-17**.
 - **Dorado installation — complete.**
   - Found that ONT no longer hosts binaries on GitHub (0 assets on all releases).
   - Located the actual CDN download URL: `cdn.oxfordnanoportal.com/software/analysis/dorado-1.4.0-win64.zip`
-  - Downloaded (~2.8 GB), extracted, verified: `dorado.exe --version` → `1.4.0` ✓
+  - Downloaded (~2.8 GB), extracted, verified: `dorado.exe --version` → `1.4.0` 
   - Installed at: `Desktop\Nanopore project\dorado\dorado-1.4.0-win64\bin\dorado.exe`
   - GPU (NVIDIA) will be auto-detected at runtime — no extra config needed.
   - Installation details added to KB §7.1.
@@ -70,7 +70,7 @@ Next meeting / deadline: **2026-05-17**.
 - **Open question for mam:** what specifically does "MBR" stand for in this context? (Flagged in KB §2.5)
 - **Topic 2 complete.** Ready for Topic 3 (basecalling) — the first CSE-heavy topic.
 - Started **Topic 3: Basecalling**.
-  - Chunk 1/4 ✓ — basecalling as ML problem: seq2seq framing, CTC analogy to speech, training data source, GPU runtime / Nsight hook (KB §3.0)
+  - Chunk 1/4  — basecalling as ML problem: seq2seq framing, CTC analogy to speech, training data source, GPU runtime / Nsight hook (KB §3.0)
   - Chunk 2/4 — NN architecture deep-dive (CNN + RNN/Transformer + CTC) → batched into KB §3.2
 - **Batch write** (user requested efficient mode): all remaining KB sections written in one pass for self-paced reading.
   - §3.1 Dorado/Guppy/Bonito tool comparison

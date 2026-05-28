@@ -2368,18 +2368,18 @@ Hyper-V (the Windows hypervisor running WSL2) does not expose all PMU counters t
 
 | Counter | Status | Notes |
 |---|---|---|
-| `cycles`, `instructions` | ✓ works | IPC ratio is valid; clock freq reported (~0.734 GHz) is wrong — TSC virtualized |
-| `cache-misses`, `cache-references` | ✓ works | overall L3 miss rate — the most useful metric |
-| `branches`, `branch-misses` | ✓ works | |
-| `stalled-cycles-frontend` | ✓ works | instruction fetch stalls visible |
-| `task-clock`, `page-faults`, `context-switches` | ✓ always works | software events, no PMU needed |
-| `L1-dcache-loads`, `L1-dcache-load-misses` | ✓ works | L1 data cache visible |
-| `L1-icache-load-misses` | ✓ works | L1 instruction cache visible |
-| `dTLB-load-misses`, `iTLB-load-misses` | ✓ works | TLB misses visible |
-| `l2_pf_miss_l2_l3` | ✓ works | AMD native event — L2 prefetch misses going to L3 |
-| `l2_pf_miss_l2_hit_l3` | ✓ works | AMD native event — L2 misses that hit L3 |
-| `LLC-loads`, `LLC-load-misses`, `LLC-stores` | ✗ `<not supported>` | Hyper-V blocks the generic PMU alias for L3 |
-| `stalled-cycles-backend` | ✗ `<not supported>` | backend stall counter blocked |
+| `cycles`, `instructions` |  works | IPC ratio is valid; clock freq reported (~0.734 GHz) is wrong — TSC virtualized |
+| `cache-misses`, `cache-references` |  works | overall L3 miss rate — the most useful metric |
+| `branches`, `branch-misses` |  works | |
+| `stalled-cycles-frontend` |  works | instruction fetch stalls visible |
+| `task-clock`, `page-faults`, `context-switches` |  always works | software events, no PMU needed |
+| `L1-dcache-loads`, `L1-dcache-load-misses` |  works | L1 data cache visible |
+| `L1-icache-load-misses` |  works | L1 instruction cache visible |
+| `dTLB-load-misses`, `iTLB-load-misses` |  works | TLB misses visible |
+| `l2_pf_miss_l2_l3` |  works | AMD native event — L2 prefetch misses going to L3 |
+| `l2_pf_miss_l2_hit_l3` |  works | AMD native event — L2 misses that hit L3 |
+| `LLC-loads`, `LLC-load-misses`, `LLC-stores` |  `<not supported>` | Hyper-V blocks the generic PMU alias for L3 |
+| `stalled-cycles-backend` |  `<not supported>` | backend stall counter blocked |
 
 **Key insight from live testing:** the generic `LLC-*` aliases are blocked, but AMD-native event names `l2_pf_miss_l2_l3` and `l2_pf_miss_l2_hit_l3` work fine. these give L3 visibility through a different PMU register path that Hyper-V doesn't block. use these instead of `LLC-load-misses` for L3 miss data.
 
@@ -2422,10 +2422,10 @@ the cycle counter is physically wrong. it counts a virtualized/throttled value, 
 **the IPC correction:** in the kraken-2 run, perf showed IPC = 2.26. that's wrong. real cycles = 68.8B × (3.2 / 0.734) ≈ 300B. real IPC = 155B instructions / 300B cycles ≈ 0.52. that makes far more sense for a memory-bound workload (IPC < 1.0 = CPU stalling on memory). the 2.26 figure should not be reported.
 
 **what is safe to report from our kraken-2 perf run:**
-- cache miss rate: 34.24% ✓
-- total cache misses: 301 million ✓
-- task-clock, wall time, user time, sys time ✓
-- raw instruction count: 156 billion ✓
+- cache miss rate: 34.24% 
+- total cache misses: 301 million 
+- task-clock, wall time, user time, sys time 
+- raw instruction count: 156 billion 
 - IPC: do not report — discard it
 
 ---
@@ -2559,17 +2559,17 @@ tested every config:
 
 | config | result | what it gives |
 |---|---|---|
-| `tbp` | ✓ works (deprecated, use hotspots) | CPU_TIME sampling, hotspot functions by wall time |
-| `hotspots` | ✓ works | same as tbp, current name |
-| `branch` | ✓ works | CYCLES_NOT_IN_HALT, RETIRED_INST, CPI, branch misprediction rates |
-| `assess` | ✗ `driver failed to start (0x80070021)` | needs IBS or L3 PMC — both blocked |
-| `cache` | ✗ `not supported` | needs L3 PMC — blocked |
-| `memory` | ✗ needs IBS — blocked | would give memory access latency |
-| `ibs` | ✗ needs IBS — blocked | instruction-level sampling |
-| `ipc` | ✗ `not supported` | needs TMAM counters — blocked |
-| `ebp` | ✗ `not supported` | generic EBP — blocked |
-| `timechart --event power` | ✓ works | per-core and socket power in Watts (RAPL) |
-| `timechart --event freq/cef/cpu` | ✗ invalid event name | APERF/MPERF available in hardware but not exposed via this CLI path |
+| `tbp` |  works (deprecated, use hotspots) | CPU_TIME sampling, hotspot functions by wall time |
+| `hotspots` |  works | same as tbp, current name |
+| `branch` |  works | CYCLES_NOT_IN_HALT, RETIRED_INST, CPI, branch misprediction rates |
+| `assess` |  `driver failed to start (0x80070021)` | needs IBS or L3 PMC — both blocked |
+| `cache` |  `not supported` | needs L3 PMC — blocked |
+| `memory` |  needs IBS — blocked | would give memory access latency |
+| `ibs` |  needs IBS — blocked | instruction-level sampling |
+| `ipc` |  `not supported` | needs TMAM counters — blocked |
+| `ebp` |  `not supported` | generic EBP — blocked |
+| `timechart --event power` |  works | per-core and socket power in Watts (RAPL) |
+| `timechart --event freq/cef/cpu` |  invalid event name | APERF/MPERF available in hardware but not exposed via this CLI path |
 
 ### the one thing uProf gives that perf cannot — real CPI
 
@@ -2612,18 +2612,18 @@ this is from RAPL (Running Average Power Limit), which reads from CPU internal p
 
 | metric | perf (WSL2) | uProf (Windows) | notes |
 |---|---|---|---|
-| **can profile kraken-2 (WSL2 binary)** | ✓ yes | ✗ no | uProf is Windows-only |
-| **cache miss rate (overall)** | ✓ 34.24% — correct | ✗ not available (L3 PMC blocked) | perf wins here |
-| **IPC** | ✗ wrong (~2.26, cycles throttled) | ✓ correct via CYCLES_NOT_IN_HALT | uProf wins here |
-| **CPI per function** | partial (perf record) | ✓ branch config gives per-function CPI | uProf more detailed |
-| **branch miss rate** | ✓ correct ratio | ✓ correct + per-function breakdown | both work |
-| **L3 miss rates** | ✗ LLC-* blocked | ✗ L3 PMC blocked | neither works |
-| **DRAM bandwidth** | ✗ not available | ✗ DF/UMC PMC blocked | neither works |
-| **backend stall breakdown** | ✗ blocked | ✗ IBS blocked | neither works |
-| **TMAM hierarchy** | ✗ not available | ✗ needs IBS — blocked | neither works |
-| **real CPU frequency** | ✗ reports 0.23–0.73 GHz (wrong) | partial (APERF/MPERF in hardware but CLI path broken) | neither reliable |
-| **power consumption (Watts)** | ✗ not available | ✓ RAPL, per-core, 1-second intervals | uProf only |
-| **function hotspots** | ✓ perf record | ✓ hotspots/tbp config | both work |
+| **can profile kraken-2 (WSL2 binary)** |  yes |  no | uProf is Windows-only |
+| **cache miss rate (overall)** |  34.24% — correct |  not available (L3 PMC blocked) | perf wins here |
+| **IPC** |  wrong (~2.26, cycles throttled) |  correct via CYCLES_NOT_IN_HALT | uProf wins here |
+| **CPI per function** | partial (perf record) |  branch config gives per-function CPI | uProf more detailed |
+| **branch miss rate** |  correct ratio |  correct + per-function breakdown | both work |
+| **L3 miss rates** |  LLC-* blocked |  L3 PMC blocked | neither works |
+| **DRAM bandwidth** |  not available |  DF/UMC PMC blocked | neither works |
+| **backend stall breakdown** |  blocked |  IBS blocked | neither works |
+| **TMAM hierarchy** |  not available |  needs IBS — blocked | neither works |
+| **real CPU frequency** |  reports 0.23–0.73 GHz (wrong) | partial (APERF/MPERF in hardware but CLI path broken) | neither reliable |
+| **power consumption (Watts)** |  not available |  RAPL, per-core, 1-second intervals | uProf only |
+| **function hotspots** |  perf record |  hotspots/tbp config | both work |
 | **overhead** | near zero | low (sampling-based) | both fine |
 
 ### what this means for our kraken-2 profiling
@@ -3087,7 +3087,7 @@ key observations:
 - 99.9% CPU — running, not stuck
 - 76.7% RAM (of 14 GB) = ~10.7 GB — 8 GB hash table fully loaded into RAM
 - actual process name is `classify`, not `kraken2` — `kraken2` is a shell wrapper
-- trailing `-` at end of args = reading from stdin ✓
+- trailing `-` at end of args = reading from stdin 
 
 **check output file size to verify progress:**
 ```bash
@@ -3300,12 +3300,12 @@ AMX (Advanced Matrix Extensions) — hardware tile matrix multiply unit built in
 
 | Tool | Status |
 |---|---|
-| perf | ✓ works (`paranoid=1`) — LLC-load-misses, stalled-cycles-backend, TMA all available |
-| gprof | ✓ build-essential present |
-| valgrind | ✓ installed |
-| make, gcc | ✓ confirmed |
-| nsys / ncu | ⚠ not in PATH — need `/etc/profile.d/nsys.sh` fix (same as Minerva) |
-| numactl | ✓ installed |
+| perf |  works (`paranoid=1`) — LLC-load-misses, stalled-cycles-backend, TMA all available |
+| gprof |  build-essential present |
+| valgrind |  installed |
+| make, gcc |  confirmed |
+| nsys / ncu |  not in PATH — need `/etc/profile.d/nsys.sh` fix (same as Minerva) |
+| numactl |  installed |
 
 ### TMA on Luna
 

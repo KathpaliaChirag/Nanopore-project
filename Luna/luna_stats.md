@@ -193,7 +193,7 @@ Linux dell-R760 6.8.0-78-generic #78~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC x86_64 G
 ## perf Hardware Counter Status
 
 **Native Linux — no Hyper-V, full PMU access in hardware.**
-**✓ perf_event_paranoid = 1 — hardware counters ENABLED for all users (verified 2026-05-28 22:19 UTC).**
+** perf_event_paranoid = 1 — hardware counters ENABLED for all users (verified 2026-05-28 22:19 UTC).**
 
 ```
 perf_event_paranoid = 1   ← verified 2026-05-28 22:19 UTC
@@ -213,15 +213,15 @@ perf_event_paranoid = 1   ← verified 2026-05-28 22:19 UTC
 
 | Counter | Status | Notes |
 |---|---|---|
-| `cycles`, `instructions`, IPC | ✓ Accurate | No virtualisation throttling |
-| `cache-misses`, `cache-references` | ✓ Works | |
-| `LLC-load-misses`, `LLC-loads` | ✓ **Works** | Was blocked on WSL2 |
-| `stalled-cycles-backend` | ✓ **Works** | Memory stall % — key metric |
-| `L1-dcache-load-misses` | ✓ Works | |
-| `mem-loads`, `mem-stores` | ✓ Works | DRAM traffic counts |
-| TMA metrics (`tma_*`) | ✓ **Full TMA** | Sapphire Rapids native TMAM |
-| Uncore events (`unc_cha_*`) | ✓ Available | Cross-socket snoops |
-| PEBS precise events | ✓ Available | Supports address |
+| `cycles`, `instructions`, IPC |  Accurate | No virtualisation throttling |
+| `cache-misses`, `cache-references` |  Works | |
+| `LLC-load-misses`, `LLC-loads` |  **Works** | Was blocked on WSL2 |
+| `stalled-cycles-backend` |  **Works** | Memory stall % — key metric |
+| `L1-dcache-load-misses` |  Works | |
+| `mem-loads`, `mem-stores` |  Works | DRAM traffic counts |
+| TMA metrics (`tma_*`) |  **Full TMA** | Sapphire Rapids native TMAM |
+| Uncore events (`unc_cha_*`) |  Available | Cross-socket snoops |
+| PEBS precise events |  Available | Supports address |
 
 ---
 
@@ -231,19 +231,19 @@ perf_event_paranoid = 1   ← verified 2026-05-28 22:19 UTC
 
 | Tool | Version / Path | Status | Notes |
 |---|---|---|---|
-| **perf** | `/usr/bin/perf` | ✓ Installed | paranoid=1 ✓ — full hardware counters enabled |
-| **gcc** | `/usr/bin/gcc` | ✓ Installed | |
-| **g++** | `/usr/bin/g++` | ✓ Installed | |
-| **python3** | `/usr/bin/python3` | ✓ Installed | |
-| **make** | `/usr/bin/make` | ✓ Installed | |
-| **perl** | `/usr/bin/perl` | ✓ Installed | |
-| **btop** | installed 2026-05-28 | ✓ Installed | Use `btop --utf-force` |
-| nvcc (CUDA compiler) | — | ✗ Not in PATH | Check: `find /usr /opt -name nvcc 2>/dev/null` |
-| nsys (Nsight Systems) | — | ✗ Not in PATH | Check: `find /usr /opt -name nsys 2>/dev/null` |
-| ncu (Nsight Compute) | — | ✗ Not in PATH | Check: `find /usr /opt -name ncu 2>/dev/null` |
-| valgrind | — | ✗ Not installed | `sudo apt install valgrind` |
-| likwid-perfctr | — | ✗ Not installed | See install_tools.md |
-| numactl | — | ✗ Not installed | `sudo apt install numactl` |
+| **perf** | `/usr/bin/perf` |  Installed | paranoid=1  — full hardware counters enabled |
+| **gcc** | `/usr/bin/gcc` |  Installed | |
+| **g++** | `/usr/bin/g++` |  Installed | |
+| **python3** | `/usr/bin/python3` |  Installed | |
+| **make** | `/usr/bin/make` |  Installed | |
+| **perl** | `/usr/bin/perl` |  Installed | |
+| **btop** | installed 2026-05-28 |  Installed | Use `btop --utf-force` |
+| nvcc (CUDA compiler) | — |  Not in PATH | Check: `find /usr /opt -name nvcc 2>/dev/null` |
+| nsys (Nsight Systems) | — |  Not in PATH | Check: `find /usr /opt -name nsys 2>/dev/null` |
+| ncu (Nsight Compute) | — |  Not in PATH | Check: `find /usr /opt -name ncu 2>/dev/null` |
+| valgrind | — |  Not installed | `sudo apt install valgrind` |
+| likwid-perfctr | — |  Not installed | See install_tools.md |
+| numactl | — |  Not installed | `sudo apt install numactl` |
 | VTune | — | Unknown | Check: `find /opt /usr -name vtune 2>/dev/null` |
 
 > **nvcc/nsys/ncu missing from PATH** — these may be installed but not on PATH (same issue as Minerva with nsys). Check:

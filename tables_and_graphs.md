@@ -63,8 +63,8 @@ pie title perf stat — Wall Time 159.4 s (what the CPU was doing)
 | **perf stat** | Cache miss rate | **34.24%** | 1 in 3 memory accesses → RAM |
 | **perf stat** | Total L3 misses | **301,288,020** | 301M × ~100 ns stall |
 | **perf stat** | Wall time | 159.4 s | |
-| **perf stat** | IPC (reported) | 2.26 ✗ | Hyper-V throttles clock — invalid |
-| **AMD uProf** | IPC (accurate) | **0.55 ✓** | CPU stalls — memory-bound confirmed |
+| **perf stat** | IPC (reported) | 2.26  | Hyper-V throttles clock — invalid |
+| **AMD uProf** | IPC (accurate) | **0.55 ** | CPU stalls — memory-bound confirmed |
 | **gprof** | Hotspot function | `CompactHashTable::Get()` | 67% of all runtime |
 | **gprof** | Hotspot calls | 9,871,933 | 9.87M lookups per run |
 | **Derived** | Misses per call | **~30.5** | 301M ÷ 9.87M |
@@ -183,15 +183,15 @@ xychart-beta
 ```mermaid
 xychart-beta horizontal
     title "Wall Time N=10000 — seconds (lower = faster)"
-    x-axis ["omp_tiled★", "tiled_avx2", "omp_par", "tiled", "ikj", "autovec", "avx2", "unrolled", "prefetch", "kij", "transpB"]
+    x-axis ["omp_tiled", "tiled_avx2", "omp_par", "tiled", "ikj", "autovec", "avx2", "unrolled", "prefetch", "kij", "transpB"]
     y-axis "Time (seconds)" 0 --> 1700
     bar [112.5, 236.5, 290.7, 298.8, 420.8, 423.1, 462.4, 535.3, 927.1, 1177.6, 1636.6]
 ```
 
 | Binary | Time (s) | vs Winner | L3 miss% |
 |---|:---:|:---:|:---:|
-| **omp_tiled** ★ | **112.5** | **1.0×** | 3.70% |
-| tiled_avx2 | 236.5 | 2.1× | 18.53% ⚠ |
+| **omp_tiled**  | **112.5** | **1.0×** | 3.70% |
+| tiled_avx2 | 236.5 | 2.1× | 18.53%  |
 | omp_parallel | 290.7 | 2.6× | 2.26% |
 | tiled | 298.8 | 2.7× | 2.92% |
 | ikj_order | 420.8 | 3.7× | 2.12% |
@@ -209,7 +209,7 @@ xychart-beta horizontal
 ```mermaid
 xychart-beta horizontal
     title "Wall Time N=2048 — seconds (lower = faster)"
-    x-axis ["tl_avx2★", "tiled", "ikj", "autovec", "avx2", "omp_tl", "unrolled", "omp_par", "prefetch", "kij", "transpB", "naive"]
+    x-axis ["tl_avx2", "tiled", "ikj", "autovec", "avx2", "omp_tl", "unrolled", "omp_par", "prefetch", "kij", "transpB", "naive"]
     y-axis "Time (seconds)" 0 --> 125
     bar [2.5, 3.1, 3.6, 3.6, 3.9, 3.9, 4.5, 6.2, 8.2, 8.6, 13.8, 120.5]
 ```
@@ -221,7 +221,7 @@ xychart-beta horizontal
 ```mermaid
 xychart-beta horizontal
     title "Wall Time N=1024 — ms, naive_ijk excluded (9961 ms, 30× off-chart)"
-    x-axis ["avx2★", "tl_avx2", "autovec", "ikj", "unrolled", "tiled", "omp_par", "kij", "omp_tl", "prefetch", "transpB"]
+    x-axis ["avx2", "tl_avx2", "autovec", "ikj", "unrolled", "tiled", "omp_par", "kij", "omp_tl", "prefetch", "transpB"]
     y-axis "Time (ms)" 0 --> 1800
     bar [324, 335, 389, 393, 415, 425, 460, 472, 579, 961, 1717]
 ```
@@ -272,7 +272,7 @@ xychart-beta
 | omp_tiled | 6.7× | sub-linear ↓ — tiles pay off |
 | tiled | 7.4× | sub-linear ↓ |
 | tiled_avx2 | 7.5× | sub-linear ↓ |
-| transpose_B | 8.0× | matches O(N³) ✓ |
+| transpose_B | 8.0× | matches O(N³)  |
 | prefetch_ikj | 8.5× | near O(N³) |
 | ikj_order | 9.2× | slightly above |
 | kij_order | **18.1×** | severely super-linear ↑ |
@@ -402,10 +402,10 @@ xychart-beta
 | GPU | GTX 1650 | 2× A40 | **2× L40S** |
 | GPU VRAM | 4 GB | 45 GB ea. | **46 GB ea.** |
 | **GPU FP32** | **2.9 TFLOPS** | **37.4 TFLOPS** | **91.6 TFLOPS** |
-| Disk free | ~50 GB | **0 GB ⚠** | 236 GB |
+| Disk free | ~50 GB | **0 GB ** | 236 GB |
 | ISA extras | AVX2 | AVX-512 | AVX-512 + **AMX** |
-| perf counters | WSL2 limited | ✓ native | ✓ native |
-| TMA support | ✗ | partial | **✓ full** |
+| perf counters | WSL2 limited |  native |  native |
+| TMA support |  | partial | ** full** |
 | NUMA nodes | 1 | 2 | 2 |
 
 ---
@@ -477,19 +477,19 @@ xychart-beta
 
 | Tool | Local (WSL2) | Minerva | Luna |
 |---|:---:|:---:|:---:|
-| `perf stat` — basic | ✓ | ✓ | ✓ |
-| `perf` — `LLC-load-misses` | ✗ Hyper-V blocked | ✓ | ✓ |
-| `perf` — `stalled-cycles-backend` | ✗ | ✓ | ✓ |
-| Accurate IPC | ✗ (clock distorted) | ✓ | ✓ |
-| **TMA (Top-down Analysis)** | ✗ | partial | **✓ full** |
-| `gprof` | ✓ | ✓ | ✓ |
-| `valgrind / cachegrind` | ✓ | ✓ | ✓ |
-| `nsys` (Nsight Systems) | ✓ | ✓ (fixed PATH) | ⚠ needs PATH fix |
-| `ncu` (Nsight Compute) | ✓ | ✓ | ⚠ needs PATH fix |
-| AMD uProf | ✓ (native AMD) | ✗ (Intel) | ✗ (Intel) |
-| Intel VTune | ✗ | ✓ (installed) | ✓ (available) |
-| DCGM (GPU metrics) | ✗ | ✓ | ✓ |
-| Write new data to disk | ✓ | **✗ FULL** | ✓ |
+| `perf stat` — basic |  |  |  |
+| `perf` — `LLC-load-misses` |  Hyper-V blocked |  |  |
+| `perf` — `stalled-cycles-backend` |  |  |  |
+| Accurate IPC |  (clock distorted) |  |  |
+| **TMA (Top-down Analysis)** |  | partial | ** full** |
+| `gprof` |  |  |  |
+| `valgrind / cachegrind` |  |  |  |
+| `nsys` (Nsight Systems) |  |  (fixed PATH) |  needs PATH fix |
+| `ncu` (Nsight Compute) |  |  |  needs PATH fix |
+| AMD uProf |  (native AMD) |  (Intel) |  (Intel) |
+| Intel VTune |  |  (installed) |  (available) |
+| DCGM (GPU metrics) |  |  |  |
+| Write new data to disk |  | ** FULL** |  |
 
 ---
 
@@ -509,7 +509,7 @@ xychart-beta
 |---|:---:|:---:|:---:|---|
 | fast | 3m 58s | ~5 min | baseline | Quick test only |
 | **hac** | **19m 8s** | **~71 min** | **+3–8%** | **Sweet spot** |
-| sup | 2h 5min | OOM ✗ | +0.1–1% | Marginal gain, not worth it |
+| sup | 2h 5min | OOM  | +0.1–1% | Marginal gain, not worth it |
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': {'pie1': '#2a9d8f','pie2': '#e63946', 'pieOuterStrokeWidth': '2px'}}}%%
@@ -558,7 +558,7 @@ pie title Database Size — Standard 180 GB vs Custom ESKAPE 650 MB
 | Species | All known | 6 ESKAPE only |
 | Build time | ~hours | **30 seconds** |
 | RAM needed | 180 GB | **< 1 GB** |
-| Runs on Colab | ✗ | **✓** |
+| Runs on Colab |  | **** |
 | Ratio | — | **277× smaller** |
 
 ---
@@ -613,66 +613,66 @@ xychart-beta
 
 ## 7. Heatmaps — Miss Rates Across All N
 
-**Colour key:** 🟦 < 2% · 🟩 2–5% · 🟨 5–10% · 🟧 10–20% · 🟥 > 20%
+**Colour key:**  < 2% ·  2–5% ·  5–10% ·  10–20% ·  > 20%
 
 ### 7.1 L3 Cache Miss Rate Heatmap (%)
 
 | Binary | N=1024 | N=2048 | N=10000 | Trend |
 |---|:---:|:---:|:---:|---|
-| naive_ijk | 🟥 22.0% | 🟥 27.6% | 🟥 >50% est. | worsens severely |
-| tiled_avx2 | 🟧 12.3% | 🟧 15.9% | 🟧 18.53% | worsens with N ⚠ |
-| omp_tiled | 🟩 3.3% | 🟩 3.6% | 🟩 3.70% | stable |
-| kij_order | 🟦 2.2% | 🟩 4.3% | 🟩 3.04% | degrades at N=2048 |
-| tiled | 🟩 4.1% | 🟩 3.7% | 🟩 2.92% | improves slightly |
-| ikj_order | 🟩 6.0% | 🟩 3.5% | 🟦 2.12% | improves with N |
-| omp_parallel | 🟩 5.9% | 🟦 1.9% | 🟦 2.26% | improves with N |
-| auto_vec_O3 | 🟨 6.6% | 🟩 3.3% | 🟦 2.24% | improves with N |
-| unrolled_ikj | 🟩 4.9% | 🟦 1.5% | 🟦 1.97% | improves with N |
-| avx2_manual | 🟦 2.3% | 🟦 2.5% | 🟦 1.64% | stable / slight improve |
-| transpose_B | 🟦 1.8% | 🟦 1.7% | 🟦 1.94% | flat — best single-thread |
-| prefetch_ikj | 🟩 4.2% | 🟦 2.0% | 🟦 1.23% | best rate but slowest time |
+| naive_ijk |  22.0% |  27.6% |  >50% est. | worsens severely |
+| tiled_avx2 |  12.3% |  15.9% |  18.53% | worsens with N  |
+| omp_tiled |  3.3% |  3.6% |  3.70% | stable |
+| kij_order |  2.2% |  4.3% |  3.04% | degrades at N=2048 |
+| tiled |  4.1% |  3.7% |  2.92% | improves slightly |
+| ikj_order |  6.0% |  3.5% |  2.12% | improves with N |
+| omp_parallel |  5.9% |  1.9% |  2.26% | improves with N |
+| auto_vec_O3 |  6.6% |  3.3% |  2.24% | improves with N |
+| unrolled_ikj |  4.9% |  1.5% |  1.97% | improves with N |
+| avx2_manual |  2.3% |  2.5% |  1.64% | stable / slight improve |
+| transpose_B |  1.8% |  1.7% |  1.94% | flat — best single-thread |
+| prefetch_ikj |  4.2% |  2.0% |  1.23% | best rate but slowest time |
 
 ---
 
 ### 7.2 L2 Cache Miss Rate Heatmap (%)
 
-**Key:** 🟦 < 1% · 🟩 1–3% · 🟨 3–6% · 🟧 6–15% · 🟥 > 15%
+**Key:**  < 1% ·  1–3% ·  3–6% ·  6–15% ·  > 15%
 
 | Binary | N=1024 | N=2048 | N=10000 | Trend |
 |---|:---:|:---:|:---:|---|
-| naive_ijk | 🟥 23.5% | 🟥 43.9% | 🟥 >60% est. | catastrophic |
-| omp_parallel | 🟧 10.6% | 🟩 2.2% | 🟩 2.2% | improves a lot |
-| unrolled_ikj | 🟧 8.2% | 🟦 1.5% | 🟩 1.7% | improves with N |
-| auto_vec_O3 | 🟨 9.1% | 🟩 3.2% | 🟩 2.0% | improves with N |
-| ikj_order | 🟨 7.7% | 🟩 3.5% | 🟩 1.9% | improves with N |
-| omp_tiled | 🟩 2.9% | 🟩 3.7% | 🟩 3.8% | stable |
-| avx2_manual | 🟩 3.0% | 🟩 3.5% | 🟦 0.9% | improves at large N |
-| kij_order | 🟦 1.9% | 🟨 6.3% | 🟩 3.2% | degrades at N=2048 |
-| tiled | 🟦 0.9% | 🟦 1.0% | 🟦 1.0% | flat — tiling works |
-| tiled_avx2 | 🟦 0.7% | 🟦 0.9% | 🟩 2.0% | good but L3 suffers |
-| transpose_B | 🟦 1.0% | 🟦 1.3% | 🟦 0.9% | stable — very low |
-| prefetch_ikj | 🟨 5.7% | 🟦 1.6% | 🟦 0.4% | lowest L2 at large N |
+| naive_ijk |  23.5% |  43.9% |  >60% est. | catastrophic |
+| omp_parallel |  10.6% |  2.2% |  2.2% | improves a lot |
+| unrolled_ikj |  8.2% |  1.5% |  1.7% | improves with N |
+| auto_vec_O3 |  9.1% |  3.2% |  2.0% | improves with N |
+| ikj_order |  7.7% |  3.5% |  1.9% | improves with N |
+| omp_tiled |  2.9% |  3.7% |  3.8% | stable |
+| avx2_manual |  3.0% |  3.5% |  0.9% | improves at large N |
+| kij_order |  1.9% |  6.3% |  3.2% | degrades at N=2048 |
+| tiled |  0.9% |  1.0% |  1.0% | flat — tiling works |
+| tiled_avx2 |  0.7% |  0.9% |  2.0% | good but L3 suffers |
+| transpose_B |  1.0% |  1.3% |  0.9% | stable — very low |
+| prefetch_ikj |  5.7% |  1.6% |  0.4% | lowest L2 at large N |
 
 ---
 
-### 7.3 Wall Time Heatmap — Relative (fastest in row = 🟦)
+### 7.3 Wall Time Heatmap — Relative (fastest in row = )
 
-**Key:** 🟦 fastest · 🟩 < 2× · 🟨 2–5× · 🟧 5–15× · 🟥 > 15×
+**Key:**  fastest ·  < 2× ·  2–5× ·  5–15× ·  > 15×
 
 | Binary | N=1024 | N=2048 | N=10000 |
 |---|:---:|:---:|:---:|
-| omp_tiled | 🟨 1.79× | 🟩 1.55× | 🟦 1.0× ★ |
-| tiled_avx2 | 🟦 1.03× | 🟦 1.0× ★ | 🟩 2.10× |
-| avx2_manual | 🟦 1.0× ★ | 🟩 1.54× | 🟨 4.11× |
-| tiled | 🟩 1.31× | 🟩 1.25× | 🟨 2.66× |
-| ikj_order | 🟩 1.21× | 🟩 1.45× | 🟨 3.74× |
-| auto_vec_O3 | 🟩 1.20× | 🟩 1.46× | 🟨 3.76× |
-| unrolled_ikj | 🟩 1.28× | 🟩 1.82× | 🟨 4.76× |
-| omp_parallel | 🟩 1.42× | 🟨 2.47× | 🟨 2.58× |
-| kij_order | 🟩 1.46× | 🟨 3.42× | 🟧 10.47× |
-| prefetch_ikj | 🟨 2.97× | 🟨 3.27× | 🟧 8.24× |
-| transpose_B | 🟧 5.30× | 🟧 5.51× | 🟧 14.55× |
-| naive_ijk | 🟥 30.74× | 🟥 48.21× | — (skipped) |
+| omp_tiled |  1.79× |  1.55× |  1.0×  |
+| tiled_avx2 |  1.03× |  1.0×  |  2.10× |
+| avx2_manual |  1.0×  |  1.54× |  4.11× |
+| tiled |  1.31× |  1.25× |  2.66× |
+| ikj_order |  1.21× |  1.45× |  3.74× |
+| auto_vec_O3 |  1.20× |  1.46× |  3.76× |
+| unrolled_ikj |  1.28× |  1.82× |  4.76× |
+| omp_parallel |  1.42× |  2.47× |  2.58× |
+| kij_order |  1.46× |  3.42× |  10.47× |
+| prefetch_ikj |  2.97× |  3.27× |  8.24× |
+| transpose_B |  5.30× |  5.51× |  14.55× |
+| naive_ijk |  30.74× |  48.21× | — (skipped) |
 
 ---
 
@@ -690,7 +690,7 @@ All key numbers from every profiling run in one place.
 | **Cache miss rate** | **34.24%** | perf stat |
 | **Total L3 misses** | **301,288,020** | perf stat |
 | Instructions | 155,949,518,373 | perf stat |
-| IPC (reported — invalid) | 2.26 ✗ | perf stat |
+| IPC (reported — invalid) | 2.26  | perf stat |
 | **IPC (accurate)** | **0.55** | AMD uProf |
 | **Top function** | `CompactHashTable::Get()` | gprof |
 | **Top function %** | **67.35%** | gprof |
@@ -733,5 +733,5 @@ All key numbers from every profiling run in one place.
 | Server | L3 | RAM | GPU | Disk | perf |
 |---|:---:|:---:|:---:|:---:|:---:|
 | Local | 16 MB | 14 GB | 2.9T | ~50 GB | limited |
-| Minerva | 66 MB | 251 GB | 37.4T | **0 GB ⚠** | ✓ |
-| **Luna** | **210 MB** | **503 GB** | **91.6T** | **236 GB** | **✓ full TMA** |
+| Minerva | 66 MB | 251 GB | 37.4T | **0 GB ** |  |
+| **Luna** | **210 MB** | **503 GB** | **91.6T** | **236 GB** | ** full TMA** |

@@ -27,7 +27,7 @@ ssh <your-username>@<luna-ip-or-hostname>
 | RAM | 251 GB | **503 GB** |
 | GPU | 2× A40 (45 GB) | **2× L40S (46 GB)** |
 | SIMD | AVX-512 | **AVX-512 + AMX** |
-| perf IPC | ✓ accurate | ✓ accurate |
+| perf IPC |  accurate |  accurate |
 | Root disk free | ~9 GB (critical) | 238 GB (fine) |
 
 ---

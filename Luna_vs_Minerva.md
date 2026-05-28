@@ -83,7 +83,7 @@
 | Root disk used | 3.2 TB | 655 GB | — |
 | Root disk free | **9.1 GB (CRITICAL — 100%)** | **236 GB (74%)** | Luna |
 | /dev/shm (tmpfs) | 126 GB | **252 GB** | Luna |
-| Risk level | 🔴 Full — jobs may fail | 🟢 Fine | Luna |
+| Risk level |  Full — jobs may fail |  Fine | Luna |
 
 > Minerva root disk is critically full (100%). Luna has 236 GB free — comfortable for benchmarks, datasets, and build artifacts.
 
@@ -103,18 +103,18 @@
 
 | Tool / Setting | Minerva | Luna |
 |---|---|---|
-| `perf` binary | ✓ `/usr/bin/perf` | ✓ `/usr/bin/perf` |
-| `perf_event_paranoid` | ✓ 1 (fixed) | ✓ **1 (confirmed 2026-05-28)** |
-| Hardware counters (LLC, stall-BE, TMA) | ✓ Works | ✓ Works |
-| TMA (Top-down Analysis) | ✓ Ice Lake TMAM | ✓ **Sapphire Rapids TMAM** (newer, more metrics) |
-| `gcc` / `g++` | ✓ 11.4.0 | ✓ 11.4.0 |
-| `nsys` (Nsight Systems) | ✓ PATH fixed → `/usr/lib/nsight-systems/bin/nsys` | ✗ Not in PATH (may be installed — needs `find`) |
-| `ncu` (Nsight Compute) | ✓ 2021.3.1.0 | ✗ Not in PATH |
-| `nvcc` (CUDA compiler) | Unknown | ✗ Not in PATH |
-| `valgrind` | Available via conda | ✗ Not installed |
-| `numactl` | Unknown | ✗ Not installed |
-| `likwid` | Not installed | ✗ Not installed |
-| `btop` | Not documented | ✓ Installed |
+| `perf` binary |  `/usr/bin/perf` |  `/usr/bin/perf` |
+| `perf_event_paranoid` |  1 (fixed) |  **1 (confirmed 2026-05-28)** |
+| Hardware counters (LLC, stall-BE, TMA) |  Works |  Works |
+| TMA (Top-down Analysis) |  Ice Lake TMAM |  **Sapphire Rapids TMAM** (newer, more metrics) |
+| `gcc` / `g++` |  11.4.0 |  11.4.0 |
+| `nsys` (Nsight Systems) |  PATH fixed → `/usr/lib/nsight-systems/bin/nsys` |  Not in PATH (may be installed — needs `find`) |
+| `ncu` (Nsight Compute) |  2021.3.1.0 |  Not in PATH |
+| `nvcc` (CUDA compiler) | Unknown |  Not in PATH |
+| `valgrind` | Available via conda |  Not installed |
+| `numactl` | Unknown |  Not installed |
+| `likwid` | Not installed |  Not installed |
+| `btop` | Not documented |  Installed |
 
 > Luna hardware counters are ready. GPU profiling tools (nsys, ncu) still need PATH fix or install — same situation as Minerva before the nsys fix.
 
@@ -137,8 +137,8 @@
 |---|---|---|---|
 | IPC (naive_ijk) | 0.23† (wrong) | ~0.3–0.5 | ~0.3–0.5 |
 | IPC (tiled_avx2) | 3.04† (wrong) | ~3–5 | **~4–7** (higher clock + L3) |
-| LLC-load-misses | Not supported | ✓ | ✓ |
-| stalled-cycles-backend | Not supported | ✓ | ✓ |
+| LLC-load-misses | Not supported |  |  |
+| stalled-cycles-backend | Not supported |  |  |
 | N=1024 naive_ijk time | 9,961ms | ~6,000ms | **~2,000ms** (3.8 GHz + L3 fits) |
 | N=1024 tiled_avx2 time | 335ms | ~200ms | **~80ms** (higher clock + AVX-512 wider use) |
 

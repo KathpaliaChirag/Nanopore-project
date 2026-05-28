@@ -35,13 +35,13 @@ df -h /
 
 ---
 
-## Step 1 — Fix perf Hardware Counters [✓ DONE]
+## Step 1 — Fix perf Hardware Counters [ DONE]
 
 Already set to 1. Confirmed. No action needed.
 
 ---
 
-## Step 2 — Fix nsys PATH System-Wide [✓ DONE]
+## Step 2 — Fix nsys PATH System-Wide [ DONE]
 
 Already added to `/etc/profile.d/nsys.sh`. Confirmed working.
 
@@ -241,8 +241,8 @@ echo "=== disk ===" && df -h /
 ```
 [ ] Check 1: internet working (iitd-login.py running in tmux)
 [ ] Check 2: disk space confirmed
-[✓] Step 1:  perf_event_paranoid = 1
-[✓] Step 2:  nsys PATH fixed
+[] Step 1:  perf_event_paranoid = 1
+[] Step 2:  nsys PATH fixed
 [ ] Step 3:  valgrind installed (source build)
 [ ] Step 4:  msr module loaded + persisted + LIKWID setuid
 [ ] Step 5:  VTune standalone installer run (only if disk >= 6 GB free)

@@ -241,8 +241,8 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 
 | Server | CPU | L3 | RAM | GPU | Disk | Status |
 |---|---|---|---|---|---|---|
-| **Minerva** | Xeon Gold 6330, 56c/112t @ 2 GHz | 66 MB | 251 GB | 2× A40 (45 GB) | **100% full** | ⚠ no new data |
-| **Luna** | Xeon Platinum 8468, 96c/192t @ 3.8 GHz | 210 MB | 503 GB | 2× L40S (46 GB) | 74% (236 GB free) | ✓ primary |
+| **Minerva** | Xeon Gold 6330, 56c/112t @ 2 GHz | 66 MB | 251 GB | 2× A40 (45 GB) | **100% full** |  no new data |
+| **Luna** | Xeon Platinum 8468, 96c/192t @ 3.8 GHz | 210 MB | 503 GB | 2× L40S (46 GB) | 74% (236 GB free) |  primary |
 
 Luna: `perf_event_paranoid = 1` confirmed — hardware counters work for all users. AVX-512 + AMX (matrix multiply unit) on Sapphire Rapids. Luna is the primary server for all future benchmarks.
 

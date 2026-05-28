@@ -253,8 +253,8 @@ Both servers are documented and accessible. Luna is the primary server going for
 
 | Server | CPU | L3 | RAM | GPU | Disk | perf counters |
 |---|---|---|---|---|---|---|
-| **Minerva** | Xeon Gold 6330, 56c/112t @ 2 GHz | 66 MB | 251 GB | 2× A40 (45 GB) | **100% full** | ✓ (set paranoid=1) |
-| **Luna** | Xeon Platinum 8468, 96c/192t @ 3.8 GHz | **210 MB** | **503 GB** | **2× L40S (46 GB)** | 74% (236 GB free) | ✓ paranoid=1 confirmed |
+| **Minerva** | Xeon Gold 6330, 56c/112t @ 2 GHz | 66 MB | 251 GB | 2× A40 (45 GB) | **100% full** |  (set paranoid=1) |
+| **Luna** | Xeon Platinum 8468, 96c/192t @ 3.8 GHz | **210 MB** | **503 GB** | **2× L40S (46 GB)** | 74% (236 GB free) |  paranoid=1 confirmed |
 
 Luna advantages: 3.2× larger L3 cache (210 MB — can potentially hold much of the Kraken-2 working set), AVX-512 + AMX (hardware tile matrix multiply unit on Sapphire Rapids), full TMA (Top-down Microarchitecture Analysis) hardware events available natively.
 

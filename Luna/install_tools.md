@@ -2,7 +2,7 @@
 
 > Native Linux (no Hyper-V) — full hardware PMU counters available without workarounds.
 > btop installed 2026-05-28 | numactl not yet installed
-> ⚠️ perf_event_paranoid = 4 (verified 2026-05-28) — hardware counters blocked for non-root. Fix below is #1 priority.
+>  perf_event_paranoid = 4 (verified 2026-05-28) — hardware counters blocked for non-root. Fix below is #1 priority.
 
 ---
 
