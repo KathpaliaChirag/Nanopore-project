@@ -142,3 +142,74 @@
 
 ### Next meeting
 TBD
+
+---
+
+## Meeting 4 — 2026-05-28
+
+**Attendees:** Kolin sir, Chayanika mam, Chirag K (CK), Chirag Suthar, Rishabh, Rohit
+**Format:** Progress review + summer direction assignment
+
+### Profiling results presented
+
+CK presented the baseline profiling report covering both pipeline stages:
+
+**Kraken-2 (CPU) — 3-tool verdict: memory-bound**
+
+| Tool | Finding |
+|---|---|
+| perf stat | 34.24% cache miss rate, 301M misses per run |
+| gprof | 67% of runtime in `CompactHashTable::Get()`, 9.87M calls |
+| AMD uProf | IPC = 0.55 — CPU stalling, not computing |
+
+**Dorado (GPU) — verdict: compute-bound**
+
+| Tool | Finding |
+|---|---|
+| Nsight Systems | GEMM = 82% of GPU time (Tensor Cores FP16) |
+| Nsight Systems | cudaStreamSynchronize = 98.9% of CUDA API time |
+
+Matrix multiply benchmark study (12 C implementations, N up to 10000) also presented to show empirical validation of cache-blocking theory.
+
+### Discussion — Kraken-2 optimisation ideas
+
+Two early ideas were discussed in the meeting:
+
+**Idea 1 — Sequential ESKAPE query pipeline**
+Instead of loading one large DB and querying everything at once, query each of the 6 ESKAPE pathogens (E, S, K, A, P, E) one at a time. Benefits: smaller active DB per query fits better in cache; can short-circuit once a dominant match is found; reduces working set per lookup. Needs: accuracy vs speed trade-off analysis.
+
+**Idea 2 — L3 cache pinning / frequency-aware partitioning**
+Pre-compute the most frequent k-mers for each ESKAPE pathogen from real clinical samples. Pin or pre-load these hot k-mers into L3 so lookups for the dominant species hit L3 instead of RAM. Basis: clinical samples tend to be dominated by one pathogen (barcode02 = 100% P. aeruginosa), so k-mer access is not uniformly random — a hot set exists. `CompactHashTable::Get()` is confirmed at 67% of runtime and ~30 L3 misses per call.
+
+More ideas to be proposed by both Chirags in the 3-day deliverable.
+
+### Summer goal — decided
+
+**Primary focus for summer: Kraken-2 optimisation only.**
+
+Dorado / GPU work is deprioritised for now. The memory-bound nature of Kraken-2 and the clear hotspot (`CompactHashTable::Get()`) make it the right target.
+
+### Work split
+
+| Team | Task | Deliverable | Deadline |
+|---|---|---|---|
+| Chirag K + Chirag S | Deep Kraken-2 analysis: CPU/memory/IO stats, confirm memory-bound vs IO-bound, propose 2–3 concrete optimisation ideas | Written report | 2026-05-31 |
+| Rohit + Rishabh | Spiking neural network approach for Dorado — track spikes in electrical signal, explore speedup vs Dorado basecaller | No report yet — research phase | TBD |
+
+### Action items
+
+**Chirag K + Chirag S (due 2026-05-31):**
+- Run deeper Kraken-2 profiling: distinguish memory-bound vs I/O-bound (page fault analysis, DRAM bandwidth measurement, `perf mem` or `numactl` on Luna)
+- Get per-function LLC miss rates via `cachegrind` on Luna (Minerva disk full)
+- Run `perf record` / `perf report` for source-line hotspot inside `CompactHashTable::Get()`
+- Measure k-mer reuse distribution from barcode02.fastq — quantify actual hit rate potential
+- Propose 2–3 specific, implementable optimisation ideas with complexity and expected speedup estimates
+- Write `kraken2_optimisation_report.md` and push to GitHub
+
+**Rohit + Rishabh:**
+- Research SNN (spiking neural networks) as a replacement or accelerator for Dorado basecalling
+- Goal: can spike timing from raw nanopore signal replace some or all of the Transformer forward pass?
+- No written report required at this stage
+
+### Next meeting
+TBD — after 3-day Kraken-2 report is submitted (target ~2026-05-31)

@@ -187,34 +187,38 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 
 ## Research Goals
 
-### Goal 1 — Memory-efficient Kraken-2 (§4.3)
-**Problem:** 180 GB DB doesn't fit in RAM on edge/clinical devices.
-**Approach:** Reduce DB size using Bloom filters or learned indexes.
-**Metric:** accuracy vs memory trade-off curve.
+### Summer 2026 Focus (decided Meeting 4, 2026-05-28)
+
+**Primary target: Kraken-2 optimisation only.** Dorado GPU work deprioritised.
+
+| Team | Track | Deliverable |
+|---|---|---|
+| Chirag K + Chirag S | Kraken-2 memory optimisation | Report due 2026-05-31, then implementation |
+| Rohit + Rishabh | SNN (spiking neural networks) for Dorado basecalling | Research phase — no report yet |
+
+### Goal 1 — Kraken-2 Optimisation (active, summer 2026)
+
+**Confirmed bottleneck:** `CompactHashTable::Get()` — 67% of runtime, 9.87M calls, IPC = 0.55, 34% cache miss rate, ~30 L3 misses per call.
+
+**3-day deliverable (due 2026-05-31):**
+- Deeper profiling on Luna: distinguish memory-bound vs I/O-bound
+- Per-function LLC miss rates via cachegrind
+- K-mer reuse measurement from barcode02.fastq
+- 2–3 concrete optimisation proposals with complexity + speedup estimates
+
+**Ideas under consideration:**
+- **Sequential ESKAPE pipeline** — query E/S/K/A/P/E one at a time, short-circuit on dominant match; smaller active DB per query fits in cache
+- **Hot-k-mer LRU cache** — pre-load most frequent k-mers per pathogen into L3; clinical samples are dominated by one species (barcode02 = 100% P. aeruginosa) so k-mer distribution is not random
 
 ### Goal 2 — Kolin sir's Caching Layer (§8)
 **Problem:** pipeline recomputes results for near-identical reads (same species, same region).
-**Solution:** build two caches:
-- **Kraken-2 (CPU):** Hot-K-mer LRU cache — pin frequent k-mer lookups in L3 cache. Uses Intel TBB (lock-free) + AVX-512 SIMD (batch lookups).
-- **Dorado (GPU):** Signal-to-Base cache in CUDA shared memory — LSH fuzzy matching to skip NN forward pass for near-duplicate signal windows.
+**Solution (Kraken-2 side):** Hot-K-mer LRU cache — pin frequent k-mer lookups in L3. Uses Intel TBB (lock-free) + AVX-512 SIMD (batch lookups).
+**Solution (Dorado side, deprioritised):** Signal-to-Base cache in CUDA shared memory — LSH fuzzy matching to skip NN forward pass for near-duplicate signal windows.
 
-**Immediate deliverable:** ~~2-page profile report using `perf` (Kraken-2) + Nsight (Dorado) by ~2026-05-25.~~ **Delivered 2026-05-26** — see `report.md` (full) and `report1.md` (2-page).
+**Baseline profiling:** **Delivered 2026-05-26** — see `final_report.md` (meeting-ready), `report.md` (full narrative).
 
-### Goal 3 — Time & Accuracy Improvement (assigned 2026-05-18, §14)
-
-**Two axes from Kolin sir's Meeting 3 direction:**
-
-**Time improvement — storage access + compute:**
-- Find **cache reuse** opportunities across the POD-5 → Dorado → Kraken-2 flow
-- Profiling tools to use:
-  - `gprof` — CPU call-graph, find which functions consume the most time
-  - `Valgrind / cachegrind` — cache miss rates, memory access pattern analysis
-- Find **matrix-vector / vector-matrix / matrix-matrix blocks** in Kraken-2 and Dorado source
-- Apply **cache blocking (tiling)** — restructure loops so data stays in L1/L2 cache
-- Apply **SIMD / MMX2 / AVX2 / AVX-512** — vectorize inner loops, process multiple k-mers per instruction
-
-**Accuracy improvement:**
-- Improve classification accuracy through the full pipeline (methods TBD in follow-up meetings)
+### Goal 3 — SNN for Dorado (Rohit + Rishabh, research phase)
+Explore spiking neural networks as replacement/accelerator for Dorado basecaller. Goal: can spike timing from raw nanopore signal replace some or all of the Transformer forward pass? No deliverable date set yet.
 
 ### Team / GitHub Structure (assigned 2026-05-18)
 - **Repo 1:** Chirag K + Chirag S — code, experiments, meeting minutes

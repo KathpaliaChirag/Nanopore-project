@@ -232,3 +232,31 @@ Next meeting / deadline: **2026-05-17**.
 ### GitHub
 - All new files committed and pushed to `KathpaliaChirag/Nanopore-project` (main)
 - `.gitignore` updated: compiled binaries excluded, AMDuProf profiling sessions excluded, `gmon.out` excluded
+
+---
+
+## 2026-05-28 — Session 9 — Meeting 4 debrief + summer direction set
+
+### Meeting 4 (2026-05-28)
+All attendees: **Kolin sir**, Chayanika mam, Chirag K (CK), Chirag Suthar, Rishabh, Rohit.
+
+**CK presented baseline profiling results:**
+- Kraken-2 (CPU): perf stat → 34.24% cache miss rate, 301M misses; gprof → 67% in `CompactHashTable::Get()`, 9.87M calls; AMD uProf → IPC = 0.55; verdict: **memory-bound**
+- Dorado (GPU): Nsight Systems → GEMM = 82% of GPU time (Tensor Cores FP16), cudaStreamSynchronize = 98.9% of CUDA API time; verdict: **compute-bound**
+- Matrix multiply benchmark suite (12 C implementations, N up to 10000) presented as empirical cache-blocking study
+
+**Two optimisation ideas discussed:**
+1. **Sequential ESKAPE pipeline** — query E, S, K, A, P, E one at a time instead of one large DB query; smaller active working set per query fits better in cache; short-circuit once dominant match found
+2. **L3 cache pinning / frequency-aware partitioning** — pre-compute most frequent k-mers per ESKAPE pathogen from real clinical samples; pin hot k-mers into L3; ~30 L3 misses per call × 9.87M calls is the target; clinical samples tend to be dominated by one pathogen (barcode02 = 100% P. aeruginosa)
+
+**Summer direction decided: Kraken-2 optimisation only.** Dorado/GPU work deprioritised.
+
+**Work split:**
+- Chirag K + Chirag S → 3-day Kraken-2 deeper analysis + 2–3 proposals → `kraken2_optimisation_report.md` due 2026-05-31
+- Rohit + Rishabh → SNN (spiking neural network) for Dorado basecalling; research phase, no report yet
+
+### Post-meeting documentation
+- `meeting_minutes.md` — Meeting 4 added (full profiling results, two ideas, work split, action items)
+- `plan.md` — summer direction section added; 3-day deliverable breakdown written
+- `summary.md` — Research Goals section rewritten to reflect Kraken-2-only focus and new work split
+- `kraken2_optimisation_report.md` — skeleton/template created for the 3-day deliverable

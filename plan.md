@@ -894,7 +894,51 @@ Day 6 (Lab server setup):
 Next steps:
   [ ] Re-run matmul on Luna — accurate IPC (no Hyper-V), compare Intel vs AMD
   [ ] Run Kraken-2 perf + gprof + TMA on Luna — confirm IPC, get real LLC miss rate
-  [ ] Run Nsight Compute on Dorado GEMM kernel on Luna L40S
-  [ ] Implement Hot-K-mer LRU cache for CompactHashTable::Get()
-  [ ] Run cachegrind on Luna (Minerva disk full)
+  [ ] Run cachegrind on Luna for per-function LLC miss rates (Minerva disk full)
+  [ ] Run `perf record` / `perf report` for source-line hotspot inside CompactHashTable::Get()
+  [ ] Measure k-mer reuse distribution from barcode02.fastq — quantify actual hit rate potential
+  [ ] Distinguish memory-bound vs I/O-bound (page fault analysis, DRAM bandwidth via numactl/perf mem)
+  [ ] Propose 2–3 concrete optimisation ideas with complexity + speedup estimates
+  [ ] Write kraken2_optimisation_report.md → push to GitHub (due 2026-05-31)
+  [ ] Run Nsight Compute on Dorado GEMM kernel on Luna L40S (deprioritised — after Kraken-2 work)
+
+---
+
+## Summer 2026 Direction (decided 2026-05-28, Meeting 4)
+
+**Primary focus: Kraken-2 optimisation only.**
+Dorado / GPU work is deprioritised until Kraken-2 work is complete.
+
+### Work split
+
+| Team | Task | Deadline |
+|---|---|---|
+| Chirag K + Chirag S | Deep Kraken-2 analysis + 2–3 optimisation proposals | 2026-05-31 |
+| Rohit + Rishabh | SNN (spiking neural network) approach for Dorado basecalling | TBD — research phase |
+
+### 3-day deliverable (Chirag K + Chirag S, due 2026-05-31)
+
+The skeleton is in `kraken2_optimisation_report.md`. Sections to complete:
+
+1. **Deeper profiling** — run on Luna (not WSL2):
+   - `perf stat` with LLC-load-misses, stalled-cycles-backend, DRAM bandwidth counters
+   - `perf record` + `perf report` → source-line hotspot inside `CompactHashTable::Get()`
+   - `cachegrind` → per-function LLC miss rates
+   - `numactl --hardware` → confirm NUMA topology; `perf mem` for memory access latency breakdown
+
+2. **Memory-bound vs I/O-bound distinction**
+   - Page fault count from perf (high = I/O-bound, reading from disk)
+   - DRAM bandwidth utilisation (are we saturating the memory bus?)
+   - If DRAM BW saturated → memory-bound; if page faults dominate → I/O-bound
+
+3. **K-mer reuse measurement**
+   - Parse barcode02.fastq → extract all 35-mers → count duplicates
+   - Compute hit rate if top-N k-mers were cached
+   - This validates or invalidates the LRU cache ROI estimate
+
+4. **2–3 concrete optimisation proposals**
+   - Idea A: Sequential ESKAPE query pipeline (query E, S, K, A, P, E one-by-one; short-circuit)
+   - Idea B: Hot-k-mer LRU cache — pin top-K frequent k-mers from clinical distribution
+   - Idea C: (TBD from deeper profiling)
+   - Each idea: algorithm description, implementation complexity, expected speedup estimate
 ```
