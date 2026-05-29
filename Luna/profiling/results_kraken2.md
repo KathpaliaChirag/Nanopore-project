@@ -488,12 +488,67 @@ The dataset may be too small to saturate all threads, or lock contention limits 
 | Total stall % | unknown | **48.7%** | |
 | TMA memory bound | unknown | **25.4%** | |
 | TMA core bound | unknown | **21.7%** | |
-| Hotspot function | CompactHashTable::Get() 67% | not yet measured | perf record pending |
+| Hotspot function | CompactHashTable::Get() 67% (gprof, user-space only) | MinimizerScanner::NextMinimizer 25.57%, CompactHashTable::Get 12.10%, I/O 20% | gprof was blind to kernel and I/O time |
+
+---
+
+## Step 6 — perf record + Flamegraph (hac, 32 threads)
+
+**Command:**
+```bash
+sudo perf record -g -F 99 -o ~/results/profiling/perf_hac_32t.data \
+  ~/tools/kraken2/kraken2 \
+  --db ~/data/kraken2_db \
+  --threads 32 \
+  --output ~/results/profiling/perf_record_hac_32t_out.txt \
+  ~/results/basecalling/reads_hac.fastq
+
+sudo perf script -i ~/results/profiling/perf_hac_32t.data | \
+  ~/tools/FlameGraph/stackcollapse-perf.pl | \
+  ~/tools/FlameGraph/flamegraph.pl > ~/results/profiling/flamegraph_hac_32t.svg
+```
+
+**Settings:** `-g` (call graph), `-F 99` (99 Hz sampling), 2142 samples collected, 0.239 MB data file.
+
+**Flamegraph:** `Luna/profiling/flamegraph_hac_32t.svg`
+
+---
+
+### 6a — Top Functions by Sample %
+
+| Function | Sample % | Type | Notes |
+|---|---|---|---|
+| `classify` | 99.11% | kraken2 | entire runtime is classification — expected |
+| `kraken2::MinimizerScanner::NextMinimizer` | **25.57%** | user-space | k-mer computation — #1 CPU hotspot |
+| `read` syscall path (entry_SYSCALL_64 → ext4_file_read_iter → filemap_read → copy_page_to_iter) | **~20%** | kernel I/O | FASTQ input reading from disk |
+| `[unknown]` | 13.45% | missing symbols | kraken2 binary lacks debug info for this slice |
+| `kraken2::CompactHashTable::Get` | **12.10%** | user-space | hash lookup — #2 user-space hotspot |
+| `exc_page_fault` / `handle_mm_fault` / `__handle_mm_fault` | **~11%** | kernel | DB mmap page faults — cold hash table pages loaded into process space |
+| `AddHitlistString` | 1.34% | user-space | writing classification hits to output |
+
+---
+
+### 6b — Analysis
+
+**WSL2 gprof result (67% CompactHashTable::Get) was misleading.**
+
+gprof only samples user-space CPU time. It cannot see:
+- Kernel time (I/O syscalls, page fault handlers)
+- Time spent blocked waiting for DRAM
+
+On native Luna with `perf`, the full picture is visible. The real breakdown is:
+
+- **25.57% — MinimizerScanner::NextMinimizer:** k-mer extraction and minimizer selection from each read. This is CPU-bound computation — not memory access. It is the true dominant hotspot, not hash lookups.
+- **~20% — I/O (read syscall chain):** Reading the FASTQ file from ext4. `filemap_read`, `copy_page_to_iter`, `_copy_to_iter` together account for ~16-20% of wall time. This is a real bottleneck invisible to gprof.
+- **12.10% — CompactHashTable::Get:** Hash table probing. Still significant but a smaller fraction than gprof suggested — because gprof's denominator (user CPU time only) excluded everything else.
+- **~11% — page faults on DB mmap:** Consistent with the 82% LLC miss rate and 11B DRAM stall cycles from perf stat. Each hash lookup that misses L3 triggers a TLB + page walk, and cold pages cause a page fault handled here.
+
+**Implication for optimisation:** Speeding up hash lookups alone (e.g., prefetching into CompactHashTable::Get) would address ~12% of wall time, not 67%. Reducing FASTQ I/O overhead (e.g., ramdisk, tmpfs, or mmap-based input) could recover ~20%. MinimizerScanner is CPU-bound — parallelisation or SIMD could help there.
 
 ---
 
 ## Next Steps
 
-- perf record + flamegraph at **32 threads** on hac model — confirm CompactHashTable::Get() as hotspot with Luna native PMU
-- NUMA analysis — check if hash table memory crosses socket boundary
+- NUMA analysis — check if hash table memory crosses socket boundary (numactl --hardware, numastat)
+- Run with DB on tmpfs to isolate I/O overhead — quantify the 20% I/O cost
 - nsys profiling of Dorado on L40S (results_dorado.md still blank)

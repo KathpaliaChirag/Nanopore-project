@@ -626,8 +626,33 @@ done 2>&1 | tee ~/results/profiling/thread_scaling_sup.txt
 
 ---
 
+### 32. perf record — hac model, 32 threads
+**Run as:** `student`
+```bash
+sudo perf record -g -F 99 -o ~/results/profiling/perf_hac_32t.data \
+  ~/tools/kraken2/kraken2 \
+  --db ~/data/kraken2_db \
+  --threads 32 \
+  --output ~/results/profiling/perf_record_hac_32t_out.txt \
+  ~/results/basecalling/reads_hac.fastq
+```
+**Status:** ✅ Done — 2142 samples, 0.239 MB, data saved to `perf_hac_32t.data`
+
+---
+
+### 33. Generate flamegraph from perf record data
+**Run as:** `student`
+```bash
+sudo perf script -i ~/results/profiling/perf_hac_32t.data | \
+  ~/tools/FlameGraph/stackcollapse-perf.pl | \
+  ~/tools/FlameGraph/flamegraph.pl > ~/results/profiling/flamegraph_hac_32t.svg
+```
+**Status:** ✅ Done — SVG saved to `~/results/profiling/flamegraph_hac_32t.svg`, copied to `Luna/profiling/flamegraph_hac_32t.svg` in repo
+
+---
+
 ## Next Steps
 
-- perf record + flamegraph at 32 threads on hac to confirm CompactHashTable::Get() hotspot (Luna native PMU)
-- NUMA analysis with numactl
+- NUMA analysis — numactl --hardware, numastat during a kraken2 run
+- Run with DB on tmpfs to isolate the ~20% I/O overhead
 - nsys profiling of Dorado GPU run

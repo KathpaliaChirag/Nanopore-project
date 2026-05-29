@@ -80,7 +80,7 @@ scripts for this are in `scripts/`.
 | tool | result |
 |---|---|
 | perf stat | **34.24% cache miss rate**, 301M misses, memory-bound verdict |
-| gprof | **67% of runtime in `CompactHashTable::Get()`** — 9.87M calls, pinpoints the bottleneck |
+| gprof | **67% of runtime in `CompactHashTable::Get()`** — 9.87M calls (later shown to be wrong — gprof misses kernel + I/O time) |
 | AMD uProf | **IPC = 0.55** (accurate — perf's cycle counter unreliable in WSL2/Hyper-V) |
 
 **dorado — Nsight Systems GPU profile (GTX 1650, fast mode):**
@@ -249,6 +249,53 @@ stall % rises from 42% at 4T to 56% at 192T. the DRAM stall cycle count is nearl
 
 ---
 
+### 7. luna — flamegraph analysis: gprof was wrong (2026-05-29)
+
+i ran `perf record -g -F 99` on the hac model at 32 threads, then generated a flamegraph with FlameGraph tools. this is the first full-stack profile — it captures kernel time and I/O, which gprof cannot.
+
+**result: gprof's 67% claim for `CompactHashTable::Get()` was wrong.**
+
+gprof only samples user-space CPU time. it never sees the kernel, I/O syscalls, or page fault handlers. on native luna with perf, the real breakdown is:
+
+---
+
+#### flamegraph: where wall time actually goes (hac, 32T)
+
+```mermaid
+pie title "Kraken-2 Wall Time Breakdown — perf flamegraph (hac, 32T)"
+    "MinimizerScanner::NextMinimizer (k-mer compute)" : 25.57
+    "read() syscall + ext4 + filemap (FASTQ I/O)" : 20.28
+    "[unknown] (missing debug symbols)" : 13.45
+    "CompactHashTable::Get (hash lookup)" : 12.10
+    "page faults on DB mmap" : 11.28
+    "other" : 17.32
+```
+
+| function | % | type | what it means |
+|---|---|---|---|
+| `MinimizerScanner::NextMinimizer` | **25.57%** | user CPU | k-mer extraction from reads — #1 hotspot |
+| `read()` syscall chain | **~20%** | kernel I/O | reading FASTQ file from ext4 |
+| `[unknown]` | 13.45% | missing symbols | kraken2 binary lacks debug info for this slice |
+| `CompactHashTable::Get` | **12.10%** | user CPU | hash table lookup — #2 user-space hotspot, not #1 |
+| `exc_page_fault` / `handle_mm_fault` | **~11%** | kernel | DB mmap cold-page faults — consistent with 82% LLC miss |
+| `AddHitlistString` | 1.34% | user CPU | writing output |
+
+---
+
+#### the gprof error explained
+
+gprof reported 67% in `CompactHashTable::Get()` because:
+
+1. its denominator was user-space CPU time only — it excluded kernel time entirely
+2. I/O and page faults are kernel-mode — both are invisible to gprof
+3. so CompactHashTable::Get() looked dominant when it was really ~12% of wall time
+
+the real dominant hotspot is `MinimizerScanner::NextMinimizer` at 25.57% — k-mer computation, not hash lookups. additionally, ~20% of wall time is spent on ext4 I/O reading the FASTQ file, something gprof was completely blind to.
+
+**implication for the caching design:** a hot-k-mer LRU cache targeting hash lookups addresses ~12% of wall time (+ ~11% from page faults = ~23% if cache avoids both). reducing FASTQ I/O (e.g., tmpfs/ramdisk for the input file) could recover another ~20%. MinimizerScanner is CPU-bound and a separate optimisation target.
+
+---
+
 ## why these numbers matter
 
 the profiling results directly justify Kolin sir's caching design:
@@ -337,8 +384,8 @@ Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all u
 ## what's next
 
 **profiling (Luna) — immediate:**
-- `perf record` + flamegraph on Luna to confirm `CompactHashTable::Get()` as hotspot with native PMU (was 67% on WSL2 gprof — want Luna-native confirmation)
 - NUMA analysis — check if hash table memory spans both sockets; pin to one socket with `numactl` and measure
+- run kraken-2 with FASTQ on tmpfs to quantify the ~20% I/O cost identified in flamegraph
 - matmul benchmark re-run on Luna — tables in `Luna/profiling/results_matmul_luna.md` are still blank; accurate IPC (no Hyper-V noise) and LLC miss rates now possible
 
 **profiling (Luna) — upcoming:**
@@ -346,7 +393,7 @@ Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all u
 - AMX matrix multiply (Luna-exclusive) — Xeon Platinum 8468 has AMX; compare vs tiled_avx2
 
 **implementation:**
-- start Hot-K-mer LRU cache layer for kraken-2 (`CompactHashTable::Get()` is the confirmed target — 67% of runtime on WSL2, now confirmed memory-bound on Luna)
+- start Hot-K-mer LRU cache layer for kraken-2 — flamegraph confirms hash lookups + page faults = ~23% of wall time; additional ~20% from FASTQ I/O is a separate target
 - run at **32 threads** going forward (not 96) — thread scaling shows 32T is the sweet spot for this dataset + DB combination
 
 ---
