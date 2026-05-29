@@ -673,9 +673,31 @@ for i in 1 2 3 4 5; do START=$(date +%s%3N); numactl --cpunodebind=1 --membind=1
 
 ---
 
+### 36. perf stat — all 4 NUMA configs (hac, 32T): node0+node0, node1+node1, cross-socket both ways
+**Run as:** `student`
+```bash
+numactl --cpunodebind=0 --membind=0 perf stat -e cycles,instructions -e LLC-load-misses,LLC-loads -e cycle_activity.stalls_total -e memory_activity.stalls_l3_miss kraken2 --db ~/data/kraken2_db --threads 32 --report /dev/null --output /dev/null ~/results/basecalling/reads_hac.fastq
+numactl --cpunodebind=1 --membind=1 perf stat [same events] ...
+numactl --cpunodebind=1 --membind=0 perf stat [same events] ...
+numactl --cpunodebind=0 --membind=1 perf stat [same events] ...
+```
+**Status:** ✅ Done — LLC miss% unchanged (~82% all configs); DRAM stalls 6.44B (local) vs 12.2B (cross); IPC 1.86 (local) vs 1.59 (cross)
+
+---
+
+### 37. TMA breakdown — all 4 NUMA configs (hac, 32T)
+**Run as:** `student`
+```bash
+numactl --cpunodebind=X --membind=Y perf stat -M tma_memory_bound,tma_core_bound kraken2 --db ~/data/kraken2_db --threads 32 --report /dev/null --output /dev/null ~/results/basecalling/reads_hac.fastq
+```
+**Status:** ✅ Done — memory_bound 23.9% (local) vs 31.7% (cross); core_bound consistent ~15% across all NUMA configs (thread-count effect, not NUMA); retiring best at 30.7% with node0+node0
+
+---
+
 ## Next Steps
 
-- Step 8: gprof on Luna (recompile kraken2 with -pg)
-- Step 9: valgrind cachegrind (per-function cache miss counts)
-- Step 10: FASTQ on tmpfs
-- Step 11: Dorado GPU profiling
+- Step 9: thread scaling with node 0 pinning
+- Step 10: gprof on Luna (recompile kraken2 with -pg)
+- Step 11: valgrind cachegrind
+- Step 12: FASTQ on tmpfs
+- Step 13: Dorado GPU profiling

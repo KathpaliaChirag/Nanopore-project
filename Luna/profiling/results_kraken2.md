@@ -695,9 +695,81 @@ Combined optimisation so far: 96T default (5.635s) → 32T (5.235s) → 32T + no
 
 ---
 
+## Step 8 — NUMA perf stat + TMA: all 4 socket/memory combinations (hac, 32T)
+
+**Goal:** Isolate the effect of NUMA on hardware counters — does pinning reduce LLC miss rate, or just miss latency?
+
+### 8a — perf stat (IPC, LLC miss, stall cycles)
+
+**Commands:**
+```bash
+# node0+node0, node1+node1, node1CPU+node0mem, node0CPU+node1mem
+numactl --cpunodebind=X --membind=Y perf stat \
+  -e cycles,instructions -e LLC-load-misses,LLC-loads \
+  -e cycle_activity.stalls_total -e memory_activity.stalls_l3_miss \
+  kraken2 --db ~/data/kraken2_db --threads 32 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq
+```
+
+| Config | IPC | LLC miss% | Total stalls (B) | Stall% | DRAM stalls (B) | Wall time |
+|---|---|---|---|---|---|---|
+| node0+node0 (local) | **1.86** | 83.1% | 25.38 | **42.1%** | **6.44** | **4.45s** |
+| node1+node1 (local) | 1.82 | 81.8% | 26.53 | 43.3% | 8.28 | 5.04s |
+| node1 CPU + node0 mem (cross) | 1.62 | 83.6% | 34.08 | 49.4% | 12.19 | 5.56s |
+| node0 CPU + node1 mem (cross) | 1.59 | 82.0% | 35.59 | 50.3% | 12.17 | 5.80s |
+| baseline (96T, no pin, hac warm) | 1.58 | 80.9% | 36.5 | 50.2% | 9.89 | 5.63s |
+
+**Key finding:** LLC miss rate stays ~82% across ALL configs — NUMA pinning does not reduce the number of cache misses (root cause is DB size >> L3, structural). DRAM stall cycles drop from 12.2B (cross-socket) to 6.44B (node0 local) — same number of misses, each one resolved faster with local DRAM. IPC improves from 1.59 to 1.86 as the CPU spends less time blocked.
+
+---
+
+### 8b — TMA breakdown (all 4 NUMA configs)
+
+| Config | memory_bound | core_bound | retiring | bad_spec | fe_bound | Wall time |
+|---|---|---|---|---|---|---|
+| baseline (96T, no pin) | 25.4% | 21.7% | 26.9% | 16.9% | 9.6% | 5.63s |
+| node0+node0 (local, 32T) | **23.9%** | **15.2%** | **30.7%** | 19.9% | 10.7% | **4.39s** |
+| node1+node1 (local, 32T) | 26.5% | 15.7% | 29.2% | 18.7% | 10.2% | 5.19s |
+| node0 CPU + node1 mem (cross) | **31.7%** | 15.3% | 26.8% | 17.3% | 9.3% | 5.50s |
+| node1 CPU + node0 mem (cross) | **31.6%** | 16.6% | 26.4% | 16.8% | 9.2% | 5.64s |
+
+**Finding 1 — NUMA adds 7.8pp to memory_bound:** node0-CPUs+node0-mem (23.9%) vs node0-CPUs+node1-mem (31.7%) — same CPUs, only memory location differs. The +7.8pp is purely QPI interconnect latency. Cross-socket configs waste nearly 1 in 3 pipeline slots waiting for remote memory.
+
+**Finding 2 — core_bound drop is from threads, not NUMA:** All 4 NUMA configs show core_bound 15.2–16.6% regardless of pinning. The baseline was 21.7% at 96T. Reduction came from dropping to 32T (less lock contention, less cache line thrashing). NUMA had no effect on core_bound.
+
+**Finding 3 — retiring improves to 30.7% (best ever):** Up from 26.9% at baseline. Both thread reduction and local memory contribute — the CPU is stalled less and does more useful work per slot.
+
+**Finding 4 — bad_spec ticks up slightly (16.9% → 19.9%):** Faster memory enables more aggressive out-of-order speculation, more instructions queued, slightly more squashed on branch mispredicts. The tradeoff is worth it — retiring gain exceeds bad_spec increase.
+
+**Finding 5 — both cross-socket configs identical at 31.6-31.7%:** QPI penalty is symmetric regardless of which socket has the CPU vs the data.
+
+---
+
+### 8c — Why node0+node0 beats node1+node1
+
+Both are "local" but node0 is faster (DRAM stalls 6.44B vs 8.28B). The FASTQ file (~355 Mbp) is also in OS page cache on node 0 from previous runs. When running pinned to node 1, the 32 threads access local DB pages but FASTQ reads still cross the interconnect. The ~1.84B extra stall cycles on node1+node1 is the FASTQ I/O still paying a cross-socket penalty.
+
+---
+
+### 8d — Counter summary vs baseline
+
+| Metric | baseline 96T unpinned | best: 32T node0 | change |
+|---|---|---|---|
+| IPC | 1.58 | **1.86** | +17.7% |
+| DRAM stall cycles | 9.89B | **6.44B** | −34.9% |
+| Stall % | 50.2% | **42.1%** | −8.1 pp |
+| memory_bound % | 25.4% | **23.9%** | −1.5 pp |
+| core_bound % | 21.7% | **15.2%** | −6.5 pp |
+| retiring % | 26.9% | **30.7%** | +3.8 pp |
+| LLC miss rate | 80.9% | 83.1% | unchanged (expected) |
+| Wall time | 5.63s | **4.39s** | −22.0% |
+
+---
+
 ## Next Steps
 
-- Step 8: gprof on Luna (recompile kraken2 with -pg, run, compare with WSL2 gprof result)
-- Step 9: valgrind cachegrind (per-function cache miss counts)
-- Step 10: FASTQ tmpfs experiment (Goal 2 — quantify the ~20% I/O cost)
-- Step 11: Dorado GPU profiling on L40S (Goal 3)
+- Step 9: thread scaling with node 0 pinning — does sweet spot shift from 32T?
+- Step 10: gprof on Luna (recompile kraken2 with -pg, compare with WSL2 result)
+- Step 11: valgrind cachegrind (per-function cache miss counts)
+- Step 12: FASTQ tmpfs experiment (quantify the ~20% I/O cost)
