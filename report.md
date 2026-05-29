@@ -66,15 +66,28 @@ Full phase details live in [`reports/phase1_dummytesting_dorado_kraken2.md`](rep
 
 > Full details: [kraken2_perf_lru_cache.md](reports/kraken2_perf_lru_cache.md)
 
-**Date:** 2026-05-29 — follow-up to Phase 2a gprof, using `perf stat -d -d` + TMA (Top-down Microarchitecture Analysis) + mpstat (Linux per-core CPU utilization tool).
-
-- **BE-Bound (Backend-Bound — pipeline stalled waiting on memory) 95.6%, IPC (Instructions Per Cycle) 0.16, Cache-Miss 24%** — pipeline stalled on DRAM ~94% of the time; only 3% of pipeline slots do real work
-- Cache-Miss% is a 16-thread aggregate across all cores, not a per-core figure
-- **`-pg` flag (gprof instrumentation) costs ~18% CPU** (`_mcount` + `__mcount_internal` + `mcount@plt`) — removing it from `Makefile` is a free ~18% speedup
-- `CompactHashTable::Get()` appears at only ~1% in perf record due to `-pg` sampling distortion — gprof's 80.65% is the correct figure
-- **K-mer→Taxon associativity table:** 4-way set-associative (each slot holds 4 entries; evicts least recently used on collision), 512 KB per thread (8 MB total across 16 threads — fits in 16 MB L3); maps minimizer/k-mer (64-bit hash) → taxon ID (32-bit taxonomy identifier); LRU keeps hot k-mers from common organisms resident; expected to drop Cache-Miss% from ~24% to ~10–15% and cut wall time 20–40%
+- **BE-Bound (Backend-Bound) 95.6%, IPC (Instructions Per Cycle) 0.16, Cache-Miss 24%** — pipeline stalled on DRAM ~94% of the time with the `-pg` binary; only 3% of slots did real work
+- **`-pg` flag cost ~18% CPU** — removing it from the Makefile raised IPC from 0.154 → 1.1–1.7 (8–10× improvement in useful work per cycle)
+- **K-mer→Taxon associativity table planned:** 4-way set-associative, 512 KB per thread (8 MB total, fits in 16 MB L3); maps minimizer/k-mer → taxon ID with LRU eviction; expected to reduce Cache-Miss% from ~24% to ~10–15%
 
 [→ Full details](reports/kraken2_perf_lru_cache.md)
+
+---
+
+## Phase 2c — Kraken2 Thread-Scaling Sweep (T1→T16, fast/hac/sup)
+
+> Full analysis: [kraken2_thread_scaling.md](reports/kraken2_thread_scaling.md)
+
+**Date:** 2026-05-29 — sweep across 9 thread counts (1,2,4,6,8,10,12,14,16) × 3 modes using `perf stat -d -d`, TMA (Top-down Microarchitecture Analysis) events, and mpstat per-core utilization. Binary rebuilt without `-pg`.
+
+- **T16 is fastest** (2.2–2.6 s, 2464–2836 Kseq/m) but only **36–41% efficient** — 16 threads on a memory-bound workload gives 6–7× speedup instead of the theoretical 16×
+- **T4–T6 is the efficiency sweet spot** — 67–86% scaling efficiency, IPC still 1.4–1.6, DRAM contention not yet severe; gives ~65–75% of T16 speed at half the CPU cost
+- **IPC without `-pg`: 1.1–1.7** vs 0.154 with it — removing profiling overhead recovered ~88% of wasted pipeline capacity
+- **BE-Bound rises with threads** (75% at T1 → 79% at T16) — more threads = more simultaneous random probes into the 8 GB DB = memory controller congestion; the bottleneck gets worse as threads increase
+- **fast/T10 regresses vs T8** — hyperthreading boundary artefact: 10 threads on 8 physical cores forces 2 cores to share L1/L2, slightly raising wall time before more threads compensate at T12+
+- **Classification accuracy unchanged** across all thread counts (fast 93.18%, hac 97.85%, sup 98.38%) — parallelism only splits reads, never changes results
+
+[→ Full analysis with all tables](reports/kraken2_thread_scaling.md)
 
 ---
 
