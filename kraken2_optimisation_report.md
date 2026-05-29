@@ -1,254 +1,411 @@
 # Kraken-2 Optimisation Report
-**Authors:** Chirag K (CK) + Chirag Suthar  
-**Due:** 2026-05-31  
+**Authors:** Chirag K (CK) + Chirag Suthar
+**Due:** 2026-05-31
 **Supervisor:** Kolin sir, Chayanika mam
+
+This report consolidates: (a) baseline profiling already completed on WSL2/Minerva/Luna,
+(b) source-derived correction of earlier inferred algorithms, (c) ten concrete
+optimisation proposals with code diffs, and (d) the pending Luna measurements that
+will calibrate each patch's expected delta. Supplementary files:
+`kraken2_get_optimizations.md` (v1 patches), `kraken2_get_optimizations_v2.md`
+(v2 patches), `Luna/experiments/{kraken2_opt_v1.patch, run_kraken2_opt_v1.sh,
+pending_measurements.md}`, and `kraken2_execution_checklist.md`.
 
 ---
 
-## 1. Baseline Profiling Recap (already delivered 2026-05-26)
+## 1. Baseline profiling — what is proven
+
+### 1.1 Initial (WSL2 + AMD uProf, 2026-05-26)
 
 | Tool | Result | Verdict |
 |---|---|---|
-| `perf stat` (WSL2) | 34.24% cache miss rate, 301M misses/run | Memory-bound |
-| `gprof` (WSL2) | 67% runtime in `CompactHashTable::Get()`, 9.87M calls | Hotspot confirmed |
+| `perf stat` (WSL2) | 34.24 % cache miss rate, 301 M misses / run | Memory-bound |
+| `gprof` (WSL2) | 67 % runtime in `CompactHashTable::Get()`, 9.87 M calls | Hotspot confirmed |
 | AMD uProf (local) | IPC = 0.55 | CPU stalling, not computing |
 
-**Key arithmetic:** 301M misses ÷ 9.87M calls = ~30 L3 misses per `CompactHashTable::Get()` call.  
-At ~100 ns per L3 miss: 301M × 100 ns = **~30 seconds** in L3 miss latency per run.
+**Derived:** 301 M ÷ 9.87 M ≈ **30 L3 misses per Get() call**. At ~100 ns/miss →
+~30 s of DRAM latency per run (out of 105.87 s total, 1T).
 
-**Limitation of baseline:** perf run on WSL2/Hyper-V — `LLC-load-misses` counter may be L2, not LLC. Needs verification on Luna (bare metal, `perf_event_paranoid = 1` confirmed).
+### 1.2 Luna deep profiling (2026-05-28 → 2026-05-29)
 
----
+Luna is bare metal (perf_event_paranoid = 1), so every counter that was unavailable
+on WSL2 was re-measured.
 
-## 2. Deeper Profiling (to run on Luna)
+| Probe | Result |
+|---|---|
+| `perf stat` hac, 32T, node0 | **wall = 4.405 s** ← current best |
+| `perf stat` hac, 96T default | wall = 5.635 s |
+| LLC miss rate | 80–82 % |
+| LLC misses / run | ~1 × 10⁹ |
+| DRAM stalls | 8–11 × 10⁹ cycles (48–52 % of total cycles) |
+| IPC | 1.47–1.65 (theoretical max ≈ 6) |
+| TMA `memory_bound` | 23–28 % |
+| TMA `core_bound`   | 15–22 % |
+| cachegrind hac 1T | **`CompactHashTable::Get()` = 96.24 % of all LL read misses** |
+| cachegrind hac 1T | `MinimizerScanner` = 48 % of instructions, **0 LL misses** |
+| Flamegraph hac 32T | MinimizerScanner 25.57 %, I/O page-cache copy 20 %, Get 12.10 % |
+| tmpfs experiment | **No benefit** — the I/O tower is page-cache copy, not disk |
 
-### 2.1 Confirm memory-bound vs I/O-bound
+### 1.3 Verdict
 
-**Command — Luna:**
-```bash
-perf stat -e LLC-load-misses,LLC-loads,stalled-cycles-backend,stalled-cycles-frontend,\
-dram_bw_use:total,page-faults,instructions,cycles \
-    ~/kraken2-build/kraken2 --db ~/eskape_db --report /dev/null ~/barcode02.fastq > /dev/null
-```
-
-**What to record:**
-
-| Metric | Expected (memory-bound) | Expected (I/O-bound) |
-|---|---|---|
-| `stalled-cycles-backend` | >50% of cycles | moderate |
-| `page-faults` | low (<1000) | very high (millions) |
-| `LLC-load-misses` | high (>100M) | moderate |
-| DRAM bandwidth utilisation | >50% peak | low |
-
-**Interpretation:**
-- High `stalled-cycles-backend` + high `LLC-load-misses` + low `page-faults` = **memory-bound** (RAM latency, not disk)
-- High `page-faults` = **I/O-bound** (DB being paged in from disk — fix: ensure DB fits in RAM before run)
-
-### 2.2 Per-function LLC miss rates (cachegrind on Luna)
-
-```bash
-valgrind --tool=cachegrind --cachegrind-out-file=~/cg_kraken2.out \
-    ~/kraken2-build/kraken2 --db ~/eskape_db --report /dev/null ~/barcode02.fastq > /dev/null
-
-cg_annotate --auto=yes ~/cg_kraken2.out > ~/cachegrind_report.txt
-```
-
-**What to record:**
-- `DLmr` (LLC data read misses) per function — top 5 functions
-- Expected: `CompactHashTable::Get()` dominates `DLmr`
-- If another function also has high `DLmr` — that is a second optimisation target
-
-### 2.3 Source-line hotspot inside CompactHashTable::Get()
-
-```bash
-perf record -g --call-graph dwarf \
-    ~/kraken2-build/kraken2 --db ~/eskape_db --report /dev/null ~/barcode02.fastq > /dev/null
-
-perf report --sort=dso,symbol,srcline
-```
-
-Press `a` on `CompactHashTable::Get()` to annotate source lines. Note:
-- Which line accounts for the most samples?
-- Is it the hash table read (`table_[idx]`)? The hash computation? The linear probe loop?
-
-### 2.4 NUMA and DRAM bandwidth (Luna has 2 NUMA nodes)
-
-```bash
-# Check NUMA topology
-numactl --hardware
-
-# Run with NUMA binding — force DB and process to same NUMA node
-numactl --cpunodebind=0 --membind=0 \
-    ~/kraken2-build/kraken2 --db ~/eskape_db --report /dev/null ~/barcode02.fastq > /dev/null
-
-# Compare runtime with and without numactl binding
-```
-
-**What to record:** is there a speedup when forcing NUMA locality? If yes — cross-NUMA traffic is contributing to memory latency.
+**Latency-bound, not bandwidth-bound, not I/O-bound.** The CPU is stalled waiting
+for DRAM reads inside `CompactHashTable::Get()`. The remaining optimisation
+budget is therefore: (a) avoid the read entirely (caching) or (b) hide the latency
+(prefetch, batching).
 
 ---
 
-## 3. K-mer Reuse Distribution (validates LRU cache ROI)
+## 2. Corrections to earlier inferred algorithms
 
-The 6-second savings estimate (20% hit rate × 9.87M calls × 30 misses × 100 ns) assumes 20% of `CompactHashTable::Get()` calls are for k-mers we've already seen. This needs empirical validation.
+The original profiling notes inferred a Get() body from intuition. Reading the
+actual upstream source (master, github.com/DerrickWood/kraken2, 2026-05-29) revealed
+three differences that change which optimisations make sense.
 
-**Script to run:**
-```python
-# Count k-mer frequency distribution in barcode02.fastq
-from collections import Counter
+### 2.1 Cells are 32-bit or 40-bit packed, not 64-bit
 
-k = 35
-kmer_counts = Counter()
-
-with open("barcode02.fastq") as f:
-    lines = f.readlines()
-    # FASTQ: line 0 = header, line 1 = sequence, line 2 = +, line 3 = qual
-    for i in range(1, len(lines), 4):
-        seq = lines[i].strip()
-        for j in range(len(seq) - k + 1):
-            kmer_counts[seq[j:j+k]] += 1
-
-total_kmers = sum(kmer_counts.values())
-unique_kmers = len(kmer_counts)
-
-# How many k-mers are seen more than once?
-repeated = {kmer: count for kmer, count in kmer_counts.items() if count > 1}
-repeat_hits = sum(count - 1 for count in repeated.values())
-
-print(f"Total k-mers:          {total_kmers:,}")
-print(f"Unique k-mers:         {unique_kmers:,}")
-print(f"Repeat lookup savings: {repeat_hits:,} ({100*repeat_hits/total_kmers:.1f}%)")
-
-# Top-100 k-mers: what % of all lookups do they cover?
-top100 = kmer_counts.most_common(100)
-top100_hits = sum(c for _, c in top100)
-print(f"Top-100 k-mers cover:  {100*top100_hits/total_kmers:.1f}% of all lookups")
-```
-
-**What to record:**
-- `repeat_hits / total_kmers` = actual LRU hit rate if all repeated k-mers are cached
-- Top-100 coverage = hit rate achievable with a tiny 100-entry cache
-- If top-100 coverage > 20%: the 6-second estimate is conservative, cache ROI is real
-
----
-
-## 4. Optimisation Proposals
-
-### Proposal A — Hot-K-mer LRU Cache
-
-**Idea:** Wrap `CompactHashTable::Get()` with a small LRU cache. Before calling into the hash table, check a fast in-memory cache of recently-seen k-mers. On a hit, skip the hash table lookup entirely.
-
-**Basis:** 
-- `CompactHashTable::Get()` = 67% of runtime, 9.87M calls
-- Barcode02 = 100% P. aeruginosa → k-mer access is highly non-uniform (one species dominates)
-- Each cache hit saves ~30 L3 misses × 100 ns = ~3 µs per call
-
-**Implementation sketch:**
 ```cpp
-// In classify/kraken2.cc, around CompactHashTable::Get() call:
-thread_local LRUCache<uint64_t, taxid_t> kmer_cache(1024);  // 1024-entry per-thread cache
+// src/compact_hash.h
+struct CompactHashCell { uint32_t data; };                              // 4-byte
+struct CompactHashCell40 { uint32_t a; uint8_t b; } __attribute__((packed));  // 5-byte
+```
 
-taxid_t get_kmer_taxid(uint64_t kmer, CompactHashTable &cht) {
-    taxid_t *cached = kmer_cache.get(kmer);
-    if (cached) return *cached;
-    taxid_t result = cht.Get(kmer);
-    kmer_cache.put(kmer, result);
-    return result;
+Default upstream Makefile builds with `cht_cell_size = 32`. **But `build_db.cc`
+appears to instantiate `CompactHashCell40` for both `-C 32` and `-C 40`** —
+likely a refactor-in-progress bug:
+
+```cpp
+if (opts.cht_cell_size == 32) {
+    build<CompactHashCell40>(...);    // <-- both branches use Cell40
+} else if (opts.cht_cell_size == 40) {
+    build<CompactHashCell40>(...);
 }
 ```
 
-**Complexity:** Low — wrapper around existing function, no change to data structures.  
-**Expected speedup:** 20% hit rate → ~6 s saved per run. 50% hit rate (plausible for single-species samples) → ~15 s saved.  
-**Risk:** Cache eviction policy; thread safety (use per-thread cache to avoid locks).
+This is testable on Luna: read the first 32 bytes of `hash.k2d` and compute
+`(file_bytes - 32) / capacity`. If ≈ 5 → 40-bit cell. The pre-built
+`k2_standard_08gb` is almost certainly 40-bit packed.
 
----
+**Implication:** prefetch stride is **12 cells per cache line, not 16**.
+`64 / sizeof(Cell)` handles either.
 
-### Proposal B — Sequential ESKAPE Query Pipeline
+### 2.2 Linear probing is the default, not double hashing
 
-**Idea:** Instead of one Kraken-2 query against a combined ESKAPE DB, run 6 sequential queries, one per pathogen. Short-circuit once a dominant species is found.
-
-**Basis:**
-- Clinical samples are typically dominated by one pathogen (barcode02 = 100% P. aeruginosa)
-- Per-pathogen DB is ~108 MB (650 MB ÷ 6) — fits entirely in Luna's L3 (210 MB)
-- When the active DB fits in L3, `CompactHashTable::Get()` becomes L3 hits instead of RAM accesses → 100 ns → 10 ns per lookup
-
-**Implementation sketch:**
-```bash
-for pathogen in E S K A P E; do
-    kraken2 --db eskape_${pathogen}_db --report ${pathogen}_report.txt input.fastq
-    # If dominant species found (>80% reads), stop
-    top_pct=$(awk 'NR==2{print $1}' ${pathogen}_report.txt)
-    if (( $(echo "$top_pct > 80" | bc -l) )); then
-        echo "Dominant species found: $pathogen"
-        break
-    fi
-done
+```makefile
+# src/Makefile
+CXXFLAGS += -DLINEAR_PROBING
 ```
 
-**Complexity:** Low for the query loop; medium for building 6 separate sub-databases.  
-**Expected speedup:** If dominant species found in first 1–2 queries → 3–5× reduction in total lookup work. Worst case (no dominant species) = 6× slower.  
-**Risk:** Accuracy may drop — k-mers shared between pathogens are assigned to the first matching DB. Need accuracy validation against combined-DB baseline on golden dataset.
+```cpp
+template<typename Cell>
+inline uint64_t CompactHashTable<Cell>::second_hash(uint64_t first_hash) const {
+#ifdef LINEAR_PROBING
+  return 1;
+#else
+  return (first_hash >> 8) | 1;
+#endif
+}
+```
+
+**Implication:** adjacent probes hit adjacent cells (same / next cache line), so
+the hardware prefetcher can help on long probe walks. The "every probe is a fresh
+L3 miss" reading is incorrect; long clusters under near-full load factor explain
+the 96.24 % LL share.
+
+### 2.3 `hash->Get` is virtual through `KeyValueStore`
+
+```cpp
+class KeyValueStore {
+  virtual hvalue_t Get(hkey_t key) const = 0;
+};
+```
+
+Every call from `classify.cc` pays a vtable load. Eliminable via LTO or `final`.
+
+### 2.4 classify.cc already has a 1-entry "cache"
+
+```cpp
+// src/classify.cc, ClassifySequence
+if (*minimizer_ptr != last_minimizer) {
+  taxon = hash->Get(*minimizer_ptr);   // only here on minimizer change
+  last_minimizer = *minimizer_ptr;
+} else {
+  taxon = last_taxon;
+}
+```
+
+So the 9.87 M Get() calls reported by gprof are **already after** the same-as-last
+skip. A bigger LRU must beat this 1-entry "cache" to be worth the patch.
+
+### 2.5 Real Get() body
+
+```cpp
+template<typename Cell>
+hvalue_t CompactHashTable<Cell>::Get(hkey_t key) const {
+  uint64_t hc = MurmurHash3(key);                          // computed once
+  uint64_t compacted_key = hc >> (64 - key_bits_);
+  size_t idx = hc % capacity_;
+  size_t first_idx = idx;
+  size_t step = 0;
+  while (true) {
+    if (! table_[idx].value(value_bits_)) break;           // empty cell → not in DB
+    if (table_[idx].hashed_key(value_bits_) == compacted_key)
+      return table_[idx].value(value_bits_);
+    if (step == 0) step = second_hash(hc);                 // LINEAR_PROBING: step = 1
+    idx += step;
+    idx %= capacity_;
+    if (idx == first_idx) break;                            // table exhausted
+  }
+  return 0;
+}
+```
 
 ---
 
-### Proposal C — [To be determined from deeper profiling]
+## 3. Pending Luna measurements (decide patch parameters)
 
-After running cachegrind + perf record on Luna, a third target may emerge (e.g. a secondary function with high DLmr, or a vectorisation opportunity in the hash function itself).
+Seven measurements, all scripted in `Luna/experiments/pending_measurements.md`.
+They take ~10 minutes total and decide which patches matter and how to tune them.
 
-Placeholder candidates:
-- **Hash function SIMD vectorisation** — if the MurmurHash3 inner loop is a significant contributor, batch-hashing 4–8 k-mers per AVX2 instruction
-- **Compact hash table prefetching** — software prefetch for the next k-mer's table bucket while processing current one (reduces effective latency if accesses are somewhat predictable)
-
----
-
-## 5. Results Tables (to fill after Luna runs)
-
-### 5.1 Luna perf stat — Kraken-2
-
-| Metric | WSL2 baseline | Luna result | Notes |
-|---|---|---|---|
-| Wall time (s) | 105.87 s (gprof) / 159.4 s (perf) | TBD | |
-| cache-misses | 301M | TBD | |
-| LLC-load-misses | N/A (WSL2) | TBD | real LLC counter |
-| stalled-cycles-backend | N/A | TBD | |
-| page-faults | N/A | TBD | I/O-bound check |
-| IPC | 0.55 (AMD uProf) | TBD | expect similar |
-| DRAM BW utilisation | N/A | TBD | |
-
-### 5.2 cachegrind — per-function LLC misses
-
-| Function | DLmr (LLC read misses) | % of total |
+| # | What | Decides |
 |---|---|---|
-| CompactHashTable::Get() | TBD | TBD |
-| (2nd function) | TBD | TBD |
-| (3rd function) | TBD | TBD |
+| M1 | `hash.k2d` header: cell size, load factor | prefetch stride; LRU viability |
+| M2 | `dTLB-load-misses / dTLB-loads` | whether MADV_HUGEPAGE pays |
+| M3 | `perf annotate CompactHashTable::Get` | exact miss line — confirms model |
+| M4 | uncore_imc cas_count → GB/s | latency-bound vs bandwidth-bound |
+| M5 | minimizer reuse rate on hac input | whether thread-local LRU pays |
+| M6 | `perf c2c` HITM events | whether per-socket DB replica matters |
+| M7 | `objdump` ymm/zmm count | AVX-512 use in current binary |
 
-### 5.3 K-mer reuse distribution
-
-| Metric | Value |
-|---|---|
-| Total k-mer lookups | TBD |
-| Unique k-mers | TBD |
-| Repeated lookup fraction | TBD % |
-| Top-100 k-mer coverage | TBD % |
-| Estimated LRU hit rate (1024 entries) | TBD % |
-
----
-
-## 6. Summary of Proposals
-
-| Proposal | Complexity | Expected speedup | Accuracy risk | Priority |
-|---|---|---|---|---|
-| A — Hot-K-mer LRU Cache | Low | 20–50% runtime reduction | None | High |
-| B — Sequential ESKAPE Pipeline | Medium | 3–5× for dominant-species samples | Needs validation | Medium |
-| C — TBD from profiling | TBD | TBD | TBD | TBD |
+**Decision gates:**
+- M4 ratio < 0.5 → latency-bound (expected) → all v1 + v2 patches apply.
+- M4 ratio > 0.7 → bandwidth-bound → defer LRU, escalate to DB compression.
+- M5 reuse > 0.30 → Patch 4 (LRU) is high-value; < 0.10 → skip Patch 4.
 
 ---
 
-## 7. References
+## 4. Optimisation proposals — ten patches
 
-- Baseline profiling: `final_report.md`
-- Kraken-2 source: `https://github.com/DerrickWood/kraken2`
-- `CompactHashTable` implementation: `src/compact_hash.h`, `src/compact_hash.cc`
+Each patch is a code diff against the upstream source. Files referenced live in
+`~/kraken2-src/src/`. Full diffs are in `kraken2_get_optimizations.md` (v1) and
+`kraken2_get_optimizations_v2.md` (v2). The unified diff to apply at once is
+`Luna/experiments/kraken2_opt_v1.patch`.
+
+### 4.1 Patch 1 — software prefetch in the probe loop (Kolin sir's Proposal E)
+
+**Why:** 96 % of all LL misses are in this loop. Issuing
+`__builtin_prefetch(&table_[idx + 64/sizeof(Cell)])` one cache line ahead each
+iteration starts the DRAM read ~100 ns before the load needs it. Even with
+linear probing the HW prefetcher only streams ~2–4 lines; explicit prefetch
+extends the window.
+
+**Where:** `src/compact_hash.h`, body of `Get()`.
+
+**Expected delta:** **−5 to −15 %.**
+
+### 4.2 Patch 2 — MADV_HUGEPAGE on the mmap'd hash table (huge pages)
+
+**Why:** 8 GB / 4 KB pages = 2 097 152 page entries. Sapphire Rapids DTLB has
+~96 small-page entries → constant DTLB misses on the probe walk. 2 MB huge
+pages reduce that to ~4 096 entries — easily fits the L2 DTLB.
+
+**Where:** `src/mmap_file.cc::OpenFile()`, after the `mmap()` call:
+```cpp
+(void) madvise(fptr_, filesize_, MADV_HUGEPAGE);
+(void) madvise(fptr_, filesize_, MADV_WILLNEED);
+(void) madvise(fptr_, filesize_, MADV_RANDOM);
+```
+
+**Expected delta:** **−3 to −8 %** (M2 measurement calibrates).
+
+### 4.3 Patch 3 — compiler flags
+
+**Why:** `-march=sapphirerapids` exposes BMI2 + AVX-512 (MurmurHash speedup);
+`-flto` inlines `hash->Get()` across translation units (devirtualises); `-funroll-loops`
+unrolls the probe.
+
+**Where:** `src/Makefile`:
+```makefile
+CXXFLAGS += -march=sapphirerapids -mtune=sapphirerapids -flto=auto -funroll-loops -fno-plt
+LDFLAGS  += -flto=auto -fuse-linker-plugin
+```
+
+**Expected delta:** **−5 to −12 %.**
+
+### 4.4 Patch 4 — thread-local direct-mapped k-mer cache (Kolin sir's Proposal A)
+
+**Why:** the existing 1-entry skip handles within-window minimizer collisions;
+this captures cross-window and cross-read reuse. 16 K entries × 16 B = 256 KB
+per thread, fits in 2 MB L2 per core. Every hit avoids ~30 LL misses ≈ 3 µs
+of DRAM latency.
+
+**Where:** `src/classify.cc::ClassifySequence`, replacing the existing
+`hash->Get()` call:
+```cpp
+thread_local LRUEntry lru_cache[1u << 14] = {};
+constexpr uint64_t LRU_MIX = 0x9E3779B97F4A7C15ULL;   // Fibonacci hash
+size_t slot = (*minimizer_ptr * LRU_MIX) >> (64 - 14);
+LRUEntry &e = lru_cache[slot];
+if (e.key == *minimizer_ptr && e.key != 0)  taxon = e.val;
+else { taxon = hash->Get(*minimizer_ptr); e.key = *minimizer_ptr; e.val = taxon; }
+```
+
+**Expected delta:** **−10 to −30 %**, gated by M5 reuse rate.
+
+**Tunable:** `LRU_BITS` 13 (8 K, 128 KB) ↔ 16 (64 K, 1 MB) depending on M5.
+
+### 4.5 Patch 5 — per-socket DB replica (NUMA)
+
+**Why:** mmap one DB copy per socket so 64T+ runs don't pay cross-NUMA latency.
+**Apply only if M6 c2c HITM > 5 %**; currently the 32T-on-node0 baseline
+already avoids the issue.
+
+**Expected delta:** TBD; deferred.
+
+### 4.6 Patch 6 — devirtualise via `final` + concrete-typed dispatch
+
+**Why:** drops the vtable load per call (~5 ns × 9.87 M = 50 ms wall on 1T,
+amortised across threads at 32T but still real).
+
+**Where:** add `final` to `CompactHashTable<Cell>::Get` in `compact_hash.h`; in
+`classify.cc`, `dynamic_cast` once per batch and dispatch to the concrete type.
+
+**Expected delta:** **−2 to −5 %.** Largely subsumed by Patch 3 (LTO) but more
+portable.
+
+### 4.7 Patch 7 — single MurmurHash via `GetByHash`
+
+**Why:** when `minimum_acceptable_hash_value > 0` (MiniKraken DBs), classify.cc
+computes MurmurHash3 in the inner loop *and* Get() recomputes it. Add a
+`GetByHash(key, hc)` overload and pass the hash through.
+
+**Expected delta:** −1 to −3 % on standard_8; −5 to −10 % on MiniKraken.
+
+### 4.8 Patch 8 — `ResolveTree` from O(N²) to O(N)
+
+**Why:** `ResolveTree` in classify.cc has a nested loop calling
+`taxonomy.IsAAncestorOfB(b, a)` for every pair `(a, b)` in `hit_counts`. For
+long nanopore reads, |hit_counts| can be 50+, so this is 50 × 50 × tree_depth
+≈ 12 000 random reads into the taxonomy nodes array per read, × 104 918 reads
+≈ 1 billion accesses per run.
+
+**Where:** `src/classify.cc::ResolveTree` — precompute an ancestor vector per
+unique taxon, replace the inner `IsAAncestorOfB` call with `std::find` on a
+short vector.
+
+**Expected delta:** **−2 to −6 %**, scales with read length.
+
+### 4.9 Patch 9 — skip output formatting when `-O /dev/null`
+
+**Why:** `ostringstream koss << ...` runs for every read even when the kraken
+output is discarded (which is what our perf runs do). Add a bool gate.
+
+**Expected delta:** −1 to −2 %.
+
+### 4.10 Patch 10 — batched Get() with cross-call prefetch pipeline (design only)
+
+**Why:** even with Patch 1 the prefetcher only helps *inside* a single Get().
+Batching N minimizers, issuing all N Murmur + prefetches first then resolving
+all N, lets the CPU pipeline DRAM accesses across Get() calls.
+
+**Status:** sketched in v2 §Patch 10 — invasive (changes ClassifySequence loop
+shape); apply only if Phase 1+2 patches leave wall > 3.0 s.
+
+---
+
+## 5. Expected cumulative stack
+
+If patches stack independently (different bottlenecks) at midrange estimates:
+
+| Phase | Patch | Mechanism | Δ | Cumulative |
+|---|---|---|---:|---:|
+| baseline | — | — | — | **4.405 s** |
+| 1 | 3 (flags) | inline + tight ASM | −8 % | 4.05 s |
+| 1 | 2 (huge pages) | dTLB | −5 % | 3.85 s |
+| 1 | 1 (prefetch) | hide DRAM in probe | −10 % | 3.47 s |
+| 2 | 4 (thread LRU) | skip DRAM on hits | −20 % | 2.77 s |
+| 3 | 6 (devirt) | drop vtable | −3 % | 2.69 s |
+| 3 | 7 (single hash) | reuse MurmurHash | −2 % | 2.66 s |
+| 3 | 8 (O(N) ResolveTree) | drop quadratic | −4 % | 2.55 s |
+| 3 | 9 (skip output) | drop ostringstream | −1.5 % | 2.51 s |
+
+**Target:** ≤ 2.6 s wall, ≈ −41 % vs 4.405 s, ≈ −55 % vs 5.635 s.
+
+**Stop rule:** two consecutive patches with delta < 2 % → stop the cycle.
+
+---
+
+## 6. Results tables (to fill after Luna runs)
+
+### 6.1 M1–M7 measurements
+
+| ID | Metric | Value |
+|---|---|---|
+| M1 | cell size (32 / 40 bit) | TBD |
+| M1 | capacity | TBD |
+| M1 | load factor | TBD |
+| M2 | dTLB miss rate | TBD |
+| M3 | top miss line in Get() | TBD |
+| M4 | DRAM utilisation vs peak | TBD |
+| M5 | minimizer reuse rate | TBD |
+| M5 | top-16 K cumulative coverage | TBD |
+| M6 | c2c HITM share | TBD |
+| M7 | zmm / ymm / xmm count | TBD |
+
+### 6.2 Per-patch benchmark
+
+| Patch | wall (s) | Δ vs baseline | LLC-load-misses | dTLB-load-misses | IPC | report identical |
+|---|---:|---:|---:|---:|---:|:---:|
+| baseline (4.405 s) | 4.405 | 0 % | ~1.0 × 10⁹ | TBD | 1.47–1.65 | ✓ |
+| + Patch 3 (flags) | TBD | TBD | TBD | TBD | TBD | TBD |
+| + Patch 2 (huge pages) | TBD | TBD | TBD | TBD | TBD | TBD |
+| + Patch 1 (prefetch) | TBD | TBD | TBD | TBD | TBD | TBD |
+| + Patch 4 (LRU) | TBD | TBD | TBD | TBD | TBD | TBD |
+| + Patch 6 (devirt) | TBD | TBD | TBD | TBD | TBD | TBD |
+| + Patch 7 (single hash) | TBD | TBD | TBD | TBD | TBD | TBD |
+| + Patch 8 (ResolveTree) | TBD | TBD | TBD | TBD | TBD | TBD |
+| + Patch 9 (skip output) | TBD | TBD | TBD | TBD | TBD | TBD |
+
+Run via `Luna/experiments/run_kraken2_opt_v1.sh`; paste its SUMMARY block.
+
+---
+
+## 7. Summary of proposals
+
+| # | Proposal | Complexity | Expected Δ | Accuracy risk | Priority |
+|---|---|---|---:|---|---|
+| 1 | Probe-loop prefetch | Low | −5 / −15 % | None | **High** |
+| 2 | Huge pages | Low | −3 / −8 % | None | **High** |
+| 3 | `-march=sapphirerapids` + LTO | Trivial | −5 / −12 % | None | **High** |
+| 4 | Thread-local k-mer cache | Low | −10 / −30 % | None | **High** (if M5 ≥ 0.20) |
+| 5 | Per-socket DB replica | Med | TBD | None | Low (defer) |
+| 6 | `final` + devirt dispatch | Low | −2 / −5 % | None | Med |
+| 7 | Single MurmurHash | Low | −1 / −3 % | None | Med |
+| 8 | O(N) ResolveTree | Low-Med | −2 / −6 % | None | Med |
+| 9 | Skip output for /dev/null | Trivial | −1 / −2 % | None | Med |
+| 10 | Batched Get pipeline | High | TBD | None | Defer |
+
+Original Proposal A (LRU) survives as Patch 4. Original Proposal B (sequential
+ESKAPE pipeline) is orthogonal to this report's CPU optimisations; revisit if
+the standard_8 baseline is replaced by a per-pathogen DB workflow.
+
+---
+
+## 8. Execution plan
+
+`kraken2_execution_checklist.md` has the linear top-to-bottom path: run M1–M7,
+apply Phase 1 patches via `Luna/experiments/kraken2_opt_v1.patch`, benchmark,
+decide on Patch 4 from M5, layer v2 patches with the < 2 % stop rule.
+
+---
+
+## 9. References
+
+- Baseline profiling: `final_report.md`, `Luna/profiling/results_kraken2.md`
+- Kraken-2 source: github.com/DerrickWood/kraken2 (master, 2026-05-29)
+- v1 patches with rationale + diffs: `kraken2_get_optimizations.md`
+- v2 patches: `kraken2_get_optimizations_v2.md`
+- Apply script + bench harness: `Luna/experiments/run_kraken2_opt_v1.sh`
+- Pending measurements: `Luna/experiments/pending_measurements.md`
+- Linear execution plan: `kraken2_execution_checklist.md`
 - Luna server specs: `Luna/luna_stats.md`
-- Profiling plan: `plan.md`
+- Meeting context: `meeting_minutes.md` §Meeting 4 (2026-05-28)
