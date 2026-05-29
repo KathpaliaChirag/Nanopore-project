@@ -3,6 +3,32 @@
 **Dorado GPU profiling (fast, HAC, CPU vs GPU, scaling) + Kraken2 gprof.**
 This file contains the complete run data, tables, and verdicts for Phases 1a–2a.
 
+### Abbreviations
+
+| Term | Meaning |
+|------|---------|
+| nsys | Nsight Systems (NVIDIA GPU profiler) |
+| CUDA | Compute Unified Device Architecture (NVIDIA GPU programming platform) |
+| API | Application Programming Interface |
+| GEMM | General Matrix Multiply |
+| LSTM | Long Short-Term Memory (type of recurrent neural network) |
+| CTC | Connectionist Temporal Classification (loss/decoding algorithm used in sequence-to-sequence tasks like basecalling) |
+| HtoD | Host-to-Device (CPU RAM → GPU VRAM memory transfer) |
+| DtoH | Device-to-Host (GPU VRAM → CPU RAM memory transfer) |
+| DtoD | Device-to-Device (within GPU memory) |
+| FP16 | 16-bit floating point (half precision) |
+| INT8 | 8-bit integer precision (used in quantised neural networks) |
+| HAC | High Accuracy (Dorado basecalling model tier) |
+| CUTLASS | NVIDIA's GPU linear algebra template library (used internally by PyTorch/Dorado) |
+| NN | Neural Network |
+| MKL | Intel Math Kernel Library (optimised math routines) |
+| DNNL | Deep Neural Network Library (Intel's neural network primitives, also called oneDNN) |
+| JIT | Just-In-Time compilation |
+| gprof | GNU profiler (function-level CPU profiling tool) |
+| L3 | Level-3 cache (shared across cores, ~16 MB on this machine) |
+| DRAM | Dynamic Random-Access Memory (main system memory, ~100 ns latency) |
+| LRU | Least Recently Used (cache eviction policy) |
+
 ---
 
 ## Phase 1a — Dorado Fast Model GPU Profiling (Nsight Systems)

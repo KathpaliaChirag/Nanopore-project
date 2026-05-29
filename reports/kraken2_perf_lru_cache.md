@@ -8,6 +8,22 @@ numerically (cache-miss%, IPC, TMA), understand the `-pg` profiling overhead, an
 a small set-associative table that maps frequent k-mer (minimizer) accesses directly to
 their taxon IDs — keeping hot k-mers resident in L3 and using LRU to evict cold ones.
 
+### Abbreviations
+
+| Term | Meaning |
+|------|---------|
+| IPC | Instructions Per Cycle (higher = better CPU utilisation; stalled pipelines show <0.5) |
+| TMA | Top-down Microarchitecture Analysis (Intel/AMD method to classify pipeline slot usage) |
+| BE-Bound | Backend-Bound (pipeline slots stalled waiting on memory or execution units) |
+| FE-Bound | Frontend-Bound (pipeline slots stalled because the decoder can't supply micro-ops fast enough) |
+| LQ-stall | Load Queue stall (pipeline slot waiting for a memory load to complete) |
+| FP-disp | Floating-Point dispatch slots (pipeline slots used for floating-point operations) |
+| DRAM | Dynamic Random-Access Memory (main system memory, ~100 ns latency) |
+| L3 | Level-3 cache (shared across cores, ~16 MB on this machine) |
+| LRU | Least Recently Used (cache eviction policy) |
+| mpstat | multiprocessor statistics (Linux tool showing per-core CPU utilisation) |
+| gprof | GNU profiler (function-level CPU profiling tool) |
+
 ---
 
 ## 1. Perf Stat Profiling (perf stat -d -d)

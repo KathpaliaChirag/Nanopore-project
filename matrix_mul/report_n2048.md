@@ -7,6 +7,28 @@
 **Source:** `results/pfz_batch1/src/matmul_*.c` (21 variants)
 **Raw output:** `results/pfz_batch1/ch3_perf_stat_N2048/perf_stat_{basic,cache,r5,full}_*.txt` (84 files)
 
+### Abbreviations
+
+| Term | Meaning |
+|------|---------|
+| L1 | Level-1 cache (closest to CPU core, fastest, smallest ~64 KB) |
+| L2 | Level-2 cache (per-core, ~512 KB) |
+| L3 | Level-3 cache (shared across cores, ~16 MB on this machine) |
+| DRAM | Dynamic Random-Access Memory (main system memory, ~100 ns latency) |
+| IPC | Instructions Per Cycle (higher = better CPU utilisation; stalled pipelines show <0.5) |
+| OMP | OpenMP (API for shared-memory parallel programming via compiler directives) |
+| AVX2 | Advanced Vector Extensions 2 (Intel/AMD CPU SIMD instruction set, 256-bit wide) |
+| SIMD | Single Instruction Multiple Data (CPU feature that processes multiple data elements at once) |
+| BLAS | Basic Linear Algebra Subprograms (standard library for matrix/vector operations) |
+| GFlops/s | Giga Floating-point Operations per second (throughput measure) |
+| LQ-stall | Load Queue stall (pipeline slot waiting for a memory load to complete) |
+| FP-disp | Floating-Point dispatch slots (pipeline slots used for floating-point operations) |
+| TMA | Top-down Microarchitecture Analysis (Intel/AMD method to classify pipeline slot usage) |
+| BE-Bound | Backend-Bound (pipeline slots stalled waiting on memory or execution units) |
+| FE-Bound | Frontend-Bound (pipeline slots stalled because the decoder can't supply micro-ops fast enough) |
+
+---
+
 ### Variant Inventory
 
 5 optimisation primitives, composed:
