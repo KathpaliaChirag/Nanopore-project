@@ -743,7 +743,7 @@ time ~/tools/kraken2-pg/kraken2-pg --db ~/data/kraken2_db --threads 1 \
 gprof ~/tools/kraken2-pg/classify gmon.out > gprof_hac_1t.txt
 head -40 gprof_hac_1t.txt
 ```
-**Status:** 🔜 Pending
+**Status:** ✅ Done — wall 22.843s, user 18.617s; MinimizerScanner 53.35% (351M calls), CompactHashTable::Get 23.23% (11.6M calls), reverse_complement 6.69%
 
 ---
 

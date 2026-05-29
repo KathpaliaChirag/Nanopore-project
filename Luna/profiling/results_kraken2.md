@@ -872,21 +872,53 @@ time ~/tools/kraken2-pg/kraken2-pg \
 gprof ~/tools/kraken2-pg/classify gmon.out > gprof_hac_32t.txt
 ```
 
-### 10d — Results
+### 10d — Results (hac, 1T, Luna)
 
-*(to be filled after run)*
+**Timing:** wall 22.843s, user 18.617s, sys 4.224s. gprof sampled 10.46s of user time.
+**Output file:** `~/results/profiling/gprof_hac_1t.txt`
 
-| Function | 1T % | 32T % (partial) | WSL2 gprof % | Notes |
+| % time | self (s) | calls | function |
+|---|---|---|---|
+| **53.35%** | 5.58 | 351,893,601 | `kraken2::MinimizerScanner::NextMinimizer()` |
+| **23.23%** | 2.43 | 11,634,763 | `kraken2::CompactHashTable::Get()` |
+| 7.27% | 0.76 | — | `ClassifySequence()` |
+| 6.69% | 0.70 | 352,208,243 | `kraken2::MinimizerScanner::reverse_complement()` |
+| 3.15% | 0.33 | 104,888 | `AddHitlistString()` |
+| 2.01% | 0.21 | 3,254,786 | `HyperLogLogPlusMinus()` constructor |
+| 1.91% | 0.20 | — | `std::unordered_map::operator[]` (two variants) |
+| ~2% | — | — | everything else |
+
+### 10e — Function-by-function explanation
+
+**MinimizerScanner::NextMinimizer (53.35%, 351M calls):** For every read, kraken2 slides a 35-base window along the sequence, hashes each window, and picks the minimum hash value in a local window as the representative k-mer (the minimizer). Called 351 million times across all reads. Pure CPU arithmetic on the read sequence — no database access.
+
+**MinimizerScanner::reverse_complement (6.69%, 352M calls):** Kraken2 checks both DNA strands for every k-mer candidate. For each minimizer it computes the reverse complement of the 35-mer and takes whichever strand gives the smaller hash. Called 352 million times — essentially once per NextMinimizer call. Together, NextMinimizer + reverse_complement = **60% of user-space time**.
+
+**CompactHashTable::Get (23.23%, 11.6M calls):** The actual database lookup. Takes the minimizer hash, computes the bucket index in the 8 GB table, loads the taxon ID. Called far fewer times than NextMinimizer because only the final minimizer per window is looked up. Each call is expensive because of the 82% LLC miss rate — every lookup likely goes to DRAM. gprof's timer fires while the thread is stalled waiting for memory, so that stall time accumulates here.
+
+**ClassifySequence (7.27%):** Per-read orchestration — calls MinimizerScanner and CompactHashTable for each read, then calls ResolveTree to find the LCA taxon. Appears here due to loop overhead and branching logic between calls.
+
+**AddHitlistString (3.15%, 104K calls):** Formats the per-read output listing which taxa each k-mer matched. One call per read, but each call iterates over the full hit vector.
+
+**HyperLogLogPlusMinus (2.01%, 3.25M calls):** Probabilistic cardinality estimator for counting distinct minimizers per taxon in the report. One constructor call per new taxon encountered.
+
+### 10f — Critical comparison: gprof vs perf, WSL2 vs Luna
+
+| Tool | Platform | DB | MinimizerScanner | CompactHashTable::Get |
 |---|---|---|---|---|
-| `kraken2::CompactHashTable::Get` | | | 67% | |
-| `kraken2::MinimizerScanner::NextMinimizer` | | | — | |
-| `kraken2::classify` | | | | |
+| gprof (user-space only) | WSL2 Ryzen | 650 MB ESKAPE | not reported | **67%** |
+| gprof (user-space only) | Luna 1T | 8 GB standard | **53.35%** | **23.23%** |
+| perf flamegraph (full wall time) | Luna 32T | 8 GB standard | **25.57%** | **12.10%** |
 
-### 10e — Expected outcome
+**Why WSL2 gprof showed 67% but Luna gprof shows 23.23% for CompactHashTable:**
 
-The WSL2 gprof showed `CompactHashTable::Get` at 67%. On Luna with a 1T run we expect a similar result for user-space time — the hash lookup dominates user-space CPU since I/O and page faults are kernel-mode and invisible to gprof. The Luna flamegraph showed the same function at only 12.10% of wall time because perf captures kernel time too.
+Two factors. First, different database: the ESKAPE DB (650 MB, 6 genomes) has far fewer distinct taxa than the 8 GB standard DB. With ESKAPE, classification is cleaner — k-mers either clearly match or don't, so MinimizerScanner does less work per read. With the 8 GB standard DB, more taxa are processed per read, making MinimizerScanner proportionally larger.
 
-This comparison — gprof Luna (user-space only) vs perf flamegraph Luna (full stack) — is the clearest demonstration of why gprof misleads on memory-bound workloads with significant I/O.
+Second, different hardware: the Xeon Platinum 8468 has wider execution units than the Ryzen 7 5800H and executes the arithmetic-heavy MinimizerScanner faster in absolute terms. Hash lookups still wait on DRAM regardless of CPU speed, so CompactHashTable::Get becomes a smaller fraction of the profile on faster compute hardware.
+
+**Why gprof Luna (23.23%) differs from perf flamegraph Luna (12.10%):**
+
+gprof's denominator is user-space CPU time only (18.6s at 1T). perf's denominator is full wall time including kernel. The ~20% FASTQ I/O and ~11% page fault handling visible in the flamegraph are completely absent from gprof — so all gprof fractions are inflated relative to wall time. If we scale: 23.23% of 18.6s user time = 2.43s; 2.43s / 22.84s wall time = 10.6% of wall time, consistent with the flamegraph's 12.10%.
 
 ---
 
