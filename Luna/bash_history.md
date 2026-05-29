@@ -808,7 +808,80 @@ cg_annotate cachegrind_hac_1t.out | head -80
 
 ---
 
+### 46. Copy FASTQ to tmpfs
+**Run as:** `student`
+```bash
+cp ~/results/basecalling/reads_hac.fastq /dev/shm/reads_hac.fastq
+ls -lh /dev/shm/reads_hac.fastq
+```
+**Status:** ✅ Done — 703 MB written to /dev/shm (RAM-backed tmpfs)
+
+---
+
+### 47. Run from tmpfs — warm cache (5 runs, 32T node0)
+**Run as:** `student`
+```bash
+for i in 1 2 3 4 5; do
+  START=$(date +%s%3N)
+  numactl --cpunodebind=0 --membind=0 kraken2 --db ~/data/kraken2_db --threads 32 \
+    --report /dev/null --output /dev/null /dev/shm/reads_hac.fastq 2>/dev/null
+  END=$(date +%s%3N)
+  echo "run $i: $(echo "scale=3; ($END-$START)/1000" | bc)s"
+done
+```
+**Status:** ✅ Done — avg 4.395s vs SSD baseline 4.405s — 0.010s difference, within noise. tmpfs gives no benefit on a warm page cache.
+
+---
+
+### 48. Drop page cache to get cold baseline
+**Run as:** `student`
+```bash
+sudo sh -c 'echo 3 > /proc/sys/vm/drop_caches'
+free -h
+```
+**Status:** ✅ Done — page cache flushed, RAM dropped from ~290 GB used to 6.8 GB used. /dev/shm file survived (tmpfs pages not dropped by drop_caches).
+
+---
+
+### 49. Cold SSD run + warm SSD run (3 runs, 32T node0)
+**Run as:** `student`
+```bash
+for i in 1 2 3; do
+  START=$(date +%s%3N)
+  numactl --cpunodebind=0 --membind=0 kraken2 --db ~/data/kraken2_db --threads 32 \
+    --report /dev/null --output /dev/null ~/results/basecalling/reads_hac.fastq 2>/dev/null
+  END=$(date +%s%3N)
+  echo "SSD run $i: $(echo "scale=3; ($END-$START)/1000" | bc)s"
+done
+```
+**Status:** ✅ Done — run 1 (cold): 10.894s, runs 2-3 (warm): 4.628s / 4.631s. Cold overhead = 6.25s for loading 8 GB DB + 703 MB FASTQ from NVMe.
+
+---
+
+### 50. tmpfs run after cache drop (warm DB, tmpfs FASTQ)
+**Run as:** `student`
+```bash
+for i in 1 2 3; do
+  START=$(date +%s%3N)
+  numactl --cpunodebind=0 --membind=0 kraken2 --db ~/data/kraken2_db --threads 32 \
+    --report /dev/null --output /dev/null /dev/shm/reads_hac.fastq 2>/dev/null
+  END=$(date +%s%3N)
+  echo "tmpfs run $i: $(echo "scale=3; ($END-$START)/1000" | bc)s"
+done
+```
+**Status:** ✅ Done — avg 4.649s vs warm SSD 4.648s — identical. Confirms tmpfs = warm SSD = same DRAM copy overhead.
+
+---
+
+### 51. Cleanup tmpfs
+**Run as:** `student`
+```bash
+rm /dev/shm/reads_hac.fastq
+```
+**Status:** ✅ Done
+
+---
+
 ## Next Steps
 
-- Step 12: FASTQ on tmpfs (quantify ~20% I/O cost)
 - Step 13: Dorado GPU profiling on L40S

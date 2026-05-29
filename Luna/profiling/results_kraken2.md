@@ -597,7 +597,7 @@ perf sees everything — user mode, kernel mode, interrupt handlers — so all p
 | Goal | Description | Status |
 |---|---|---|
 | 1 | NUMA analysis — wall time + perf stat + TMA across all 4 socket/memory configs | ✅ Done (Steps 7-9) |
-| 2 | FASTQ on tmpfs — quantify ~20% ext4 I/O cost from flamegraph | 🔜 Next (Step 12) |
+| 2 | FASTQ on tmpfs — quantify ~20% ext4 I/O cost from flamegraph | ✅ Done (Step 12) |
 | 3 | valgrind cachegrind — per-function L1/LLC miss counts | ✅ Done (Step 11) |
 | 4 | gprof on Luna — user-space profile, compare with WSL2 | ✅ Done (Step 10) |
 | 5 | Dorado GPU profiling on L40S with nsys | 🔜 Pending (Step 13) |
@@ -1034,7 +1034,53 @@ The question for the implementation is: how often are the same k-mers seen acros
 
 ---
 
+---
+
+## Step 12 — FASTQ on tmpfs (hac, 32T, node 0 pinned)
+
+**Full write-up:** `Luna/experiments/tmpfs_fastq/README.md`
+
+### 12a — Summary
+
+Hypothesis: copying the FASTQ to `/dev/shm` (RAM-backed tmpfs) would eliminate the ~20% ext4 I/O tower seen in the flamegraph and save ~0.88s.
+
+Result: **no benefit.**
+
+| Config | Avg wall time | vs SSD baseline |
+|---|---|---|
+| SSD warm (baseline) | 4.405s | — |
+| tmpfs warm | 4.395s | -0.010s (-0.2%) — noise |
+| Cold SSD (after drop_caches) | 10.894s | +6.49s |
+| Warm SSD (after cold run) | 4.648s | same as baseline |
+| tmpfs (after cold run) | 4.649s | identical to warm SSD |
+
+### 12b — Why tmpfs gave no benefit
+
+Luna has 503 GB RAM. The FASTQ (703 MB) has been in the Linux page cache since the first ever run and never evicted. The SSD baseline was already reading from DRAM, not from disk. tmpfs is also DRAM. Both execute `copy_page_to_iter` — the memory-to-memory copy from page cache to process buffer. That copy exists in both cases and cannot be removed by changing filesystems.
+
+The flamegraph's ~20% I/O tower is this copy overhead, not disk I/O.
+
+### 12c — Cold cache experiment
+
+After `echo 3 > /proc/sys/vm/drop_caches`, the cold run took 10.894s — 6.25s slower than warm. That 6.25s is the true cost of loading the 8 GB DB + 703 MB FASTQ from NVMe with no page cache. In normal operation this never occurs on Luna.
+
+### 12d — How to actually eliminate the I/O overhead
+
+The copy overhead is intrinsic to read()-based I/O. Two approaches that would help — both require Kraken2 source changes:
+- **mmap the FASTQ** — maps file pages directly into process address space, zero copy on access. One page fault per 4 KB page, then free.
+- **O_DIRECT with aligned buffers** — bypasses page cache entirely, reads direct from storage to buffer.
+
+### 12e — Optimisation ladder (unchanged)
+
+| Configuration | Wall time | vs 96T baseline |
+|---|---|---|
+| 96T, no pin | 5.635s | — |
+| 32T, no pin | 5.235s | -7.1% |
+| 32T, node0+node0 | 4.405s | -21.8% |
+| 32T, node0+node0, tmpfs FASTQ | 4.395s | -21.9% — no real gain |
+
+---
+
 ## Next Steps
 
-- Step 12: FASTQ on tmpfs (quantify ~20% I/O cost from flamegraph)
 - Step 13: Dorado GPU profiling on L40S
