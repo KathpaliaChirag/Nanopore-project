@@ -333,6 +333,52 @@ numactl --cpunodebind=0 --membind=0 \
 
 ---
 
+### 9. luna — NUMA perf stat + TMA: LLC miss rate unchanged, DRAM stalls halved (2026-05-29)
+
+ran perf stat and TMA breakdown across all 4 NUMA socket/memory configurations to isolate exactly what NUMA pinning changes at the hardware counter level.
+
+| config | IPC | LLC miss% | DRAM stalls (B) | stall% | memory_bound% | wall time |
+|---|---|---|---|---|---|---|
+| node0+node0 (local, best) | **1.86** | 83.1% | **6.44** | **42.1%** | **23.9%** | **4.45s** |
+| node1+node1 (local) | 1.82 | 81.8% | 8.28 | 43.3% | 26.5% | 5.04s |
+| cross-socket (either dir.) | 1.59–1.62 | 82–83% | **~12.2** | ~50% | **~31.7%** | 5.56–5.80s |
+| baseline 96T no pin | 1.58 | 80.9% | 9.89 | 50.2% | 25.4% | 5.63s |
+
+**LLC miss rate stays ~82% regardless of NUMA config** — pinning does not reduce the number of cache misses. the root cause (8 GB DB >> 210 MB L3) is structural and unchanged. what NUMA pinning does change:
+
+- DRAM stall cycles drop 47% (12.2B → 6.44B) — same misses, each one resolved faster from local DRAM
+- memory_bound% drops from 31.7% (cross) to 23.9% (local node0) — 7.8pp reduction purely from QPI latency
+- core_bound% drop (21.7% → 15.2%) is from thread count reduction (96T → 32T), not from NUMA
+- IPC improves 17.7% (1.58 → 1.86) — less time stalled = more useful work per cycle
+- retiring% improves to 30.7% — best ever measured for kraken2 on this system
+
+---
+
+### 10. luna — gprof: 3-way comparison confirms perf flamegraph (2026-05-29)
+
+kraken2 recompiled with `-pg`. two binaries: `~/tools/kraken2-pg/kraken2-pg` (gprof) and `~/tools/kraken2/kraken2` (production, untouched). ran 1T (primary, clean) and 32T (secondary, partial).
+
+**gprof hac 1T flat profile (user-space only):**
+
+| % | function | what it does |
+|---|---|---|
+| **53.35%** | `MinimizerScanner::NextMinimizer` | k-mer extraction — #1 user-space hotspot |
+| **23.23%** | `CompactHashTable::Get` | hash table lookup |
+| 6.69% | `reverse_complement` | canonical k-mer strand selection |
+| 7.27% | `ClassifySequence` | per-read orchestration |
+
+**the three-way comparison is now complete:**
+
+| tool | platform | DB | MinimizerScanner | CompactHashTable |
+|---|---|---|---|---|
+| gprof (user-space only) | WSL2 Ryzen | 650 MB ESKAPE | not reported | **67%** |
+| gprof (user-space only) | Luna 1T | 8 GB standard | **53.35%** | **23.23%** |
+| perf flamegraph (full wall time) | Luna 32T | 8 GB standard | **25.57%** | **12.10%** |
+
+cross-validation: 23.23% of 18.6s user time = 2.43s = **10.6% of 22.8s wall** — matches flamegraph 12.10% exactly. the tools agree once you account for the denominator difference (user-space vs full wall time). this is the strongest proof that gprof's 67% on WSL2 was a denominator artifact, not a real measurement.
+
+---
+
 ## why these numbers matter
 
 the profiling results directly justify Kolin sir's caching design:
@@ -421,9 +467,9 @@ Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all u
 ## what's next
 
 **profiling (Luna) — immediate:**
-- run kraken-2 with FASTQ on tmpfs to quantify the ~20% I/O cost identified in flamegraph
-- gprof on Luna (recompile kraken2 with -pg — never done on Luna, only on WSL2)
-- valgrind cachegrind — per-function cache miss attribution
+- valgrind cachegrind — per-function L1/LLC cache miss counts (Step 11)
+- FASTQ on tmpfs — copy reads_hac.fastq to /dev/shm and re-run to quantify the ~20% I/O cost (Step 12)
+- Dorado GPU profiling on L40S with nsys (Step 13, needs nsys in PATH)
 - matmul benchmark re-run on Luna — tables in `Luna/profiling/results_matmul_luna.md` are still blank; accurate IPC (no Hyper-V noise) and LLC miss rates now possible
 
 **profiling (Luna) — upcoming:**

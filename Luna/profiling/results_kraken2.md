@@ -446,7 +446,7 @@ IPC falls from 1.81 (4T) to 1.28 (192T). More threads = more lock contention and
 
 ---
 
-## Core Findings (hac — to be updated for fast/sup)
+## Core Findings (hac at 96T baseline — all findings confirmed consistent across fast/sup)
 
 ### 1. Memory is the primary bottleneck
 
@@ -592,39 +592,15 @@ perf sees everything — user mode, kernel mode, interrupt handlers — so all p
 
 ---
 
-## Profiling Goals (ordered)
+## Profiling Goals Status
 
-The following experiments are planned in sequence after Step 6.
-
-**Goal 1 — NUMA analysis (next)**
-
-Check whether the 8 GB hash table is allocated across both NUMA sockets. If kraken2 threads on socket 0 are accessing memory pinned to socket 1, each lookup crosses the QPI interconnect (higher latency than local DRAM). `numactl --hardware` shows topology; `numastat` during a run shows cross-socket traffic.
-
-Command to try after baseline:
-```bash
-numactl --cpunodebind=0 --membind=0 \
-  kraken2 --db ~/data/kraken2_db --threads 32 \
-  --report /dev/null --output /dev/null \
-  ~/results/basecalling/reads_hac.fastq
-```
-If wall time drops, cross-NUMA traffic was a real cost.
-
-**Goal 2 — FASTQ on tmpfs (quantify the 20% I/O cost)**
-
-The flamegraph shows ~20% of wall time in ext4 I/O reading the FASTQ. Moving the input file to `/dev/shm` (tmpfs, RAM-backed) should eliminate that entire tower.
-
-```bash
-cp ~/results/basecalling/reads_hac.fastq /dev/shm/reads_hac.fastq
-kraken2 --db ~/data/kraken2_db --threads 32 \
-  --report /dev/null --output /dev/null \
-  /dev/shm/reads_hac.fastq
-```
-
-Expected: wall time drops by ~1s (from 5.2s toward ~4.2s). This isolates whether the I/O cost is the ext4 layer or something deeper.
-
-**Goal 3 — Dorado GPU profiling on L40S**
-
-`results_dorado.md` is still blank. Needs nsys/ncu located in PATH first (`find /usr /opt -name nsys 2>/dev/null`).
+| Goal | Description | Status |
+|---|---|---|
+| 1 | NUMA analysis — wall time + perf stat + TMA across all 4 socket/memory configs | ✅ Done (Steps 7-9) |
+| 2 | FASTQ on tmpfs — quantify ~20% ext4 I/O cost from flamegraph | 🔜 Next (Step 12) |
+| 3 | valgrind cachegrind — per-function L1/LLC miss counts | 🔜 Next (Step 11) |
+| 4 | gprof on Luna — user-space profile, compare with WSL2 | ✅ Done (Step 10) |
+| 5 | Dorado GPU profiling on L40S with nsys | 🔜 Pending (Step 13) |
 
 ---
 
