@@ -128,4 +128,20 @@ See per-N reports for full tables (CH3-A wall/IPC (Instructions Per Cycle)/GFlop
 
 [→ Full analysis with all tables](reports/kraken2_thread_scaling.md)
 
+### Phase 2c (full) — Per-Thread Profiling Report with per-table observations
+
+> Full per-thread breakdown (all 27 combinations, exact raw values, per-table observations):
+> **[kraken2_thread_scaling_full.md](reports/kraken2_thread_scaling_full.md)**
+> GitHub: [reports/kraken2_thread_scaling_full.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/kraken2_thread_scaling_full.md)
+
+Key findings extracted from the full report:
+
+- **Instructions retired are flat (±1.8% T1→T16)** — definitively proves no algorithmic overhead from multi-threading; the same computation is done at every thread count. IPC drops because stall *cycles* grow, not because more work is added.
+- **Bandwidth saturation at T=10, not T=8** — `ls_not_halted_cyc` (total stall cycles) is stable T1–T8 (~85 B cycles), then jumps +13.9% at T10 and climbs to +24.5% at T16. The T10 cliff appears simultaneously in IPC, BE-Bound, and `ic_fetch_stall` for all three modes.
+- **Cache-miss count is constant (~375–400 M for fast), but cache-miss% declines (16.5%→14.6%)** — this is a ratio artefact: references grow (+6.5%) as more threads issue events while actual DRAM misses are flat. No real cache improvement occurs with more threads.
+- **fast mode has ~3–4 pp higher cache-miss% than hac/sup at every thread count** — lower-quality reads probe a wider range of hash-table buckets, generating more cold DRAM accesses.
+- **Op-cache misses grow +15% (fast) to +25% (sup) T1→T16** — secondary pressure from concurrent threads evicting each other's decoded micro-ops from the 32 KB op-cache; hac/sup grow faster because they execute more instructions per read.
+- **Optimal thread count: T8** — delivers 5.36× speedup with IPC 1.4017 and BE-Bound 74.6%. T16 adds only 23% more throughput over T8 at the cost of a 20% IPC drop and 4.6 pp more BE-Bound.
+- **sup mpstat anomaly at T14/T16** — overall %usr appears low (12–13%) vs fast/hac (~25%) because sup completes faster (~2.3 s), capturing fewer 2-second mpstat intervals; the DB-loading samples dominate the average.
+
 ---
