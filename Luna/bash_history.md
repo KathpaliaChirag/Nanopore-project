@@ -694,9 +694,23 @@ numactl --cpunodebind=X --membind=Y perf stat -M tma_memory_bound,tma_core_bound
 
 ---
 
+### 38. Thread scaling — all 4 NUMA configs (hac, 2/4/8/16/32/48/64/96T, 5 runs each)
+**Run as:** `student`
+```bash
+# Repeated for all 4 numactl configs: --cpunodebind=0/1 --membind=0/1
+for T in 2 4 8 16 32 48 64 96; do
+  for i in 1 2 3 4 5; do
+    numactl --cpunodebind=X --membind=Y kraken2 --db ~/data/kraken2_db --threads $T \
+      --report /dev/null --output /dev/null ~/results/basecalling/reads_hac.fastq 2>/dev/null
+  done
+done
+```
+**Status:** ✅ Done — sweet spot stays 32T for ALL 4 configs; node0+node0 floor 4.405s (best), cross-socket floor ~5.53-5.60s, node1+node1 floor 5.037s; DRAM bandwidth wall confirmed independent of NUMA topology
+
+---
+
 ## Next Steps
 
-- Step 9: thread scaling with node 0 pinning
 - Step 10: gprof on Luna (recompile kraken2 with -pg)
 - Step 11: valgrind cachegrind
 - Step 12: FASTQ on tmpfs

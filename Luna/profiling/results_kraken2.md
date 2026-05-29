@@ -767,9 +767,66 @@ Both are "local" but node0 is faster (DRAM stalls 6.44B vs 8.28B). The FASTQ fil
 
 ---
 
+## Step 9 — Thread Scaling: all 4 NUMA configs (hac, 5 runs each)
+
+**Goal:** Does NUMA pinning shift the 32T sweet spot? Does local memory allow more threads to be useful?
+
+**Commands:** Same loop as Step 5 but with numactl prefix for each of the 4 configs.
+**Output file:** `~/results/profiling/thread_scaling_hac_node0.txt`
+
+### 9a — Wall Time Results (5-run avg)
+
+| Threads | unpinned (orig) | node0+node0 | node1+node1 | node0CPU+node1mem | node1CPU+node0mem |
+|---|---|---|---|---|---|
+| 2 | 11.764 | 10.200 | 10.778 | 11.535 | 11.625 |
+| 4 | 7.907 | 6.981 | 7.631 | 8.241 | 8.306 |
+| 8 | 6.273 | 5.420 | 6.082 | 6.583 | 6.648 |
+| 16 | 5.498 | 4.671 | 5.314 | 5.787 | 5.819 |
+| **32** | 5.235 | **4.405** | **5.037** | **5.532** | **5.595** |
+| 48 | — | 4.454 | 5.099 | 5.660 | 5.694 |
+| 64 | 5.417 | 4.536 | 5.199 | 5.788 | 5.875 |
+| 96 | 5.635 | 4.690 | 5.392 | 5.997 | 6.050 |
+| **sweet spot** | **32T** | **32T** | **32T** | **32T** | **32T** |
+| **floor (s)** | 5.235 | **4.405** | 5.037 | 5.532 | 5.595 |
+| **2T→32T speedup** | 2.25x | **2.32x** | 2.14x | 2.09x | 2.08x |
+
+### 9b — Analysis
+
+**Sweet spot stays at 32T for every config without exception.**
+
+NUMA pinning, cross-socket, local node 1 — the peak is always 32T. This proves the 32T wall is caused by DRAM bandwidth saturation, not by thread scheduling or cross-socket contention. No matter how clean the memory access pattern, Kraken2 cannot use more than ~32 threads effectively on this dataset and DB combination.
+
+**NUMA shifts the floor uniformly, not the shape.**
+
+All 5 curves are identical in shape — fast drop from 2T to 32T, then slow degradation beyond. The degradation rate past 32T is nearly the same across all configs. NUMA makes every point on the curve faster or slower uniformly — it does not change when or why the DRAM wall is hit.
+
+**node0+node0 gets the best per-thread scaling (2.32x vs 2.08x cross-socket).**
+
+With local memory, threads scale more efficiently. Cross-socket threads compete for remote DRAM bandwidth AND pay higher latency per miss — so additional threads help less. Local memory provides more bandwidth per socket, so each new thread contributes slightly more.
+
+**NUMA effect is present at every thread count, not just high counts.**
+
+At 2T, node0+node0 (10.200s) beats unpinned (11.764s) by 13%. Even with 2 threads, one of them was landing on the wrong socket in the default run. Pinning helps uniformly across the scaling curve.
+
+**One socket always beats split, even the non-home socket.**
+
+node1+node1 (5.037s) beats unpinned (5.235s) despite the DB being on node 0. Consistent access from one socket is better than Linux randomly splitting threads across both sockets.
+
+### 9c — Complete Optimisation Ladder (hac model)
+
+| Configuration | Floor (s) | vs 96T default | Cumulative gain |
+|---|---|---|---|
+| 96T, no pin (original baseline) | 5.635 | — | — |
+| 32T, no pin | 5.235 | −7.1% | −7.1% |
+| 32T, node1+node1 | 5.037 | −10.6% | −10.6% |
+| 32T, node0+node0 | **4.405** | **−21.8%** | **−21.8%** |
+
+Zero code changes. Zero recompilation. Just thread count + numactl.
+
+---
+
 ## Next Steps
 
-- Step 9: thread scaling with node 0 pinning — does sweet spot shift from 32T?
 - Step 10: gprof on Luna (recompile kraken2 with -pg, compare with WSL2 result)
 - Step 11: valgrind cachegrind (per-function cache miss counts)
 - Step 12: FASTQ tmpfs experiment (quantify the ~20% I/O cost)
