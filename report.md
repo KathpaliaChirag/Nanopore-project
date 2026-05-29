@@ -113,9 +113,7 @@ See per-N reports for full tables (CH3-A wall/IPC (Instructions Per Cycle)/GFlop
 
 ---
 
-## Phase 2c — Kraken2 Thread-Scaling Sweep (T1→T16, fast/hac/sup)
-
-### Phase 2c — Per-Thread Profiling Report with per-table observations
+## Phase 2c — Per-Thread Profiling Report with per-table observations
 
 > Full per-thread breakdown (all 27 combinations, exact raw values, per-table observations):
 > **[kraken2_thread_scaling_full.md](reports/kraken2_thread_scaling_full.md)**
