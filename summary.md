@@ -301,6 +301,10 @@ Luna: `perf_event_paranoid = 1` confirmed — hardware counters work for all use
 | gprof | CPU call-graph profiling | compiled binary (-pg) | Function-level time breakdown |
 | AMD uProf | CPU profiling (AMD native) | running process | Accurate IPC, DRAM bandwidth, TMA |
 | Valgrind / cachegrind | Cache + memory analysis | compiled binary | Per-function LLC miss rates |
+| numactl | NUMA CPU/memory binding | running process | Wall time per NUMA config |
+| perf record + FlameGraph | Wall-time function attribution | running process | SVG flamegraph |
+| perf c2c | Cache-to-cache false sharing | running process | False sharing hot lines |
+| valgrind cachegrind | Per-function cache miss counts | compiled binary | L1/LL miss attribution |
 
 ---
 
@@ -315,11 +319,14 @@ Luna: `perf_event_paranoid = 1` confirmed — hardware counters work for all use
 6. Dorado ignores `--batchsize` flag and runs at 64 regardless on this GPU
 7. ONT no longer distributes Dorado on GitHub — download from `cdn.oxfordnanoportal.com`
 
-### Kraken-2 profiling (CPU bottleneck confirmed)
-8. **perf stat (WSL2):** 34.24% cache miss rate, 301M misses — memory-bound verdict
-9. **gprof:** 67% of runtime in `CompactHashTable::Get()` — 9.87M calls, confirmed hotspot
-10. **AMD uProf (local Ryzen):** IPC = 0.55 — accurate reading (perf IPC inflated in WSL2/Hyper-V)
-11. Hot-K-mer LRU cache target justified: at 301M misses/run, 20% hit rate saves ~6 s
+### Kraken-2 profiling — Luna (bare metal, comprehensive)
+8. **perf stat (Luna, all 3 models, 32-192T):** LLC miss rate flat at ~82% across all models — DB size is the wall, not read quality. IPC 1.47 (fast) → 1.65 (sup). Stall% 48-52%.
+9. **Thread scaling:** sweet spot 32T for all 3 models regardless of NUMA config. 2T→32T = 2.1-2.5x speedup. DRAM bandwidth saturates at 8T — more threads just queue up for the same bandwidth.
+10. **NUMA analysis:** node0+node0 pinned (4.405s) vs default 96T (5.635s) = 21.8% reduction, zero code changes. LLC miss% unchanged — NUMA reduces miss latency, not miss count. DRAM stall cycles halve with local memory (12.2B → 6.44B cross vs local).
+11. **perf flamegraph (hac, 32T):** MinimizerScanner 25.57% (CPU-bound, zero DRAM), FASTQ I/O copy ~20%, CompactHashTable::Get 12.10% (memory-bound), DB page faults ~11%.
+12. **gprof (Luna, 1T):** MinimizerScanner 53.35% (351M calls), CompactHashTable::Get 23.23% (11.6M calls). Cross-validates flamegraph exactly: 23.23% × 18.6s = 10.6% of wall.
+13. **cachegrind (hac, 1T):** CompactHashTable::Get = **96.24% of all last-level read cache misses** despite only 0.65% of instructions. MinimizerScanner = zero LL misses. Two clear regimes confirmed.
+14. **tmpfs experiment (negative):** FASTQ on /dev/shm gives 0.010s saving vs warm ext4 (within noise). The ~20% flamegraph I/O tower is page-cache copy overhead, not disk I/O. Fix requires mmap or O_DIRECT in Kraken2 source.
 
 ### Dorado profiling (GPU bottleneck confirmed)
 12. **Nsight Systems:** GEMM = 82% of GPU time (Tensor Cores, FP16) — compute-bound

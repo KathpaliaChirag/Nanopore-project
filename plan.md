@@ -434,18 +434,29 @@ diff baseline.kraken optimized.kraken  # expect zero diff for Proposals A/D/E/F
 
 ---
 
-## IMMEDIATE ACTIONS (2026-05-28 to 05-30)
+## IMMEDIATE ACTIONS STATUS (as of 2026-05-30)
 
-- [ ] SSH to Luna, run Phase A (perf stat cold/warm)
-- [ ] Run Phase B (TMA)
-- [ ] Run Phase C (cachegrind with `--LL=210000000,16,64`)
-- [ ] Run Phase D (perf record + source annotation)
-- [ ] Run Phase E (NUMA numactl comparison)
-- [ ] Run Phase F (DRAM bandwidth via uncore_imc)
-- [ ] Run k-mer reuse script on barcode02.fastq (k=35)
-- [ ] Read compact_hash.h, compact_hash.cc, classify.cc (annotate answers to 8 questions above)
-- [ ] Fill result tables in `kraken2_optimisation_report.md`
-- [ ] Push complete report to GitHub by 2026-05-31
+- [x] SSH to Luna, run Phase A (perf stat cold/warm) — ✅ done, all 3 models, all NUMA configs
+- [x] Run Phase B (TMA) — ✅ done, all 3 models + all 4 NUMA configs
+- [x] Run Phase C (cachegrind) — ✅ done, Step 11; CompactHashTable::Get = 96.24% of LL read misses
+- [x] Run Phase D (perf record + flamegraph) — ✅ done, Step 6; flamegraph_hac_32t.svg in repo
+- [x] Run Phase E (NUMA numactl comparison) — ✅ done, Steps 7-9; node0 = 4.405s (21.8% gain)
+- [ ] Run Phase F (DRAM bandwidth via uncore_imc) — 🔜 next priority
+- [ ] Run k-mer reuse script on reads_hac.fastq (k=35) — 🔜 needed to validate LRU cache ROI
+- [ ] Read compact_hash.h, compact_hash.cc, classify.cc — 🔜 before implementation phase
+- [ ] Fill result tables in `kraken2_optimisation_report.md` — 🔜 in progress
+- [ ] Push complete report to GitHub by 2026-05-31 — 🔜 deadline approaching
+
+## REMAINING PROFILING (added 2026-05-30)
+
+In priority order:
+
+- [ ] **DRAM bandwidth** — `perf stat -e uncore_imc_*/cas_count_read/,uncore_imc_*/cas_count_write/` at 32T node0. Tells us actual GB/s vs theoretical DDR5 max. Determines if bandwidth-limited (need DB compression) or latency-limited (LRU cache is the right fix).
+- [ ] **perf c2c** — `perf c2c record` then `perf c2c report`. Finds cache-line false sharing between threads. Explains why IPC drops from 1.81 (4T) to 1.28 (192T). Run at 32T and 96T for comparison.
+- [ ] **Instruction mix** — `objdump -d ~/tools/kraken2/classify | grep -c "ymm\|zmm\|xmm"`. Instant check: is MinimizerScanner already auto-vectorized by the compiler? If yes, SIMD proposal is blocked. If no, AVX-512 vectorisation is a real opportunity.
+- [ ] **perf annotate** — rebuild classify with `-g` (debug symbols), run `perf record -e LLC-load-misses`, then `perf annotate CompactHashTable::Get`. Shows which exact line (the `table_[idx]` load? probe loop? hash computation?) causes the 96% LL miss concentration.
+- [ ] **k-mer reuse measurement** — Python script on reads_hac.fastq, k=35. Count how many unique minimizers appear vs total lookups. If reuse > 3x, LRU cache is highly justified. Script: `scripts/kmer_reuse.py`.
+- [ ] **VTune** — check: `which vtune` or `find /opt -name vtune 2>/dev/null`. If available, run Memory Access analysis for bandwidth per channel and Threading analysis for lock contention.
 
 ---
 

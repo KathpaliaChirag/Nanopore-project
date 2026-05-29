@@ -290,3 +290,59 @@ All attendees: **Kolin sir**, Chayanika mam, Chirag K (CK), Chirag Suthar, Risha
 - **Files saved:** `Luna/profiling/results_kraken2.md` fully populated, `bash_history.md` steps 23-29, `thread_scaling_perf_T*.txt`, `thread_scaling_fast.txt`, `thread_scaling_perf_summary.txt`
 - **README updated** with section 6 — ASCII bar and segment charts for all stats with observations
 - **Next:** `perf record` + flamegraph to confirm `CompactHashTable::Get()` as hotspot on Luna native PMU (was 67% on WSL2 gprof — want native confirmation); NUMA analysis
+
+---
+
+## 2026-05-29 (late) — Session 11 — Luna: flamegraph, NUMA, gprof
+
+- **perf record + flamegraph (hac, 32T):**
+  - SVG at `Luna/profiling/flamegraph_hac_32t.svg`
+  - MinimizerScanner::NextMinimizer = 25.57% of wall time (pure CPU, no DB access)
+  - FASTQ read() syscall chain (ext4 → filemap_read → copy_page_to_iter) = ~20%
+  - CompactHashTable::Get = 12.10% — hash lookups hit DRAM (~82% LLC miss rate)
+  - DB mmap page faults = ~11%
+  - gprof's 67% WSL2 figure confirmed wrong: gprof can't see kernel or I/O time
+
+- **NUMA analysis (hac, 32T, all 4 socket/memory configs):**
+  - numactl topology: 2 nodes, even CPUs = node 0, odd = node 1, distance 10/21
+  - DB resides on node 0 (202 GB used there)
+  - Default 32T: 5.261s → node 0 pinned: 4.405s (−16.3%) → node 1 pinned: 5.083s
+  - perf stat per NUMA config: LLC miss% stays ~82% in ALL configs — pinning doesn't reduce misses, only miss latency
+  - DRAM stall cycles: 6.44B (local node 0) vs 12.2B (cross-socket) — 47% reduction from locality
+  - TMA: memory_bound 23.9% (local) vs 31.7% (cross) — 7.8pp from QPI latency alone
+  - Thread scaling all 4 NUMA configs: sweet spot always 32T regardless — DRAM bandwidth wall is structural
+
+- **gprof on Luna (two binaries — gprof-instrumented + production):**
+  - hac 1T: MinimizerScanner 53.35% (351M calls), CompactHashTable::Get 23.23% (11.6M calls), reverse_complement 6.69%
+  - hac 32T (partial, one thread): MinimizerScanner 68.08%, CompactHashTable 10.09%
+  - Cross-validation: 23.23% × 18.6s user = 2.43s = 10.6% of wall → matches flamegraph 12.10% exactly
+  - Combined zero-code-change gain: 96T default 5.635s → 32T → 32T numactl node0 4.405s = **21.8% reduction**
+
+---
+
+## 2026-05-29–30 — Session 12 — valgrind cachegrind + tmpfs experiment
+
+- **valgrind cachegrind (hac, 1T) — Step 11:**
+  - Ran with `--trace-children=yes` (kraken2 is a Perl wrapper, needed to follow into classify binary)
+  - Wall time: 362s (~20x overhead), output: `cachegrind_hac_1t.out` (227 KB)
+  - **CompactHashTable::Get accounts for 96.24% of all last-level cache read misses** — 5.62M of 5.84M total LL read misses
+  - MinimizerScanner::NextMinimizer: 48.23% of instructions, **zero LL misses** — pure compute, perfectly cached
+  - Confirms two regimes: MinimizerScanner = CPU-bound (SIMD target), CompactHashTable = memory-bound (LRU cache target)
+  - Full results: `Luna/profiling/results_kraken2.md` Step 11
+
+- **FASTQ on tmpfs experiment — Step 12 (negative result):**
+  - Hypothesis: copying FASTQ to /dev/shm would eliminate ~20% flamegraph I/O tower
+  - Result: warm SSD 4.405s vs tmpfs 4.395s = 0.010s difference — within noise
+  - Cold cache experiment (drop_caches): cold SSD 10.894s vs warm SSD 4.648s vs tmpfs 4.649s
+  - Conclusion: the 20% tower is `copy_page_to_iter` overhead (page-cache-to-process-buffer copy), not disk I/O
+  - FASTQ (703 MB) has been permanently in Luna's 503 GB page cache — tmpfs and ext4 warm are identical
+  - Fix would require mmap or O_DIRECT in Kraken2 source
+  - Full write-up: `Luna/experiments/tmpfs_fastq/README.md`
+
+- **Next remaining profiling steps:**
+  - DRAM bandwidth via uncore IMC events (`perf stat -e uncore_imc_*/cas_count_*`)
+  - perf c2c — false sharing between threads (explains IPC degradation past 32T)
+  - Instruction mix check via objdump — is MinimizerScanner already auto-vectorized?
+  - perf annotate with -g debug symbols — source-line hotspots inside CompactHashTable::Get
+  - VTune — check if installed on Luna
+  - k-mer reuse measurement script (validate LRU cache ROI)

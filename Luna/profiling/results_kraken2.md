@@ -600,7 +600,12 @@ perf sees everything — user mode, kernel mode, interrupt handlers — so all p
 | 2 | FASTQ on tmpfs — quantify ~20% ext4 I/O cost from flamegraph | ✅ Done (Step 12) |
 | 3 | valgrind cachegrind — per-function L1/LLC miss counts | ✅ Done (Step 11) |
 | 4 | gprof on Luna — user-space profile, compare with WSL2 | ✅ Done (Step 10) |
-| 5 | Dorado GPU profiling on L40S with nsys | 🔜 Pending (Step 13) |
+| 6 | DRAM bandwidth utilization — actual GB/s consumed vs theoretical max via uncore IMC events | 🔜 Next |
+| 7 | perf c2c — cache-to-cache false sharing between threads (explains IPC drop past 32T) | 🔜 Next |
+| 8 | Instruction mix check — is MinimizerScanner auto-vectorized? (objdump, 2 min, no run needed) | 🔜 Next |
+| 9 | perf annotate with -g symbols — source-line hotspots inside CompactHashTable::Get | 🔜 Next |
+| 10 | k-mer reuse measurement — validate LRU cache ROI on reads_hac.fastq (Python script) | 🔜 Next |
+| 11 | VTune — check if installed on Luna, run memory access + threading analysis if available | 🔜 Next |
 
 ---
 
