@@ -404,10 +404,180 @@ perf stat -M tma_memory_bound,tma_core_bound \
 
 ---
 
-## Next Steps
+---
+
+### 23. perf stat + per-core CPU capture — fast model
+**Run as:** `student`
+```bash
+# Run mpstat in background to capture per-core CPU utilisation at 1s intervals.
+# Kill it after perf stat finishes. perf stat stderr redirected to file.
+mpstat -P ALL 1 > ~/results/profiling/mpstat_fast.txt &
+MPSTAT_PID=$!
+
+perf stat \
+  -e cycles,instructions \
+  -e cache-misses,cache-references \
+  -e LLC-load-misses,LLC-loads \
+  -e L1-dcache-load-misses,L1-dcache-loads \
+  -e branch-misses,branch-instructions \
+  -e cycle_activity.stalls_total \
+  -e cycle_activity.stalls_l1d_miss \
+  -e cycle_activity.stalls_l2_miss \
+  -e cycle_activity.stalls_l3_miss \
+  -e memory_activity.stalls_l3_miss \
+  kraken2 --db ~/data/kraken2_db --threads 96 \
+  --report ~/results/profiling/report_fast.txt \
+  --output /dev/null \
+  ~/results/basecalling/reads_fast.fastq \
+  2> ~/results/profiling/perf_stat_fast.txt
+
+kill $MPSTAT_PID
+```
+**Status:** ✅ Done — IPC 1.47, LLC miss 82.0%, 51.8% stall cycles, wall 5.84s
+
+---
+
+### 24. perf stat + per-core CPU capture — sup model
+**Run as:** `student`
+```bash
+mpstat -P ALL 1 > ~/results/profiling/mpstat_sup.txt &
+MPSTAT_PID=$!
+
+perf stat \
+  -e cycles,instructions \
+  -e cache-misses,cache-references \
+  -e LLC-load-misses,LLC-loads \
+  -e L1-dcache-load-misses,L1-dcache-loads \
+  -e branch-misses,branch-instructions \
+  -e cycle_activity.stalls_total \
+  -e cycle_activity.stalls_l1d_miss \
+  -e cycle_activity.stalls_l2_miss \
+  -e cycle_activity.stalls_l3_miss \
+  -e memory_activity.stalls_l3_miss \
+  kraken2 --db ~/data/kraken2_db --threads 96 \
+  --report ~/results/profiling/report_sup.txt \
+  --output /dev/null \
+  ~/results/basecalling/reads_sup.fastq \
+  2> ~/results/profiling/perf_stat_sup.txt
+
+kill $MPSTAT_PID
+```
+**Status:** ✅ Done — IPC 1.65, LLC miss 82.0%, 48.5% stall cycles, wall 5.63s
+
+---
+
+### 25. Also capture mpstat for hac (retroactive — was not done in step 21)
+**Run as:** `student`
+```bash
+# hac perf stat was already run without mpstat. Re-run with mpstat this time.
+# DB should be warm in page cache so this also gives the warm-cache wall time.
+mpstat -P ALL 1 > ~/results/profiling/mpstat_hac.txt &
+MPSTAT_PID=$!
+
+perf stat \
+  -e cycles,instructions \
+  -e cache-misses,cache-references \
+  -e LLC-load-misses,LLC-loads \
+  -e L1-dcache-load-misses,L1-dcache-loads \
+  -e branch-misses,branch-instructions \
+  -e cycle_activity.stalls_total \
+  -e cycle_activity.stalls_l1d_miss \
+  -e cycle_activity.stalls_l2_miss \
+  -e cycle_activity.stalls_l3_miss \
+  -e memory_activity.stalls_l3_miss \
+  kraken2 --db ~/data/kraken2_db --threads 96 \
+  --report ~/results/profiling/report_hac_warm.txt \
+  --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq \
+  2> ~/results/profiling/perf_stat_hac_warm.txt
+
+kill $MPSTAT_PID
+```
+**Status:** ✅ Done — IPC 1.58 (identical cold/warm), wall time same ~5.6s, DB already in page cache. See results_kraken2.md.
+
+---
+
+### 26. TMA breakdown — fast model
+**Run as:** `student`
+```bash
+perf stat -M tma_memory_bound,tma_core_bound \
+  kraken2 --db ~/data/kraken2_db --threads 96 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_fast.fastq \
+  2> ~/results/profiling/tma_fast.txt
+```
+**Status:** ✅ Done — memory_bound 28.1%, core_bound 22.4%
+
+---
+
+### 27. TMA breakdown — sup model
+**Run as:** `student`
+```bash
+perf stat -M tma_memory_bound,tma_core_bound \
+  kraken2 --db ~/data/kraken2_db --threads 96 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_sup.fastq \
+  2> ~/results/profiling/tma_sup.txt
+```
+**Status:** ✅ Done — memory_bound 26.2%, core_bound 20.8%
+
+---
+
+### 28. Thread scaling experiment — fast model (5 runs per thread count)
+**Run as:** `student`
+```bash
+# Each thread count runs 5 times. Wall time measured with millisecond precision
+# using date +%s%3N (start/end timestamps). kraken2 stderr suppressed.
+# avg computed with bc. Output tee'd to file and printed to terminal.
+for T in 2 4 8 16 32 64 96 128 192; do
+  echo "=== threads=$T ==="
+  sum=0
+  for i in 1 2 3 4 5; do
+    START=$(date +%s%3N)
+    kraken2 --db ~/data/kraken2_db --threads $T \
+      --report /dev/null --output /dev/null \
+      ~/results/basecalling/reads_fast.fastq 2>/dev/null
+    END=$(date +%s%3N)
+    W=$(echo "scale=3; ($END - $START) / 1000" | bc)
+    echo "  run $i: ${W}s"
+    sum=$(echo "$sum + $W" | bc)
+  done
+  AVG=$(echo "scale=3; $sum / 5" | bc)
+  echo "  avg: ${AVG}s"
+  echo ""
+done 2>&1 | tee ~/results/profiling/thread_scaling_fast.txt
+```
+**Status:** ✅ Done — sweet spot 32 threads (5.507s avg). Beyond 32 threads perf degrades. Only 2.13x speedup despite 16x more threads — DRAM bandwidth wall confirmed.
+
+---
+
+### 29. Thread scaling — perf stat with 5-run avg per thread count
+**Run as:** `student`
+```bash
+# perf stat -r 5 runs 5 repetitions and reports mean ± stddev per counter automatically.
+# Saves each thread count to its own file, summary to combined file.
+# Takes ~5-6 minutes total.
+for T in 2 4 8 16 32 64 96 128 192; do
+  echo "=== threads=$T ==="
+  perf stat -r 5 \
+    -e cycles,instructions \
+    -e LLC-load-misses,LLC-loads \
+    -e cycle_activity.stalls_total \
+    -e memory_activity.stalls_l3_miss \
+    kraken2 --db ~/data/kraken2_db --threads $T \
+    --report /dev/null --output /dev/null \
+    ~/results/basecalling/reads_fast.fastq \
+    2> ~/results/profiling/thread_scaling_perf_T${T}.txt
+  cat ~/results/profiling/thread_scaling_perf_T${T}.txt
+  echo ""
+done 2>&1 | tee ~/results/profiling/thread_scaling_perf_summary.txt
+```
+**Status:** ✅ Done — IPC 1.81 peak at 4T, degrades to 1.28 at 192T. DRAM saturates at 8T. Sweet spot 32T (5.52s). See results_kraken2.md Step 5b.
+
+---
+
+## Next Steps (after steps 23-27 complete)
 
 - perf record + flamegraph to confirm CompactHashTable::Get() as hotspot on Luna
-- Second Kraken2 pass after DB is in page cache to isolate classification-only time
 - NUMA analysis with numactl
-- perf stat for fast and sup models for comparison
 - nsys profiling of Dorado GPU run

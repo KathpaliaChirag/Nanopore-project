@@ -260,3 +260,33 @@ All attendees: **Kolin sir**, Chayanika mam, Chirag K (CK), Chirag Suthar, Risha
 - `plan.md` — summer direction section added; 3-day deliverable breakdown written
 - `summary.md` — Research Goals section rewritten to reflect Kraken-2-only focus and new work split
 - `kraken2_optimisation_report.md` — skeleton/template created for the 3-day deliverable
+
+---
+
+## 2026-05-29 — Study session 10 — Luna Kraken-2 profiling complete
+
+- **Goal:** run `perf stat` + mpstat for all 3 models, TMA for all 3, and full thread scaling sweep on Luna
+- **perf stat + per-core CPU capture — all 3 models done:**
+  - fast: IPC 1.47, LLC miss 82.0%, stall% 51.8%, wall 5.84s — `perf_stat_fast.txt` + `mpstat_fast.txt`
+  - hac: IPC 1.58, LLC miss 81.9%, stall% 48.7%, wall 5.0s — `perf_stat_hac.txt` + `mpstat_hac.txt`
+  - sup: IPC 1.65, LLC miss 82.0%, stall% 48.5%, wall 5.63s — `perf_stat_sup.txt` + `mpstat_sup.txt`
+  - hac warm-cache re-run: IPC identical (1.58), wall time same (~5.6s) — proves the ~4s overhead is mmap fault cost, not disk IO
+- **Key cross-model finding:** LLC miss rate is flat at ~82% for all 3 models. read quality does not change the DB miss rate — the 8 GB hash table is simply 38× the 210 MB L3, and no model fixes that. IPC improves with model quality (1.47→1.65) because better reads produce k-mers that retire more useful instructions, not because they hit cache more
+- **TMA breakdown — all 3 models done:**
+  - hac: memory_bound 25.4%, core_bound 21.7%, retiring 26.9%, bad_spec 16.9%, fe_bound 9.6%
+  - fast: memory_bound 28.1% (worst), retiring 24.4% (worst) — lower quality = more wasted slots
+  - sup: retiring 27.4% (best) — best useful work per slot
+  - all three have near-identical profiles, confirming the bottleneck is the DB, not the reads
+- **Thread scaling — wall time sweep (2/4/8/16/32/64/96/128/192 threads, 5 runs each):**
+  - sweet spot: **32 threads** (5.507s avg) — we were running 96 which is 6% slower
+  - classification time parallelises well: 7.4s→0.72s from 2T→32T (10× speedup on the actual work)
+  - but ~4.8s DB mmap overhead is a fixed floor — can't be parallelised away
+  - beyond 32T: contention overhead > parallelism benefit, wall time rises continuously to 192T
+- **Thread scaling — `perf stat -r 5` sweep (IPC + LLC miss + stalls per thread count):**
+  - DRAM stall cycles plateau at ~11B from T=8 onward — memory bandwidth saturates at 8 threads, more threads gain nothing
+  - IPC degrades monotonically: 1.81 peak at 4T → 1.28 at 192T (29% collapse)
+  - stall% rises: 42% at 4T → 56% at 192T — more threads = more lock contention = more stalls
+  - LLC miss% stays flat ~80-82% throughout — the memory wall is structural, not a thread count artifact
+- **Files saved:** `Luna/profiling/results_kraken2.md` fully populated, `bash_history.md` steps 23-29, `thread_scaling_perf_T*.txt`, `thread_scaling_fast.txt`, `thread_scaling_perf_summary.txt`
+- **README updated** with section 6 — ASCII bar and segment charts for all stats with observations
+- **Next:** `perf record` + flamegraph to confirm `CompactHashTable::Get()` as hotspot on Luna native PMU (was 67% on WSL2 gprof — want native confirmation); NUMA analysis

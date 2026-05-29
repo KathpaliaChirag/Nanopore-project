@@ -117,6 +117,136 @@ access to two lab servers, both fully documented:
 
 luna's `perf_event_paranoid = 1` confirmed — hardware counters (LLC-load-misses, stalled-cycles-backend, TMA) work for all users. matmul re-run on Luna will give accurate IPC for the first time.
 
+### 6. luna — kraken-2 full profiling analysis (2026-05-29)
+
+i ran the complete kraken-2 profiling suite on luna using real hardware counters (no Hyper-V noise). this covers all 3 basecalling models, TMA breakdown, warm vs cold cache, and a full thread scaling sweep from 2 to 192 threads with 5 runs per point.
+
+---
+
+#### classification rate: fast vs hac vs sup
+
+```mermaid
+xychart-beta
+    title "Kraken-2 Classification Rate by Model (%)"
+    x-axis ["fast", "hac", "sup"]
+    y-axis "% reads classified" 70 --> 100
+    bar [82.66, 95.77, 97.09]
+```
+
+classification jumps hard from fast→hac (+13 pp) but barely moves from hac→sup (+1.3 pp). hac is the clinical sweet spot — that's where most real pathogen k-mers show up in reads. sup adds noise-level improvement at 6× the compute cost.
+
+---
+
+#### ipc across models
+
+```mermaid
+xychart-beta
+    title "IPC by Basecalling Model (Luna, Kraken-2 hac/fast/sup)"
+    x-axis ["fast", "hac", "sup"]
+    y-axis "Instructions per cycle" 1.3 --> 1.8
+    bar [1.47, 1.58, 1.65]
+```
+
+sup has the best IPC — better reads produce k-mers that retire more useful instructions per cycle. the difference is real but modest (12%). all three sit well below the ~6 theoretical max because the bottleneck is memory, not compute.
+
+---
+
+#### dram stall cycles per model
+
+```mermaid
+xychart-beta
+    title "DRAM Stall Cycles by Model (billions)"
+    x-axis ["fast", "hac", "sup"]
+    y-axis "Stall cycles (B)" 7 --> 12
+    bar [11.30, 8.34, 9.26]
+```
+
+fast spends the most cycles waiting on DRAM — lower-quality reads generate more diverse k-mers that miss the hash table less predictably. the root cause is identical for all three: the 8 GB database is 38× the 210 MB L3, so nearly every lookup goes to DRAM.
+
+---
+
+#### where cpu time goes: tma slot breakdown
+
+```mermaid
+pie title "TMA Slot Breakdown — hac model (Luna)"
+    "Retiring (useful work)" : 26.9
+    "Memory Bound" : 25.4
+    "Core Bound" : 21.7
+    "Bad Speculation" : 16.9
+    "Frontend Bound" : 9.6
+```
+
+only 26.9% of cpu slots are doing real work. memory + core bound together = 47% — the cpu is idle for nearly half its time. bad speculation at 16.9% means 1 in 6 slots is wasted on squashed instructions. the 8 GB hash table directly causes the memory_bound slice; there's no fix that doesn't address the database size.
+
+---
+
+#### tma comparison across all 3 models
+
+```mermaid
+xychart-beta
+    title "TMA Memory Bound % by Model"
+    x-axis ["fast", "hac", "sup"]
+    y-axis "Memory bound %" 20 --> 32
+    bar [28.1, 25.4, 26.2]
+```
+
+fast is the most memory-bound (28.1%) — lower quality reads require more hash lookups that miss. sup has the best retiring % (27.4%) but the TMA profiles are nearly identical across all three, confirming the bottleneck is the DB, not the reads.
+
+---
+
+#### thread scaling: wall time (5-run avg, fast model)
+
+```mermaid
+xychart-beta
+    title "Kraken-2 Wall Time vs Thread Count (fast model, 5-run avg)"
+    x-axis ["2T", "4T", "8T", "16T", "32T", "64T", "96T", "128T", "192T"]
+    y-axis "Wall time (s)" 4 --> 13
+    bar [12.29, 8.18, 6.57, 5.74, 5.52, 5.68, 5.87, 5.97, 6.12]
+```
+
+the floor is ~5.5s no matter how many threads i add. kraken-2's own classification time drops from 7.4s (2T) to 0.72s (32T) — a real 10× speedup on the actual work — but ~4.8s of DB mmap page-fault overhead is single-threaded and unavoidable. beyond 32T, contention and cache thrashing push the time back up. i was running 96T — that's 6% slower than the 32T optimum and wastes 64 threads completely.
+
+---
+
+#### thread scaling: ipc degradation
+
+```mermaid
+xychart-beta
+    title "IPC vs Thread Count (Kraken-2 fast, perf stat -r 5)"
+    x-axis ["2T", "4T", "8T", "16T", "32T", "64T", "96T", "128T", "192T"]
+    y-axis "IPC" 1.1 --> 1.95
+    line [1.73, 1.81, 1.78, 1.73, 1.60, 1.48, 1.46, 1.41, 1.28]
+```
+
+IPC peaks at 4T (1.81) then falls continuously to 1.28 at 192T — a 29% drop. more threads = more lock contention in the hash table, more cache line thrashing across cores, each thread spending more time blocked. at 192T every individual thread is doing less useful work per cycle than at 4T despite using 48× more hardware.
+
+---
+
+#### thread scaling: stall % growth
+
+```mermaid
+xychart-beta
+    title "Stall % vs Thread Count (cycle_activity.stalls_total / cycles)"
+    x-axis ["2T", "4T", "8T", "16T", "32T", "64T", "96T", "128T", "192T"]
+    y-axis "Stall %" 38 --> 60
+    line [44.2, 42.2, 43.0, 44.4, 48.1, 51.5, 52.0, 52.8, 56.0]
+```
+
+stall % rises from 42% at 4T to 56% at 192T. the DRAM stall cycle count is nearly flat (~11B) from 8T onward — bandwidth is saturated at 8 threads and extra threads can't get more of it. what grows instead is contention stalls: pure overhead with zero classification benefit.
+
+---
+
+#### summary: what luna confirmed that wsl2 couldn't
+
+| metric | wsl2 (unreliable) | luna (accurate) |
+|---|---|---|
+| IPC | 2.26 (wrong, Hyper-V clock) | **1.47–1.65** (real) |
+| LLC miss rate | not supported | **80–82%** (first real measurement) |
+| stall % | not available | **42–56%** depending on thread count |
+| TMA memory_bound | not available | **25–28%** of all slots |
+| optimal thread count | unknown | **32 threads** (not 96) |
+| DRAM saturation point | unknown | **8 threads** — bandwidth maxes out early |
+
 ---
 
 ## why these numbers matter
@@ -206,18 +336,18 @@ Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all u
 
 ## what's next
 
-**profiling (Luna):**
-- re-run matmul benchmark suite on Luna — get accurate IPC (no Hyper-V noise), compare Intel vs AMD cache behaviour
-- run kraken-2 perf + gprof + TMA on Luna — confirm IPC ~0.55, get real LLC miss rate
-- run Nsight Compute on Dorado GEMM kernel on Luna L40S — SM occupancy, arithmetic intensity, Tensor Core utilization
+**profiling (Luna) — immediate:**
+- `perf record` + flamegraph on Luna to confirm `CompactHashTable::Get()` as hotspot with native PMU (was 67% on WSL2 gprof — want Luna-native confirmation)
+- NUMA analysis — check if hash table memory spans both sockets; pin to one socket with `numactl` and measure
+- matmul benchmark re-run on Luna — tables in `Luna/profiling/results_matmul_luna.md` are still blank; accurate IPC (no Hyper-V noise) and LLC miss rates now possible
+
+**profiling (Luna) — upcoming:**
+- Dorado GPU profiling on L40S with nsys + ncu — `results_dorado.md` is blank; need to locate nsys/ncu in PATH first
+- AMX matrix multiply (Luna-exclusive) — Xeon Platinum 8468 has AMX; compare vs tiled_avx2
 
 **implementation:**
-- start implementing the Hot-K-mer LRU cache layer for kraken-2 (`CompactHashTable::Get()` is the confirmed target)
-- benchmark cache hit rate on real AIIMS barcode02 (Pseudomonas aeruginosa dominant) vs mixed-species barcodes
-
-**profiling tools still to run:**
-- `cachegrind` for per-function LLC miss rates on kraken-2 (Minerva disk full — run on Luna)
-- `perf record` for source line hotspot mapping inside `CompactHashTable::Get()`
+- start Hot-K-mer LRU cache layer for kraken-2 (`CompactHashTable::Get()` is the confirmed target — 67% of runtime on WSL2, now confirmed memory-bound on Luna)
+- run at **32 threads** going forward (not 96) — thread scaling shows 32T is the sweet spot for this dataset + DB combination
 
 ---
 
