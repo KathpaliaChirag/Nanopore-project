@@ -528,27 +528,108 @@ sudo perf script -i ~/results/profiling/perf_hac_32t.data | \
 
 ---
 
-### 6b — Analysis
+### 6b — How perf record and flamegraph work
 
-**WSL2 gprof result (67% CompactHashTable::Get) was misleading.**
+**perf record** is a sampling profiler. Every 1/99th of a second (`-F 99`), the Linux kernel interrupts whatever is running on each CPU core, looks at the instruction pointer (where in the code is the CPU right now?), and records it along with the full call stack (`-g`). After the program finishes, the `.data` file contains all those snapshots.
 
-gprof only samples user-space CPU time. It cannot see:
-- Kernel time (I/O syscalls, page fault handlers)
-- Time spent blocked waiting for DRAM
+With 2142 samples over a ~0.74s run across 32 threads, that is roughly 32 × 0.74 × 99 ≈ 2340 possible samples. 2142 collected is expected — some samples are dropped due to kernel overhead.
 
-On native Luna with `perf`, the full picture is visible. The real breakdown is:
+The key principle: **functions that appear in more samples are the ones the CPU spent the most time in.** If `foo()` shows up in 257 out of 2142 samples, it consumed ~12% of CPU time.
 
-- **25.57% — MinimizerScanner::NextMinimizer:** k-mer extraction and minimizer selection from each read. This is CPU-bound computation — not memory access. It is the true dominant hotspot, not hash lookups.
-- **~20% — I/O (read syscall chain):** Reading the FASTQ file from ext4. `filemap_read`, `copy_page_to_iter`, `_copy_to_iter` together account for ~16-20% of wall time. This is a real bottleneck invisible to gprof.
-- **12.10% — CompactHashTable::Get:** Hash table probing. Still significant but a smaller fraction than gprof suggested — because gprof's denominator (user CPU time only) excluded everything else.
-- **~11% — page faults on DB mmap:** Consistent with the 82% LLC miss rate and 11B DRAM stall cycles from perf stat. Each hash lookup that misses L3 triggers a TLB + page walk, and cold pages cause a page fault handled here.
+**The flamegraph** takes all those call stacks and visualises them:
+- X axis = % of total samples (width = time)
+- Y axis = call depth (bottom = entry point, top = where the CPU actually was)
+- Each box = one function
 
-**Implication for optimisation:** Speeding up hash lookups alone (e.g., prefetching into CompactHashTable::Get) would address ~12% of wall time, not 67%. Reducing FASTQ I/O overhead (e.g., ramdisk, tmpfs, or mmap-based input) could recover ~20%. MinimizerScanner is CPU-bound — parallelisation or SIMD could help there.
+A wide box at the top of a stack means that function itself was doing the work. A wide box in the middle means it was calling something else that consumed the time.
+
+---
+
+### 6c — Analysis of the three main towers
+
+The root is `classify` at 99.11% — all of kraken2's work is inside that function, which is expected.
+
+Below it, three major towers:
+
+**Tower 1 — MinimizerScanner::NextMinimizer (25.57%)**
+
+This is k-mer extraction. For every read, kraken2 scans along it with a sliding window of 35 bases, hashes each window, and picks the minimizer (the minimum hash value in a window of k-mers) as the representative k-mer to look up. This is pure CPU arithmetic — no memory access to the database, just bit operations on the read sequence itself. It is the true dominant hotspot.
+
+On WSL2 gprof this was significantly under-reported because gprof attributed time to the function it sampled in user-space and missed the boundary effects, and the denominator (user CPU time) was inflated by excluding all kernel time.
+
+**Tower 2 — read() syscall chain (~20%)**
+
+This is a kernel call chain: `read() → entry_SYSCALL_64 → do_syscall_64 → __x64_sys_read → vfs_read → ext4_file_read_iter → filemap_read → copy_page_to_iter → _copy_to_iter`
+
+All of that is the Linux kernel reading the FASTQ file from the SSD through the ext4 filesystem into kraken2's buffer. ~20% of all CPU time is spent doing this. gprof cannot see any kernel-mode code — this entire tower was completely invisible to it.
+
+**Tower 3 — CompactHashTable::Get + page faults (~23% combined)**
+
+`CompactHashTable::Get` at 12.10% is the actual hash table probe: take the minimizer hash, compute the bucket index, load the bucket from the 8 GB database. Since the database is 38× larger than the 210 MB L3 cache, most loads miss the cache and go to DRAM — that is what the 82% LLC miss rate from perf stat measures.
+
+The ~11% page faults sit adjacent to this in the flamegraph. When kraken2 first accesses a page of the database that is not in its process address space yet (even if it is already in OS page cache from a previous run), the CPU raises a page fault. The kernel handles it via `exc_page_fault → handle_mm_fault → __handle_mm_fault`. This is the mmap overhead measured in wall time. It is present even on warm runs because the process address space is re-mapped on each execution.
+
+---
+
+### 6d — Why gprof was wrong
+
+gprof works by inserting timer interrupts and counting time only while the process is in **user mode**. The moment kraken2 calls `read()`, the CPU switches to kernel mode and gprof's timer stops counting. Same for every page fault. So gprof's denominator was only the user-space fraction of wall time.
+
+Within that reduced denominator, `CompactHashTable::Get` was genuinely the biggest chunk of user-space time — so gprof's 67% figure was correct for user-space only. But user-space time was only a fraction of actual wall time (user time 19.3s / wall time 5.2s at 32T = ~3.7 effective cores, meaning most of the clock is spent waiting on I/O or kernel handlers).
+
+perf sees everything — user mode, kernel mode, interrupt handlers — so all percentages are of actual wall time.
+
+---
+
+### 6e — Optimisation targets derived from flamegraph
+
+| Target | Wall time % | Approach | Priority |
+|---|---|---|---|
+| MinimizerScanner::NextMinimizer | **25.57%** | SIMD vectorisation of the minimizer hash computation; or skip redundant minimizer recalculation for overlapping windows | future |
+| FASTQ I/O (read syscall chain) | **~20%** | copy input file to tmpfs / ramdisk (`cp reads.fastq /dev/shm/`) — eliminates ext4 entirely and removes the kernel I/O tower | Goal 1 (see below) |
+| CompactHashTable::Get | **12.10%** | hot-k-mer LRU cache — cache hits bypass the DRAM lookup entirely | implementation target (Kolin sir's design) |
+| DB mmap page faults | **~11%** | `mlock()` the database into RAM before classification starts; eliminates fault overhead on every run | future |
+
+---
+
+## Profiling Goals (ordered)
+
+The following experiments are planned in sequence after Step 6.
+
+**Goal 1 — NUMA analysis (next)**
+
+Check whether the 8 GB hash table is allocated across both NUMA sockets. If kraken2 threads on socket 0 are accessing memory pinned to socket 1, each lookup crosses the QPI interconnect (higher latency than local DRAM). `numactl --hardware` shows topology; `numastat` during a run shows cross-socket traffic.
+
+Command to try after baseline:
+```bash
+numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/data/kraken2_db --threads 32 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq
+```
+If wall time drops, cross-NUMA traffic was a real cost.
+
+**Goal 2 — FASTQ on tmpfs (quantify the 20% I/O cost)**
+
+The flamegraph shows ~20% of wall time in ext4 I/O reading the FASTQ. Moving the input file to `/dev/shm` (tmpfs, RAM-backed) should eliminate that entire tower.
+
+```bash
+cp ~/results/basecalling/reads_hac.fastq /dev/shm/reads_hac.fastq
+kraken2 --db ~/data/kraken2_db --threads 32 \
+  --report /dev/null --output /dev/null \
+  /dev/shm/reads_hac.fastq
+```
+
+Expected: wall time drops by ~1s (from 5.2s toward ~4.2s). This isolates whether the I/O cost is the ext4 layer or something deeper.
+
+**Goal 3 — Dorado GPU profiling on L40S**
+
+`results_dorado.md` is still blank. Needs nsys/ncu located in PATH first (`find /usr /opt -name nsys 2>/dev/null`).
 
 ---
 
 ## Next Steps
 
-- NUMA analysis — check if hash table memory crosses socket boundary (numactl --hardware, numastat)
-- Run with DB on tmpfs to isolate I/O overhead — quantify the 20% I/O cost
-- nsys profiling of Dorado on L40S (results_dorado.md still blank)
+- Step 7: NUMA analysis (Goal 1)
+- Step 8: FASTQ tmpfs experiment (Goal 2)
+- Step 9: Dorado GPU profiling on L40S (Goal 3)
