@@ -74,23 +74,6 @@ Full phase details live in [`reports/phase1_dummytesting_dorado_kraken2.md`](rep
 
 ---
 
-## Phase 2c — Kraken2 Thread-Scaling Sweep (T1→T16, fast/hac/sup)
-
-> Full analysis: [kraken2_thread_scaling.md](reports/kraken2_thread_scaling.md)
-
-**Date:** 2026-05-29 — sweep across 9 thread counts (1,2,4,6,8,10,12,14,16) × 3 modes using `perf stat -d -d`, TMA (Top-down Microarchitecture Analysis) events, and mpstat per-core utilization. Binary rebuilt without `-pg`.
-
-- **T16 is fastest** (2.2–2.6 s, 2464–2836 Kseq/m) but only **36–41% efficient** — 16 threads on a memory-bound workload gives 6–7× speedup instead of the theoretical 16×
-- **T4–T6 is the efficiency sweet spot** — 67–86% scaling efficiency, IPC still 1.4–1.6, DRAM contention not yet severe; gives ~65–75% of T16 speed at half the CPU cost
-- **IPC without `-pg`: 1.1–1.7** vs 0.154 with it — removing profiling overhead recovered ~88% of wasted pipeline capacity
-- **BE-Bound rises with threads** (75% at T1 → 79% at T16) — more threads = more simultaneous random probes into the 8 GB DB = memory controller congestion; the bottleneck gets worse as threads increase
-- **fast/T10 regresses vs T8** — hyperthreading boundary artefact: 10 threads on 8 physical cores forces 2 cores to share L1/L2, slightly raising wall time before more threads compensate at T12+
-- **Classification accuracy unchanged** across all thread counts (fast 93.18%, hac 97.85%, sup 98.38%) — parallelism only splits reads, never changes results
-
-[→ Full analysis with all tables](reports/kraken2_thread_scaling.md)
-
----
-
 ## Phase 2b — Matrix Multiplication 21-Variant CH3 Sweep (N=1024, N=2048, N=4096)
 
 **Date:** 2026-05-28
@@ -127,5 +110,22 @@ Key findings (across all N):
 6. **Strassen finally shows O(N^2.807)** at N=4096 (6.81× per N-doubling vs ideal 8×), but absolute time still 15× slower than BLAS.
 
 See per-N reports for full tables (CH3-A wall/IPC (Instructions Per Cycle)/GFlops, CH3-B cache, CH3-C stability, CH3-D LQ-stalls (Load Queue stalls), CH3-E parallel efficiency — all with exact-precision numbers for all 21 variants).
+
+---
+
+## Phase 2c — Kraken2 Thread-Scaling Sweep (T1→T16, fast/hac/sup)
+
+> Full analysis: [kraken2_thread_scaling.md](reports/kraken2_thread_scaling.md)
+
+**Date:** 2026-05-29 — sweep across 9 thread counts (1,2,4,6,8,10,12,14,16) × 3 modes using `perf stat -d -d`, TMA (Top-down Microarchitecture Analysis) events, and mpstat per-core utilization. Binary rebuilt without `-pg`.
+
+- **T16 is fastest** (2.2–2.6 s, 2464–2836 Kseq/m) but only **36–41% efficient** — 16 threads on a memory-bound workload gives 6–7× speedup instead of the theoretical 16×
+- **T4–T6 is the efficiency sweet spot** — 67–86% scaling efficiency, IPC still 1.4–1.6, DRAM contention not yet severe; gives ~65–75% of T16 speed at half the CPU cost
+- **IPC without `-pg`: 1.1–1.7** vs 0.154 with it — removing profiling overhead recovered ~88% of wasted pipeline capacity
+- **BE-Bound rises with threads** (75% at T1 → 79% at T16) — more threads = more simultaneous random probes into the 8 GB DB = memory controller congestion; the bottleneck gets worse as threads increase
+- **fast/T10 regresses vs T8** — hyperthreading boundary artefact: 10 threads on 8 physical cores forces 2 cores to share L1/L2, slightly raising wall time before more threads compensate at T12+
+- **Classification accuracy unchanged** across all thread counts (fast 93.18%, hac 97.85%, sup 98.38%) — parallelism only splits reads, never changes results
+
+[→ Full analysis with all tables](reports/kraken2_thread_scaling.md)
 
 ---
