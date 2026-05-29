@@ -747,10 +747,21 @@ head -40 gprof_hac_1t.txt
 
 ---
 
+### 41. gprof run — hac model, 32 threads (secondary, partial)
+**Run as:** `student`
+```bash
+cd ~/results/profiling
+time ~/tools/kraken2-pg/kraken2-pg --db ~/data/kraken2_db --threads 32 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq 2>/dev/null
+gprof ~/tools/kraken2-pg/classify gmon.out > gprof_hac_32t.txt
+```
+**Status:** ✅ Done — wall 43.4s (10x -pg overhead), MinimizerScanner 68.08%, CompactHashTable 10.09% (partial: one thread only, DB pre-warmed by other threads reduces hash miss fraction)
+
+---
+
 ## Next Steps
 
-- Step 10: gprof 1T run (step 40 above)
-- Step 11: gprof 32T run (secondary, partial data)
-- Step 12: valgrind cachegrind
-- Step 13: FASTQ on tmpfs
-- Step 14: Dorado GPU profiling
+- Step 11: valgrind cachegrind (per-function L1/LL cache miss counts)
+- Step 12: FASTQ on tmpfs (quantify ~20% I/O cost)
+- Step 13: Dorado GPU profiling on L40S

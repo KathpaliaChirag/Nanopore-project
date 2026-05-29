@@ -922,8 +922,29 @@ gprof's denominator is user-space CPU time only (18.6s at 1T). perf's denominato
 
 ---
 
+### 10g — Secondary run: gprof hac 32T (partial — one thread only)
+
+**Timing:** wall 43.428s (vs 4.4s normal — ~10x overhead from -pg), user 20m17s (32T × ~38s each), sys 10s.
+**Output file:** `~/results/profiling/gprof_hac_32t.txt`
+**Caveat:** gmon.out contains only the last thread's data. Call counts are ~1/57th of 1T totals, confirming one thread of ~32 is captured.
+
+| Function | 1T % | calls (1T) | 32T % (partial) | calls (32T, 1 thread) |
+|---|---|---|---|---|
+| `MinimizerScanner::NextMinimizer` | 53.35% | 351,893,601 | **68.08%** | 6,160,005 |
+| `CompactHashTable::Get` | 23.23% | 11,634,763 | **10.09%** | 164,928 |
+| `reverse_complement` | 6.69% | 352,208,243 | 8.48% | 7,696,256 |
+| `ClassifySequence` | 7.27% | — | 6.01% | — |
+| `AddHitlistString` | 3.15% | 104,888 | 3.65% | 1,581 |
+
+**CompactHashTable::Get drops from 23.23% to 10.09% at 32T.** All 31 other threads simultaneously load DB pages into RAM. By the time this measured thread needs a page, another thread has often already faulted it in — the effective LLC miss rate for this one thread is lower because the DB is pre-warmed by peers. MinimizerScanner (pure CPU, no DB access) is unaffected and grows proportionally.
+
+**MinimizerScanner + reverse_complement = 76.6% at 32T** vs 60.0% at 1T. With hash lookups cheaper per thread at 32T, the compute-bound scanner operations dominate even more.
+
+**-pg overhead:** 43s wall vs 4.4s normal = 10x slowdown. Instrumentation fires on every function call and each thread maintains its own profiling counters, adding significant overhead at 32T.
+
+---
+
 ## Next Steps
 
-- Step 10: gprof 1T run — pending output
 - Step 11: valgrind cachegrind (per-function cache miss counts)
 - Step 12: FASTQ tmpfs experiment (quantify the ~20% I/O cost)
