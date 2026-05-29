@@ -84,3 +84,19 @@ One dated entry per session. Append at end of each conversation.
 - Audited both n2048 and n4096 reports for proper analysis: fixed Bottom Line contradiction in n2048 (BLAS lead "narrowed" not "further ahead"), fixed wrong working-set number (96 MB → 384 MB) in n4096 Critical Self-Review, fixed wrong IPC numbers in retraction claim, added missing Surprises/Self-Review sections, added cross-N scaling tables to both
 - Total today: 21 variants × 4 perf_stat experiments × 3 N values = **252 perf outputs**; 3 per-N reports + report.md summary + daily_summary + index updated
 - Pending: CH4 (perf record cycles/cache/IBS, perf annotate, perf diff) and CH5 (perf mem `--sort mem`, perf c2c, perf bench mem) — currently only CH3 is complete across all N values
+
+---
+
+## 2026-05-29
+
+- Ran `perf stat` (cache events) + `perf stat` (AMD Zen4 TMA events) + `mpstat -P ALL 2` for all 27 combinations: 9 thread counts (1,2,4,6,8,10,12,14,16) × 3 modes (fast/hac/sup); binary rebuilt without `-pg`
+- Key findings: IPC stable T1–T8 (fast 1.363→1.402), drops sharply at T10 (1.233) and continues to T16 (1.115) — bandwidth saturation boundary is T=10 for all three modes
+- Instructions retired flat (fast ±1.83% T1→T16) — proves zero algorithmic overhead from multi-threading; IPC drop is purely stall cycles growing
+- `ls_not_halted_cyc` flat T1–T8 (~85 B cycles), jumps +13.9% at T10 — confirms T10 as the DRAM bandwidth saturation point; same inflection in all three modes simultaneously
+- Cache-miss count near-constant (~375–400 M for fast) at all thread counts — 8 GB working set does not shrink with more threads; cache-miss% decline (16.5%→14.6%) is a ratio artefact, not a real improvement
+- BE-Bound rises 75.5%→79.2% (fast T1→T16); FE-Bound stays 1.4–1.8% throughout — frontend never a bottleneck
+- Op-cache misses grow +15% (fast) to +25% (sup) T1→T16 — secondary pressure from concurrent threads evicting each other's decoded micro-ops
+- Optimal thread count: T8 — 5.36× speedup, IPC 1.4017, BE-Bound 74.6%; T16 adds only 23% more throughput at cost of 20% IPC drop
+- Rewrote `generate_thread_report.py` to match actual data format (perf_stat_dd has only cache-misses/refs/elapsed, not IPC); IPC sourced from TMA events
+- Generated `reports/kraken2_thread_scaling_full.md` — 494 lines, 7 sections, per-table observations after every table (18 obs blocks total)
+- Updated report.md Phase 2c with GitHub link and 7 key findings; pushed commit 8f44af9 to hobbbit branch

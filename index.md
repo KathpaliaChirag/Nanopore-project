@@ -36,6 +36,17 @@ Update this every time a new major topic is pushed.
 - Phase 1g: HAC model re-profiling (post Ubuntu reinstall, _15.pod5) — 116.6s, 30,275 reads, LstmKernel 70.0% confirmed
 - Phase 2a: Kraken-2 classification + gprof — 93% classified, CompactHashTable::Get() = 80.65% CPU time, memory-bound verdict
 - Phase 2b: Matmul 21-variant CH3 perf-stat sweep at **N=1024, 2048, 4096** — full primitive matrix T/O/A/P/U + transposed/BLAS/Strassen refs. Detailed per-N reports in `matrix_mul/` (see below). report.md has only the cross-N summary now.
+- Phase 2c: Kraken2 thread-scaling sweep — 9 thread counts × 3 modes, `perf stat` cache + TMA + mpstat. T8 optimal (5.36×, IPC 1.40, BE 74.6%). Bandwidth saturates at T10. Full report in `reports/kraken2_thread_scaling_full.md`.
+
+**reports/kraken2_thread_scaling_full.md** → comprehensive per-thread Kraken2 profiling report
+- 7 sections, 494 lines, 18 per-table observation blocks — exact raw values, no aggregation
+- §1 Classification baseline (deterministic, fast 93.18% / hac 97.85% / sup 98.38%)
+- §2 Throughput scaling: all 3 runs per (mode, thread), speedup column, cross-mode comparison
+- §3 Cache: full 27-row table with cache-misses, refs, miss%, CPU-Eff%; cross-thread miss% breakdown
+- §4 TMA: all 27 combinations — retiring/FE/BE/bad-spec/IPC; instructions retired flat (±1.8%); ls_not_halted_cyc T10 jump; op-cache miss growth
+- §5 Raw TMA event counts: 7 events × 9 threads per mode
+- §6 mpstat per-core utilisation: overall avg, top-3 cores, cores below 5%
+- §7 Master cross-thread summary with throughput–efficiency trade-off analysis
 
 **matrix_mul/** → 21-variant matmul perf-stat sweep, per-N standalone reports
 - `report_n1024.md` — N=1024 (24 MB working set, fits L3): naive→ikj 11× speedup is purely access-pattern; tiling has nothing to add at this size; BLAS 165× best
@@ -48,3 +59,4 @@ Update this every time a new major topic is pushed.
 - 2026-05-22
 - 2026-05-25
 - 2026-05-28
+- 2026-05-29
