@@ -576,8 +576,58 @@ done 2>&1 | tee ~/results/profiling/thread_scaling_perf_summary.txt
 
 ---
 
-## Next Steps (after steps 23-27 complete)
+### 30. Thread scaling — wall time, hac model (5 runs each)
+**Run as:** `student`
+```bash
+for T in 2 4 8 16 32 64 96 128 192; do
+  echo "=== threads=$T ==="
+  sum=0
+  for i in 1 2 3 4 5; do
+    START=$(date +%s%3N)
+    kraken2 --db ~/data/kraken2_db --threads $T \
+      --report /dev/null --output /dev/null \
+      ~/results/basecalling/reads_hac.fastq 2>/dev/null
+    END=$(date +%s%3N)
+    W=$(echo "scale=3; ($END - $START) / 1000" | bc)
+    echo "  run $i: ${W}s"
+    sum=$(echo "$sum + $W" | bc)
+  done
+  AVG=$(echo "scale=3; $sum / 5" | bc)
+  echo "  avg: ${AVG}s"
+  echo ""
+done 2>&1 | tee ~/results/profiling/thread_scaling_hac.txt
+```
+**Status:** ✅ Done — sweet spot 32T (5.235s), same curve as fast
 
-- perf record + flamegraph to confirm CompactHashTable::Get() as hotspot on Luna
+---
+
+### 31. Thread scaling — wall time, sup model (5 runs each)
+**Run as:** `student`
+```bash
+for T in 2 4 8 16 32 64 96 128 192; do
+  echo "=== threads=$T ==="
+  sum=0
+  for i in 1 2 3 4 5; do
+    START=$(date +%s%3N)
+    kraken2 --db ~/data/kraken2_db --threads $T \
+      --report /dev/null --output /dev/null \
+      ~/results/basecalling/reads_sup.fastq 2>/dev/null
+    END=$(date +%s%3N)
+    W=$(echo "scale=3; ($END - $START) / 1000" | bc)
+    echo "  run $i: ${W}s"
+    sum=$(echo "$sum + $W" | bc)
+  done
+  AVG=$(echo "scale=3; $sum / 5" | bc)
+  echo "  avg: ${AVG}s"
+  echo ""
+done 2>&1 | tee ~/results/profiling/thread_scaling_sup.txt
+```
+**Status:** ✅ Done — sweet spot 32T (4.560s), lowest floor of all 3 models; 2T→32T = 2.51x speedup
+
+---
+
+## Next Steps
+
+- perf record + flamegraph at 32 threads on hac to confirm CompactHashTable::Get() hotspot (Luna native PMU)
 - NUMA analysis with numactl
 - nsys profiling of Dorado GPU run

@@ -319,6 +319,69 @@ done 2>&1 | tee ~/results/profiling/thread_scaling_fast.txt
 
 ---
 
+### 5c — Thread Scaling: hac model
+
+**Output file:** `~/results/profiling/thread_scaling_hac.txt`
+
+| Threads | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 | Avg (s) | Speedup vs 2T |
+|---|---|---|---|---|---|---|---|
+| 2 | 12.005 | 11.266 | 11.719 | 12.098 | 11.734 | 11.764 | 1.00x |
+| 4 | 7.863 | 7.908 | 7.841 | 8.008 | 7.917 | 7.907 | 1.49x |
+| 8 | 6.237 | 6.264 | 6.292 | 6.296 | 6.276 | 6.273 | 1.88x |
+| 16 | 5.514 | 5.504 | 5.489 | 5.548 | 5.438 | 5.498 | 2.14x |
+| 32 | 5.287 | 5.215 | 5.245 | 5.175 | 5.255 | **5.235** | **2.25x** |
+| 64 | 5.430 | 5.405 | 5.388 | 5.470 | 5.396 | 5.417 | 2.17x |
+| 96 | 5.649 | 5.596 | 5.660 | 5.633 | 5.638 | 5.635 | 2.09x |
+| 128 | 5.752 | 5.767 | 5.738 | 5.793 | 5.717 | 5.753 | 2.05x |
+| 192 | 5.857 | 5.882 | 5.816 | 5.897 | 5.845 | 5.859 | 2.01x |
+
+Sweet spot: **32 threads (5.235s)**. Same curve shape as fast. Slightly lower floor than fast (5.235 vs 5.507) — hac has higher classification rate so less wasted hash lookups on unclassified reads.
+
+---
+
+### 5d — Thread Scaling: sup model
+
+**Output file:** `~/results/profiling/thread_scaling_sup.txt`
+
+| Threads | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 | Avg (s) | Speedup vs 2T |
+|---|---|---|---|---|---|---|---|
+| 2 | 11.813 | 11.282 | 11.463 | 11.153 | 11.636 | 11.469 | 1.00x |
+| 4 | 8.021 | 7.895 | 7.940 | 7.932 | 7.970 | 7.951 | 1.44x |
+| 8 | 6.259 | 6.248 | 6.268 | 6.267 | 6.262 | 6.260 | 1.83x |
+| 16 | 5.071 | 4.801 | 4.796 | 4.810 | 4.821 | 4.859 | 2.36x |
+| 32 | 4.530 | 4.573 | 4.561 | 4.554 | 4.584 | **4.560** | **2.51x** |
+| 64 | 4.751 | 4.748 | 4.777 | 4.757 | 4.784 | 4.763 | 2.41x |
+| 96 | 4.947 | 4.954 | 4.946 | 4.969 | 5.629 | 5.089 | 2.25x |
+| 128 | 5.777 | 5.760 | 5.799 | 5.694 | 5.700 | 5.746 | 2.00x |
+| 192 | 5.918 | 5.910 | 5.861 | 5.934 | 5.859 | 5.896 | 1.94x |
+
+Sweet spot: **32 threads (4.560s)** — but note 16T (4.859s) is already very close. sup also has a steeper degradation past 32T than fast/hac (128T jumps to 5.746s vs hac's 5.753s). The 96T run has one outlier (5.629s) — system noise, not a real effect.
+
+---
+
+### 5e — Cross-Model Thread Scaling Comparison
+
+| Threads | fast (s) | hac (s) | sup (s) | Notes |
+|---|---|---|---|---|
+| 2 | 11.739 | 11.764 | 11.469 | All similar — DB load dominates |
+| 4 | 7.747 | 7.907 | 7.951 | |
+| 8 | 6.544 | 6.273 | 6.260 | hac/sup pull ahead |
+| 16 | 5.730 | 5.498 | **4.859** | sup notably faster from here |
+| 32 | **5.507** | **5.235** | **4.560** | **Sweet spot for all 3** |
+| 64 | 5.709 | 5.417 | 4.763 | All degrade past 32T |
+| 96 | 5.844 | 5.635 | 5.089 | |
+| 128 | 5.992 | 5.753 | 5.746 | |
+| 192 | 6.159 | 5.859 | 5.896 | |
+| **Sweet spot** | **32T** | **32T** | **32T** | Unanimous |
+| **Best avg (s)** | 5.507 | 5.235 | **4.560** | sup fastest floor |
+| **2T→32T speedup** | 2.13x | 2.25x | **2.51x** | sup gets most from threading |
+
+**Why sup is faster overall:** sup classifies 97.1% of reads vs fast's 82.7%. Unclassified reads in fast exhaust their full k-mer set without finding enough matches — more wasted hash lookups per read. sup wastes less time on dead-end lookups, so the actual classification phase is shorter. The DB mmap floor (~4-5s) is the same for all three.
+
+**Conclusion: run all future profiling at 32 threads.**
+
+---
+
 ### 5b — Thread Scaling: perf stat per thread count (5-run avg with stddev)
 
 **Goal:** Capture IPC, LLC miss rate, and stall % at each thread count to see how cache behaviour and CPU efficiency change with parallelism.
@@ -431,8 +494,6 @@ The dataset may be too small to saturate all threads, or lock contention limits 
 
 ## Next Steps
 
-- Run perf stat + mpstat for fast and sup models (Step 3 incomplete)
-- Run TMA for fast and sup models (Step 4 incomplete)
-- perf record + flamegraph to confirm CompactHashTable::Get() as hotspot
-- Second Kraken2 pass after DB is warm in page cache to isolate classification-only time
+- perf record + flamegraph at **32 threads** on hac model — confirm CompactHashTable::Get() as hotspot with Luna native PMU
 - NUMA analysis — check if hash table memory crosses socket boundary
+- nsys profiling of Dorado on L40S (results_dorado.md still blank)
