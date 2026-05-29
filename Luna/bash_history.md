@@ -709,9 +709,48 @@ done
 
 ---
 
+### 39. Recompile kraken2 with -pg for gprof
+**Run as:** `student`
+```bash
+# Add -pg to Makefile
+sed -i 's/CXXFLAGS = $(KRAKEN2_SKIP_FOPENMP) -Wall -std=c++11 -O3/CXXFLAGS = $(KRAKEN2_SKIP_FOPENMP) -Wall -std=c++11 -O3 -pg/' ~/tools/kraken2-src/src/Makefile
+
+# Build instrumented binary
+cd ~/tools/kraken2-src/src && make clean && make
+
+# Install to separate pg directory
+mkdir -p ~/tools/kraken2-pg
+cp ~/tools/kraken2-src/src/classify ~/tools/kraken2-pg/
+cp ~/tools/kraken2/kraken2 ~/tools/kraken2-pg/kraken2-pg
+cp ~/tools/kraken2/kraken2lib.pm ~/tools/kraken2-pg/
+
+# Revert Makefile and rebuild production binary
+sed -i 's/ -pg//' ~/tools/kraken2-src/src/Makefile
+cd ~/tools/kraken2-src/src && make clean && make
+cp ~/tools/kraken2-src/src/classify ~/tools/kraken2/classify
+```
+**Status:** ✅ Done — `~/tools/kraken2-pg/kraken2-pg` (gprof), `~/tools/kraken2/kraken2` (production), both `kraken2 2.1.3`
+
+---
+
+### 40. gprof run — hac model, 1 thread (primary)
+**Run as:** `student`
+```bash
+cd ~/results/profiling
+time ~/tools/kraken2-pg/kraken2-pg --db ~/data/kraken2_db --threads 1 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq 2>/dev/null
+gprof ~/tools/kraken2-pg/classify gmon.out > gprof_hac_1t.txt
+head -40 gprof_hac_1t.txt
+```
+**Status:** 🔜 Pending
+
+---
+
 ## Next Steps
 
-- Step 10: gprof on Luna (recompile kraken2 with -pg)
-- Step 11: valgrind cachegrind
-- Step 12: FASTQ on tmpfs
-- Step 13: Dorado GPU profiling
+- Step 10: gprof 1T run (step 40 above)
+- Step 11: gprof 32T run (secondary, partial data)
+- Step 12: valgrind cachegrind
+- Step 13: FASTQ on tmpfs
+- Step 14: Dorado GPU profiling

@@ -825,8 +825,73 @@ Zero code changes. Zero recompilation. Just thread count + numactl.
 
 ---
 
+## Step 10 — gprof on Luna
+
+### 10a — Setup
+
+kraken2 recompiled from source (`~/tools/kraken2-src/`) with `-pg` added to `CXXFLAGS` in `src/Makefile`. The instrumented binary and wrapper were installed to `~/tools/kraken2-pg/` as a separate installation. The production binary at `~/tools/kraken2/` was rebuilt clean (no `-pg`) so normal profiling runs are unaffected.
+
+Two binaries available going forward:
+- `~/tools/kraken2/kraken2` — production, `-O3`, no instrumentation
+- `~/tools/kraken2-pg/kraken2-pg` — gprof-instrumented, `-O3 -pg`
+
+### 10b — gprof Limitations (important for interpreting results)
+
+**gprof only profiles user-space CPU time.** It cannot see:
+- Kernel time (I/O syscalls, page fault handlers, scheduler)
+- Time blocked waiting for DRAM
+- Any work done in system libraries called via syscall
+
+This means gprof's percentages are fractions of user-mode CPU time only — not wall time. Functions that spend significant time in kernel (e.g. the read() syscall chain that consumed ~20% of wall time in the perf flamegraph) are completely invisible.
+
+**gprof has a multithreading problem.** With `-pg`, each thread writes its own `gmon.out` on exit, but they overwrite each other (all write to the same filename). The resulting `gmon.out` contains only one thread's data — usually whichever thread exited last. Running at 32T would give misleading per-function percentages because ~31 threads worth of work is silently discarded.
+
+**Decision: run at 1 thread for gprof.** Single-threaded gives a complete, reliable call graph. Every instruction is accounted for in the one thread. The percentages correctly show which functions dominate user-space CPU time. This matches how the WSL2 gprof was collected and makes the comparison valid.
+
+A secondary run at 32T is also done as a data point, with the caveat noted.
+
+### 10c — Commands
+
+```bash
+# Primary: single-threaded — clean, comparable to WSL2 gprof
+cd ~/results/profiling
+time ~/tools/kraken2-pg/kraken2-pg \
+  --db ~/data/kraken2_db --threads 1 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq 2>/dev/null
+# gmon.out written to ~/results/profiling/
+
+gprof ~/tools/kraken2-pg/classify gmon.out > gprof_hac_1t.txt
+head -40 gprof_hac_1t.txt
+
+# Secondary: 32 threads — partial data (last thread only), noted as such
+time ~/tools/kraken2-pg/kraken2-pg \
+  --db ~/data/kraken2_db --threads 32 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq 2>/dev/null
+gprof ~/tools/kraken2-pg/classify gmon.out > gprof_hac_32t.txt
+```
+
+### 10d — Results
+
+*(to be filled after run)*
+
+| Function | 1T % | 32T % (partial) | WSL2 gprof % | Notes |
+|---|---|---|---|---|
+| `kraken2::CompactHashTable::Get` | | | 67% | |
+| `kraken2::MinimizerScanner::NextMinimizer` | | | — | |
+| `kraken2::classify` | | | | |
+
+### 10e — Expected outcome
+
+The WSL2 gprof showed `CompactHashTable::Get` at 67%. On Luna with a 1T run we expect a similar result for user-space time — the hash lookup dominates user-space CPU since I/O and page faults are kernel-mode and invisible to gprof. The Luna flamegraph showed the same function at only 12.10% of wall time because perf captures kernel time too.
+
+This comparison — gprof Luna (user-space only) vs perf flamegraph Luna (full stack) — is the clearest demonstration of why gprof misleads on memory-bound workloads with significant I/O.
+
+---
+
 ## Next Steps
 
-- Step 10: gprof on Luna (recompile kraken2 with -pg, compare with WSL2 result)
+- Step 10: gprof 1T run — pending output
 - Step 11: valgrind cachegrind (per-function cache miss counts)
 - Step 12: FASTQ tmpfs experiment (quantify the ~20% I/O cost)
