@@ -598,7 +598,7 @@ perf sees everything — user mode, kernel mode, interrupt handlers — so all p
 |---|---|---|
 | 1 | NUMA analysis — wall time + perf stat + TMA across all 4 socket/memory configs | ✅ Done (Steps 7-9) |
 | 2 | FASTQ on tmpfs — quantify ~20% ext4 I/O cost from flamegraph | 🔜 Next (Step 12) |
-| 3 | valgrind cachegrind — per-function L1/LLC miss counts | 🔜 Next (Step 11) |
+| 3 | valgrind cachegrind — per-function L1/LLC miss counts | ✅ Done (Step 11) |
 | 4 | gprof on Luna — user-space profile, compare with WSL2 | ✅ Done (Step 10) |
 | 5 | Dorado GPU profiling on L40S with nsys | 🔜 Pending (Step 13) |
 
@@ -920,7 +920,121 @@ gprof's denominator is user-space CPU time only (18.6s at 1T). perf's denominato
 
 ---
 
+---
+
+## Step 11 — valgrind cachegrind (hac, 1 thread)
+
+**Goal:** Get per-function L1 and LL (last-level) cache miss counts. perf stat gives total LLC miss rate (82%) but cannot attribute misses to specific functions. cachegrind simulates the full cache hierarchy and records how many times each function caused an L1 miss vs an LL miss vs a hit.
+
+**Why 1 thread:** cachegrind simulates memory accesses serially. With multiple threads, simulated accesses interleave unpredictably and per-function attribution becomes unreliable. 1T gives clean, fully attributed numbers. Absolute counts scale roughly linearly to 32T.
+
+### 11a — Commands
+
+**First attempt (failed — stderr suppressed the error):**
+```bash
+cd ~/results/profiling && valgrind --tool=cachegrind \
+  --cachegrind-out-file=cachegrind_hac_1t.out \
+  ~/tools/kraken2/kraken2 --db ~/data/kraken2_db --threads 1 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq 2>/dev/null
+```
+Output file not created. Root cause: `~/tools/kraken2/kraken2` is a Perl wrapper that exec's the actual C++ binary (`classify`) as a child process. valgrind instrumented the Perl parent and never followed into the child. `2>/dev/null` hid valgrind's own diagnostic output, so the failure was silent.
+
+**Fix — use `--trace-children=yes`:**
+```bash
+valgrind --tool=cachegrind --trace-children=yes \
+  --cachegrind-out-file=cachegrind_hac_1t.out \
+  ~/tools/kraken2/kraken2 --db ~/data/kraken2_db --threads 1 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq
+```
+Wall time: 362s (~20x overhead vs 18s uninstrumented). Output: `~/results/profiling/cachegrind_hac_1t.out` (227 KB).
+
+**Annotate:**
+```bash
+cg_annotate cachegrind_hac_1t.out | head -80
+```
+
+### 11b — Cache Configuration (simulated by valgrind)
+
+| Level | Size | Line size | Associativity |
+|---|---|---|---|
+| I1 (instruction L1) | 32 KB | 64 B | 8-way |
+| D1 (data L1) | 48 KB | 64 B | 12-way |
+| LL (L3 last-level) | 104 MB | 64 B | 26-way |
+
+valgrind detected the L3 cache and rounded associativity (actual: 110 MB 15-way, simulated: 104 MB 26-way — same effective size).
+
+### 11c — Program-Wide Totals
+
+| Metric | Value | Meaning |
+|---|---|---|
+| I refs | 99.96 billion | Total instructions executed |
+| D refs | 43.88 billion | Total data memory operations (28.6B reads + 15.3B writes) |
+| D1 misses | 338.5 million | L1 data cache misses — 0.8% of all D refs |
+| LLd misses | 9.58 million | Last-level (L3) data cache misses — went to DRAM |
+| LLd miss rate | 0.02% of all D refs | Looks small, but 5.84M of these are reads (see below) |
+
+**Why LLd miss rate looks low but isn't:** The 0.02% is LLd misses / all D refs. Most ops hit L1/L2. The perf stat 82% LLC miss rate measures LLd misses / LLC accesses — a much smaller denominator. Both are consistent: only 11.7M accesses reach L3, and 9.58M of those miss it (82%). The absolute 9.58M DRAM accesses × ~100 ns each = roughly 1 second of serialised DRAM latency at 1T.
+
+### 11d — Per-Function Results
+
+Column key: `Ir` = instructions executed, `D1mr` = L1 read misses, `DLmr` = LL read misses (DRAM reads), `D1mw` = L1 write misses, `DLmw` = LL write misses.
+
+| Function | Ir % | D1mr % | DLmr % | D1mw % | DLmw % | Notes |
+|---|---|---|---|---|---|---|
+| `MinimizerScanner::NextMinimizer` | **48.23%** | 2.33% | **0%** | 0.11% | 0% | Zero DRAM reads — pure compute |
+| `MinimizerScanner::reverse_complement` | 11.63% | 0.00% | **0%** | 0% | 0% | Zero DRAM reads — pure compute |
+| `ClassifySequence` | 11.51% | 0.56% | 0.00% | 25.44% | 1.57% | Orchestration; write misses from output buffering |
+| `memmove/memcpy` (avx unaligned) | 4.29% | 44.64% | 0.85% | 62.74% | **38.64%** | String copy for output — heavy write traffic |
+| `AddHitlistString` | 4.28% | 19.24% | 0.08% | 0% | 0% | Formats output strings — many small reads |
+| `CompactHashTable::Get` | 0.65% | **7.09%** | **96.24%** | 0% | 0% | Accounts for nearly all DRAM reads |
+| `memset` (avx2) | 1.31% | 0% | 0% | 9.35% | **56.84%** | Buffer clearing — majority of LL write misses |
+| `HyperLogLogPlusMinus::insert` | 0.37% | 2.17% | 0% | 0% | 0% | Cardinality estimator — L1 misses only |
+| `murmurhash3_finalizer` | 0.14% | 0% | 0% | 0% | 0% | Pure compute, no cache pressure |
+
+### 11e — Key Finding: CompactHashTable::Get owns 96.24% of all DRAM reads
+
+`CompactHashTable::Get` executes only 0.65% of all instructions — it is a short, tight function. But it generates:
+- 12.57 million L1 read misses (7.09% of total)
+- **5.62 million LL read misses — 96.24% of ALL last-level read cache misses**
+
+Every other function in the program combined causes only 3.76% of LL read misses.
+
+**Why every CompactHashTable::Get call misses L3:** The hash table is 8 GB. The L3 cache is 104 MB. The ratio is 77:1 — no working set of hash table pages can stay warm. Each k-mer hash maps to a pseudorandom bucket anywhere in the 8 GB array. With 104,918 reads, each generating ~11 minimizers, and the DB 77x too large to cache, effectively every lookup is a cold DRAM access.
+
+### 11f — MinimizerScanner is purely CPU-bound
+
+`MinimizerScanner::NextMinimizer` runs 48.23% of all instructions and 56.31% of all data reads — but causes **zero LL misses**. It operates entirely on the read sequence (a few kilobytes at most), which stays resident in L1/L2 throughout classification of one read. The CPU is executing this function at near-theoretical speed with no memory stalls.
+
+This splits the profiling picture cleanly into two regimes:
+- **MinimizerScanner (48% of instructions):** CPU-bound, compute-limited, zero DRAM pressure. Target for SIMD optimisation.
+- **CompactHashTable::Get (0.65% of instructions):** Memory-bound, DRAM-limited, 96% of DRAM reads. Target for caching (Kolin sir's LRU cache design).
+
+### 11g — Cross-validation with previous tools
+
+| Tool | CompactHashTable::Get fraction | Denominator |
+|---|---|---|
+| gprof 1T (user-space time) | 23.23% | 18.6s user CPU time |
+| perf flamegraph 32T (wall time) | 12.10% | 4.4s wall time |
+| cachegrind (LL read misses) | **96.24%** | All LL read misses |
+| cachegrind (instruction count) | 0.65% | All instructions |
+
+All four are consistent. gprof's 23.23% × 18.6s = 2.43s wall time from hash lookups ≈ cachegrind confirming it as the sole source of DRAM traffic.
+
+### 11h — Implications for Kolin sir's LRU cache design
+
+Kolin sir's proposal: a hot k-mer LRU cache in front of `CompactHashTable::Get`. Each cache hit bypasses one DRAM lookup (~100 ns). Cachegrind confirms this is the right target:
+
+- 5.62 million DRAM reads in a single-threaded run come from this one function
+- At 32T, scale that to ~5.62M × 32 / (parallelism factor) DRAM ops total
+- A cache hit rate of even 20% on repeated k-mers would eliminate ~1.1M DRAM accesses per thread
+
+The question for the implementation is: how often are the same k-mers seen across reads? With 104,918 reads from a mixed-community sample, many reads will share common taxa k-mers. The LRU cache size vs hit rate tradeoff is the key design parameter.
+
+---
+
 ## Next Steps
 
-- Step 11: valgrind cachegrind (per-function cache miss counts)
-- Step 12: FASTQ tmpfs experiment (quantify the ~20% I/O cost)
+- Step 12: FASTQ on tmpfs (quantify ~20% I/O cost from flamegraph)
+- Step 13: Dorado GPU profiling on L40S

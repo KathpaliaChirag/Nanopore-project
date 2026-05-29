@@ -760,8 +760,55 @@ gprof ~/tools/kraken2-pg/classify gmon.out > gprof_hac_32t.txt
 
 ---
 
+### 42. valgrind cachegrind — first attempt (failed silently)
+**Run as:** `student`
+```bash
+cd ~/results/profiling && time valgrind --tool=cachegrind \
+  --cachegrind-out-file=cachegrind_hac_1t.out \
+  ~/tools/kraken2/kraken2 --db ~/data/kraken2_db --threads 1 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq 2>/dev/null
+```
+**Status:** ❌ Failed — output file not created. `2>/dev/null` suppressed valgrind's own stderr, masking the failure. kraken2 is a Perl wrapper — valgrind instrumented the shell, not the C++ binary.
+
+---
+
+### 43. valgrind cachegrind — without stderr redirect (diagnosis)
+**Run as:** `student`
+```bash
+valgrind --tool=cachegrind \
+  --cachegrind-out-file=cachegrind_hac_1t.out \
+  ~/tools/kraken2/kraken2 --db ~/data/kraken2_db --threads 1 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq
+```
+**Status:** ❌ Failed — output file still not created. Confirmed root cause: `~/tools/kraken2/kraken2` is a Perl script that exec's the actual C++ binary (`classify`) as a child process. valgrind instruments the parent Perl process and does not follow into the child. Fix: use `--trace-children=yes`.
+
+---
+
+### 44. valgrind cachegrind — with --trace-children=yes (success)
+**Run as:** `student`
+```bash
+valgrind --tool=cachegrind --trace-children=yes \
+  --cachegrind-out-file=cachegrind_hac_1t.out \
+  ~/tools/kraken2/kraken2 --db ~/data/kraken2_db --threads 1 \
+  --report /dev/null --output /dev/null \
+  ~/results/basecalling/reads_hac.fastq
+```
+**Status:** ✅ Done — wall 362s (~20x overhead), 227 KB output file created at `~/results/profiling/cachegrind_hac_1t.out`. brk segment overflow warning (benign — valgrind internal limit, does not affect results).
+
+---
+
+### 45. cg_annotate — per-function cache miss breakdown
+**Run as:** `student`
+```bash
+cg_annotate cachegrind_hac_1t.out | head -80
+```
+**Status:** ✅ Done — CompactHashTable::Get accounts for 96.24% of all LL read misses (DLmr). MinimizerScanner::NextMinimizer has zero LL misses despite 48% of instructions. See results_kraken2.md Step 11.
+
+---
+
 ## Next Steps
 
-- Step 11: valgrind cachegrind (per-function L1/LL cache miss counts)
 - Step 12: FASTQ on tmpfs (quantify ~20% I/O cost)
 - Step 13: Dorado GPU profiling on L40S
