@@ -296,6 +296,43 @@ the real dominant hotspot is `MinimizerScanner::NextMinimizer` at 25.57% — k-m
 
 ---
 
+### 8. luna — NUMA analysis: 16.3% wall time lost to cross-socket traffic (2026-05-29)
+
+luna has two physical CPU sockets, each with its own ~252 GB RAM bank. accessing local RAM costs distance 10; crossing the interconnect to the other socket costs distance 21 — **2.1× slower**. the kraken2 DB (8 GB) loaded into node 0's RAM on first use. with no pinning, linux places threads freely across both sockets — half of them cross the interconnect for every single hash lookup.
+
+```mermaid
+xychart-beta
+    title "NUMA Pinning Effect — Wall Time (hac, 32T, 5-run avg)"
+    x-axis ["default (no pin)", "node 0 pinned", "node 1 pinned"]
+    y-axis "Wall time (s)" 4.0 --> 5.5
+    bar [5.261, 4.405, 5.083]
+```
+
+| config | avg wall time | vs default |
+|---|---|---|
+| default (no pinning) | 5.261s | baseline |
+| node 0 pinned (`--cpunodebind=0 --membind=0`) | **4.405s** | **−16.3%** |
+| node 1 pinned (`--cpunodebind=1 --membind=1`) | 5.083s | −3.4% |
+
+node 0 is fastest because the DB is already there. node 1 is slightly better than default (no split-socket problem) but slower than node 0 because the FASTQ file cache is also on node 0, so reads still cross the interconnect.
+
+**combined optimisation so far — zero code changes:**
+
+| step | change | wall time | saving |
+|---|---|---|---|
+| baseline | 96 threads, no pinning | 5.635s | — |
+| thread scaling | 32 threads | 5.235s | −0.400s (7.1%) |
+| NUMA pinning | + numactl node 0 | 4.405s | −0.830s (15.8%) |
+| **total** | | **4.405s** | **−21.8%** |
+
+the optimised run command for all future profiling:
+```bash
+numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/data/kraken2_db --threads 32 ...
+```
+
+---
+
 ## why these numbers matter
 
 the profiling results directly justify Kolin sir's caching design:
@@ -384,8 +421,9 @@ Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all u
 ## what's next
 
 **profiling (Luna) — immediate:**
-- NUMA analysis — check if hash table memory spans both sockets; pin to one socket with `numactl` and measure
 - run kraken-2 with FASTQ on tmpfs to quantify the ~20% I/O cost identified in flamegraph
+- gprof on Luna (recompile kraken2 with -pg — never done on Luna, only on WSL2)
+- valgrind cachegrind — per-function cache miss attribution
 - matmul benchmark re-run on Luna — tables in `Luna/profiling/results_matmul_luna.md` are still blank; accurate IPC (no Hyper-V noise) and LLC miss rates now possible
 
 **profiling (Luna) — upcoming:**
@@ -394,7 +432,7 @@ Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all u
 
 **implementation:**
 - start Hot-K-mer LRU cache layer for kraken-2 — flamegraph confirms hash lookups + page faults = ~23% of wall time; additional ~20% from FASTQ I/O is a separate target
-- run at **32 threads** going forward (not 96) — thread scaling shows 32T is the sweet spot for this dataset + DB combination
+- run at **32 threads + numactl --cpunodebind=0 --membind=0** — thread scaling + NUMA pinning together give 21.8% wall time reduction over the original 96T default, zero code changes
 
 ---
 

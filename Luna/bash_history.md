@@ -651,8 +651,31 @@ sudo perf script -i ~/results/profiling/perf_hac_32t.data | \
 
 ---
 
+### 34. NUMA topology check
+**Run as:** `student`
+```bash
+numactl --hardware
+```
+**Status:** ✅ Done — 2 nodes, even CPUs = node 0, odd = node 1, distance 10/21, DB on node 0 (202 GB used there)
+
+---
+
+### 35. NUMA wall time experiment — default vs node 0 vs node 1 pinned (hac, 32T, 5 runs each)
+**Run as:** `student`
+```bash
+for i in 1 2 3 4 5; do START=$(date +%s%3N); kraken2 --db ~/data/kraken2_db --threads 32 --report /dev/null --output /dev/null ~/results/basecalling/reads_hac.fastq 2>/dev/null; END=$(date +%s%3N); echo "default run $i: $(echo "scale=3; ($END-$START)/1000" | bc)s"; done
+
+for i in 1 2 3 4 5; do START=$(date +%s%3N); numactl --cpunodebind=0 --membind=0 kraken2 --db ~/data/kraken2_db --threads 32 --report /dev/null --output /dev/null ~/results/basecalling/reads_hac.fastq 2>/dev/null; END=$(date +%s%3N); echo "node0 run $i: $(echo "scale=3; ($END-$START)/1000" | bc)s"; done
+
+for i in 1 2 3 4 5; do START=$(date +%s%3N); numactl --cpunodebind=1 --membind=1 kraken2 --db ~/data/kraken2_db --threads 32 --report /dev/null --output /dev/null ~/results/basecalling/reads_hac.fastq 2>/dev/null; END=$(date +%s%3N); echo "node1 run $i: $(echo "scale=3; ($END-$START)/1000" | bc)s"; done
+```
+**Status:** ✅ Done — default 5.261s, node 0 4.405s, node 1 5.083s — 16.3% penalty from cross-NUMA traffic confirmed
+
+---
+
 ## Next Steps
 
-- NUMA analysis — numactl --hardware, numastat during a kraken2 run
-- Run with DB on tmpfs to isolate the ~20% I/O overhead
-- nsys profiling of Dorado GPU run
+- Step 8: gprof on Luna (recompile kraken2 with -pg)
+- Step 9: valgrind cachegrind (per-function cache miss counts)
+- Step 10: FASTQ on tmpfs
+- Step 11: Dorado GPU profiling

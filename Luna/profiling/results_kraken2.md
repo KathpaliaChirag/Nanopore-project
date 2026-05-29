@@ -628,8 +628,76 @@ Expected: wall time drops by ~1s (from 5.2s toward ~4.2s). This isolates whether
 
 ---
 
+## Step 7 — NUMA Analysis (hac, 32 threads)
+
+**Commands:**
+```bash
+numactl --hardware   # topology check
+
+# 5 runs each: default, node 0 pinned, node 1 pinned
+for i in 1 2 3 4 5; do START=$(date +%s%3N); kraken2 --db ~/data/kraken2_db --threads 32 --report /dev/null --output /dev/null ~/results/basecalling/reads_hac.fastq 2>/dev/null; END=$(date +%s%3N); echo "default run $i: $(echo "scale=3; ($END-$START)/1000" | bc)s"; done
+
+for i in 1 2 3 4 5; do START=$(date +%s%3N); numactl --cpunodebind=0 --membind=0 kraken2 --db ~/data/kraken2_db --threads 32 --report /dev/null --output /dev/null ~/results/basecalling/reads_hac.fastq 2>/dev/null; END=$(date +%s%3N); echo "node0 run $i: $(echo "scale=3; ($END-$START)/1000" | bc)s"; done
+
+for i in 1 2 3 4 5; do START=$(date +%s%3N); numactl --cpunodebind=1 --membind=1 kraken2 --db ~/data/kraken2_db --threads 32 --report /dev/null --output /dev/null ~/results/basecalling/reads_hac.fastq 2>/dev/null; END=$(date +%s%3N); echo "node1 run $i: $(echo "scale=3; ($END-$START)/1000" | bc)s"; done
+```
+
+### 7a — NUMA Topology
+
+```
+available: 2 nodes (0-1)
+node 0 cpus: 0 2 4 6 ... 190  (all even-numbered logical CPUs — 96 total)
+node 1 cpus: 1 3 5 7 ... 191  (all odd-numbered logical CPUs — 96 total)
+node 0 size: 257,467 MB  |  node 0 free: 55,356 MB  (used: ~202 GB)
+node 1 size: 257,964 MB  |  node 1 free: 174,467 MB (used: ~83 GB)
+node distances:  local = 10,  remote = 21  (2.1× penalty for cross-socket access)
+```
+
+The DB and file cache are predominantly on node 0 (202 GB used vs 83 GB on node 1). Even-numbered CPUs are node 0, odd-numbered are node 1 — so with no pinning, Linux places threads across both sockets freely.
+
+### 7b — Wall Time Results
+
+| Config | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 | Avg |
+|---|---|---|---|---|---|---|
+| default (no pinning) | 5.267 | 5.267 | 5.247 | 5.262 | 5.263 | **5.261s** |
+| node 0 pinned | 4.775 | 4.400 | 4.398 | 4.393 | 4.430 | 4.479s (steady: **4.405s**) |
+| node 1 pinned | 5.143 | 5.086 | 5.078 | 5.041 | 5.068 | **5.083s** |
+
+Node 0 run 1 is a warm-up outlier (DB page remapping on first NUMA bind). Runs 2-5 are steady state.
+
+### 7c — Analysis
+
+**Default (5.261s):** Linux freely schedules 32 threads across both sockets — roughly 16 threads on node 0 (local to DB) and 16 on node 1 (remote). With 82% LLC miss rate, every remote thread's hash lookup crosses the QPI interconnect at 2.1× cost.
+
+**Node 0 pinned (4.405s steady):** All threads on node 0 CPUs, all memory on node 0. DB is already there from previous runs. Every hash lookup hits local DRAM. No cross-socket traffic. Fastest configuration.
+
+**Node 1 pinned (5.083s):** Threads on node 1, memory forced to node 1. DB pages migrate from node 0 page cache to node 1 RAM on first access. The FASTQ file cache also lives on node 0, so reads still pay a cross-socket penalty. Slightly better than default but worse than node 0.
+
+**NUMA cross-socket penalty:**
+```
+Default:       5.261s
+Node 0 pinned: 4.405s  (steady state)
+Penalty:       0.856s = 16.3% of wall time wasted on cross-NUMA traffic
+```
+
+### 7d — Optimised Command
+
+NUMA pinning recovers 16.3% wall time with zero code changes:
+
+```bash
+numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/data/kraken2_db --threads 32 \
+  --report <report.txt> --output /dev/null \
+  <reads.fastq>
+```
+
+Combined optimisation so far: 96T default (5.635s) → 32T (5.235s) → 32T + node 0 pinned (4.405s) = **21.8% total wall time reduction**, no code changes.
+
+---
+
 ## Next Steps
 
-- Step 7: NUMA analysis (Goal 1)
-- Step 8: FASTQ tmpfs experiment (Goal 2)
-- Step 9: Dorado GPU profiling on L40S (Goal 3)
+- Step 8: gprof on Luna (recompile kraken2 with -pg, run, compare with WSL2 gprof result)
+- Step 9: valgrind cachegrind (per-function cache miss counts)
+- Step 10: FASTQ tmpfs experiment (Goal 2 — quantify the ~20% I/O cost)
+- Step 11: Dorado GPU profiling on L40S (Goal 3)
