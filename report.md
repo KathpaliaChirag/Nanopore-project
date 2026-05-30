@@ -130,3 +130,18 @@ Key findings extracted from the full report:
 - **sup mpstat anomaly at T14/T16** — overall %usr appears low (12–13%) vs fast/hac (~25%) because sup completes faster (~2.3 s), capturing fewer 2-second mpstat intervals; the DB-loading samples dominate the average.
 
 ---
+
+## Phase 3 — Kraken2 Optimization Design (full-stack, latency-attack)
+
+> Full design document (5 stackable layers + broader speedup menu, exact + optional
+> approximate paths, Ultraplan-merged): **[reports/plandoc.md](reports/plandoc.md)**
+
+Design only — no source/Makefile/binary changes this pass. Headline points:
+
+- **Verdict:** memory-bound — gprof `CompactHashTable::Get()` = **80.65%** of CPU; T8 clean baseline IPC **1.40**, cache-miss **15.91%**, wall **8.39 s**; DB ≈ 500× L3.
+- **5 layers:** (1) per-thread 4-way set-associative k-mer→taxon LRU cache wrapping `Get()` (exact, bit-identical), (2) software prefetch for cold k-mers, (3) build flags `-march=native -mtune=native -flto`, (4) transparent huge pages for the 8 GB table, (5) run at the T8 bandwidth sweet spot.
+- **Optional approximate fast-path:** 16-bit key tag (2× cache capacity, ~1/65536 false-hit/way), validated against `kraken2_report.txt`.
+- **Projected:** cache-miss → 9–12%, IPC → 1.8–2.3, wall → 5.5–6.5 s.
+- **Broader menu:** AMAC probe-pipelining, rolling 2-bit minimizer scanning, PGO/LTO/BOLT, bucketized DB layout, static hot sub-table, 1 GB huge pages, index-param tuning, I/O path, GPU offload.
+
+---
