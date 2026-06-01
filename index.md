@@ -37,6 +37,13 @@ Update this every time a new major topic is pushed.
 - Phase 2a: Kraken-2 classification + gprof — 93% classified, CompactHashTable::Get() = 80.65% CPU time, memory-bound verdict
 - Phase 2b: Matmul 21-variant CH3 perf-stat sweep at **N=1024, 2048, 4096** — full primitive matrix T/O/A/P/U + transposed/BLAS/Strassen refs. Detailed per-N reports in `matrix_mul/` (see below). report.md has only the cross-N summary now.
 - Phase 2c: Kraken2 thread-scaling sweep — 9 thread counts × 3 modes, `perf stat` cache + TMA + mpstat. T8 optimal (5.36×, IPC 1.40, BE 74.6%). Bandwidth saturates at T10. Full report in `reports/kraken2_thread_scaling_full.md`.
+- Phase 3: Kraken2 full-stack optimization design (cache the 8 GB DB) — 5 stackable latency-attack layers + broader menu. Full design in `reports/plandoc.md`.
+- Phase 4: ESKAPE targeted **bitmask DB** (replace the 8 GB DB with a 6-organism, 6-bit-mask DB) — source-verified implementable, cache-friendly, scoped accuracy gain, OpenMP-ready, 3 critical (all fixable) inconsistencies. Full plan in `reports/eskape_bitmask_plan.md`.
+
+**reports/eskape_bitmask_plan.md** → ESKAPE bitmask DB plan, verified against Kraken2 source (2026-06-01)
+- §0 corrections (40-bit cell/key=34, unique-hit detection, taxonomy load) + mechanism-trace note
+- §3 implementability: CompareAndSet OR-accumulation, self-describing file round-trip, OpenMP both sides
+- §5 accuracy (collision ~2⁻³⁴, scope limits), §7 baseline ground-truth run, §8 summary
 
 **reports/kraken2_thread_scaling_full.md** → comprehensive per-thread Kraken2 profiling report
 - 7 sections, 494 lines, 18 per-table observation blocks — exact raw values, no aggregation

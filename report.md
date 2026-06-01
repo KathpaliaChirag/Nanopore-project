@@ -145,3 +145,24 @@ Design only — no source/Makefile/binary changes this pass. Headline points:
 - **Broader menu:** AMAC probe-pipelining, rolling 2-bit minimizer scanning, PGO/LTO/BOLT, bucketized DB layout, static hot sub-table, 1 GB huge pages, index-param tuning, I/O path, GPU offload.
 
 ---
+
+## Phase 4 — ESKAPE Targeted Bitmask DB (design + source verification)
+
+> Full plan + source-verified analysis (5 corrections, mechanism trace, OpenMP, accuracy/speed verdicts): **[reports/eskape_bitmask_plan.md](reports/eskape_bitmask_plan.md)**
+
+Alternative direction to Phase 3: instead of caching the 8 GB DB, **replace it** with a 6-organism ESKAPE-only DB whose cell value is a **6-bit bitmask** (1 bit/organism) — one `Get()` answers all 6. Design only, no code changes. Verified against local source 2026-06-01.
+
+| Question | Verdict |
+|---|---|
+| Implementable? | **Yes** — no showstopper; core mechanism traced & confirmed |
+| Reduces lookup time? | **Yes** — DRAM probe (~100 ns) → L2/L3 hit; bounded (NextMinimizer cost unchanged) |
+| Cache-friendly? | **Likely** — tens of MB vs 8 GB; confirm L3-residency via `estimate_capacity` |
+| Improves accuracy? | **Scoped yes** (collision FP ~2⁻³⁴ + unique-hit rule); loses sub-species + non-ESKAPE; sensitivity bounded by reference panel |
+| OpenMP usable? | **Yes, both sides** — zone-locked build (order-independent), `org_read_counts[6]` reduction at classify |
+
+- **Mechanism (verified):** OR-accumulate via `CompareAndSet` (≤2 iters, same shape as LCA loop); self-describing file round-trip (`key_bits+value_bits`); 40-bit `CompactHashCell40` → **key=34 / value=6**; over-capacity is a hard `errx` (size via `estimate_capacity`).
+- **3 critical inconsistencies (all fixable):** (1) cell is 40-bit not 32 — key=34; (2) detection must count **single-bit unique** hits, not any set bit, or shared minimizers cause false positives; (3) `load_index` always loads a taxonomy → needs stub or gate. +5 moderate/minor (taxonomy-derived value_bits, `ProcessSequenceFast` coupling, `ResolveTree` misuse, output format, confidence threshold).
+- **Scope note:** classify.cc edit is ~100 lines — the output tail (`:898`, `:923`) and caller (`:607-622`) index the taxonomy unconditionally and must be gated, not just the accumulation.
+- **Baseline ground-truth run** (`reads_fast.fastq`, 8 GB DB, p8, measured): 104,832 reads, **93.18% classified**, 2.398 s, RSS 8.5 GB. ESKAPE: **P. aeruginosa 54,122 (51.63%)** + **K. pneumoniae 8,193 (7.82%)** strong; trace E. cloacae 28 / A. baumannii 6 / S. aureus 1; E. faecium absent. Non-ESKAPE background (E. coli 18.19%, human 0.57%) must be rejected. Outputs in `results/kraken2/manual_run/`.
+
+---
