@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:23:03 2026
+
+
+ Performance counter stats for './transpose_B 1024':
+
+      37,82,76,523      cycle_activity.stalls_total                                           
+       3,67,57,199      cycle_activity.stalls_l1d_miss                                        
+       2,81,33,082      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+         68,10,663      memory_activity.stalls_l3_miss                                        
+
+       0.709911514 seconds time elapsed
+
+       0.693972000 seconds user
+       0.015999000 seconds sys
+
+

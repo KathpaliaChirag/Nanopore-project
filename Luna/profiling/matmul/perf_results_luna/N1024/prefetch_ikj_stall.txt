@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:23:09 2026
+
+
+ Performance counter stats for './prefetch_ikj 1024':
+
+      10,20,84,770      cycle_activity.stalls_total                                           
+       3,99,46,131      cycle_activity.stalls_l1d_miss                                        
+       1,22,44,197      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+          6,20,552      memory_activity.stalls_l3_miss                                        
+
+       0.497378753 seconds time elapsed
+
+       0.491417000 seconds user
+       0.006005000 seconds sys
+
+

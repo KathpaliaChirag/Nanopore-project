@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:22:50 2026
+
+
+ Performance counter stats for './naive_ijk 1024':
+
+          5,703.91 msec task-clock                       #    1.000 CPUs utilized             
+   17,52,99,18,604      cycles                           #    3.073 GHz                         (79.98%)
+    3,85,28,77,009      instructions                     #    0.22  insn per cycle              (89.99%)
+      18,23,97,659      branches                         #   31.978 M/sec                       (90.00%)
+          1,15,777      branch-misses                    #    0.06% of all branches             (90.01%)
+    1,05,68,39,555      cache-references                 #  185.283 M/sec                       (90.01%)
+          7,51,164      cache-misses                     #    0.07% of all cache refs           (90.01%)
+    1,05,28,33,442      LLC-loads                        #  184.581 M/sec                       (89.99%)
+          2,31,729      LLC-load-misses                  #    0.02% of all LL-cache accesses    (90.01%)
+    2,20,67,09,515      L1-dcache-loads                  #  386.876 M/sec                       (90.01%)
+    1,07,84,43,598      L1-dcache-load-misses            #   48.87% of all L1-dcache accesses   (90.00%)
+
+       5.704619830 seconds time elapsed
+
+       5.682701000 seconds user
+       0.022002000 seconds sys
+
+

@@ -1,0 +1,17 @@
+============================================================
+ Luna GPU matmul full run
+ Host: dell-R760
+ Started: 2026-06-02T19:40:06+05:30
+============================================================
+
+>>> Step 0/4  GPU sanity check
+name, memory.total [MiB], driver_version, compute_cap
+NVIDIA L40S, 46068 MiB, 575.64.03, 8.9
+NVIDIA L40S, 46068 MiB, 575.64.03, 8.9
+
+>>> Step 1/4  build all variants
+rm -f naive_gpu coalesced_gpu shared_tiled shared_tiled_2d cublas_sgemm cublas_tensor wmma_manual
+rm -rf gpu_results/
+nvcc -O3 -std=c++14 -arch=native -Xcompiler -O3 -lineinfo -o naive_gpu naive_gpu.cu
+make: nvcc: No such file or directory
+make: *** [Makefile:21: naive_gpu] Error 127

@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:44:02 2026
+
+
+ Performance counter stats for './kij_order 10000':
+
+       6,60,594.19 msec task-clock                       #    1.000 CPUs utilized             
+19,66,34,00,71,873      cycles                           #    2.977 GHz                         (80.00%)
+ 8,76,85,61,48,433      instructions                     #    0.45  insn per cycle              (90.00%)
+   38,39,23,73,915      branches                         #   58.118 M/sec                       (90.00%)
+      10,91,00,912      branch-misses                    #    0.28% of all branches             (90.00%)
+ 1,26,47,22,73,986      cache-references                 #  191.452 M/sec                       (90.00%)
+ 1,13,27,89,92,639      cache-misses                     #   89.57% of all cache refs           (90.00%)
+   43,17,63,07,306      LLC-loads                        #   65.360 M/sec                       (90.00%)
+   40,78,22,45,617      LLC-load-misses                  #   94.46% of all LL-cache accesses    (90.00%)
+ 5,07,60,59,86,260      L1-dcache-loads                  #  768.408 M/sec                       (90.00%)
+ 1,49,04,12,23,569      L1-dcache-load-misses            #   29.36% of all L1-dcache accesses   (90.00%)
+
+     660.699840799 seconds time elapsed
+
+     657.852976000 seconds user
+       2.739587000 seconds sys
+
+

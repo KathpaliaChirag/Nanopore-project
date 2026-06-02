@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:23:02 2026
+
+
+ Performance counter stats for './ikj_order 1024':
+
+      44,09,95,001      cycle_activity.stalls_total                                           
+      38,56,52,310      cycle_activity.stalls_l1d_miss                                        
+      37,79,83,576      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+          4,48,333      memory_activity.stalls_l3_miss                                        
+
+       0.329143824 seconds time elapsed
+
+       0.322173000 seconds user
+       0.007003000 seconds sys
+
+

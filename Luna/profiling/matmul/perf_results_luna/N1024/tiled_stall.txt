@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:23:04 2026
+
+
+ Performance counter stats for './tiled 1024':
+
+      21,65,74,087      cycle_activity.stalls_total                                           
+      11,62,64,627      cycle_activity.stalls_l1d_miss                                        
+         87,20,817      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+         13,10,377      memory_activity.stalls_l3_miss                                        
+
+       0.270689513 seconds time elapsed
+
+       0.262840000 seconds user
+       0.008025000 seconds sys
+
+

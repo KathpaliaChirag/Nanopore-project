@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:23:05 2026
+
+
+ Performance counter stats for './omp_parallel 1024':
+
+            352.21 msec task-clock                       #    2.781 CPUs utilized             
+      97,14,53,616      cycles                           #    2.758 GHz                         (79.56%)
+    1,13,62,10,837      instructions                     #    1.17  insn per cycle              (89.52%)
+       8,52,13,309      branches                         #  241.936 M/sec                       (89.49%)
+          1,04,419      branch-misses                    #    0.12% of all branches             (89.37%)
+      13,71,69,737      cache-references                 #  389.449 M/sec                       (89.55%)
+          4,70,754      cache-misses                     #    0.34% of all cache refs           (90.33%)
+       3,74,94,516      LLC-loads                        #  106.454 M/sec                       (90.29%)
+          1,48,079      LLC-load-misses                  #    0.39% of all LL-cache accesses    (90.62%)
+      58,98,01,046      L1-dcache-loads                  #    1.675 G/sec                       (90.63%)
+       6,34,51,226      L1-dcache-load-misses            #   10.76% of all L1-dcache accesses   (90.43%)
+
+       0.126639594 seconds time elapsed
+
+       0.324839000 seconds user
+       0.026903000 seconds sys
+
+

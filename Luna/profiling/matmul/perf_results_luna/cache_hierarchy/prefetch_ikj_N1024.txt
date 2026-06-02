@@ -1,0 +1,20 @@
+# started on Tue Jun  2 19:24:18 2026
+
+
+ Performance counter stats for './prefetch_ikj 1024':
+
+    3,27,57,91,238      L1-dcache-loads                                                         (74.87%)
+       2,11,32,453      L1-dcache-load-misses            #    0.65% of all L1-dcache accesses   (74.87%)
+       2,03,74,260      mem_load_retired.l2_hit                                                 (74.87%)
+          1,48,766      mem_load_retired.l2_miss                                                (74.87%)
+          1,32,016      mem_load_retired.l3_hit                                                 (50.26%)
+            13,616      mem_load_retired.l3_miss                                                (50.26%)
+      13,43,85,903      cache-references                                                        (62.67%)
+          8,39,940      cache-misses                     #    0.63% of all cache refs           (75.03%)
+
+       0.501858973 seconds time elapsed
+
+       0.488925000 seconds user
+       0.012998000 seconds sys
+
+

@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:24:48 2026
+
+
+ Performance counter stats for './kij_order 2048':
+
+          2,975.41 msec task-clock                       #    1.000 CPUs utilized             
+    8,30,21,05,499      cycles                           #    2.790 GHz                         (79.97%)
+    8,05,42,56,686      instructions                     #    0.97  insn per cycle              (89.99%)
+      44,99,32,600      branches                         #  151.217 M/sec                       (89.98%)
+          3,25,662      branch-misses                    #    0.07% of all branches             (89.99%)
+    1,09,20,09,571      cache-references                 #  367.011 M/sec                       (89.98%)
+         31,85,013      cache-misses                     #    0.29% of all cache refs           (90.01%)
+      43,44,47,740      LLC-loads                        #  146.013 M/sec                       (90.02%)
+          9,29,737      LLC-load-misses                  #    0.21% of all LL-cache accesses    (90.02%)
+    4,50,22,09,724      L1-dcache-loads                  #    1.513 G/sec                       (90.02%)
+      42,79,81,389      L1-dcache-load-misses            #    9.51% of all L1-dcache accesses   (90.01%)
+
+       2.976479718 seconds time elapsed
+
+       2.930974000 seconds user
+       0.044999000 seconds sys
+
+

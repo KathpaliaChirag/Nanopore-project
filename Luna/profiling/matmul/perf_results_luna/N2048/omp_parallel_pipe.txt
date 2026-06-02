@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:25:09 2026
+
+
+ Performance counter stats for './omp_parallel 2048':
+
+          2,618.65 msec task-clock                       #    3.132 CPUs utilized             
+    7,26,47,92,395      cycles                           #    2.774 GHz                         (80.02%)
+    8,11,06,38,009      instructions                     #    1.12  insn per cycle              (90.03%)
+      46,69,78,784      branches                         #  178.328 M/sec                       (90.03%)
+          4,10,006      branch-misses                    #    0.09% of all branches             (90.03%)
+    1,08,78,61,490      cache-references                 #  415.428 M/sec                       (90.07%)
+       1,61,09,623      cache-misses                     #    1.48% of all cache refs           (90.06%)
+      38,24,50,317      LLC-loads                        #  146.048 M/sec                       (90.02%)
+         82,85,093      LLC-load-misses                  #    2.17% of all LL-cache accesses    (89.96%)
+    4,51,90,51,049      L1-dcache-loads                  #    1.726 G/sec                       (89.96%)
+      42,74,24,868      L1-dcache-load-misses            #    9.46% of all L1-dcache accesses   (89.94%)
+
+       0.836138541 seconds time elapsed
+
+       2.527241000 seconds user
+       0.089866000 seconds sys
+
+

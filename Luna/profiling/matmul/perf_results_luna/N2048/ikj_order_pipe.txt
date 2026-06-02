@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:24:43 2026
+
+
+ Performance counter stats for './ikj_order 2048':
+
+          2,459.71 msec task-clock                       #    1.000 CPUs utilized             
+    7,32,54,93,424      cycles                           #    2.978 GHz                         (80.00%)
+    5,63,30,41,677      instructions                     #    0.77  insn per cycle              (90.00%)
+      30,91,00,245      branches                         #  125.665 M/sec                       (90.00%)
+          3,30,186      branch-misses                    #    0.11% of all branches             (90.00%)
+    1,08,41,70,939      cache-references                 #  440.772 M/sec                       (90.00%)
+         15,68,632      cache-misses                     #    0.14% of all cache refs           (90.00%)
+      40,80,44,709      LLC-loads                        #  165.891 M/sec                       (90.00%)
+          4,43,886      LLC-load-misses                  #    0.11% of all LL-cache accesses    (90.00%)
+    3,57,99,86,954      L1-dcache-loads                  #    1.455 G/sec                       (90.00%)
+      67,67,53,639      L1-dcache-load-misses            #   18.90% of all L1-dcache accesses   (90.00%)
+
+       2.460579024 seconds time elapsed
+
+       2.406236000 seconds user
+       0.053982000 seconds sys
+
+

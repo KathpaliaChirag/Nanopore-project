@@ -1,0 +1,20 @@
+# started on Tue Jun  2 19:24:14 2026
+
+
+ Performance counter stats for './kij_order 1024':
+
+      58,81,28,184      L1-dcache-loads                                                         (74.48%)
+       5,47,87,678      L1-dcache-load-misses            #    9.32% of all L1-dcache accesses   (74.73%)
+       1,61,05,280      mem_load_retired.l2_hit                                                 (75.16%)
+       3,31,09,826      mem_load_retired.l2_miss                                                (75.18%)
+       3,27,81,330      mem_load_retired.l3_hit                                                 (50.36%)
+          2,42,948      mem_load_retired.l3_miss                                                (50.10%)
+      13,72,17,527      cache-references                                                        (62.51%)
+          9,59,339      cache-misses                     #    0.70% of all cache refs           (74.92%)
+
+       0.403561722 seconds time elapsed
+
+       0.387650000 seconds user
+       0.016068000 seconds sys
+
+

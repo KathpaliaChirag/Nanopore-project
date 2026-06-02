@@ -1,0 +1,17 @@
+# started on Tue Jun  2 18:52:13 2026
+
+
+ Performance counter stats for './tiled_avx2 10000':
+
+   39,01,40,30,917      cycle_activity.stalls_total                                           
+   27,07,05,71,029      cycle_activity.stalls_l1d_miss                                        
+   16,96,88,56,759      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+   10,74,24,25,178      memory_activity.stalls_l3_miss                                        
+
+     167.059687535 seconds time elapsed
+
+     164.295504000 seconds user
+       2.731124000 seconds sys
+
+

@@ -1,0 +1,339 @@
+============================================================
+ Luna matmul full run
+ Host:    dell-R760
+ CPU:     Intel(R) Xeon(R) Platinum 8468
+ Started: 2026-06-02T16:22:48+05:30
+============================================================
+
+>>> Step 1/5  build all binaries
+rm -f naive_ijk ikj_order kij_order transpose_B tiled omp_parallel omp_tiled unrolled_ikj avx2_manual auto_vec_O3 tiled_avx2 prefetch_ikj tiled_t32 omp_tiled_t32 tiled_avx2_t32
+rm -rf perf_results/
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -o naive_ijk naive_ijk.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -o ikj_order ikj_order.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -o kij_order kij_order.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -o transpose_B transpose_B.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -o tiled tiled.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -fopenmp -o omp_parallel omp_parallel.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -fopenmp -o omp_tiled omp_tiled.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -o unrolled_ikj unrolled_ikj.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -mavx2 -mfma -o avx2_manual avx2_manual.c
+avx2_manual.c: In function ‘alloc_aligned’:
+avx2_manual.c:16:5: warning: ignoring return value of ‘posix_memalign’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+   16 |     posix_memalign(&p, 32, n * sizeof(double));
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -mavx2 -mfma -fopt-info-vec -o auto_vec_O3 auto_vec_O3.c 2>&1 | grep -E "vectorized|note" || true
+auto_vec_O3.c:23:31: optimized: loop vectorized using 32 byte vectors
+auto_vec_O3.c:23:31: optimized: loop vectorized using 16 byte vectors
+auto_vec_O3.c:23:31: optimized: loop vectorized using 32 byte vectors
+auto_vec_O3.c:23:31: optimized: loop vectorized using 16 byte vectors
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -mavx2 -mfma -o auto_vec_O3 auto_vec_O3.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -mavx2 -mfma -o tiled_avx2 tiled_avx2.c
+tiled_avx2.c: In function ‘alloc_aligned’:
+tiled_avx2.c:20:5: warning: ignoring return value of ‘posix_memalign’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+   20 |     posix_memalign(&p, 32, bytes);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -o prefetch_ikj prefetch_ikj.c
+
+>>> Step 2/5  perf stat at N=1024
+============================================================
+ Luna matmul perf run | N=1024 | OMP_NUM_THREADS=4
+ Output: perf_results_luna/N1024/
+============================================================
+>>> naive_ijk (N=1024)  pass 1/2  pipeline+cache
+>>> naive_ijk (N=1024)  pass 2/2  stall events
+>>> ikj_order (N=1024)  pass 1/2  pipeline+cache
+>>> ikj_order (N=1024)  pass 2/2  stall events
+>>> kij_order (N=1024)  pass 1/2  pipeline+cache
+>>> kij_order (N=1024)  pass 2/2  stall events
+>>> transpose_B (N=1024)  pass 1/2  pipeline+cache
+>>> transpose_B (N=1024)  pass 2/2  stall events
+>>> tiled (N=1024)  pass 1/2  pipeline+cache
+>>> tiled (N=1024)  pass 2/2  stall events
+>>> omp_parallel (N=1024)  pass 1/2  pipeline+cache
+>>> omp_parallel (N=1024)  pass 2/2  stall events
+>>> omp_tiled (N=1024)  pass 1/2  pipeline+cache
+>>> omp_tiled (N=1024)  pass 2/2  stall events
+>>> unrolled_ikj (N=1024)  pass 1/2  pipeline+cache
+>>> unrolled_ikj (N=1024)  pass 2/2  stall events
+>>> avx2_manual (N=1024)  pass 1/2  pipeline+cache
+>>> avx2_manual (N=1024)  pass 2/2  stall events
+>>> auto_vec_O3 (N=1024)  pass 1/2  pipeline+cache
+>>> auto_vec_O3 (N=1024)  pass 2/2  stall events
+>>> tiled_avx2 (N=1024)  pass 1/2  pipeline+cache
+>>> tiled_avx2 (N=1024)  pass 2/2  stall events
+>>> prefetch_ikj (N=1024)  pass 1/2  pipeline+cache
+>>> prefetch_ikj (N=1024)  pass 2/2  stall events
+============================================================
+ Done. Combine with summarise_luna.sh or read perf_results_luna/N1024/*.txt
+============================================================
+
+>>> Step 3/5  perf stat at N=2048
+============================================================
+ Luna matmul perf run | N=2048 | OMP_NUM_THREADS=4
+ Output: perf_results_luna/N2048/
+============================================================
+>>> naive_ijk (N=2048)  pass 1/2  pipeline+cache
+>>> naive_ijk (N=2048)  pass 2/2  stall events
+>>> ikj_order (N=2048)  pass 1/2  pipeline+cache
+>>> ikj_order (N=2048)  pass 2/2  stall events
+>>> kij_order (N=2048)  pass 1/2  pipeline+cache
+>>> kij_order (N=2048)  pass 2/2  stall events
+>>> transpose_B (N=2048)  pass 1/2  pipeline+cache
+>>> transpose_B (N=2048)  pass 2/2  stall events
+>>> tiled (N=2048)  pass 1/2  pipeline+cache
+>>> tiled (N=2048)  pass 2/2  stall events
+>>> omp_parallel (N=2048)  pass 1/2  pipeline+cache
+>>> omp_parallel (N=2048)  pass 2/2  stall events
+>>> omp_tiled (N=2048)  pass 1/2  pipeline+cache
+>>> omp_tiled (N=2048)  pass 2/2  stall events
+>>> unrolled_ikj (N=2048)  pass 1/2  pipeline+cache
+>>> unrolled_ikj (N=2048)  pass 2/2  stall events
+>>> avx2_manual (N=2048)  pass 1/2  pipeline+cache
+>>> avx2_manual (N=2048)  pass 2/2  stall events
+>>> auto_vec_O3 (N=2048)  pass 1/2  pipeline+cache
+>>> auto_vec_O3 (N=2048)  pass 2/2  stall events
+>>> tiled_avx2 (N=2048)  pass 1/2  pipeline+cache
+>>> tiled_avx2 (N=2048)  pass 2/2  stall events
+>>> prefetch_ikj (N=2048)  pass 1/2  pipeline+cache
+>>> prefetch_ikj (N=2048)  pass 2/2  stall events
+============================================================
+ Done. Combine with summarise_luna.sh or read perf_results_luna/N2048/*.txt
+============================================================
+
+>>> Step 4/5  perf stat at N=10000 (long, ~20-40 min)
+============================================================
+ Luna matmul perf run | N=10000 | OMP_NUM_THREADS=4
+ Output: perf_results_luna/N10000/
+============================================================
+  skip naive_ijk at N=10000 (>4 hr runtime, see PERF_REPORT.md)
+>>> ikj_order (N=10000)  pass 1/2  pipeline+cache
+>>> ikj_order (N=10000)  pass 2/2  stall events
+>>> kij_order (N=10000)  pass 1/2  pipeline+cache
+>>> kij_order (N=10000)  pass 2/2  stall events
+>>> transpose_B (N=10000)  pass 1/2  pipeline+cache
+>>> transpose_B (N=10000)  pass 2/2  stall events
+>>> tiled (N=10000)  pass 1/2  pipeline+cache
+>>> tiled (N=10000)  pass 2/2  stall events
+>>> omp_parallel (N=10000)  pass 1/2  pipeline+cache
+>>> omp_parallel (N=10000)  pass 2/2  stall events
+>>> omp_tiled (N=10000)  pass 1/2  pipeline+cache
+>>> omp_tiled (N=10000)  pass 2/2  stall events
+>>> unrolled_ikj (N=10000)  pass 1/2  pipeline+cache
+>>> unrolled_ikj (N=10000)  pass 2/2  stall events
+>>> avx2_manual (N=10000)  pass 1/2  pipeline+cache
+>>> avx2_manual (N=10000)  pass 2/2  stall events
+>>> auto_vec_O3 (N=10000)  pass 1/2  pipeline+cache
+>>> auto_vec_O3 (N=10000)  pass 2/2  stall events
+>>> tiled_avx2 (N=10000)  pass 1/2  pipeline+cache
+>>> tiled_avx2 (N=10000)  pass 2/2  stall events
+>>> prefetch_ikj (N=10000)  pass 1/2  pipeline+cache
+>>> prefetch_ikj (N=10000)  pass 2/2  stall events
+============================================================
+ Done. Combine with summarise_luna.sh or read perf_results_luna/N10000/*.txt
+============================================================
+
+>>> Step 5a/5  cache hierarchy (Intel mem_load_retired events)
+
+========================================================================
+  CACHE HIERARCHY (Intel SPR) — N = 1024
+========================================================================
+Binary              L1-loads    L1-m%     L2-loads    L2-m%     L3-loads    L3-m%
+------------------------------------------------------------------------
+naive_ijk         2204703613   48.92%    965521142   94.87%    915645958    0.02%
+ikj_order          476489274   15.86%     47329604   57.70%     27232945    0.20%
+kij_order          588128184    9.32%     49215106   67.28%     33024278    0.74%
+transpose_B        589455414    0.23%       829140   50.71%       433566   15.26%
+tiled              581097765   25.78%     90772367    0.39%       333662    6.11%
+omp_parallel       587731688   11.73%     52599871   35.13%     18626129    0.22%
+omp_tiled          742678673   19.82%     97688761    2.10%      1682619   18.88%
+unrolled_ikj       590922893    9.01%     51539719   69.35%     35393497    0.24%
+avx2_manual        590881292   10.83%    113764162   74.55%     84880083    0.02%
+auto_vec_O3        474983252   15.76%     46926802   58.11%     27300377    0.24%
+tiled_avx2         686544711   13.02%     88882669    0.51%       453871    4.26%
+prefetch_ikj      3275791238    0.65%     20523026    0.72%       145632    9.35%
+
+Raw perf output: perf_results_luna/cache_hierarchy/*.txt
+
+>>> Step 5b/5  TMA breakdown
+============================================================
+ TMA breakdown (Sapphire Rapids) — naive_ijk vs tiled_avx2
+============================================================
+>>> naive_ijk  N=1024
+     1,02,95,98,07,835      TOPDOWN.SLOTS                    #     67.0 %  tma_memory_bound       
+                                                      #     16.5 %  tma_core_bound         
+                                                      #      0.1 %  tma_dram_bound         
+                                                      #     85.4 %  tma_l3_bound             (39.99%)
+     1,03,00,24,85,301      TOPDOWN.SLOTS                    #      0.0 %  tma_l2_bound             (20.01%)
+     1,02,98,15,68,843      TOPDOWN.SLOTS                    #      0.0 %  tma_l1_bound             (20.01%)
+     1,02,96,95,68,942      TOPDOWN.SLOTS                    #      0.8 %  tma_branch_mispredicts 
+                                                      #      0.4 %  tma_machine_clears       (19.99%)
+        2,62,17,69,962      UOPS_EXECUTED.CORE_CYCLES_GE_1   #     3.60 tma_info_core_ilp           (39.98%)
+>>> naive_ijk  N=2048
+     8,42,86,02,28,501      TOPDOWN.SLOTS                    #     54.7 %  tma_memory_bound       
+                                                      #     20.8 %  tma_core_bound         
+                                                      #      0.3 %  tma_dram_bound         
+                                                      #     85.9 %  tma_l3_bound             (40.00%)
+     8,43,28,31,02,535      TOPDOWN.SLOTS                    #      0.0 %  tma_l2_bound             (20.00%)
+     8,43,21,08,73,501      TOPDOWN.SLOTS                    #      0.0 %  tma_l1_bound             (20.00%)
+     8,43,18,54,15,087      TOPDOWN.SLOTS                    #      0.8 %  tma_branch_mispredicts 
+                                                      #      0.4 %  tma_machine_clears       (20.00%)
+       20,82,81,37,871      UOPS_EXECUTED.CORE_CYCLES_GE_1   #     3.56 tma_info_core_ilp           (40.00%)
+>>> tiled_avx2  N=1024
+        3,68,21,27,051      TOPDOWN.SLOTS                    #     10.8 %  tma_memory_bound       
+                                                      #     32.4 %  tma_core_bound         
+                                                      #      0.2 %  tma_dram_bound         
+                                                      #      1.0 %  tma_l3_bound             (39.59%)
+        3,67,65,69,506      TOPDOWN.SLOTS                    #      2.9 %  tma_l2_bound             (20.15%)
+        3,68,29,76,761      TOPDOWN.SLOTS                    #      7.8 %  tma_l1_bound             (20.14%)
+        3,68,34,12,212      TOPDOWN.SLOTS                    #      1.2 %  tma_branch_mispredicts 
+                                                      #      0.4 %  tma_machine_clears       (20.12%)
+          53,19,22,476      UOPS_EXECUTED.CORE_CYCLES_GE_1   #     8.03 tma_info_core_ilp           (39.81%)
+>>> tiled_avx2  N=2048
+       27,22,38,55,122      TOPDOWN.SLOTS                    #     20.9 %  tma_memory_bound       
+                                                      #     33.1 %  tma_core_bound         
+                                                      #      0.3 %  tma_dram_bound         
+                                                      #      0.8 %  tma_l3_bound             (39.98%)
+       27,22,42,17,574      TOPDOWN.SLOTS                    #      4.1 %  tma_l2_bound             (20.04%)
+       27,23,45,46,919      TOPDOWN.SLOTS                    #      4.3 %  tma_l1_bound             (19.99%)
+       27,23,36,79,219      TOPDOWN.SLOTS                    #      2.0 %  tma_branch_mispredicts 
+                                                      #      0.8 %  tma_machine_clears       (19.99%)
+        4,04,16,64,221      UOPS_EXECUTED.CORE_CYCLES_GE_1   #     8.00 tma_info_core_ilp           (39.98%)
+>>> tiled_avx2  N=10000
+    28,06,30,25,74,620      TOPDOWN.SLOTS                    #     39.1 %  tma_memory_bound       
+                                                      #     17.1 %  tma_core_bound         
+                                                      #      2.3 %  tma_dram_bound         
+                                                      #      1.4 %  tma_l3_bound             (40.00%)
+    28,08,10,11,10,247      TOPDOWN.SLOTS                    #      2.5 %  tma_l2_bound             (20.00%)
+    28,07,88,37,36,117      TOPDOWN.SLOTS                    #      1.6 %  tma_l1_bound             (20.00%)
+    28,07,47,20,73,613      TOPDOWN.SLOTS                    #      1.6 %  tma_branch_mispredicts 
+                                                      #      2.3 %  tma_machine_clears       (20.00%)
+     4,29,62,90,59,801      UOPS_EXECUTED.CORE_CYCLES_GE_1   #     8.46 tma_info_core_ilp           (40.00%)
+>>> omp_tiled  N=10000
+    41,87,92,17,86,752      TOPDOWN.SLOTS                    #     30.6 %  tma_memory_bound       
+                                                      #     25.9 %  tma_core_bound         
+                                                      #     14.7 %  tma_dram_bound         
+                                                      #      4.5 %  tma_l3_bound             (40.00%)
+    41,90,70,10,45,202      TOPDOWN.SLOTS                    #      0.4 %  tma_l2_bound             (20.00%)
+    41,89,41,68,88,058      TOPDOWN.SLOTS                    #      7.9 %  tma_l1_bound             (20.00%)
+    41,89,54,91,23,611      TOPDOWN.SLOTS                    #      0.7 %  tma_branch_mispredicts 
+                                                      #      1.1 %  tma_machine_clears       (20.00%)
+     4,64,83,87,99,858      UOPS_EXECUTED.CORE_CYCLES_GE_1   #     7.63 tma_info_core_ilp           (40.00%)
+============================================================
+ Full output: perf_results_luna/tma/*.txt
+
+>>> Step 5c/5  TILE=32 sweep
+>>> Rebuilding tiled variants with TILE=32
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -DTILE=32 -o tiled_t32 tiled.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -fopenmp -DTILE=32 -o omp_tiled_t32 omp_tiled.c
+gcc -O3 -march=native -funroll-loops -Wall -Wextra -mavx2 -mfma -DTILE=32 -o tiled_avx2_t32 tiled_avx2.c
+tiled_avx2.c: In function ‘alloc_aligned’:
+tiled_avx2.c:20:5: warning: ignoring return value of ‘posix_memalign’ declared with attribute ‘warn_unused_result’ [-Wunused-result]
+   20 |     posix_memalign(&p, 32, bytes);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+============================================================
+ TILE=32 sweep | N=1024
+============================================================
+>>> tiled_t32  N=1024
+                284.65 msec task-clock                       #    0.998 CPUs utilized             
+          84,92,29,840      cycles                           #    2.983 GHz                       
+        1,35,91,32,733      instructions                     #    1.60  insn per cycle            
+             52,30,174      cache-references                 #   18.374 M/sec                     
+              6,24,212      cache-misses                     #   11.93% of all cache refs         
+                13,328      LLC-load-misses                  #    5.02% of all LL-cache accesses  
+          70,05,32,189      L1-dcache-loads                  #    2.461 G/sec                     
+          11,23,05,334      L1-dcache-load-misses            #   16.03% of all L1-dcache accesses 
+>>> omp_tiled_t32  N=1024
+                561.94 msec task-clock                       #    3.231 CPUs utilized             
+        1,66,70,60,859      cycles                           #    2.967 GHz                       
+        2,02,68,99,796      instructions                     #    1.22  insn per cycle            
+           4,01,37,112      cache-references                 #   71.426 M/sec                     
+             56,56,876      cache-misses                     #   14.09% of all cache refs         
+              3,85,333      LLC-load-misses                  #    9.06% of all LL-cache accesses  
+          90,46,06,307      L1-dcache-loads                  #    1.610 G/sec                     
+          11,06,05,285      L1-dcache-load-misses            #   12.23% of all L1-dcache accesses 
+>>> tiled_avx2_t32  N=1024
+                249.41 msec task-clock                       #    0.998 CPUs utilized             
+          71,11,69,908      cycles                           #    2.851 GHz                       
+        2,44,29,02,768      instructions                     #    3.44  insn per cycle            
+             56,03,415      cache-references                 #   22.466 M/sec                     
+              6,80,825      cache-misses                     #   12.15% of all cache refs         
+                15,079      LLC-load-misses                  #    5.60% of all LL-cache accesses  
+          79,78,46,695      L1-dcache-loads                  #    3.199 G/sec                     
+           9,90,41,105      L1-dcache-load-misses            #   12.41% of all L1-dcache accesses 
+
+============================================================
+ TILE=32 sweep | N=2048
+============================================================
+>>> tiled_t32  N=2048
+              2,340.01 msec task-clock                       #    1.000 CPUs utilized             
+        7,02,14,74,351      cycles                           #    3.001 GHz                       
+       10,16,17,42,279      instructions                     #    1.45  insn per cycle            
+           4,24,81,509      cache-references                 #   18.154 M/sec                     
+             29,96,655      cache-misses                     #    7.05% of all cache refs         
+              1,09,926      LLC-load-misses                  #    4.35% of all LL-cache accesses  
+        5,41,11,05,856      L1-dcache-loads                  #    2.312 G/sec                     
+        1,30,35,66,524      L1-dcache-load-misses            #   24.09% of all L1-dcache accesses 
+>>> omp_tiled_t32  N=2048
+              4,326.10 msec task-clock                       #    3.587 CPUs utilized             
+       12,93,92,28,992      cycles                           #    2.991 GHz                       
+       15,47,44,23,876      instructions                     #    1.20  insn per cycle            
+          32,29,26,987      cache-references                 #   74.646 M/sec                     
+           3,69,32,918      cache-misses                     #   11.44% of all cache refs         
+             37,94,475      LLC-load-misses                  #    8.90% of all LL-cache accesses  
+        7,04,11,74,777      L1-dcache-loads                  #    1.628 G/sec                     
+          95,47,14,966      L1-dcache-load-misses            #   13.56% of all L1-dcache accesses 
+>>> tiled_avx2_t32  N=2048
+              1,954.96 msec task-clock                       #    1.000 CPUs utilized             
+        5,51,03,40,417      cycles                           #    2.819 GHz                       
+       18,85,25,42,876      instructions                     #    3.42  insn per cycle            
+           4,69,50,919      cache-references                 #   24.016 M/sec                     
+             35,29,746      cache-misses                     #    7.52% of all cache refs         
+              1,16,539      LLC-load-misses                  #    3.33% of all LL-cache accesses  
+        6,19,71,14,134      L1-dcache-loads                  #    3.170 G/sec                     
+          86,83,34,159      L1-dcache-load-misses            #   14.01% of all L1-dcache accesses 
+
+============================================================
+ TILE=32 sweep | N=10000
+============================================================
+>>> tiled_t32  N=10000
+           1,92,798.03 msec task-clock                       #    1.000 CPUs utilized             
+     5,39,92,15,37,921      cycles                           #    2.800 GHz                       
+    11,19,14,43,09,242      instructions                     #    2.07  insn per cycle            
+        9,38,23,33,537      cache-references                 #   48.664 M/sec                     
+        4,23,42,16,774      cache-misses                     #   45.13% of all cache refs         
+        2,64,96,50,164      LLC-load-misses                  #   52.67% of all LL-cache accesses  
+     6,12,53,84,98,924      L1-dcache-loads                  #    3.177 G/sec                     
+        9,77,31,26,329      L1-dcache-load-misses            #    1.60% of all L1-dcache accesses 
+>>> omp_tiled_t32  N=10000
+           4,35,922.16 msec task-clock                       #    3.892 CPUs utilized             
+    13,09,59,26,83,157      cycles                           #    3.004 GHz                       
+    17,31,74,85,75,976      instructions                     #    1.32  insn per cycle            
+       16,82,86,20,677      cache-references                 #   38.605 M/sec                     
+        8,30,49,98,831      cache-misses                     #   49.35% of all cache refs         
+        4,61,93,78,416      LLC-load-misses                  #   61.78% of all LL-cache accesses  
+     8,01,20,09,35,160      L1-dcache-loads                  #    1.838 G/sec                     
+       12,95,20,69,654      L1-dcache-load-misses            #    1.62% of all L1-dcache accesses 
+>>> tiled_avx2_t32  N=10000
+           1,99,580.48 msec task-clock                       #    1.000 CPUs utilized             
+     5,59,26,05,45,913      cycles                           #    2.802 GHz                       
+    21,40,95,49,83,730      instructions                     #    3.83  insn per cycle            
+       10,25,06,64,551      cache-references                 #   51.361 M/sec                     
+        4,32,36,47,364      cache-misses                     #   42.18% of all cache refs         
+        1,50,18,85,234      LLC-load-misses                  #   34.97% of all LL-cache accesses  
+     7,06,28,12,46,785      L1-dcache-loads                  #    3.539 G/sec                     
+        9,23,51,17,215      L1-dcache-load-misses            #    1.31% of all L1-dcache accesses 
+
+Done. Compare against perf_results_luna/N<size>/{tiled,omp_tiled,tiled_avx2}_pipe.txt
+
+============================================================
+ DONE: 2026-06-02T19:37:37+05:30
+ Results: perf_results_luna/
+   N1024/   pipeline + stall passes per binary
+   N2048/   pipeline + stall passes per binary
+   N10000/  pipeline + stall passes per binary
+   cache_hierarchy/   Intel per-level cache stats
+   tma/               TMA Level-1/2 breakdown
+   tile32/            TILE=32 sweep
+ Fill the tables in Luna/profiling/results_matmul_luna.md
+============================================================

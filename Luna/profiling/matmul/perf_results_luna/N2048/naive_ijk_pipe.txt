@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:23:09 2026
+
+
+ Performance counter stats for './naive_ijk 2048':
+
+         47,301.60 msec task-clock                       #    1.000 CPUs utilized             
+ 1,45,51,75,18,723      cycles                           #    3.076 GHz                         (80.00%)
+   30,08,92,22,977      instructions                     #    0.21  insn per cycle              (90.00%)
+    1,29,85,09,440      branches                         #   27.452 M/sec                       (90.00%)
+         46,55,008      branch-misses                    #    0.36% of all branches             (90.00%)
+    8,59,69,50,252      cache-references                 #  181.748 M/sec                       (90.00%)
+       2,50,07,441      cache-misses                     #    0.29% of all cache refs           (90.00%)
+    8,57,93,57,272      LLC-loads                        #  181.376 M/sec                       (90.00%)
+       2,31,29,285      LLC-load-misses                  #    0.27% of all LL-cache accesses    (90.00%)
+   17,45,96,15,630      L1-dcache-loads                  #  369.113 M/sec                       (90.00%)
+    9,66,11,15,088      L1-dcache-load-misses            #   55.33% of all L1-dcache accesses   (90.00%)
+
+      47.306513371 seconds time elapsed
+
+      47.214244000 seconds user
+       0.087993000 seconds sys
+
+

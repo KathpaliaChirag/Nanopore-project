@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:23:08 2026
+
+
+ Performance counter stats for './prefetch_ikj 1024':
+
+            501.40 msec task-clock                       #    0.999 CPUs utilized             
+    1,49,35,38,944      cycles                           #    2.979 GHz                         (79.84%)
+    5,97,59,43,950      instructions                     #    4.00  insn per cycle              (90.01%)
+      17,87,26,048      branches                         #  356.451 M/sec                       (90.03%)
+            86,219      branch-misses                    #    0.05% of all branches             (90.03%)
+      13,62,95,470      cache-references                 #  271.828 M/sec                       (90.03%)
+          3,44,169      cache-misses                     #    0.25% of all cache refs           (90.03%)
+          3,45,331      LLC-loads                        #  688.728 K/sec                       (90.03%)
+             5,461      LLC-load-misses                  #    1.58% of all LL-cache accesses    (90.03%)
+    3,27,00,91,582      L1-dcache-loads                  #    6.522 G/sec                       (90.03%)
+       2,11,48,504      L1-dcache-load-misses            #    0.65% of all L1-dcache accesses   (89.96%)
+
+       0.501844814 seconds time elapsed
+
+       0.493896000 seconds user
+       0.007998000 seconds sys
+
+

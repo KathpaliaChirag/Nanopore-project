@@ -1,0 +1,20 @@
+# started on Tue Jun  2 19:24:16 2026
+
+
+ Performance counter stats for './omp_parallel 1024':
+
+      58,77,31,688      L1-dcache-loads                                                         (76.27%)
+       6,89,53,877      L1-dcache-load-misses            #   11.73% of all L1-dcache accesses   (75.65%)
+       3,41,20,237      mem_load_retired.l2_hit                                                 (74.75%)
+       1,84,79,634      mem_load_retired.l2_miss                                                (74.46%)
+       1,85,84,583      mem_load_retired.l3_hit                                                 (49.07%)
+            41,546      mem_load_retired.l3_miss                                                (50.27%)
+      13,52,65,385      cache-references                                                        (63.78%)
+          6,36,640      cache-misses                     #    0.47% of all cache refs           (76.06%)
+
+       0.113719333 seconds time elapsed
+
+       0.299816000 seconds user
+       0.020848000 seconds sys
+
+

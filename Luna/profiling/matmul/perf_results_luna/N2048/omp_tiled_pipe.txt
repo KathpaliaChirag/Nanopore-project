@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:25:11 2026
+
+
+ Performance counter stats for './omp_tiled 2048':
+
+          3,126.82 msec task-clock                       #    3.447 CPUs utilized             
+    8,76,87,07,603      cycles                           #    2.804 GHz                         (79.98%)
+   11,68,58,54,133      instructions                     #    1.33  insn per cycle              (89.99%)
+    1,25,11,77,082      branches                         #  400.143 M/sec                       (89.99%)
+         26,16,808      branch-misses                    #    0.21% of all branches             (89.99%)
+      11,33,39,865      cache-references                 #   36.248 M/sec                       (89.99%)
+       2,11,43,409      cache-misses                     #   18.65% of all cache refs           (89.97%)
+       3,09,66,996      LLC-loads                        #    9.904 M/sec                       (90.03%)
+         49,15,657      LLC-load-misses                  #   15.87% of all LL-cache accesses    (90.02%)
+    5,73,32,30,768      L1-dcache-loads                  #    1.834 G/sec                       (90.02%)
+    1,17,90,05,929      L1-dcache-load-misses            #   20.56% of all L1-dcache accesses   (90.01%)
+
+       0.907184939 seconds time elapsed
+
+       3.044530000 seconds user
+       0.082905000 seconds sys
+
+

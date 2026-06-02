@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:25:07 2026
+
+
+ Performance counter stats for './tiled 2048':
+
+    1,64,61,71,485      cycle_activity.stalls_total                                           
+    1,06,66,66,419      cycle_activity.stalls_l1d_miss                                        
+      11,34,25,634      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+       1,92,97,708      memory_activity.stalls_l3_miss                                        
+
+       1.997432345 seconds time elapsed
+
+       1.944722000 seconds user
+       0.052992000 seconds sys
+
+

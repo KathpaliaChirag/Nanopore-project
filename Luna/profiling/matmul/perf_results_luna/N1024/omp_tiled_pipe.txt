@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:23:05 2026
+
+
+ Performance counter stats for './omp_tiled 1024':
+
+            426.59 msec task-clock                       #    3.058 CPUs utilized             
+    1,17,74,69,081      cycles                           #    2.760 GHz                         (80.78%)
+    1,54,97,33,412      instructions                     #    1.32  insn per cycle              (90.39%)
+      17,88,52,353      branches                         #  419.264 M/sec                       (89.93%)
+          3,77,780      branch-misses                    #    0.21% of all branches             (89.69%)
+       1,36,57,288      cache-references                 #   32.015 M/sec                       (89.69%)
+         27,41,232      cache-misses                     #   20.07% of all cache refs           (89.68%)
+         37,62,863      LLC-loads                        #    8.821 M/sec                       (89.70%)
+          6,15,612      LLC-load-misses                  #   16.36% of all LL-cache accesses    (89.69%)
+      73,92,96,687      L1-dcache-loads                  #    1.733 G/sec                       (90.54%)
+      14,68,13,264      L1-dcache-load-misses            #   19.86% of all L1-dcache accesses   (90.45%)
+
+       0.139513751 seconds time elapsed
+
+       0.402578000 seconds user
+       0.023915000 seconds sys
+
+

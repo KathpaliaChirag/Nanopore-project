@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:23:02 2026
+
+
+ Performance counter stats for './kij_order 1024':
+
+      46,78,89,210      cycle_activity.stalls_total                                           
+      41,15,34,614      cycle_activity.stalls_l1d_miss                                        
+      39,25,61,294      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+         18,01,470      memory_activity.stalls_l3_miss                                        
+
+       0.394593647 seconds time elapsed
+
+       0.382614000 seconds user
+       0.012019000 seconds sys
+
+

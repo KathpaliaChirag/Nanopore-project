@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:25:20 2026
+
+
+ Performance counter stats for './avx2_manual 2048':
+
+    2,67,21,54,048      cycle_activity.stalls_total                                           
+    2,41,87,56,613      cycle_activity.stalls_l1d_miss                                        
+    2,40,97,30,517      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+       2,43,54,684      memory_activity.stalls_l3_miss                                        
+
+       2.474030664 seconds time elapsed
+
+       2.431811000 seconds user
+       0.041996000 seconds sys
+
+

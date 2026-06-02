@@ -1,0 +1,21 @@
+# started on Tue Jun  2 19:34:17 2026
+
+
+ Performance counter stats for './tiled_avx2_t32 10000':
+
+       1,99,580.48 msec task-clock                       #    1.000 CPUs utilized             
+ 5,59,26,05,45,913      cycles                           #    2.802 GHz                       
+21,40,95,49,83,730      instructions                     #    3.83  insn per cycle            
+   10,25,06,64,551      cache-references                 #   51.361 M/sec                     
+    4,32,36,47,364      cache-misses                     #   42.18% of all cache refs         
+    4,29,52,80,737      LLC-loads                        #   21.522 M/sec                     
+    1,50,18,85,234      LLC-load-misses                  #   34.97% of all LL-cache accesses  
+ 7,06,28,12,46,785      L1-dcache-loads                  #    3.539 G/sec                     
+    9,23,51,17,215      L1-dcache-load-misses            #    1.31% of all L1-dcache accesses 
+
+     199.624131001 seconds time elapsed
+
+     196.507100000 seconds user
+       3.072064000 seconds sys
+
+

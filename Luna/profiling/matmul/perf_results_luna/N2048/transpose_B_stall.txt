@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:24:59 2026
+
+
+ Performance counter stats for './transpose_B 2048':
+
+    2,97,60,52,663      cycle_activity.stalls_total                                           
+      26,87,56,942      cycle_activity.stalls_l1d_miss                                        
+      19,30,04,746      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+       6,34,89,920      memory_activity.stalls_l3_miss                                        
+
+       5.650085550 seconds time elapsed
+
+       5.585953000 seconds user
+       0.063999000 seconds sys
+
+

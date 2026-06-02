@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:25:10 2026
+
+
+ Performance counter stats for './omp_parallel 2048':
+
+    2,12,91,19,230      cycle_activity.stalls_total                                           
+    1,70,67,08,925      cycle_activity.stalls_l1d_miss                                        
+    1,56,62,89,830      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+      28,13,28,960      memory_activity.stalls_l3_miss                                        
+
+       0.824396639 seconds time elapsed
+
+       2.427137000 seconds user
+       0.080136000 seconds sys
+
+

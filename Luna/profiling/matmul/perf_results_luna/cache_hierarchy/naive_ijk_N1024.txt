@@ -1,0 +1,20 @@
+# started on Tue Jun  2 19:24:09 2026
+
+
+ Performance counter stats for './naive_ijk 1024':
+
+    2,20,47,03,613      L1-dcache-loads                                                         (74.99%)
+    1,07,85,12,117      L1-dcache-load-misses            #   48.92% of all L1-dcache accesses   (74.99%)
+       4,94,96,368      mem_load_retired.l2_hit                                                 (74.99%)
+      91,60,24,774      mem_load_retired.l2_miss                                                (75.00%)
+      91,54,44,910      mem_load_retired.l3_hit                                                 (50.01%)
+          2,01,048      mem_load_retired.l3_miss                                                (50.01%)
+    1,02,61,47,734      cache-references                                                        (62.52%)
+          5,63,643      cache-misses                     #    0.05% of all cache refs           (75.01%)
+
+       5.222795065 seconds time elapsed
+
+       5.206493000 seconds user
+       0.015998000 seconds sys
+
+

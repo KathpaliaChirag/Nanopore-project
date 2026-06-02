@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:24:54 2026
+
+
+ Performance counter stats for './transpose_B 2048':
+
+          5,682.08 msec task-clock                       #    1.000 CPUs utilized             
+   17,45,98,21,332      cycles                           #    3.073 GHz                         (79.99%)
+   21,80,76,85,263      instructions                     #    1.25  insn per cycle              (90.00%)
+      72,90,00,961      branches                         #  128.298 M/sec                       (90.01%)
+          3,36,687      branch-misses                    #    0.05% of all branches             (90.00%)
+    1,09,90,55,499      cache-references                 #  193.425 M/sec                       (90.01%)
+         32,11,379      cache-misses                     #    0.29% of all cache refs           (90.00%)
+         40,14,425      LLC-loads                        #  706.506 K/sec                       (90.01%)
+          2,92,650      LLC-load-misses                  #    7.29% of all LL-cache accesses    (90.00%)
+    4,51,50,96,946      L1-dcache-loads                  #  794.620 M/sec                       (90.00%)
+       1,17,76,614      L1-dcache-load-misses            #    0.26% of all L1-dcache accesses   (89.98%)
+
+       5.683083831 seconds time elapsed
+
+       5.629619000 seconds user
+       0.052996000 seconds sys
+
+

@@ -1,0 +1,20 @@
+# started on Tue Jun  2 19:24:16 2026
+
+
+ Performance counter stats for './tiled 1024':
+
+      58,10,97,765      L1-dcache-loads                                                         (74.88%)
+      14,98,23,574      L1-dcache-load-misses            #   25.78% of all L1-dcache accesses   (74.87%)
+       9,04,22,550      mem_load_retired.l2_hit                                                 (74.87%)
+          3,49,817      mem_load_retired.l2_miss                                                (74.87%)
+          3,13,272      mem_load_retired.l3_hit                                                 (50.25%)
+            20,390      mem_load_retired.l3_miss                                                (50.26%)
+         34,92,907      cache-references                                                        (62.82%)
+          7,52,778      cache-misses                     #   21.55% of all cache refs           (75.17%)
+
+       0.271115175 seconds time elapsed
+
+       0.259145000 seconds user
+       0.012006000 seconds sys
+
+

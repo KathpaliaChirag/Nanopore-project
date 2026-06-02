@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:25:23 2026
+
+
+ Performance counter stats for './auto_vec_O3 2048':
+
+          2,493.65 msec task-clock                       #    1.000 CPUs utilized             
+    7,42,55,62,741      cycles                           #    2.978 GHz                         (79.95%)
+    5,62,62,52,080      instructions                     #    0.76  insn per cycle              (89.98%)
+      31,03,88,819      branches                         #  124.472 M/sec                       (89.98%)
+          3,32,901      branch-misses                    #    0.11% of all branches             (90.01%)
+    1,08,51,04,295      cache-references                 #  435.148 M/sec                       (90.01%)
+         10,92,561      cache-misses                     #    0.10% of all cache refs           (90.01%)
+      40,94,87,431      LLC-loads                        #  164.212 M/sec                       (90.02%)
+          1,28,754      LLC-load-misses                  #    0.03% of all LL-cache accesses    (90.01%)
+    3,57,63,93,466      L1-dcache-loads                  #    1.434 G/sec                       (90.02%)
+      67,91,30,918      L1-dcache-load-misses            #   18.99% of all L1-dcache accesses   (89.98%)
+
+       2.494229949 seconds time elapsed
+
+       2.440150000 seconds user
+       0.054003000 seconds sys
+
+

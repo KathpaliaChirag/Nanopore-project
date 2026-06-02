@@ -1,0 +1,23 @@
+# started on Tue Jun  2 17:34:22 2026
+
+
+ Performance counter stats for './tiled 10000':
+
+       1,35,663.23 msec task-clock                       #    1.000 CPUs utilized             
+ 3,77,74,08,95,746      cycles                           #    2.784 GHz                         (80.00%)
+ 8,38,78,32,10,798      instructions                     #    2.22  insn per cycle              (90.00%)
+   53,46,02,62,582      branches                         #  394.066 M/sec                       (90.00%)
+       1,18,07,551      branch-misses                    #    0.02% of all branches             (90.00%)
+    4,12,99,14,829      cache-references                 #   30.442 M/sec                       (90.00%)
+    1,96,25,97,299      cache-misses                     #   47.52% of all cache refs           (90.00%)
+    2,09,33,34,939      LLC-loads                        #   15.430 M/sec                       (90.00%)
+      67,58,50,393      LLC-load-misses                  #   32.29% of all LL-cache accesses    (90.00%)
+ 4,98,92,07,95,782      L1-dcache-loads                  #    3.678 G/sec                       (90.00%)
+   10,79,56,36,273      L1-dcache-load-misses            #    2.16% of all L1-dcache accesses   (90.00%)
+
+     135.687708234 seconds time elapsed
+
+     134.214415000 seconds user
+       1.448756000 seconds sys
+
+

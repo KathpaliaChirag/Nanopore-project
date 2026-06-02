@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:23:06 2026
+
+
+ Performance counter stats for './unrolled_ikj 1024':
+
+      32,37,76,061      cycle_activity.stalls_total                                           
+      26,41,42,022      cycle_activity.stalls_l1d_miss                                        
+      25,53,03,137      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+         63,25,577      memory_activity.stalls_l3_miss                                        
+
+       0.349197395 seconds time elapsed
+
+       0.335218000 seconds user
+       0.013967000 seconds sys
+
+

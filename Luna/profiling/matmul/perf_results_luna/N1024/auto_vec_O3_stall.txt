@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:23:07 2026
+
+
+ Performance counter stats for './auto_vec_O3 1024':
+
+      45,05,76,490      cycle_activity.stalls_total                                           
+      38,64,56,579      cycle_activity.stalls_l1d_miss                                        
+      37,82,69,506      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+         71,61,036      memory_activity.stalls_l3_miss                                        
+
+       0.329575983 seconds time elapsed
+
+       0.318616000 seconds user
+       0.011021000 seconds sys
+
+

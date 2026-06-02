@@ -1,0 +1,17 @@
+# started on Tue Jun  2 17:42:35 2026
+
+
+ Performance counter stats for './omp_parallel 10000':
+
+20,69,66,36,04,589      cycle_activity.stalls_total                                           
+20,23,61,83,15,617      cycle_activity.stalls_l1d_miss                                        
+18,72,11,90,83,187      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+ 7,66,42,62,06,112      memory_activity.stalls_l3_miss                                        
+
+     228.156200367 seconds time elapsed
+
+     886.582804000 seconds user
+      12.128511000 seconds sys
+
+

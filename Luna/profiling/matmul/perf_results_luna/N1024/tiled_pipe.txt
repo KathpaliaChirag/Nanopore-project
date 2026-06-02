@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:23:04 2026
+
+
+ Performance counter stats for './tiled 1024':
+
+            267.05 msec task-clock                       #    0.998 CPUs utilized             
+      74,63,18,589      cycles                           #    2.795 GHz                         (79.78%)
+    1,05,86,90,091      instructions                     #    1.42  insn per cycle              (89.89%)
+       9,35,10,214      branches                         #  350.163 M/sec                       (89.89%)
+            89,629      branch-misses                    #    0.10% of all branches             (89.89%)
+         34,10,322      cache-references                 #   12.770 M/sec                       (89.89%)
+          1,07,913      cache-misses                     #    3.16% of all cache refs           (89.89%)
+          5,91,923      LLC-loads                        #    2.217 M/sec                       (89.91%)
+             5,683      LLC-load-misses                  #    0.96% of all LL-cache accesses    (90.26%)
+      57,91,00,695      L1-dcache-loads                  #    2.169 G/sec                       (90.26%)
+      14,87,19,507      L1-dcache-load-misses            #   25.68% of all L1-dcache accesses   (90.22%)
+
+       0.267494206 seconds time elapsed
+
+       0.261539000 seconds user
+       0.006012000 seconds sys
+
+

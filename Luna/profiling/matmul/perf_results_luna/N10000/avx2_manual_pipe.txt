@@ -1,0 +1,23 @@
+# started on Tue Jun  2 18:09:44 2026
+
+
+ Performance counter stats for './avx2_manual 10000':
+
+       6,29,532.88 msec task-clock                       #    1.000 CPUs utilized             
+19,35,42,91,60,112      cycles                           #    3.074 GHz                         (80.00%)
+ 8,99,00,92,50,652      instructions                     #    0.46  insn per cycle              (90.00%)
+   42,78,83,26,603      branches                         #   67.968 M/sec                       (90.00%)
+      10,91,35,870      branch-misses                    #    0.26% of all branches             (90.00%)
+ 1,26,42,21,86,323      cache-references                 #  200.819 M/sec                       (90.00%)
+ 1,12,28,79,56,482      cache-misses                     #   88.82% of all cache refs           (90.00%)
+   60,76,51,20,211      LLC-loads                        #   96.524 M/sec                       (90.00%)
+   57,34,55,15,097      LLC-load-misses                  #   94.37% of all LL-cache accesses    (90.00%)
+ 5,11,98,30,87,099      L1-dcache-loads                  #  813.275 M/sec                       (90.00%)
+ 1,54,75,89,17,315      L1-dcache-load-misses            #   30.23% of all L1-dcache accesses   (90.00%)
+
+     629.648597654 seconds time elapsed
+
+     622.713204000 seconds user
+       6.817765000 seconds sys
+
+

@@ -1,0 +1,21 @@
+# started on Tue Jun  2 19:29:12 2026
+
+
+ Performance counter stats for './tiled_t32 10000':
+
+       1,92,798.03 msec task-clock                       #    1.000 CPUs utilized             
+ 5,39,92,15,37,921      cycles                           #    2.800 GHz                       
+11,19,14,43,09,242      instructions                     #    2.07  insn per cycle            
+    9,38,23,33,537      cache-references                 #   48.664 M/sec                     
+    4,23,42,16,774      cache-misses                     #   45.13% of all cache refs         
+    5,03,10,12,839      LLC-loads                        #   26.095 M/sec                     
+    2,64,96,50,164      LLC-load-misses                  #   52.67% of all LL-cache accesses  
+ 6,12,53,84,98,924      L1-dcache-loads                  #    3.177 G/sec                     
+    9,77,31,26,329      L1-dcache-load-misses            #    1.60% of all L1-dcache accesses 
+
+     192.841073396 seconds time elapsed
+
+     191.220596000 seconds user
+       1.576021000 seconds sys
+
+

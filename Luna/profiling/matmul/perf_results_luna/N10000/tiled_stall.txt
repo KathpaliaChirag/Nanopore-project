@@ -1,0 +1,17 @@
+# started on Tue Jun  2 17:36:38 2026
+
+
+ Performance counter stats for './tiled 10000':
+
+   51,01,35,83,812      cycle_activity.stalls_total                                           
+   25,00,25,01,135      cycle_activity.stalls_l1d_miss                                        
+   22,06,15,42,585      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+   15,54,02,94,799      memory_activity.stalls_l3_miss                                        
+
+     133.378442986 seconds time elapsed
+
+     132.008123000 seconds user
+       1.347766000 seconds sys
+
+

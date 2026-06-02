@@ -1,0 +1,21 @@
+# started on Tue Jun  2 19:32:25 2026
+
+
+ Performance counter stats for './omp_tiled_t32 10000':
+
+       4,35,922.16 msec task-clock                       #    3.892 CPUs utilized             
+13,09,59,26,83,157      cycles                           #    3.004 GHz                       
+17,31,74,85,75,976      instructions                     #    1.32  insn per cycle            
+   16,82,86,20,677      cache-references                 #   38.605 M/sec                     
+    8,30,49,98,831      cache-misses                     #   49.35% of all cache refs         
+    7,47,77,12,285      LLC-loads                        #   17.154 M/sec                     
+    4,61,93,78,416      LLC-load-misses                  #   61.78% of all LL-cache accesses  
+ 8,01,20,09,35,160      L1-dcache-loads                  #    1.838 G/sec                     
+   12,95,20,69,654      L1-dcache-load-misses            #    1.62% of all L1-dcache accesses 
+
+     111.998339046 seconds time elapsed
+
+     432.363900000 seconds user
+       3.575602000 seconds sys
+
+

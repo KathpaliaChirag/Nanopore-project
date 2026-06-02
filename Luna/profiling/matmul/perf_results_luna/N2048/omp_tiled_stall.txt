@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:25:12 2026
+
+
+ Performance counter stats for './omp_tiled 2048':
+
+    3,08,57,57,276      cycle_activity.stalls_total                                           
+    1,76,04,23,990      cycle_activity.stalls_l1d_miss                                        
+      83,88,74,528      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+      45,63,08,073      memory_activity.stalls_l3_miss                                        
+
+       0.900960157 seconds time elapsed
+
+       3.009181000 seconds user
+       0.086976000 seconds sys
+
+

@@ -1,0 +1,20 @@
+# started on Tue Jun  2 19:24:17 2026
+
+
+ Performance counter stats for './auto_vec_O3 1024':
+
+      47,49,83,252      L1-dcache-loads                                                         (74.87%)
+       7,48,78,171      L1-dcache-load-misses            #   15.76% of all L1-dcache accesses   (74.87%)
+       1,96,55,439      mem_load_retired.l2_hit                                                 (74.87%)
+       2,72,71,363      mem_load_retired.l2_miss                                                (74.87%)
+       2,72,34,710      mem_load_retired.l3_hit                                                 (50.26%)
+            65,667      mem_load_retired.l3_miss                                                (50.26%)
+      13,65,96,016      cache-references                                                        (62.62%)
+          5,53,692      cache-misses                     #    0.41% of all cache refs           (74.88%)
+
+       0.326803317 seconds time elapsed
+
+       0.312872000 seconds user
+       0.013994000 seconds sys
+
+

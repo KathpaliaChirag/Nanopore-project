@@ -1,0 +1,43 @@
+============================================================
+ Luna GPU matmul timing sweep
+ GPU: NVIDIA L40S
+ Started: 2026-06-02T19:47:30+05:30
+============================================================
+
+--- N=1024 ---
+naive_gpu            N=1024    time=      0.40 ms     5328.6 GFLOPS
+coalesced_gpu        N=1024    time=      0.72 ms     2977.9 GFLOPS
+shared_tiled         N=1024    time=      0.34 ms     6335.8 GFLOPS
+shared_tiled_2d      N=1024    time=      0.15 ms    14752.4 GFLOPS
+cublas_sgemm         N=1024    time=      0.08 ms    27235.7 GFLOPS
+cublas_tensor_tf32   N=1024    time=      0.04 ms    47934.9 GFLOPS
+wmma_manual_fp16     N=1024    time=      0.06 ms    33058.6 GFLOPS
+
+--- N=2048 ---
+naive_gpu            N=2048    time=      3.06 ms     5613.3 GFLOPS
+coalesced_gpu        N=2048    time=      5.98 ms     2872.0 GFLOPS
+shared_tiled         N=2048    time=      2.43 ms     7063.2 GFLOPS
+shared_tiled_2d      N=2048    time=      0.60 ms    28588.9 GFLOPS
+cublas_sgemm         N=2048    time=      0.39 ms    44501.9 GFLOPS
+cublas_tensor_tf32   N=2048    time=      0.16 ms   110376.4 GFLOPS
+wmma_manual_fp16     N=2048    time=      0.47 ms    36194.4 GFLOPS
+
+--- N=4096 ---
+naive_gpu            N=4096    time=     24.18 ms     5684.7 GFLOPS
+coalesced_gpu        N=4096    time=     48.46 ms     2836.2 GFLOPS
+shared_tiled         N=4096    time=     19.48 ms     7056.9 GFLOPS
+shared_tiled_2d      N=4096    time=      4.57 ms    30044.0 GFLOPS
+cublas_sgemm         N=4096    time=      3.01 ms    45717.9 GFLOPS
+cublas_tensor_tf32   N=4096    time=      1.12 ms   122461.4 GFLOPS
+wmma_manual_fp16     N=4096    time=      3.45 ms    39845.3 GFLOPS
+
+--- N=10000 ---
+skip naive_gpu at N=10000 (slow)
+coalesced_gpu        N=10000   time=   5209.00 ms      384.0 GFLOPS
+shared_tiled         N=10000   time=    338.10 ms     5915.3 GFLOPS
+shared_tiled_2d      N=10000   time=     68.03 ms    29398.9 GFLOPS
+cublas_sgemm         N=10000   time=     44.97 ms    44475.3 GFLOPS
+cublas_tensor_tf32   N=10000   time=     16.27 ms   122923.1 GFLOPS
+wmma_manual_fp16     N=10000   time=     40.00 ms    50000.9 GFLOPS
+
+Done. Summary in gpu_results/timing/all_timing.txt

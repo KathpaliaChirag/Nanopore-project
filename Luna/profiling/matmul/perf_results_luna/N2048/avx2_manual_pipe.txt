@@ -1,0 +1,23 @@
+# started on Tue Jun  2 16:25:18 2026
+
+
+ Performance counter stats for './avx2_manual 2048':
+
+          2,493.75 msec task-clock                       #    1.000 CPUs utilized             
+    7,42,84,11,470      cycles                           #    2.979 GHz                         (79.95%)
+    8,11,63,66,154      instructions                     #    1.09  insn per cycle              (89.98%)
+      47,61,94,395      branches                         #  190.955 M/sec                       (89.98%)
+          3,19,546      branch-misses                    #    0.07% of all branches             (90.01%)
+    1,08,51,60,488      cache-references                 #  435.152 M/sec                       (90.02%)
+         14,31,418      cache-misses                     #    0.13% of all cache refs           (90.01%)
+      64,25,11,154      LLC-loads                        #  257.649 M/sec                       (90.02%)
+          3,41,992      LLC-load-misses                  #    0.05% of all LL-cache accesses    (90.02%)
+    4,50,70,62,287      L1-dcache-loads                  #    1.807 G/sec                       (89.97%)
+      51,49,24,799      L1-dcache-load-misses            #   11.42% of all L1-dcache accesses   (90.01%)
+
+       2.494862440 seconds time elapsed
+
+       2.451275000 seconds user
+       0.043004000 seconds sys
+
+

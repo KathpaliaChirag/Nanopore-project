@@ -1,0 +1,52 @@
+# started on Tue Jun  2 19:24:18 2026
+
+
+ Performance counter stats for './naive_ijk 1024':
+
+ 1,02,95,98,07,835      TOPDOWN.SLOTS                    #     67.0 %  tma_memory_bound       
+                                                  #     16.5 %  tma_core_bound         
+                                                  #      0.1 %  tma_dram_bound         
+                                                  #     85.4 %  tma_l3_bound             (39.99%)
+   11,71,47,91,043      topdown-retiring                                                        (39.99%)
+    4,44,55,64,649      topdown-fe-bound                                                        (39.99%)
+   72,27,37,47,460      topdown-mem-bound                                                       (39.99%)
+   90,03,93,61,360      topdown-be-bound                                                        (39.99%)
+    1,61,50,55,808      topdown-bad-spec                                                        (39.99%)
+   14,67,48,91,486      MEMORY_ACTIVITY.STALLS_L2_MISS                                          (39.99%)
+       2,10,64,336      MEMORY_ACTIVITY.STALLS_L3_MISS                                          (39.99%)
+   17,16,01,48,824      CPU_CLK_UNHALTED.THREAD                                                 (39.99%)
+ 1,03,00,24,85,301      TOPDOWN.SLOTS                    #      0.0 %  tma_l2_bound             (20.01%)
+    9,69,71,32,668      topdown-retiring                                                        (20.01%)
+    2,83,26,38,713      topdown-fe-bound                                                        (20.01%)
+   75,93,90,87,201      topdown-mem-bound                                                       (20.01%)
+   92,50,02,71,111      topdown-be-bound                                                        (20.01%)
+    1,21,17,93,942      topdown-bad-spec                                                        (20.01%)
+   14,66,91,22,959      MEMORY_ACTIVITY.STALLS_L2_MISS                                          (20.01%)
+   14,67,06,10,892      MEMORY_ACTIVITY.STALLS_L1D_MISS                                         (20.01%)
+   17,16,77,90,610      CPU_CLK_UNHALTED.THREAD                                                 (20.01%)
+ 1,02,98,15,68,843      TOPDOWN.SLOTS                    #      0.0 %  tma_l1_bound             (20.01%)
+    9,69,50,57,747      topdown-retiring                                                        (20.01%)
+    2,83,19,85,322      topdown-fe-bound                                                        (20.01%)
+   75,92,36,66,440      topdown-mem-bound                                                       (20.01%)
+   92,48,14,87,311      topdown-be-bound                                                        (20.01%)
+    1,21,15,47,867      topdown-bad-spec                                                        (20.01%)
+   14,50,67,68,908      EXE_ACTIVITY.BOUND_ON_LOADS                                             (20.01%)
+   14,66,06,09,480      MEMORY_ACTIVITY.STALLS_L1D_MISS                                         (20.01%)
+   17,16,36,61,182      CPU_CLK_UNHALTED.THREAD                                                 (20.01%)
+ 1,02,96,95,68,942      TOPDOWN.SLOTS                    #      0.8 %  tma_branch_mispredicts 
+                                                  #      0.4 %  tma_machine_clears       (19.99%)
+    9,69,40,30,147      topdown-retiring                                                        (19.99%)
+    2,83,04,63,739      topdown-fe-bound                                                        (19.99%)
+   92,47,07,10,929      topdown-be-bound                                                        (19.99%)
+      80,76,04,460      topdown-br-mispredict                                                   (19.99%)
+    1,21,14,06,693      topdown-bad-spec                                                        (19.99%)
+          4,33,566      INT_MISC.UOP_DROPPING                                                   (19.99%)
+    2,62,17,69,962      UOPS_EXECUTED.CORE_CYCLES_GE_1   #     3.60 tma_info_core_ilp           (39.98%)
+    4,72,00,87,733      UOPS_EXECUTED.THREAD                                                    (39.98%)
+
+       5.577845211 seconds time elapsed
+
+       5.551686000 seconds user
+       0.025998000 seconds sys
+
+

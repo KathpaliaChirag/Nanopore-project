@@ -1,0 +1,20 @@
+# started on Tue Jun  2 19:24:14 2026
+
+
+ Performance counter stats for './ikj_order 1024':
+
+      47,64,89,274      L1-dcache-loads                                                         (74.90%)
+       7,55,92,301      L1-dcache-load-misses            #   15.86% of all L1-dcache accesses   (74.90%)
+       2,00,20,840      mem_load_retired.l2_hit                                                 (74.90%)
+       2,73,08,764      mem_load_retired.l2_miss                                                (74.90%)
+       2,71,78,796      mem_load_retired.l3_hit                                                 (50.21%)
+            54,149      mem_load_retired.l3_miss                                                (50.20%)
+      13,63,21,297      cache-references                                                        (62.75%)
+          4,70,478      cache-misses                     #    0.35% of all cache refs           (75.15%)
+
+       0.335095980 seconds time elapsed
+
+       0.322148000 seconds user
+       0.013006000 seconds sys
+
+

@@ -1,0 +1,17 @@
+# started on Tue Jun  2 17:47:31 2026
+
+
+ Performance counter stats for './omp_tiled 10000':
+
+ 2,42,41,42,71,341      cycle_activity.stalls_total                                           
+ 1,44,76,09,33,767      cycle_activity.stalls_l1d_miss                                        
+ 1,34,82,67,80,788      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+ 1,07,56,33,35,744      memory_activity.stalls_l3_miss                                        
+
+      66.404719644 seconds time elapsed
+
+     249.700449000 seconds user
+       3.757503000 seconds sys
+
+

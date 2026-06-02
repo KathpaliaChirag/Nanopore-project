@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:55:03 2026
+
+
+ Performance counter stats for './kij_order 10000':
+
+13,29,01,61,46,962      cycle_activity.stalls_total                                           
+13,13,94,21,70,881      cycle_activity.stalls_l1d_miss                                        
+12,92,00,56,34,974      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+11,96,49,45,70,816      memory_activity.stalls_l3_miss                                        
+
+     655.617093785 seconds time elapsed
+
+     652.774282000 seconds user
+       2.726575000 seconds sys
+
+

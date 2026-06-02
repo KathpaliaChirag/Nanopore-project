@@ -1,0 +1,17 @@
+# started on Tue Jun  2 16:23:56 2026
+
+
+ Performance counter stats for './naive_ijk 2048':
+
+ 1,22,11,60,10,211      cycle_activity.stalls_total                                           
+ 1,21,80,52,35,790      cycle_activity.stalls_l1d_miss                                        
+ 1,21,78,47,32,635      cycle_activity.stalls_l2_miss                                         
+                 0      cycle_activity.stalls_l3_miss                                         
+       8,40,00,920      memory_activity.stalls_l3_miss                                        
+
+      46.205551561 seconds time elapsed
+
+      46.134968000 seconds user
+       0.065992000 seconds sys
+
+

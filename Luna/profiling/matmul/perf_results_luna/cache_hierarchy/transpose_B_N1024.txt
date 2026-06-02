@@ -1,0 +1,20 @@
+# started on Tue Jun  2 19:24:15 2026
+
+
+ Performance counter stats for './transpose_B 1024':
+
+      58,94,55,414      L1-dcache-loads                                                         (74.85%)
+         13,59,639      L1-dcache-load-misses            #    0.23% of all L1-dcache accesses   (74.86%)
+          4,08,687      mem_load_retired.l2_hit                                                 (74.96%)
+          4,20,453      mem_load_retired.l2_miss                                                (75.09%)
+          3,67,402      mem_load_retired.l3_hit                                                 (50.19%)
+            66,164      mem_load_retired.l3_miss                                                (50.05%)
+      13,79,47,053      cache-references                                                        (62.48%)
+          9,21,137      cache-misses                     #    0.67% of all cache refs           (74.91%)
+
+       0.716365203 seconds time elapsed
+
+       0.697436000 seconds user
+       0.018984000 seconds sys
+
+

@@ -1,0 +1,23 @@
+# started on Tue Jun  2 17:48:37 2026
+
+
+ Performance counter stats for './unrolled_ikj 10000':
+
+       6,34,316.98 msec task-clock                       #    1.000 CPUs utilized             
+19,23,65,19,84,978      cycles                           #    3.033 GHz                         (80.00%)
+ 9,06,65,27,08,901      instructions                     #    0.47  insn per cycle              (90.00%)
+   38,06,27,24,309      branches                         #   60.006 M/sec                       (90.00%)
+      10,93,55,435      branch-misses                    #    0.29% of all branches             (90.00%)
+ 1,25,86,57,81,274      cache-references                 #  198.427 M/sec                       (90.00%)
+ 1,12,40,19,10,892      cache-misses                     #   89.30% of all cache refs           (90.00%)
+   45,81,80,76,392      LLC-loads                        #   72.232 M/sec                       (90.00%)
+   43,16,55,99,458      LLC-load-misses                  #   94.21% of all LL-cache accesses    (90.00%)
+ 5,07,46,03,80,192      L1-dcache-loads                  #  800.011 M/sec                       (90.00%)
+ 1,45,15,75,07,684      L1-dcache-load-misses            #   28.60% of all L1-dcache accesses   (90.00%)
+
+     634.415094734 seconds time elapsed
+
+     631.666464000 seconds user
+       2.647599000 seconds sys
+
+
