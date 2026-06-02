@@ -4,8 +4,12 @@
 DB where each minimizer slot stores a **6-bit bitmask** (one bit per organism).
 One lookup → all 6 ESKAPE organisms answered simultaneously.
 
-> **Status:** design doc. Verified against local source on 2026-06-01; corrections folded in
-> (see §0). No code edited.
+> **Status:** design doc. Source-verified on 2026-06-01 (two passes); 6 reference genomes
+> downloaded and the gate measurement run. **No code edited.**
+> **Headline result:** 8,533,848 distinct minimizers (k=35, l=31) → full DB **~61 MB** (5-byte
+> cell, 70% load). This **does not fit the 16 MB L3** (~3.8× over), but is **~130× smaller than
+> the 8 GB DB**. L3-residency is reachable by subsampling to ~27.5% of minimizers (`-M`).
+> Cross-organism minimizer sharing is **0.23%** — which decides bitmask vs taxon-ID (§9).
 
 ---
 
@@ -25,8 +29,37 @@ Three claims in the first draft were **wrong** and are fixed below:
    unconditionally does `new Taxonomy(...)`. "No taxonomy needed" is false — needs a stub
    taxonomy file or a code change.
 
-DB-size / L3-residency is **unverified** — depends on distinct-minimizer count; measure with
-`estimate_capacity` before claiming L3-resident (§2).
+### Second-pass corrections (2026-06-01, after reading every hot-path source body)
+
+4. **`estimate_capacity` and `build_db` read FASTA from STDIN, not a filename argument.**
+   Both use a default-constructed `BatchSequenceReader`, which opens `fileno(stdin)` when no
+   filename is given (`seqreader.h:59-62`); `estimate_capacity`'s `ProcessSequences` never
+   passes one. The first draft's `estimate_capacity … eskape_all.fna` would hang on stdin and
+   ignore the file. **Correct form:** `cat eskape_all.fna | estimate_capacity -k 35 -l 31 -p 8`
+   (or `… < eskape_all.fna`). Same applies to the bitmask builder's input.
+5. **Only `classify` is compiled** in `tools/kraken2/src/`. `build_db`, `estimate_capacity`,
+   `dump_table` are source-only. `estimate_capacity` builds from the existing Makefile target
+   with **no source edits** (`make estimate_capacity`) — done 2026-06-01.
+6. **Correction 3 is lighter than first stated.** The classify hot path (`Get()` →
+   `hit_counts[mask]++`, `classify.cc:838,859`) is **taxonomy-free** — `hit_counts` is keyed by
+   the raw returned value, i.e. our mask. Taxonomy is touched in only ~5 places
+   (`ResolveTree` `:878`, `ext_call` `:898`, `AddHitlistString` `:923/949/965`, caller
+   `tax.nodes()[call]` `:609-610`). So C3 = **reuse the existing 1.75 MB `taxo.k2d`** to satisfy
+   the `load_index` constructor (`:275`, loads in ms) + gate those 5 lines behind `eskape_mode`.
+   **No stub taxonomy file needs to be authored.**
+
+### DB size — NOW MEASURED (was unverified)
+
+`estimate_capacity -k 35 -l 31 -n 1024` (exact, no sampling) over the 6 reference genomes
+(26.7 Mbp) → **8,533,848 distinct minimizers** (§2). At 5 bytes/cell, 70% load → **~61 MB**.
+That **spills the 16 MB L3** (~3.8×), but is ~130× smaller than 8 GB. Keep ~27.5% of minimizers
+(`build_db -M`, honored by classify at `:832-834`) → ~15 MB → **L3-resident**. The first draft's
+"~1M → 7 MB fits L3" bracket was optimistic by ~8×.
+
+**Build↔classify minimizer compatibility — confirmed (silent-failure risk closed):** the
+scanner's default `revcom_version == CURRENT_REVCOM_VERSION == 1` (`mmscanner.h:19,36`), build
+writes that to the opts file (`build_db.cc:102`), classify reads it back (`classify.cc:521-523`).
+Same k/l/toggle/spaced-seed ⇒ identical minimizers between build and classify.
 
 **Mechanism traced & confirmed (2026-06-01):** the OR-accumulation `CompareAndSet`, the
 self-describing file round-trip, linear probing, and OpenMP thread-safety on both build and
@@ -42,8 +75,8 @@ classify were verified against the source bodies — see §3. No true showstoppe
 |---|---|---|
 | Stored value | taxon ID (~19 bits) | 6-bit bitmask (1 bit/organism) |
 | Cell width | 40-bit (CompactHashCell40, 5 B) | 40-bit, **key=34 / value=6** |
-| DB size | 8,000 MB (capped/subsampled) | ~tens of MB (full, **measure it**) |
-| Cache behavior | 8 GB >> 16 MB L3 → 15.91% miss | likely L3-resident → near-0% miss |
+| DB size | 8,000 MB (capped/subsampled) | **~61 MB full** (measured); **~15 MB** at 27.5% subsample |
+| Cache behavior | 8 GB >> 16 MB L3 → 15.91% miss | full 61 MB still spills L3; subsample → ~15 MB **L3-resident** |
 | Organisms covered | ~200,000 | 6 ESKAPE only |
 | Merge op at build | LCA (taxonomy walk) | bitwise OR |
 | Decision at classify | `ResolveTree` tree-walk | per-bit **unique-hit** count |
@@ -103,59 +136,69 @@ co-infection / conserved-gene false positive. `ResolveTree` is not called.
 
 ---
 
-## 2. Reference Genome Data
+## 2. Reference Genome Data — DOWNLOADED & MEASURED (2026-06-01)
 
-### Per-Organism Genome Sizes and Download Sizes
+One **designated reference genome per organism** (NCBI RefSeq, `refseq_category = reference
+genome`, Complete Genome level), resolved via the NCBI Datasets REST API and pulled from the
+NCBI FTP (no CLI tool installed). Files live in `data/eskape_genomes/`, named by bit:
 
-| Organism | Taxid | Genome | FASTA (raw) | .fna.gz/genome | 5-strain total |
-|---|---|---|---|---|---|
-| *E. faecium* | 1352 | ~2.8 Mb | ~2.8 MB | ~750 KB | ~3.7 MB |
-| *S. aureus* | 1280 | ~2.9 Mb | ~2.9 MB | ~780 KB | ~3.9 MB |
-| *K. pneumoniae* | 573 | ~5.5 Mb | ~5.5 MB | ~1.5 MB | ~7.5 MB |
-| *A. baumannii* | 470 | ~4.0 Mb | ~4.0 MB | ~1.1 MB | ~5.5 MB |
-| *P. aeruginosa* | 287 | ~6.3 Mb | ~6.3 MB | ~1.7 MB | ~8.5 MB |
-| *E. cloacae* | 550 | ~5.4 Mb | ~5.4 MB | ~1.5 MB | ~7.5 MB |
-| **Total (5 strains)** | | **~133 Mb** | **~133 MB** | | **~36.6 MB** |
+| bit | Organism | Taxid | Accession | Assembly | bp | contigs |
+|---|---|---|---|---|---|---|
+| 0 | *E. faecium* | 1352 | GCF_009734005.1 | ASM973400v2 | 2,919,198 | 2 |
+| 1 | *S. aureus* | 1280 | GCF_000013425.1 | ASM1342v1 (NCTC 8325) | 2,821,361 | 1 |
+| 2 | *K. pneumoniae* | 573 | GCF_000240185.1 | ASM24018v2 (HS11286) | 5,682,322 | 7 |
+| 3 | *A. baumannii* | 470 | GCF_009035845.1 | ASM903584v1 | 3,999,136 | 3 |
+| 4 | *P. aeruginosa* | 287 | GCF_000006765.1 | ASM676v1 (PAO1) | 6,264,404 | 1 |
+| 5 | *E. cloacae* | 550 | GCF_905331265.2 | AI2999v1_cpp | 5,023,439 | 3 |
+| | **combined** | | | `eskape_all.fna` | **26,709,860** | 17 |
 
-**Reference strains (NCBI RefSeq):**
+Reproduce the download (resolve accession + assembly, build FTP URL, fetch `.fna.gz`):
+```bash
+# per (bit,taxid,acc,asm): URL = .../genomes/all/GCF/<3>/<3>/<3>/<acc>_<asm>/<acc>_<asm>_genomic.fna.gz
+acc=$(curl -s "https://api.ncbi.nlm.nih.gov/datasets/v2/genome/taxon/287/dataset_report?filters.assembly_source=RefSeq&filters.reference_only=true&page_size=1" \
+      | jq -r '.reports[0].accession')
+```
+Total compressed ~7.8 MB. **kseq reads raw bytes — it does NOT decompress**, so `gunzip` before
+building/estimating.
 
-| Organism | Strains | Example accession |
-|---|---|---|
-| *E. faecium* | Aus0004, DO, NRRL B-2354 | GCF_000250945.1 |
-| *S. aureus* | NCTC 8325, USA300, MW2, N315, Mu50 | GCF_000013425.1 |
-| *K. pneumoniae* | ATCC 13883, HS11286, MGH 78578, NTUH-K2044 | GCF_000742135.1 |
-| *A. baumannii* | ATCC 17978, AYE, ACICU, AB5075 | GCF_000012345.1 |
-| *P. aeruginosa* | PAO1, PA14, LESB58, DK2 | GCF_000006765.1 |
-| *E. cloacae* | ATCC 13047, NCTC9394 | GCF_000025565.1 |
+### Distinct minimizers (the gate) — MEASURED
 
 ```bash
-# NCBI datasets CLI (conda install -c conda-forge ncbi-datasets-cli)
-datasets download genome taxon 287 --reference --assembly-level complete \
-    --filename data/eskape_genomes/paeruginosa.zip
-# repeat for 1352 1280 573 470 550
+cat eskape_all.fna | tools/kraken2/src/estimate_capacity -k 35 -l 31 -n 1024 -p 8
+# 8,533,848   (exact; n=1024 makes every minimizer qualify. n=4 sample gave 8,518,144 — agrees)
 ```
 
-### Expected DB Size — UNVERIFIED, must measure
+| Organism | distinct minimizers |
+|---|---|
+| *E. faecium* | 896,648 |
+| *S. aureus* | 914,325 |
+| *K. pneumoniae* | 1,817,267 |
+| *A. baumannii* | 1,294,551 |
+| *P. aeruginosa* | 2,007,830 |
+| *E. cloacae* | 1,623,085 |
+| **sum of individuals** | **8,553,706** |
+| **combined (measured)** | **8,533,848** |
+
+**Cross-organism sharing = sum − combined = 19,858 = 0.23%.** 99.77% of minimizers are unique to
+one organism. (These are phylogenetically diverse species — 2 Firmicutes, 4 Proteobacteria — so
+they barely share 31-mers.) This number is the crux of the bitmask-vs-taxon-ID decision (§9).
+
+### DB size (5-byte `CompactHashCell40`)
 
 ```
-Cell = 5 bytes (CompactHashCell40), occupancy ~70%.
-DB size ≈ distinct_minimizers / 0.70 × 5 bytes.
+DB ≈ distinct_minimizers / load_factor × 5 bytes
+  load 80% → 10,647,680 cells → 53.2 MB
+  load 70% → 12,191,211 cells → 61.0 MB   ← reference point
+  load 60% → 14,196,907 cells → 71.0 MB
+  load 50% → 17,036,288 cells → 85.2 MB
+(4-byte CompactHashCell32 @70% → ~48.8 MB, at the cost of a 26-bit vs 34-bit key.)
 
-distinct_minimizers is the unknown. Rough bracket for ~133 Mbp of 6 species
-(heavy within-species, little cross-species dedup): ~1M (optimistic) to ~10M+.
-  →   1M  →  ~7 MB   (fits L3)
-  →  10M  →  ~70 MB  (spills 16 MB L3, still ~115× smaller than 8 GB)
+L3 = 16 MB → max 3,355,443 cells → max 2,348,810 distinct @70%.
+  ⇒ keep ~27.5% of minimizers (build_db -M) → ~15 MB → L3-resident.
 ```
-
-**Action — run the existing standalone tool** (OpenMP-parallel, `estimate_capacity.cc:49,71`):
-```bash
-# concatenate the 6 ESKAPE FASTAs, then:
-tools/kraken2/src/estimate_capacity -k 35 -l 31 -S <seed> eskape_all.fna
-# distinct minimizers × (1/0.70) × 5 bytes = real DB size
-#   ≲3M  → ≲21 MB  (effectively L3-resident)
-#   ~10M → ~70 MB  (spills 16 MB L3, still ~115× smaller than 8 GB, mostly cache-resident)
-```
-Either way the lookup-time and cache wins hold; only exact L3-residency is in question.
+**Verdict:** the full DB is ~130× smaller than 8 GB but **not** L3-resident; full L3-residency
+needs ~27.5% subsampling (orthogonal to taxon-vs-bitmask; §9). The lookup-latency win over 8 GB
+holds in both cases.
 
 ---
 
@@ -169,8 +212,8 @@ Either way the lookup-time and cache wins hold; only exact L3-residency is in qu
 | `tools/kraken2/src/build_eskape_db.cc` | NEW | ~200 | bitmask builder, `bits_for_taxid=6` |
 | `tools/kraken2/src/classify.cc` | MODIFY | ~100 | eskape mode + unique-hit path + **gate output tail** + report + skip taxonomy |
 | `tools/kraken2/src/Makefile` | MODIFY | ~5 | new build target |
-| `data/eskape_seqid2bit.txt` | NEW | 6 | seqid → bit (0-5) |
-| `data/eskape_stub_taxonomy/` | NEW | tiny | stub taxo.k2d (or reuse 8 GB DB's taxo.k2d) so `load_index` doesn't fail |
+| seqid→bit mapping | optional | — | not needed if the builder maps each file→bit by argument order |
+| (taxonomy) | **reuse** | 0 | point `-t` at the existing `taxo.k2d` to satisfy `load_index:275` — **no stub authored** (§0 correction 6) |
 
 > **Scope correction:** the classify.cc edit is **bigger than ~60 lines**. Line `classify.cc:898`
 > runs `taxonomy.nodes()[call].external_id` **unconditionally**, and `AddHitlistString` (`:923`)
@@ -213,9 +256,11 @@ explicitly pick `CompactHashCell` (32-bit) in the new tool.
 Counting every set bit lets shared minimizers promote absent organisms. **Fix:** detection
 on `popcount(mask)==1` unique hits only (§1, §6). This is the key accuracy fix.
 
-### 🟠 MODERATE 3 — Taxonomy always loaded
-`load_index` (`classify.cc:275`) unconditionally `new Taxonomy(...)`. Provide a stub
-taxonomy file, or gate the load behind `!opts.eskape_mode`.
+### 🟠 MODERATE 3 — Taxonomy always loaded (lighter than first stated — §0 correction 6)
+`load_index` (`classify.cc:275`) unconditionally `new Taxonomy(...)`. **Reuse the existing
+1.75 MB `taxo.k2d`** (`-t …`) to satisfy the constructor — it loads in ms and the hot path never
+queries it — then gate the ~5 taxonomy-using lines (`:878/:898/:923/:609-610`) behind
+`eskape_mode`. No stub taxonomy needs authoring.
 
 ### 🟠 MODERATE 4 — `bits_needed_for_value` from taxonomy
 `build_db.cc:66-67` derives value_bits from `taxonomy.node_count()`. New tool must
@@ -263,19 +308,23 @@ stay below it. Universal minimizers (mask 63) are skipped outright.
 
 ## 6. Step-by-Step Plan
 
-### Phase 1 — Download genomes
-6 organisms × ~5 strains, ~37 MB compressed (§2). Concatenate per organism into
-`data/eskape_genomes/<org>_combined.fna`. Write `data/eskape_seqid2bit.txt` (seqid → bit).
+### Phase 1 — Download genomes ✅ DONE (2026-06-01)
+6 reference genomes (1 per organism) in `data/eskape_genomes/`, concatenated to `eskape_all.fna`
+(26.7 Mbp), measured at 8,533,848 distinct minimizers / ~61 MB DB (§2). Multi-strain panels can
+be added later for sensitivity (re-measure capacity if so). The build maps each FASTA → its bit
+directly (file-order), so no `seqid2bit` map is strictly required.
 
 ### Phase 2 — Build tool `build_eskape_db.cc`
 ```
-1. estimate_capacity over all 6 FASTAs → distinct minimizer count
+1. estimate_capacity (DONE, §2) → 8,533,848 distinct → capacity ≈ 12.2M @70%
+   (`cat eskape_all.fna | estimate_capacity …` — reads STDIN, §0 correction 4)
 2. CompactHashTable<CompactHashCell40>(capacity, key_bits=34, value_bits=6)
-   (bits_for_taxid = 6 hardcoded — NOT from taxonomy.node_count())
+   (bits_for_taxid = 6 hardcoded — NOT from taxonomy.node_count(); cf. build_db.h:60-62)
 3. for organism i in 0..5:
      for each sequence: ProcessSequenceBitmask(seq, i, hash, scanner, ...)
 4. hash.WriteTable("data/eskape_bitmask.k2d")
-5. write eskape.k2opts (k=35, l=31, value_bits=6); write stub taxo.k2d
+5. write eskape.k2opts (k=35, l=31, value_bits=6, revcom=CURRENT_REVCOM_VERSION); NO taxonomy file
+   (classify reuses an existing taxo.k2d for its loader — §0 correction 6)
 ```
 Makefile: add `build_eskape_db` target linking `compact_hash.o mmscanner.o seqreader.o ...`.
 
@@ -303,7 +352,9 @@ Makefile: add `build_eskape_db` target linking `compact_hash.o mmscanner.o seqre
 ```bash
 perf stat -d ./classify -E -H data/eskape_bitmask.k2d -p 8 results/dorado/reads_fast.fastq
 # Baseline (8 GB DB, this machine, §7): processing 2.398s, cache-miss 15.91%, RSS 8.5 GB
-# Target: cache-miss near 0, RSS tens of MB, processing < 1s
+# Full 61 MB DB:   RSS ~tens of MB, cache-miss reduced but still elevated (spills 16 MB L3)
+# Subsampled ~15 MB (-M, ~27.5%): RSS ~15 MB, cache-miss → near 0 (L3-resident)
+# Both: ~130× smaller RSS than 8 GB; processing dominated by NextMinimizer once Get() is cheap
 ```
 
 ---
@@ -349,13 +400,178 @@ Outputs: `results/kraken2/manual_run/{kraken2_report.txt, kraken2_output.txt, cl
 | Implementable? | **Yes** — no showstopper; mechanism traced & confirmed (§3) |
 | Major inconsistencies? | **3 critical** (cell width, any-bit counting, taxonomy load) + 5 moderate/minor — all fixable |
 | Reduces lookup time? | **Yes** — DRAM probe (~100 ns) → L2/L3 hit (~4-14 ns); `Get()` is 80.65% of CPU. (NextMinimizer cost unchanged → bounded) |
-| Cache-friendly? | **Very likely** — tens of MB vs 8 GB; confirm L3-residency via estimate_capacity |
-| OpenMP usable? | **Yes, both sides** — already the model; zone-locked build (order-independent), `org_read_counts[6]` reduction at classify |
-| Improves accuracy? | **Scoped yes** with unique-hit rule; loses sub-species + non-ESKAPE; sensitivity bounded by panel |
+| Cache-friendly? | **Partly** — full DB 61 MB still spills 16 MB L3; ~27.5% subsample → ~15 MB L3-resident; either way ~130× smaller than 8 GB |
+| OpenMP usable? | **Yes, both sides** — already the model; zone-locked build (order-independent), `org_read_counts[6]` reduction at classify; bitmask scales the fine-grained combine best (§10) |
+| Improves accuracy? | **Scoped yes** with unique-hit rule; loses sub-species + non-ESKAPE; sensitivity bounded by panel. vs taxon-ID: ~tie (slight taxon-ID edge, §9) |
 | Code scope | new build tool ~200 lines; **classify.cc ~100** (output tail + caller must be gated, not just accumulation) |
-| DB size | tens of MB (measure) |
-| Download | ~37 MB compressed; no taxonomy dump (stub only) |
-| Biggest risk | (1) any-bit FP if unique-hit rule omitted; (2) diverged strains outside panel |
+| DB size | **~61 MB measured** (8,533,848 minimizers × 5 B / 0.70); ~15 MB at 27.5% subsample |
+| Download | **~7.8 MB** compressed (1 ref genome/organism); reuse existing `taxo.k2d` for the loader — no stub authored |
+| Bitmask vs Taxon-ID? | **Taxon-ID** for the project (zero code, validated, equal on the metrics that matter, §9); bitmask for fine-grained-parallel elegance (§10) |
+| Biggest risk | (1) any-bit FP if unique-hit rule omitted; (2) diverged strains outside panel; (3) full DB not L3-resident without subsampling |
 
 Original build/classify pipelines (`build_db.*`, `compact_hash.h`, `ResolveTree`) untouched;
 eskape mode is additive.
+
+---
+
+## 9. Bitmask vs Taxon-ID — evidence-based decision (2026-06-01)
+
+**The deciding measurement: cross-organism minimizer sharing = 0.23%** (§2). The first draft's
+case for the bitmask was *"a combined DB maximizes cross-organism sharing, so taxon-ID's LCA
+collapse is lossy."* The data refutes the premise — 99.77% of minimizers are unique to one
+organism, so the bitmask's only unique advantage (lossless multi-membership) applies to **0.23%
+of cells**. Both schemes ride on the same 99.77% unique minimizers.
+
+**Both schemes share the substrate:** identical 8,533,848 minimizers, identical
+`CompactHashTable`, identical `Get()`. The label (taxon id vs 6-bit mask) is a thin layer. So
+three of the four axes are ties:
+
+| Axis | Taxon-ID | Bitmask | Winner |
+|---|---|---|---|
+| **Data storage** | 61 MB (Cell40); ~5 value bits → 35 key bits | 61 MB (Cell40); 6 value bits → 34 key bits | **Tie.** Size = `distinct_mm × cell_size`; label-independent. Cell width (4 vs 5 B) is the only lever, open to both. |
+| **Cache utilization** | 61 MB hash + few-KB taxonomy (6-species taxo is KB, not the 8 GB DB's 1.75 MB) | 61 MB hash | **Tie.** Hash dominates; both spill 16 MB L3 identically. The real lever (subsample → 15 MB) is shared. |
+| **Speedup vs 8 GB** | same DB shrink; `ResolveTree` O(taxa²) over ≤~6 taxa/read = <1% | same shrink; `popcount`+6-int = cheaper post-lookup | **Near-tie.** `Get()` (≈80% CPU, DRAM-bound) is identical. Bitmask saves ~1–3%, visible only once not memory-bound (post-subsample). |
+| **Accuracy** | validated Kraken2 `ResolveTree`+confidence+min-hit-groups; +1 key bit → ~2× fewer collision FPs | custom `eskape_min_hits` unique-hit rule (unproven, needs tuning) | **Slight taxon-ID.** Same fundamentals (same minimizers); taxon-ID inherits validated thresholding + marginally cleaner keys. |
+
+Shared risk, identical for both: **within-Enterobacteriaceae false positives** — *E. coli* reads
+(18% of the baseline, §7) hitting *K. pneumoniae* / *E. cloacae* minimizers. Defended the same
+way in both schemes by the hit-count threshold.
+
+**Practical asymmetry that breaks the tie:** taxon-ID needs **zero new code** — stock `build_db`
++ a 6-species `seqid2taxid` map + an NCBI taxonomy (full taxdump, or a hand-built minimal
+`nodes.dmp`/`names.dmp`), then stock `classify` with a standard, validated, Bracken-compatible
+report directly comparable to the 8 GB baseline. The bitmask needs new, unproven C++ on both the
+build and classify sides plus its own validation.
+
+> **Recommendation:** for the project goal (prove a small DB fixes the DRAM-latency bottleneck),
+> **taxon-ID is the better engineering choice** — equal on the metrics that matter, validated
+> output, no code risk. The bitmask is the more elegant *end state* for a fixed presence/absence
+> panel, but with 0.23% sharing its concrete edge here is marginal (a ~1–3% post-lookup speedup
+> that only the fine-grained-parallel design in §10 can cash in). The 130× shrink and the
+> subsample-to-L3 win are **identical for both and orthogonal to this choice.**
+
+---
+
+## 10. l-mer-level (fine-grained) parallelism — which scales better?
+
+If parallelism moves from the current read/block level (`classify.cc:519`) down to the
+**per-minimizer** level (distribute the `Get()` lookups + their aggregation across threads), the
+two phases behave very differently:
+
+**Phase 1 — the lookup (`Get()` per l-mer): TIE.** `Get()` is `const`, lock-free, read-only
+(`compact_hash.h:258-280`); the table is never mutated during classify (`zone_locks_` are
+build-only, `:320-339`). Any number of threads look up concurrently with zero synchronization —
+*for both schemes, on the same table*. This is ~80% of CPU and **DRAM-latency bound**; parallelism
+helps by overlapping independent loads (memory-level parallelism), but that benefit is
+label-independent and capped by two ceilings that apply equally: **bandwidth saturates ~T10**
+(measured), and read-level threading already extracts most of the MLP. Finer granularity adds
+OpenMP dispatch overhead per ~100–300-cycle load; within-thread **prefetch batching**
+(`__builtin_prefetch` upcoming minimizers) is usually the better latency tool, and is also
+scheme-independent.
+
+**Phase 2 — the combine (aggregate l-mer results → call): BITMASK WINS.**
+
+| | Bitmask | Taxon-ID (default) |
+|---|---|---|
+| per-l-mer result | 6-bit mask | taxon id |
+| aggregation | OR / `popcount` into a **fixed 6-int array** | build `unordered_map` histogram |
+| cross-thread merge | per-thread `int[6]`, summed at end — **lock-free, zero contention, O(log T)** | map-merge in `#pragma omp critical` (`classify.cc:660`) + allocation |
+| final resolve | `popcount==1` tally + threshold | **`ResolveTree`** — O(taxa²) tree walk, data-dependent (`classify.cc:729-781`) |
+| reduction algebra | commutative + associative + fixed-width | tree-structured LCA + variable-size histogram |
+
+The bitmask's combine is the textbook parallel reduction; taxon-ID's default has a higher serial
+fraction (critical-section merge) and a tree resolution that doesn't parallelize cleanly.
+
+**Two honest bounds:**
+1. **Amdahl.** The combine is the minority of work; the dominant ~80% lookup is identical and
+   bandwidth-capped. So the bitmask's edge improves the cheaper part — modest, and *visible* only
+   after subsampling makes lookups cheap (L3-resident).
+2. **It's really "flat fixed histogram vs taxonomy-tree resolution," not "bitmask vs taxon."**
+   Give taxon-ID a flat 6-bucket per-species counter + threshold (skip `ResolveTree`) and it
+   reduces *the same way* — differing only on the 0.23% shared minimizers (flat-taxon collapses
+   K∩E to root and loses them; bitmask keeps {K,E}). The bitmask just bakes the flat scheme into
+   the data structure.
+
+> **Verdict (§10):** for fine-grained parallel classification the **bitmask scales the combine
+> best** (lock-free fixed-width reduction), stock-`ResolveTree` taxon-ID scales it worst, and
+> **flattened** taxon-ID ≈ bitmask. The lookup — the actual bottleneck — is identical in all
+> three. The real lesson: *keep the taxonomy tree out of the hot path*, which the bitmask enforces
+> structurally.
+
+---
+
+## 11. Worked Example — build & use the bitmask DB
+
+### 11.1 Build (conceptual CLI — `build_eskape_db` not yet written)
+```
+build_eskape_db -k 35 -l 31 -c 12200000 -C 40 -H eskape.k2d -o eskape.k2opts \
+  0:bit0_Efaecium_*.fna 1:bit1_Saureus_*.fna 2:bit2_Kpneumoniae_*.fna \
+  3:bit3_Abaumannii_*.fna 4:bit4_Paeruginosa_*.fna 5:bit5_Ecloacae_*.fna
+```
+`-c 12.2M` = 8.53M distinct ÷ 0.70 (§2). Loops over `(file, bit)` pairs; for each minimizer it
+ORs that organism's bit into the cell via `CompareAndSet` (modeled on `build_db.h:196-214`):
+```cpp
+hvalue_t existing = 0, newval = (1u << org_bit);
+while (! hash.CompareAndSet(m, newval, &existing))   // ≤2 iters
+    newval = (1u << org_bit) | existing;             // OR in what's already there
+```
+
+**Trace — a conserved minimizer `m2` in both K. pneumoniae (bit2=4) and E. cloacae (bit5=32),**
+**processed K before E:**
+```
+K.pneumoniae:  cell[m2] empty(0). CAS(m2,new=4,old=0): 0==old → populate. cell[m2]=4   (0b000100 {K})
+E.cloacae:     existing=0,newval=32. CAS(m2,32,&existing=0): cell=4≠0 → existing=4, false
+               loop: newval=(1<<5)|4=36. CAS(m2,36,&existing=4): cell=4==4 → populate.
+               cell[m2]=36  (0b100100 {K,E})
+```
+OR is commutative → order-independent → the parallel build is deterministic in result. Resulting
+cells (low 6 bits = mask; upper 34 = `MurmurHash3(m)>>30`):
+```
+ m1 | 000100 (=4)  | K.pneumoniae only        (unique)
+ m2 | 100100 (=36) | K.pneumoniae + E.cloacae (shared)
+ m3 | 010000 (=16) | P.aeruginosa only        (unique)
+ m4 | 111111 (=63) | all six (rRNA-like)      (universal)
+```
+Measured reality: of 8,533,848 cells, **~99.77% are single-bit** (popcount==1), **~19,858 (0.23%)
+multi-bit**. Output = `eskape.k2d` (~61 MB) + `eskape.k2opts` (k=35,l=31,revcom=1) — **no taxonomy
+file**. `GetKVStoreCellType` reads `34+6=40 → CompactHash40` on load (`kv_store.h:34-56`).
+
+### 11.2 Use (classify a sample)
+```
+classify --eskape --eskape-min-hits 3 -H eskape.k2d -o eskape.k2opts \
+         -t <any taxo.k2d, only to satisfy the loader> results/dorado/reads_sup.fastq
+```
+Per read, scan minimizers (same k/l) and `Get()` each → a mask or 0. **A real P. aeruginosa read
+(~200 minimizers):**
+```
+ Get() result | count | popcount | action
+   16 (P)     |  185  |   1      | UNIQUE → unique_hits[P.aeruginosa] += 185
+   48 (P|E)   |    8  |   2      | shared → confirmatory only, skip
+   63 (all)   |    2  |   6      | universal → skip
+    0 (miss)  |    5  |   -      | not in DB (seq error / single-ref gap)
+```
+Detection rule (replaces `ResolveTree`):
+```cpp
+hvalue_t v = hash->Get(m);
+if (v == 0 || v == 0x3F) continue;            // skip empty + universal
+if (__builtin_popcount(v) == 1) unique_hits[__builtin_ctz(v)]++;   // single organism
+// popcount > 1 → shared → confirmatory only
+```
+This read: `unique_hits[P.aeruginosa]=185 ≥ 3` → supports *P. aeruginosa*.
+
+**An E. coli read** (not in DB): nearly all minimizers → `Get()=0`; a few hit
+Enterobacteriaceae-conserved minimizers → `unique_hits[K]≈2` < 3 → **does not** falsely promote
+*K. pneumoniae*. The threshold is the false-positive guard, and matters most inside the
+Gram-negative groups (highest sharing).
+
+**Aggregate over ~105k reads → per-sample panel** (reproduces the §7 baseline from a ~61 MB DB,
+one `Get()`+`popcount` per minimizer, no taxonomy walk):
+```
+ E. faecium       0   NOT_DETECTED      A. baumannii     6   NOT_DETECTED
+ S. aureus        1   NOT_DETECTED      P. aeruginosa  high  DETECTED
+ K. pneumoniae  high  DETECTED          E. cloacae      28   NOT_DETECTED (trace)
+```
+
+**Mental model:** *build* = each organism paints its bit onto its minimizers (shared ones become
+multi-colored via OR); *use* = each read's minimizers vote, only single-color votes count, and an
+organism is called if it clears the hit threshold.
