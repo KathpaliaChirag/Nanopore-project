@@ -1,38 +1,31 @@
 # nanopore pipeline — ESKAPE pathogen profiling
 
-**chirag kathpalia** | research project under Prof. Kolin Paul
+**chirag kathpalia** | MTech CSE, IIT Delhi | research project under Prof. Kolin Paul
 
 ---
 
 ## what this project is about
 
-i'm working on making a clinical diagnostic pipeline faster and less memory-hungry.
-
-the pipeline identifies dangerous antibiotic-resistant bacteria (ESKAPE pathogens) from patient DNA samples. it currently works but has two big bottlenecks — one in the GPU basecalling step and one in the CPU classification step. my job is to profile both, find exactly where time is going, and build a caching layer that targets the bottlenecks.
-
-the pipeline looks like this:
+Making a clinical diagnostic pipeline faster and less memory-hungry. The pipeline identifies antibiotic-resistant ESKAPE pathogens from patient DNA samples. Two bottlenecks: GPU basecalling (dorado) and CPU classification (kraken2). The goal is to profile both deeply, find exactly where time goes, and build optimised caching layers targeting the bottlenecks.
 
 ```
 patient sample (blood / swab)
         ↓  DNA extraction + adapter ligation (wet lab)
 flow cell → POD-5 file (raw electrical signal, GBs)
-        ↓  dorado (GPU, neural network basecaller)
+        ↓  dorado (GPU, transformer neural network basecaller)
 BAM files (one per patient barcode — ATGC reads)
         ↓  samtools (format conversion)
 FASTQ files
-        ↓  kraken-2 (CPU, k-mer hash lookup)
+        ↓  kraken-2 (CPU, k-mer hash lookup against 8 GB database)
 species report → "patient has Pseudomonas aeruginosa"
 ```
 
-why these tools:
-- **dorado** — the sequencer outputs raw current readings (squiggles). dorado runs a transformer neural network to decode those into ATGC letters. can't skip it.
-- **kraken-2** — instead of aligning every read to every genome (too slow), it hashes 35-letter windows (k-mers) and looks them up in a prebuilt database. fast but memory-intensive.
+- **dorado** decodes raw nanopore current signals into ATGC via a transformer neural network. 82% of GPU time is GEMM (Tensor Cores, FP16). Can't skip it.
+- **kraken2** hashes 35-base sliding windows (k-mers) and looks them up in a prebuilt database. Fast but LLC miss rate is 80–82% on the 8 GB standard DB — structural DRAM-bound.
 
 ---
 
 ## the 6 ESKAPE pathogens
-
-these are the bacteria this pipeline is built to detect. each one is dangerous because it resists most or all available antibiotics.
 
 | pathogen | taxon ID | why it matters |
 |---|---|---|
@@ -45,351 +38,7 @@ these are the bacteria this pipeline is built to detect. each one is dangerous b
 
 ---
 
-## what i've done so far
-
-### 1. ran the full pipeline on real AIIMS patient data
-
-the input was `FBE01990_24778b97_03e50f91_10.pod5` — 4 GB, 104,478 reads from 12 barcodes (12 patient samples), from an AIIMS run. real clinical data.
-
-ran dorado in all 3 modes to benchmark speed vs accuracy:
-
-| mode | time (colab T4) | time (GTX 1650) | accuracy gain over prev |
-|---|---|---|---|
-| fast | 3 min 58s | ~5 min | baseline |
-| hac | 19 min 8s | ~71 min | +3–8% classified reads |
-| sup | 2h 5min | OOM on GTX 1650 | +0.1–1% |
-
-hac is the sweet spot. fast→hac gives meaningful improvement. hac→sup barely moves the needle and takes 6x longer.
-
-classified all 14 barcodes against our custom ESKAPE DB:
-- barcodes 01–07: Pseudomonas aeruginosa
-- barcodes 09–12: mixed Klebsiella pneumoniae + Enterococcus faecium
-- barcode 13: Enterococcus faecium
-- barcode 14: mixed
-
-### 2. built a custom ESKAPE kraken-2 database
-
-the standard kraken-2 DB is 180 GB — doesn't fit in RAM on most edge devices. i built a 650 MB custom DB with only the 6 ESKAPE reference genomes. runs on Colab's free tier. built in ~30 seconds.
-
-scripts for this are in `scripts/`.
-
-### 3. profiled both pipeline stages (baseline report delivered)
-
-**kraken-2 — 3-tool CPU profile (WSL2 + Minerva):**
-
-| tool | result |
-|---|---|
-| perf stat | **34.24% cache miss rate**, 301M misses, memory-bound verdict |
-| gprof | **67% of runtime in `CompactHashTable::Get()`** — 9.87M calls (later shown to be wrong — gprof misses kernel + I/O time) |
-| AMD uProf | **IPC = 0.55** (accurate — perf's cycle counter unreliable in WSL2/Hyper-V) |
-
-**dorado — Nsight Systems GPU profile (GTX 1650, fast mode):**
-
-| metric | value |
-|---|---|
-| GEMM % of GPU time | **82%** (Tensor Cores, FP16) |
-| cudaStreamSynchronize % of CUDA API time | **98.9%** |
-| memory transfers | minor — GPU is not memory-starved |
-
-verdict: compute-bound. full details in `docs/archive/report.md`.
-
-### 4. matrix multiply benchmark suite (cache blocking study)
-
-built 12 C implementations in `All_Matric_Mul_perf_stats/` to empirically study how cache access patterns and vectorisation interact with real hardware:
-
-| key finding | detail |
-|---|---|
-| naive_ijk vs tiled_avx2 | **29.7× slower** at N=1024, **48.2×** at N=2048 — gap widens with N |
-| omp_tiled at N=10000 | **2.1× faster than tiled_avx2** — tiling + 4 threads finally pays off at 2.4 GB working set |
-| prefetch_ikj paradox | lowest L3 miss% (1.23%) but 9.3× more instructions than ikj_order — software prefetch adds overhead when hardware prefetcher already covers sequential access |
-| tiled variants | sub-8× scaling (1024→2048) vs expected O(N³) 8× — tile size stays in L2 regardless of N |
-
-full results in `All_Matric_Mul_perf_stats/PERF_REPORT.md` (N=1024/2048/10000, 22 result files).
-
-### 5. lab server access + documentation
-
-access to two lab servers, both fully documented:
-
-| server | CPU | L3 | RAM | GPU | disk |
-|---|---|---|---|---|---|
-| **Minerva** | Xeon Gold 6330 (56c/112t @ 2GHz) | 66 MB | 251 GB | 2× A40 | **100% full** |
-| **Luna** | Xeon Platinum 8468 (96c/192t @ 3.8GHz) | **210 MB** | **503 GB** | **2× L40S** | 74% (236 GB free) |
-
-luna's `perf_event_paranoid = 1` confirmed — hardware counters (LLC-load-misses, stalled-cycles-backend, TMA) work for all users. matmul re-run on Luna will give accurate IPC for the first time.
-
-### 6. luna — kraken-2 full profiling analysis (2026-05-29)
-
-i ran the complete kraken-2 profiling suite on luna using real hardware counters (no Hyper-V noise). this covers all 3 basecalling models, TMA breakdown, warm vs cold cache, and a full thread scaling sweep from 2 to 192 threads with 5 runs per point.
-
----
-
-#### classification rate: fast vs hac vs sup
-
-```mermaid
-xychart-beta
-    title "Kraken-2 Classification Rate by Model (%)"
-    x-axis ["fast", "hac", "sup"]
-    y-axis "% reads classified" 70 --> 100
-    bar [82.66, 95.77, 97.09]
-```
-
-classification jumps hard from fast→hac (+13 pp) but barely moves from hac→sup (+1.3 pp). hac is the clinical sweet spot — that's where most real pathogen k-mers show up in reads. sup adds noise-level improvement at 6× the compute cost.
-
----
-
-#### ipc across models
-
-```mermaid
-xychart-beta
-    title "IPC by Basecalling Model (Luna, Kraken-2 hac/fast/sup)"
-    x-axis ["fast", "hac", "sup"]
-    y-axis "Instructions per cycle" 1.3 --> 1.8
-    bar [1.47, 1.58, 1.65]
-```
-
-sup has the best IPC — better reads produce k-mers that retire more useful instructions per cycle. the difference is real but modest (12%). all three sit well below the ~6 theoretical max because the bottleneck is memory, not compute.
-
----
-
-#### dram stall cycles per model
-
-```mermaid
-xychart-beta
-    title "DRAM Stall Cycles by Model (billions)"
-    x-axis ["fast", "hac", "sup"]
-    y-axis "Stall cycles (B)" 7 --> 12
-    bar [11.30, 8.34, 9.26]
-```
-
-fast spends the most cycles waiting on DRAM — lower-quality reads generate more diverse k-mers that miss the hash table less predictably. the root cause is identical for all three: the 8 GB database is 38× the 210 MB L3, so nearly every lookup goes to DRAM.
-
----
-
-#### where cpu time goes: tma slot breakdown
-
-```mermaid
-pie title "TMA Slot Breakdown — hac model (Luna)"
-    "Retiring (useful work)" : 26.9
-    "Memory Bound" : 25.4
-    "Core Bound" : 21.7
-    "Bad Speculation" : 16.9
-    "Frontend Bound" : 9.6
-```
-
-only 26.9% of cpu slots are doing real work. memory + core bound together = 47% — the cpu is idle for nearly half its time. bad speculation at 16.9% means 1 in 6 slots is wasted on squashed instructions. the 8 GB hash table directly causes the memory_bound slice; there's no fix that doesn't address the database size.
-
----
-
-#### tma comparison across all 3 models
-
-```mermaid
-xychart-beta
-    title "TMA Memory Bound % by Model"
-    x-axis ["fast", "hac", "sup"]
-    y-axis "Memory bound %" 20 --> 32
-    bar [28.1, 25.4, 26.2]
-```
-
-fast is the most memory-bound (28.1%) — lower quality reads require more hash lookups that miss. sup has the best retiring % (27.4%) but the TMA profiles are nearly identical across all three, confirming the bottleneck is the DB, not the reads.
-
----
-
-#### thread scaling: wall time (5-run avg, fast model)
-
-```mermaid
-xychart-beta
-    title "Kraken-2 Wall Time vs Thread Count (fast model, 5-run avg)"
-    x-axis ["2T", "4T", "8T", "16T", "32T", "64T", "96T", "128T", "192T"]
-    y-axis "Wall time (s)" 4 --> 13
-    bar [12.29, 8.18, 6.57, 5.74, 5.52, 5.68, 5.87, 5.97, 6.12]
-```
-
-the floor is ~5.5s no matter how many threads i add. kraken-2's own classification time drops from 7.4s (2T) to 0.72s (32T) — a real 10× speedup on the actual work — but ~4.8s of DB mmap page-fault overhead is single-threaded and unavoidable. beyond 32T, contention and cache thrashing push the time back up. i was running 96T — that's 6% slower than the 32T optimum and wastes 64 threads completely.
-
----
-
-#### thread scaling: ipc degradation
-
-```mermaid
-xychart-beta
-    title "IPC vs Thread Count (Kraken-2 fast, perf stat -r 5)"
-    x-axis ["2T", "4T", "8T", "16T", "32T", "64T", "96T", "128T", "192T"]
-    y-axis "IPC" 1.1 --> 1.95
-    line [1.73, 1.81, 1.78, 1.73, 1.60, 1.48, 1.46, 1.41, 1.28]
-```
-
-IPC peaks at 4T (1.81) then falls continuously to 1.28 at 192T — a 29% drop. more threads = more lock contention in the hash table, more cache line thrashing across cores, each thread spending more time blocked. at 192T every individual thread is doing less useful work per cycle than at 4T despite using 48× more hardware.
-
----
-
-#### thread scaling: stall % growth
-
-```mermaid
-xychart-beta
-    title "Stall % vs Thread Count (cycle_activity.stalls_total / cycles)"
-    x-axis ["2T", "4T", "8T", "16T", "32T", "64T", "96T", "128T", "192T"]
-    y-axis "Stall %" 38 --> 60
-    line [44.2, 42.2, 43.0, 44.4, 48.1, 51.5, 52.0, 52.8, 56.0]
-```
-
-stall % rises from 42% at 4T to 56% at 192T. the DRAM stall cycle count is nearly flat (~11B) from 8T onward — bandwidth is saturated at 8 threads and extra threads can't get more of it. what grows instead is contention stalls: pure overhead with zero classification benefit.
-
----
-
-#### summary: what luna confirmed that wsl2 couldn't
-
-| metric | wsl2 (unreliable) | luna (accurate) |
-|---|---|---|
-| IPC | 2.26 (wrong, Hyper-V clock) | **1.47–1.65** (real) |
-| LLC miss rate | not supported | **80–82%** (first real measurement) |
-| stall % | not available | **42–56%** depending on thread count |
-| TMA memory_bound | not available | **25–28%** of all slots |
-| optimal thread count | unknown | **32 threads** (not 96) |
-| DRAM saturation point | unknown | **8 threads** — bandwidth maxes out early |
-
----
-
-### 7. luna — flamegraph analysis: gprof was wrong (2026-05-29)
-
-i ran `perf record -g -F 99` on the hac model at 32 threads, then generated a flamegraph with FlameGraph tools. this is the first full-stack profile — it captures kernel time and I/O, which gprof cannot.
-
-**result: gprof's 67% claim for `CompactHashTable::Get()` was wrong.**
-
-gprof only samples user-space CPU time. it never sees the kernel, I/O syscalls, or page fault handlers. on native luna with perf, the real breakdown is:
-
----
-
-#### flamegraph: where wall time actually goes (hac, 32T)
-
-```mermaid
-pie title "Kraken-2 Wall Time Breakdown — perf flamegraph (hac, 32T)"
-    "MinimizerScanner::NextMinimizer (k-mer compute)" : 25.57
-    "read() syscall + ext4 + filemap (FASTQ I/O)" : 20.28
-    "[unknown] (missing debug symbols)" : 13.45
-    "CompactHashTable::Get (hash lookup)" : 12.10
-    "page faults on DB mmap" : 11.28
-    "other" : 17.32
-```
-
-| function | % | type | what it means |
-|---|---|---|---|
-| `MinimizerScanner::NextMinimizer` | **25.57%** | user CPU | k-mer extraction from reads — #1 hotspot |
-| `read()` syscall chain | **~20%** | kernel I/O | reading FASTQ file from ext4 |
-| `[unknown]` | 13.45% | missing symbols | kraken2 binary lacks debug info for this slice |
-| `CompactHashTable::Get` | **12.10%** | user CPU | hash table lookup — #2 user-space hotspot, not #1 |
-| `exc_page_fault` / `handle_mm_fault` | **~11%** | kernel | DB mmap cold-page faults — consistent with 82% LLC miss |
-| `AddHitlistString` | 1.34% | user CPU | writing output |
-
----
-
-#### the gprof error explained
-
-gprof reported 67% in `CompactHashTable::Get()` because:
-
-1. its denominator was user-space CPU time only — it excluded kernel time entirely
-2. I/O and page faults are kernel-mode — both are invisible to gprof
-3. so CompactHashTable::Get() looked dominant when it was really ~12% of wall time
-
-the real dominant hotspot is `MinimizerScanner::NextMinimizer` at 25.57% — k-mer computation, not hash lookups. additionally, ~20% of wall time is spent on ext4 I/O reading the FASTQ file, something gprof was completely blind to.
-
-**implication for the caching design:** a hot-k-mer LRU cache targeting hash lookups addresses ~12% of wall time (+ ~11% from page faults = ~23% if cache avoids both). reducing FASTQ I/O (e.g., tmpfs/ramdisk for the input file) could recover another ~20%. MinimizerScanner is CPU-bound and a separate optimisation target.
-
----
-
-### 8. luna — NUMA analysis: 16.3% wall time lost to cross-socket traffic (2026-05-29)
-
-luna has two physical CPU sockets, each with its own ~252 GB RAM bank. accessing local RAM costs distance 10; crossing the interconnect to the other socket costs distance 21 — **2.1× slower**. the kraken2 DB (8 GB) loaded into node 0's RAM on first use. with no pinning, linux places threads freely across both sockets — half of them cross the interconnect for every single hash lookup.
-
-```mermaid
-xychart-beta
-    title "NUMA Pinning Effect — Wall Time (hac, 32T, 5-run avg)"
-    x-axis ["default (no pin)", "node 0 pinned", "node 1 pinned"]
-    y-axis "Wall time (s)" 4.0 --> 5.5
-    bar [5.261, 4.405, 5.083]
-```
-
-| config | avg wall time | vs default |
-|---|---|---|
-| default (no pinning) | 5.261s | baseline |
-| node 0 pinned (`--cpunodebind=0 --membind=0`) | **4.405s** | **−16.3%** |
-| node 1 pinned (`--cpunodebind=1 --membind=1`) | 5.083s | −3.4% |
-
-node 0 is fastest because the DB is already there. node 1 is slightly better than default (no split-socket problem) but slower than node 0 because the FASTQ file cache is also on node 0, so reads still cross the interconnect.
-
-**combined optimisation so far — zero code changes:**
-
-| step | change | wall time | saving |
-|---|---|---|---|
-| baseline | 96 threads, no pinning | 5.635s | — |
-| thread scaling | 32 threads | 5.235s | −0.400s (7.1%) |
-| NUMA pinning | + numactl node 0 | 4.405s | −0.830s (15.8%) |
-| **total** | | **4.405s** | **−21.8%** |
-
-the optimised run command for all future profiling:
-```bash
-numactl --cpunodebind=0 --membind=0 \
-  kraken2 --db ~/data/kraken2_db --threads 32 ...
-```
-
----
-
-### 9. luna — NUMA perf stat + TMA: LLC miss rate unchanged, DRAM stalls halved (2026-05-29)
-
-ran perf stat and TMA breakdown across all 4 NUMA socket/memory configurations to isolate exactly what NUMA pinning changes at the hardware counter level.
-
-| config | IPC | LLC miss% | DRAM stalls (B) | stall% | memory_bound% | wall time |
-|---|---|---|---|---|---|---|
-| node0+node0 (local, best) | **1.86** | 83.1% | **6.44** | **42.1%** | **23.9%** | **4.45s** |
-| node1+node1 (local) | 1.82 | 81.8% | 8.28 | 43.3% | 26.5% | 5.04s |
-| cross-socket (either dir.) | 1.59–1.62 | 82–83% | **~12.2** | ~50% | **~31.7%** | 5.56–5.80s |
-| baseline 96T no pin | 1.58 | 80.9% | 9.89 | 50.2% | 25.4% | 5.63s |
-
-**LLC miss rate stays ~82% regardless of NUMA config** — pinning does not reduce the number of cache misses. the root cause (8 GB DB >> 210 MB L3) is structural and unchanged. what NUMA pinning does change:
-
-- DRAM stall cycles drop 47% (12.2B → 6.44B) — same misses, each one resolved faster from local DRAM
-- memory_bound% drops from 31.7% (cross) to 23.9% (local node0) — 7.8pp reduction purely from QPI latency
-- core_bound% drop (21.7% → 15.2%) is from thread count reduction (96T → 32T), not from NUMA
-- IPC improves 17.7% (1.58 → 1.86) — less time stalled = more useful work per cycle
-- retiring% improves to 30.7% — best ever measured for kraken2 on this system
-
----
-
-### 10. luna — gprof: 3-way comparison confirms perf flamegraph (2026-05-29)
-
-kraken2 recompiled with `-pg`. two binaries: `~/tools/kraken2-pg/kraken2-pg` (gprof) and `~/tools/kraken2/kraken2` (production, untouched). ran 1T (primary, clean) and 32T (secondary, partial).
-
-**gprof hac 1T flat profile (user-space only):**
-
-| % | function | what it does |
-|---|---|---|
-| **53.35%** | `MinimizerScanner::NextMinimizer` | k-mer extraction — #1 user-space hotspot |
-| **23.23%** | `CompactHashTable::Get` | hash table lookup |
-| 6.69% | `reverse_complement` | canonical k-mer strand selection |
-| 7.27% | `ClassifySequence` | per-read orchestration |
-
-**the three-way comparison is now complete:**
-
-| tool | platform | DB | MinimizerScanner | CompactHashTable |
-|---|---|---|---|---|
-| gprof (user-space only) | WSL2 Ryzen | 650 MB ESKAPE | not reported | **67%** |
-| gprof (user-space only) | Luna 1T | 8 GB standard | **53.35%** | **23.23%** |
-| perf flamegraph (full wall time) | Luna 32T | 8 GB standard | **25.57%** | **12.10%** |
-
-cross-validation: 23.23% of 18.6s user time = 2.43s = **10.6% of 22.8s wall** — matches flamegraph 12.10% exactly. the tools agree once you account for the denominator difference (user-space vs full wall time). this is the strongest proof that gprof's 67% on WSL2 was a denominator artifact, not a real measurement.
-
----
-
-## why these numbers matter
-
-the profiling results directly justify Kolin sir's caching design:
-
-**kraken-2 (CPU):** a hot k-mer LRU cache keeps recently-seen k-mers in fast memory. clinical samples have dominant species — the same k-mers repeat heavily. each cache hit saves one ~100 ns RAM lookup. at 301 million misses per run, even a 20% hit rate saves ~6 seconds.
-
-**dorado (GPU):** a signal-to-base (S2B) cache in CUDA shared memory skips the neural network forward pass for signal windows similar to ones already decoded. GEMM is 82% of GPU time — a 30% cache hit rate would save ~25% of total GPU time. the cache lookup must happen GPU-side (CUDA shared memory + LSH) and must be faster than one GEMM call (~19.6 ms avg).
-
----
-
-## hardware i'm running on
+## hardware
 
 **local machine:**
 
@@ -400,7 +49,7 @@ the profiling results directly justify Kolin sir's caching design:
 | GPU | NVIDIA GTX 1650, 4 GB VRAM |
 | OS | Windows 11 + WSL2 (Ubuntu 24.04) |
 
-WSL2 note: Hyper-V blocks LLC-specific perf counters. perf also needs to be built from source for the Microsoft WSL2 kernel (linux-tools-generic doesn't cover it). full build instructions in `docs/knowledge_base.md §15.3`.
+WSL2 caveat: Hyper-V throttles the CPU cycle counter to ~7–23% of real rate. IPC is inflated 4–14×. Cache miss counts are real; IPC and stall% are not. All authoritative numbers come from Luna native hardware counters.
 
 **lab servers:**
 
@@ -409,92 +58,520 @@ WSL2 note: Hyper-V blocks LLC-specific perf counters. perf also needs to be buil
 | **Minerva** | Xeon Gold 6330 (Ice Lake) | 56c/112t @ 2 GHz | 66 MB | 251 GB | 2× A40 (45 GB) | **100% full** |
 | **Luna** | Xeon Platinum 8468 (Sapphire Rapids) | 96c/192t @ 3.8 GHz | **210 MB** | **503 GB** | **2× L40S (46 GB)** | 74% (236 GB free) |
 
-Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all users. Luna is the primary server for future benchmarks. Minerva disk is full — no new data can be written.
+Luna has `perf_event_paranoid=1` — full hardware counters, TMA, all available for all users. Minerva disk is full — cannot store new data.
+
+→ side-by-side comparison: [docs/Luna_vs_Minerva.md](docs/Luna_vs_Minerva.md)
+
+---
+
+## 1. full pipeline run on real AIIMS data
+
+input: `FBE01990_24778b97_03e50f91_10.pod5` — 4 GB, 104,478+ reads from 12 barcodes (12 patient samples), real AIIMS clinical run.
+
+dorado benchmarked in all 3 modes:
+
+| mode | time (Colab T4) | time (GTX 1650) | classification rate |
+|---|---|---|---|
+| fast | 3 min 58s | ~5 min | 82.66% |
+| hac | 19 min 8s | ~71 min | 95.77% |
+| sup | 2h 5min | OOM | 97.09% |
+
+hac is the clinical sweet spot. fast→hac gains 13 pp classification; hac→sup gains only 1.3 pp at 6× the compute cost.
+
+barcodes classified against custom ESKAPE DB:
+- barcodes 01–07: Pseudomonas aeruginosa
+- barcodes 09–12: Klebsiella pneumoniae + Enterococcus faecium (mixed)
+- barcode 13: Enterococcus faecium
+- barcode 14: mixed
+
+---
+
+## 2. custom ESKAPE kraken2 database
+
+standard kraken2 DB = 180 GB. built a 650 MB custom DB with only the 6 ESKAPE reference genomes — 277× compression. runs on Colab free tier. builds in ~30 seconds. scripts in `scripts/`.
+
+---
+
+## 3. dorado GPU profile (GTX 1650, fast mode, Nsight Systems)
+
+| metric | value |
+|---|---|
+| GEMM % of GPU time | **82%** (Tensor Cores, FP16 — 68.5% from 128×64 kernel + 13.5% from 128×128) |
+| cudaStreamSynchronize % of CUDA API time | **98.9%** (27,283 calls, avg 56.6 ms — CPU idle while GPU works) |
+| H2D transfer | minor — GPU is compute-bound, not memory-starved |
+| verdict | compute-bound — the transformer neural network is the bottleneck |
+
+a Signal-to-Base (S2B) cache skipping the NN forward pass for similar signal windows at 30% hit rate would save ~25% of total GPU time. cache lookup must happen GPU-side in CUDA shared memory and be faster than one GEMM call (~19.6 ms avg).
+
+Dorado profiling on Luna L40S (nsys + ncu) is pending — Step 13.
+
+→ full narrative: [docs/archive/report.md](docs/archive/report.md) | template: [Luna/profiling/results_dorado.md](Luna/profiling/results_dorado.md)
+
+---
+
+## 4. matrix multiply benchmark suite
+
+built 12 CPU implementations and 7 GPU CUDA kernels to empirically study how cache access patterns, vectorisation, and parallelism interact on real hardware across 3 platforms.
+
+→ full CPU report: [Luna/profiling/matmul/report/REPORT.md](Luna/profiling/matmul/report/REPORT.md) | WSL2 data: [All_Matric_Mul_perf_stats/PERF_REPORT.md](All_Matric_Mul_perf_stats/PERF_REPORT.md)
+
+### 4a. CPU variants
+
+12 double-precision implementations tested at N = 1024, 2048, 10000 on WSL2 and Luna.
+
+**WSL2 wall time (N=1024, best to worst):**
+
+| variant | time (ms) | vs naive | strategy |
+|---|---|---|---|
+| `naive_ijk` | 9,961 | 1× | worst — sequential column access, every load L3 miss |
+| `tiled_avx2` | 335 | **29.7×** faster | tiles in L2, AVX2 FMA — best single-thread at N=1024 |
+| `avx2_manual` | 324 | 30.7× faster | — |
+| `omp_tiled` | 579 | — | best overall at N=10000 (2.4 GB set) |
+| `prefetch_ikj` | 961 | **9.3× more insns** than ikj_order, 2.2× **slower** | software prefetch hurts sequential access |
+
+**gap grows with N:** naive_ijk is **29.7× slower** at N=1024, **48.2× slower** at N=2048 vs tiled_avx2. The tiling advantage compounds as the working set grows.
+
+**Luna CPU N=10000 (single-thread, authoritative):**
+
+| variant | Luna time (s) | IPC | L3 miss rate |
+|---|---|---|---|
+| `naive_ijk` | >4 hours (projected) | — | — |
+| `tiled` | **135.7** | 2.22 | 32.3% |
+| `tiled_avx2` | 168.4 | 3.20 | 14.4% |
+| `ikj_order` | 552.1 | 0.36 | 92.3% |
+
+### 4b. Luna TMA — the real microarchitecture story
+
+```mermaid
+xychart-beta
+    title "L3-Bound % of Pipeline Slots (Luna TMA)"
+    x-axis ["naive N=1024", "naive N=2048", "tiled_avx2 N=1024", "tiled_avx2 N=2048", "omp_tiled N=10000"]
+    y-axis "% L3-bound" 0 --> 90
+    bar [85.4, 85.9, 1.0, 0.8, 4.5]
+```
+
+**85.4% of naive_ijk pipeline slots stall on L3 misses.** Tiling drops this to 0.8–1.0% — tiles fit in L2, L3 is almost never touched. ILP doubles from 3.6 → 8.0+ (Sapphire Rapids' 8 uop/cycle saturation).
+
+| variant | L3-bound % | ILP | verdict |
+|---|---|---|---|
+| naive_ijk | **85.4%** | 3.6 | memory-bound — L3 latency dominates |
+| tiled_avx2 | **0.8–1.0%** | 8.0+ | FMA-bound — pipeline fully saturated |
+| omp_tiled N=10000 | 4.5% | — | DRAM-bound — 4 threads saturate the bus |
+
+### 4c. Luna GPU — L40S Ada Lovelace
+
+7 CUDA variants at N = 1024, 2048, 4096, 10000. Single precision (FP32/TF32/FP16).
+
+| variant | N=10000 time (ms) | GFLOPS | % of dense peak | notes |
+|---|---|---|---|---|
+| `coalesced_gpu` | 5,209 | 384 | low | **slower than naive** — 1D block kills SM occupancy |
+| `naive_gpu` | — (skipped) | ~5,600 | — | ~24s at N=4096 |
+| `shared_tiled` | 338 | 5,915 | 6.5% FP32 | shared memory tiling |
+| `shared_tiled_2d` | 68 | 29,399 | **32% FP32** | register blocking + 2D tiles |
+| `wmma_manual_fp16` | 40 | 50,001 | **14% FP16** | manual Tensor Cores — cuBLAS 3× faster |
+| `cublas_sgemm` | 45 | 44,475 | **49% FP32** | vendor FP32 library |
+| `cublas_tensor_tf32` | **16.27** | **122,923** | **67% TF32** | **peak: 123 TFLOPS** |
+
+L40S theoretical peaks (dense): 91.6 TFLOPS FP32 · 183 TFLOPS TF32 · 362 TFLOPS FP16.
+
+```mermaid
+xychart-beta
+    title "GPU GFLOPS at N=10000 (NVIDIA L40S)"
+    x-axis ["coalesced", "shared_tiled", "shared_tiled_2d", "cublas_sgemm", "cublas_tensor_tf32", "wmma_manual"]
+    y-axis "GFLOPS" 0 --> 130000
+    bar [384, 5915, 29399, 44475, 122923, 50001]
+```
+
+### 4d. GPU vs CPU speedup (N=10000)
+
+vs Luna CPU best single-thread (tiled, 135.7 s):
+
+```mermaid
+xychart-beta
+    title "GPU Speedup vs Luna CPU best single-thread (N=10000)"
+    x-axis ["shared_tiled", "shared_tiled_2d", "cublas_sgemm", "wmma_manual", "cublas_tensor_tf32"]
+    y-axis "Speedup (×)" 0 --> 9000
+    bar [401, 1995, 3017, 3393, 8342]
+```
+
+`cublas_tensor_tf32` is **~8,342×** faster than the best CPU single-thread implementation. Even the worst non-naive GPU variant (coalesced, 5,209 ms) beats CPU by ~26×. Dense linalg is four orders of magnitude better on GPU.
+
+### 4e. key lessons for kraken2
+
+| property | dense matmul | kraken2 lookup |
+|---|---|---|
+| access pattern | sequential, predictable | random pointer chasing |
+| working set | fits in cache with tiling | 8 GB DB >> any cache |
+| SIMD/GPU port? | **8,300× GPU speedup** | <2× even in research papers |
+| software prefetch | **hurts** — HW already handles sequential | **helps** — HW can't predict random |
+
+this is why the NN-prefetcher targets the only meaningful axis: learning to predict otherwise-unpredictable probe slots. `prefetch_ikj`'s negative result proves the argument — prefetch hurts when access is regular, and helps when it's irregular. matmul is regular. kraken2 isn't.
+
+---
+
+## 5. lab server access + documentation
+
+both servers fully documented with user guides, install procedures, and profiling results.
+
+→ Luna: [Luna/](Luna/) | Minerva: [Minerva/](Minerva/)
+
+---
+
+## 6. kraken2 profiling: Luna (Steps 3–12)
+
+input: standard 8 GB DB (`k2_standard_08gb_20240112`), 104,918 reads (hac FASTQ), Luna with `perf_event_paranoid=1`.
+
+→ complete data tables: [Luna/profiling/results_kraken2.md](Luna/profiling/results_kraken2.md)
+
+### 6a. classification rates
+
+```mermaid
+xychart-beta
+    title "Kraken-2 Classification Rate by Model (%)"
+    x-axis ["fast", "hac", "sup"]
+    y-axis "% reads classified" 70 --> 100
+    bar [82.66, 95.77, 97.09]
+```
+
+fast→hac: +13 pp. hac→sup: +1.3 pp at 6× the compute cost. hac is the clinical sweet spot.
+
+### 6b. perf stat: all 3 models (96 threads)
+
+| metric | fast | hac | sup |
+|---|---|---|---|
+| IPC | 1.47 | **1.58** | **1.65** |
+| LLC miss rate | 82.0% | 81.9% | 82.0% |
+| stall % | **51.8%** | 48.7% | 48.5% |
+| DRAM stalls (B cycles) | **11.3B** | 8.34B | 9.26B |
+| wall time | 5.84s | 5.0s | 5.63s |
+
+LLC miss rate is 80–82% regardless of model — the 8 GB DB is 38× the 210 MB L3. structural. no thread count or NUMA fix will change the miss rate. IPC of 1.47–1.65 against theoretical max of ~6 = CPU at 24–27% efficiency.
+
+### 6c. TMA breakdown (hac model)
+
+```mermaid
+pie title "TMA Slot Breakdown — hac model (Luna)"
+    "Retiring (useful work)" : 26.9
+    "Memory Bound" : 25.4
+    "Core Bound" : 21.7
+    "Bad Speculation" : 16.9
+    "Frontend Bound" : 9.6
+```
+
+only 26.9% of pipeline slots do real work. memory + core bound = 47%. bad speculation = 16.9% (1 in 6 slots squashed). all 3 models have nearly identical TMA profiles — bottleneck is the DB size, not read quality.
+
+### 6d. thread scaling (fast model, 5-run avg)
+
+```mermaid
+xychart-beta
+    title "Kraken-2 Wall Time vs Thread Count (fast model, 5-run avg)"
+    x-axis ["2T", "4T", "8T", "16T", "32T", "64T", "96T", "128T", "192T"]
+    y-axis "Wall time (s)" 4 --> 13
+    bar [12.29, 8.18, 6.57, 5.74, 5.52, 5.68, 5.87, 5.97, 6.12]
+```
+
+floor is ~5.5s no matter how many threads. kraken2 classification time drops 7.4s→0.72s (10× speedup) from 2T→32T — the actual work parallelises well. but ~4.8s of DB mmap page-fault overhead is single-threaded and unavoidable. beyond 32T: contention and cache thrashing push time back up.
+
+```mermaid
+xychart-beta
+    title "IPC vs Thread Count (Kraken-2 fast, perf stat -r 5)"
+    x-axis ["2T", "4T", "8T", "16T", "32T", "64T", "96T", "128T", "192T"]
+    y-axis "IPC" 1.1 --> 1.95
+    line [1.73, 1.81, 1.78, 1.73, 1.60, 1.48, 1.46, 1.41, 1.28]
+```
+
+IPC peaks at 4T (1.81) then falls to 1.28 at 192T — a 29% drop. more threads = more lock contention + cache line thrashing. at 192T each thread does less useful work per cycle than at 4T despite using 48× more hardware.
+
+stall % rises from 42% at 4T to 56% at 192T. DRAM stall cycles plateau at ~11B from 8T — bandwidth is saturated by 8 threads and extra threads can't get more of it.
+
+**optimal: 32 threads for all 3 models.**
+
+### 6e. flamegraph (perf, not gprof) — gprof was wrong
+
+ran `perf record -g -F 99` on hac at 32T — first full-stack profile, captures kernel + I/O.
+
+```mermaid
+pie title "Kraken-2 Wall Time Breakdown — perf flamegraph (hac, 32T)"
+    "MinimizerScanner::NextMinimizer (k-mer compute)" : 25.57
+    "read() syscall + ext4 + filemap (FASTQ I/O)" : 20.00
+    "[unknown] (missing debug symbols)" : 13.45
+    "CompactHashTable::Get (hash lookup)" : 12.10
+    "page faults on DB mmap" : 11.00
+    "other" : 17.88
+```
+
+(I/O and page fault shares are approximate from flamegraph sampling; exact fractions vary run to run.)
+
+**gprof's 67% claim for CompactHashTable::Get was a denominator error.** gprof only counts user-space time; its denominator excludes all kernel/I/O time. the real #1 hotspot is MinimizerScanner::NextMinimizer at 25.57%.
+
+| tool | platform | CompactHashTable | MinimizerScanner |
+|---|---|---|---|
+| gprof (WSL2, ESKAPE DB) | user-space only | **67%** | not reported |
+| gprof (Luna 1T, 8 GB DB) | user-space only | **23.23%** | **53.35%** |
+| perf flamegraph (Luna 32T) | **full wall time** | **12.10%** | **25.57%** |
+
+cross-validation: gprof 23.23% × 18.6s user = 2.43s = **10.6% of 22.8s wall** — matches flamegraph exactly. the tools agree once you account for the denominator.
+
+→ flamegraph SVG: [Luna/profiling/flamegraph_hac_32t.svg](Luna/profiling/flamegraph_hac_32t.svg)
+
+### 6f. NUMA analysis (Step 7–9)
+
+luna has 2 physical CPU sockets. local DRAM cost = distance 10, cross-socket = distance 21 (2.1× penalty). DB loads into node 0's RAM on first use.
+
+```mermaid
+xychart-beta
+    title "NUMA Pinning Effect — Wall Time (hac, 32T, 5-run avg)"
+    x-axis ["default (no pin)", "node 0 pinned", "node 1 pinned"]
+    y-axis "Wall time (s)" 4.0 --> 5.5
+    bar [5.261, 4.405, 5.083]
+```
+
+node 0 pinning saves **16.3%** wall time with zero code changes.
+
+what changes at the hardware counter level:
+
+| metric | cross-socket (default) | node 0 local | change |
+|---|---|---|---|
+| IPC | 1.58–1.62 | **1.86** | +17.7% |
+| DRAM stall cycles | ~12.2B | **6.44B** | −47% |
+| memory_bound % | ~31.7% | **23.9%** | −7.8 pp |
+| LLC miss rate | 82–83% | **83.1%** | unchanged |
+
+LLC miss rate stays ~82% regardless of NUMA config — pinning reduces miss **latency**, not miss **count**. the root cause (DB >> L3) is structural.
+
+→ full NUMA data: [Luna/profiling/results_kraken2.md § Step 7–9](Luna/profiling/results_kraken2.md)
+
+### 6g. gprof on Luna: 3-way comparison closes the loop (Step 10)
+
+recompiled kraken2 with `-pg`, ran 1T (clean, comparable) and 32T (partial).
+
+**gprof 1T flat profile (user-space only):**
+
+| % time | calls | function |
+|---|---|---|
+| **53.35%** | 351,893,601 | MinimizerScanner::NextMinimizer |
+| **23.23%** | 11,634,763 | CompactHashTable::Get |
+| 7.27% | — | ClassifySequence |
+| 6.69% | 352,208,243 | reverse_complement |
+
+**why WSL2 gprof showed 67% but Luna gprof shows 23.23% for Get():**
+- different database (650 MB ESKAPE vs 8 GB standard) — different proportion of work per read
+- different CPU speed — Xeon 8468 runs MinimizerScanner faster in absolute terms, making it proportionally larger
+
+**why gprof Luna (23.23%) differs from perf Luna (12.10%):**
+different denominator — gprof uses user-space time (18.6s), perf uses wall time (22.8s). scaled: 23.23% × 18.6s = 2.43s = 10.6% of wall time. consistent.
+
+### 6h. valgrind cachegrind: per-function DRAM attribution (Step 11)
+
+ran `valgrind --tool=cachegrind --trace-children=yes` at 1T. 362s wall (~20× overhead). simulated 104 MB L3, 64B lines.
+
+**program-wide:** 99.96B instructions, 43.88B data refs, **9.58M last-level read misses** (the 9.58M × ~100ns = ~0.96s serialised DRAM latency at 1T).
+
+| function | instructions % | LL read miss % | meaning |
+|---|---|---|---|
+| MinimizerScanner::NextMinimizer | **48.23%** | **0%** | pure compute — zero DRAM reads |
+| reverse_complement | 11.63% | **0%** | pure compute |
+| **CompactHashTable::Get** | **0.65%** | **96.24%** | owns virtually all DRAM reads |
+| ClassifySequence | 11.51% | 0.00% | orchestration |
+| AddHitlistString | 4.28% | 0.08% | output |
+| memset/memmove | ~5.6% | ~39-57% | buffer ops |
+
+**CompactHashTable::Get executes 0.65% of all instructions but generates 96.24% of all last-level cache read misses.** every other function combined causes 3.76% of DRAM reads.
+
+why: the hash table is 8 GB. L3 is 104 MB. ratio = 77:1. with 104,918 reads × ~11 minimizers each, and the DB 77× too large, virtually every lookup is a cold DRAM access.
+
+this splits the picture cleanly:
+- **MinimizerScanner** (48% of instructions): CPU-bound, compute-limited, zero DRAM. target for SIMD.
+- **CompactHashTable::Get** (0.65% of instructions): memory-bound, 96% of DRAM. target for LRU cache.
+
+→ full cachegrind analysis: [Luna/profiling/results_kraken2.md § Step 11](Luna/profiling/results_kraken2.md)
+
+### 6i. FASTQ on tmpfs — no benefit (Step 12)
+
+hypothesis: the flamegraph's ~20% I/O tower is disk I/O. copying FASTQ to `/dev/shm` would eliminate ext4 and save ~0.88s.
+
+result: **no benefit** (−0.010s, noise).
+
+| config | wall time |
+|---|---|
+| SSD warm (baseline) | 4.405s |
+| tmpfs warm | 4.395s (−0.2%, noise) |
+| cold SSD (after drop_caches) | 10.894s (+6.49s) |
+
+why: luna has 503 GB RAM. the 703 MB FASTQ has been in the OS page cache since the first run and was never evicted. the SSD baseline was already reading from DRAM. the flamegraph's I/O tower is `copy_page_to_iter` — a memory-to-memory copy from page cache to process buffer that exists regardless of filesystem. eliminating it requires mmap() or O_DIRECT (both need Kraken2 source changes).
+
+→ full write-up: [Luna/experiments/tmpfs_fastq/README.md](Luna/experiments/tmpfs_fastq/README.md)
+
+### 6j. cumulative optimisation ladder (zero code changes)
+
+| step | change | wall time | cumulative saving |
+|---|---|---|---|
+| baseline | 96T, no pinning | 5.635s | — |
+| thread scaling | 32 threads | 5.235s | −7.1% |
+| NUMA pinning | + numactl node 0 | **4.405s** | **−21.8%** |
+
+best run command for all future profiling:
+```bash
+numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/data/kraken2_db --threads 32 \
+  --report report.txt --output /dev/null reads.fastq
+```
+
+---
+
+## 7. WSL2 vs Luna — what Luna corrected
+
+| metric | WSL2 | Luna | what it means |
+|---|---|---|---|
+| IPC | 2.26 (wrong, Hyper-V) | **1.47–1.65** | CPU at 24–27% efficiency |
+| LLC miss rate | not supported | **80–82%** | every lookup goes to DRAM |
+| stall % | not available | **42–56%** | half the cycles are wasted |
+| TMA memory_bound | not available | **25–28%** | memory is bottleneck #1 |
+| optimal threads | unknown | **32** (not 96) | 64 threads were wasted |
+| DRAM saturation point | unknown | **8 threads** | extra threads don't get more bandwidth |
+| top hotspot (gprof) | CompactHashTable::Get **67%** | MinimizerScanner **25.57%**, I/O **~20%**, Get **12.10%** | gprof was blind to kernel |
+
+---
+
+## 8. kraken2 optimisation design: 10 patches
+
+baseline: **4.405s**. target: ≤ 2.6s (−41%).
+
+| patch | mechanism | independent Δ | cumulative |
+|---|---|---:|---:|
+| 3 — compile flags | `-march=sapphirerapids -flto -funroll-loops` | −8% | 4.05s |
+| 2 — huge pages | `MADV_HUGEPAGE` on DB mmap, reduces dTLB misses | −5% | 3.85s |
+| 1 — probe prefetch | `__builtin_prefetch` one cache line ahead in Get() loop | −10% | 3.47s |
+| 4 — thread-local LRU | 16K-entry direct-mapped cache (256 KB, fits L2), Fibonacci hash | −20% | 2.77s |
+| 6 — devirtualise | `final` on Get() + concrete dispatch, drops vtable hop | −3% | 2.69s |
+| 7 — single MurmurHash | `GetByHash` overload reuses hash between skip check + lookup | −2% | 2.66s |
+| 8 — ResolveTree O(N²→N) | precompute ancestor sets, drops quadratic walk per read | −4% | 2.55s |
+| 9 — skip /dev/null output | no ostringstream work when output is suppressed | −1.5% | 2.51s |
+| 10 — batched Get() | gather N minimizers, issue all N prefetches then resolve all N | speculative | TBD |
+
+**v1 target (Patches 1–5):** ≤ 3.0s (−32%). **v2 stretch (+ Patches 6–9):** ≤ 2.6s (−41%).
+
+**Patch 4** (thread-local LRU cache) is Kolin sir's design: clinical samples have dominant species — the same k-mers repeat heavily across reads. cachegrind confirms 5.62M DRAM reads at 1T from CompactHashTable::Get. at 20% hit rate on 32T that's ~36M fewer DRAM lookups per run. each hit saves ~100 ns. the cache (16K entries × 16 bytes = 256 KB) fits entirely in L2 per core on Sapphire Rapids — no DRAM pressure from the cache itself.
+
+patch 1 (`__builtin_prefetch`) is already implemented. see `Luna/experiments/kraken2_opt_v1.patch`.
+
+stop rule: two consecutive patches each < 2% delta → diminishing returns, stop.
+
+→ v1 patches (source-verified): [docs/reports/kraken2_get_optimizations.md](docs/reports/kraken2_get_optimizations.md)
+→ v2 patches: [docs/reports/kraken2_get_optimizations_v2.md](docs/reports/kraken2_get_optimizations_v2.md)
+→ optimisation report: [docs/reports/kraken2_optimisation_report.md](docs/reports/kraken2_optimisation_report.md)
+
+---
+
+## 9. neural prefetcher direction
+
+Kolin sir's broader proposal: replace the static `__builtin_prefetch` in Patch 1 with a mini neural network that learns to predict which hash bucket will be accessed next.
+
+CompactHashTable::Get starts a probe at `MurmurHash3(k-mer) % capacity`. the probe position is determined by the k-mer value — not predictable by the hardware prefetcher. a learned model observing the sequence of k-mer hashes could predict the next starting slot.
+
+target accuracy: 60–70% correct prefetches. at 60%, most of the 5.62M DRAM stalls on the first probe of each Get() are eliminated. the predictor must be cheaper than the ~100 ns DRAM stall it's hiding.
+
+current state: Patch 1 (`__builtin_prefetch`, prefetches the next cache line in the probe chain) is designed and patch-ready. the NN predictor is the next evolution — it predicts the starting bucket rather than just the next probe step.
+
+the matmul `prefetch_ikj` negative result validates the argument: **prefetch hurts regular access, helps irregular access**. matmul B-row access is stride-1 (hardware handles it). kraken2 hash table access is random (hardware can't predict it). NN-guided prefetch is the only lever left.
+
+---
+
+## 10. what's next
+
+**profiling (Luna) — immediate:**
+- Step 13: Dorado GPU profiling on L40S with nsys + ncu — template at `Luna/profiling/results_dorado.md`
+
+**profiling (Luna) — upcoming:**
+- DRAM bandwidth utilisation: actual GB/s consumed vs IMC peak via uncore events
+- `perf c2c` — cache-to-cache false sharing (explains IPC drop past 32T)
+- instruction mix: is MinimizerScanner auto-vectorised? (`objdump`, 2 min, no run needed)
+- k-mer reuse measurement: validate LRU cache ROI on reads_hac.fastq (Python script)
+- `perf annotate` with debug symbols — source-line hotspots inside CompactHashTable::Get
+
+**implementation:**
+- run baseline measurements M1–M7 (cell type, load factor, dTLB rate, DRAM bandwidth ratio, k-mer reuse, false sharing, vectorisation status) — these gate which patches apply
+- apply Patch 3 (flags) → measure → Patch 2 (huge pages) → measure → Patch 1 (prefetch) → measure → Patch 4 (LRU)
+- always run at **32T + numactl node0** (21.8% already free)
+
+**AMX matmul (Luna-exclusive):**
+- Xeon Platinum 8468 has Intel AMX (Advanced Matrix Extensions) — hardware tile matrix multiply
+- compare AMX vs tiled_avx2 vs cublas_tensor_tf32 on L40S
 
 ---
 
 ## repo structure
 
 ```
-├── README.md                    ← this file
+├── README.md                          ← this file
 ├── docs/
-│   ├── plan.md                  ← research plan and next steps
-│   ├── updates.md               ← chronological session log
-│   ├── meeting_minutes.md       ← notes from meetings with mam and Kolin sir
-│   ├── knowledge_base.md        ← deep-dive notes on everything (§0–§21)
-│   ├── Luna_vs_Minerva.md       ← side-by-side hardware comparison of both lab servers
-│   ├── reports/
-│   │   ├── final_report.md      ← single consolidated report — all numbers, meeting-ready
-│   │   ├── summary.md           ← quick reference — what goes in, what comes out
-│   │   ├── tables_and_graphs.md ← all stats with Mermaid pie/bar charts (renders on GitHub)
-│   │   ├── tables_and_graphs_basic.md ← same stats, plain ASCII bars (works everywhere)
-│   │   ├── kraken2_optimisation_report.md
-│   │   ├── kraken2_get_optimizations.md / _v2.md
-│   │   └── kraken2_execution_checklist.md
-│   ├── archive/
-│   │   ├── report.md            ← full narrative report with commands + failures (historical)
-│   │   ├── report1.md           ← original 2-page profiling report (historical)
-│   │   └── plan_old.md          ← superseded plan
-│   └── resources/
-│       └── profiling_from_zero_*.pdf  ← 5 reference PDFs
-├── All_Matric_Mul_perf_stats/   ← matrix multiply benchmark suite (WSL2 perf stat)
-│   ├── PERF_REPORT.md           ← full results: N=1024/2048/10000, cache analysis
-│   ├── README.md                ← build/run instructions
+│   ├── plan.md                        ← research plan
+│   ├── updates.md                     ← chronological session log
+│   ├── meeting_minutes.md             ← notes from meetings with Kolin sir
+│   ├── knowledge_base.md              ← deep-dive notes on everything (§0–§21)
+│   ├── Luna_vs_Minerva.md             ← side-by-side hardware comparison
+│   └── reports/
+│       ├── final_report.md            ← consolidated meeting-ready report
+│       ├── summary.md                 ← quick reference
+│       ├── tables_and_graphs.md       ← all stats with Mermaid charts
+│       ├── tables_and_graphs_basic.md ← same, plain ASCII bars
+│       ├── kraken2_optimisation_report.md
+│       ├── kraken2_get_optimizations.md    ← v1 patches 1–5 (source-verified)
+│       ├── kraken2_get_optimizations_v2.md ← v2 patches 6–10
+│       └── kraken2_execution_checklist.md
+├── All_Matric_Mul_perf_stats/         ← matrix multiply benchmark suite (WSL2 perf stat)
+│   ├── PERF_REPORT.md                 ← WSL2 results: N=1024/2048/10000, 22 result files
+│   ├── README.md
 │   ├── Makefile
-│   ├── *.c                      ← 12 implementations (naive_ijk through prefetch_ikj)
-│   ├── run_N10000.sh / run_wsl_perf.sh / run_cache_hierarchy.sh
-│   └── perf_results/N10000/     ← raw perf stat output for all 11 binaries
-├── Minerva/                     ← minerva server docs (Xeon Gold 6330, 2× A40)
-│   ├── minerva_stats.md         ← CPU/RAM/GPU/disk/tool inventory
-│   ├── install_tools.md         ← tool install commands (needs sudo)
-│   ├── user_guide.md            ← user management (create/restrict accounts)
-│   ├── internet_access.md
-│   └── profiling/
-│       ├── plan.md              ← Minerva profiling plan (Kraken-2 + Dorado)
-│       ├── results_kraken2.md   ← result tables (templates, to fill on Minerva)
-│       └── results_dorado.md
-├── Luna/                        ← luna server docs (Xeon Platinum 8468, 2× L40S)
-│   ├── luna_stats.md            ← CPU/RAM/GPU/disk/tool inventory
-│   ├── install_tools.md         ← tool install commands (needs sudo)
-│   ├── user_guide.md            ← first-login checklist, run matmul on Luna
-│   ├── user_management.md       ← create/restrict accounts (student account guide)
+│   ├── *.c                            ← 12 CPU implementations
+│   └── perf_results/N10000/           ← raw perf stat output
+├── Luna/                              ← Luna server docs + profiling
+│   ├── luna_stats.md                  ← CPU/RAM/GPU/disk/tool inventory
+│   ├── install_tools.md
+│   ├── user_guide.md
+│   ├── bash_history.md
 │   ├── experiments/
-│   │   ├── kraken2_opt_v1.patch ← optimization patch
+│   │   ├── kraken2_opt_v1.patch       ← Patches 1–4 implementation
 │   │   ├── run_kraken2_opt_v1.sh
 │   │   ├── pending_measurements.md
-│   │   └── tmpfs_fastq/
+│   │   └── tmpfs_fastq/README.md      ← Step 12 experiment write-up
 │   └── profiling/
-│       ├── plan.md              ← 4-phase Luna profiling plan
-│       ├── results_matmul_luna.md
-│       ├── results_kraken2.md
-│       ├── results_dorado.md
-│       ├── amd_uprof/           ← AMD uProf session outputs
-│       ├── matmul/              ← CPU matmul re-run on Sapphire Rapids
-│       └── matmul_gpu_bundle/   ← CUDA kernels + NCU profiling on L40S
-├── scripts/
-│   ├── tag_genomes.py           ← tags ESKAPE genome FASTAs with kraken taxon IDs
-│   ├── fix_seqid_map.py         ← builds seqid2taxid.map from tagged FASTAs
-│   └── fix_prelim_maps.py       ← fixes ACCNUM→TAXID in kraken prelim_map files
-└── results/                     ← pipeline output data (BAM, nsys traces)
+│       ├── plan.md
+│       ├── results_kraken2.md         ← full Luna profiling data (Steps 1–12)
+│       ├── results_matmul_luna.md     ← Luna CPU matmul results
+│       ├── results_dorado.md          ← blank — Step 13 pending
+│       ├── flamegraph_hac_32t.svg     ← perf flamegraph (hac, 32T)
+│       ├── amd_uprof/                 ← AMD uProf session outputs
+│       ├── matmul/
+│       │   ├── report/REPORT.md       ← full matmul CPU+GPU analysis with 11 graphs
+│       │   ├── perf_results_luna/     ← raw perf stat (N=1024/2048/10000 + TMA + cache)
+│       │   └── *.sh                   ← run scripts
+│       └── matmul_gpu_bundle/
+│           ├── README.md
+│           ├── *.cu                   ← 7 CUDA kernels
+│           ├── timing.log             ← all GPU timing results
+│           └── gpu_results/ncu/       ← NCU profiling summaries
+├── Minerva/                           ← Minerva server docs
+│   ├── minerva_stats.md
+│   ├── install_tools.md
+│   └── profiling/
+│       ├── plan.md
+│       ├── results_kraken2.md         ← template (not yet run — disk full)
+│       └── results_dorado.md
+├── WSL2/kraken2/                      ← WSL2 baseline profiling data
+│   ├── kraken2_report.txt
+│   ├── kraken2_report_perf.txt
+│   ├── kraken2_report_cg.txt
+│   └── gprof_report.txt
+├── scripts/                           ← ESKAPE DB build scripts
+│   ├── tag_genomes.py
+│   ├── fix_seqid_map.py
+│   └── fix_prelim_maps.py
+└── results/                           ← pipeline output data (BAM, nsys traces)
+    ├── fast/                          ← BAM per barcode (fast model)
+    ├── hac/                           ← BAM per barcode (hac model)
+    └── nsight/                        ← Nsight Systems .nsys-rep + .sqlite
 ```
-
----
-
-## what's next
-
-**profiling (Luna) — immediate:**
-- valgrind cachegrind — per-function L1/LLC cache miss counts (Step 11)
-- FASTQ on tmpfs — copy reads_hac.fastq to /dev/shm and re-run to quantify the ~20% I/O cost (Step 12)
-- Dorado GPU profiling on L40S with nsys (Step 13, needs nsys in PATH)
-- matmul benchmark re-run on Luna — tables in `Luna/profiling/results_matmul_luna.md` are still blank; accurate IPC (no Hyper-V noise) and LLC miss rates now possible
-
-**profiling (Luna) — upcoming:**
-- Dorado GPU profiling on L40S with nsys + ncu — `results_dorado.md` is blank; need to locate nsys/ncu in PATH first
-- AMX matrix multiply (Luna-exclusive) — Xeon Platinum 8468 has AMX; compare vs tiled_avx2
-
-**implementation:**
-- start Hot-K-mer LRU cache layer for kraken-2 — flamegraph confirms hash lookups + page faults = ~23% of wall time; additional ~20% from FASTQ I/O is a separate target
-- run at **32 threads + numactl --cpunodebind=0 --membind=0** — thread scaling + NUMA pinning together give 21.8% wall time reduction over the original 96T default, zero code changes
 
 ---
 
