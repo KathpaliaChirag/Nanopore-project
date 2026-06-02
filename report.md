@@ -51,6 +51,29 @@ Full phase details live in [`reports/phase1_dummytesting_dorado_kraken2.md`](rep
 
 [→ Full Phase 1f/1g](reports/phase1_dummytesting_dorado_kraken2.md#phase-1f--dorado-fast-model-re-profiling-post-ubuntu-reinstall)
 
+### Phase 1h — Dorado Fast vs HAC GPU Utilisation (`nvidia-smi dmon`, full 4 GB file)
+
+> Full profiling data and per-metric breakdown: [results/dorado/prof/gpu_profile_report.md](results/dorado/prof/gpu_profile_report.md)
+
+**Input:** `FBE01990_24778b97_03e50f91_7.pod5` (4 GB) | **GPU:** RTX 4050 Laptop, 6 GB VRAM, 60W
+
+| Metric | Fast (118s) | HAC (293s) |
+|---|---|---|
+| SM avg (CUDA cores) | **97.6%** | **99.5%** |
+| SM max | 100% | 100% |
+| Mem BW avg | 84.7% | 32.4% |
+| Mem BW max | 100% | 52% |
+| VRAM avg / max | 3.2 GB / 3.5 GB | 3.6 GB / 3.6 GB |
+| Throughput | ~33.9 MB/s | ~13.7 MB/s |
+
+- **Fast:** compute + memory bound simultaneously — small model weights reloaded frequently, driving Mem BW to 84.7%; SM at 97.6%
+- **HAC:** purely compute bound — large model weights sit in VRAM and are reused heavily (high arithmetic intensity); low Mem BW (32.4%) is a sign of efficiency, not waste; SM at 99.5%
+- **No CPU/disk bottleneck** in either run — flat 97–99% SM with no inter-batch sag confirms GPU was never starved
+- **VRAM headroom:** ~2.5 GB unused — safe margin before adding `--modified-bases` or increasing `--batchsize`
+- **Verdict:** GPU is at physical capacity; no software tuning will improve throughput; a larger GPU is required to go faster
+
+[→ Full report](results/dorado/prof/gpu_profile_report.md)
+
 ---
 
 ## Phase 2a — Kraken2 CPU Profiling (gprof — GNU profiler)
