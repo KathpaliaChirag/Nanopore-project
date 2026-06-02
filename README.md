@@ -91,7 +91,7 @@ scripts for this are in `scripts/`.
 | cudaStreamSynchronize % of CUDA API time | **98.9%** |
 | memory transfers | minor — GPU is not memory-starved |
 
-verdict: compute-bound. full details in `report.md`.
+verdict: compute-bound. full details in `docs/archive/report.md`.
 
 ### 4. matrix multiply benchmark suite (cache blocking study)
 
@@ -400,7 +400,7 @@ the profiling results directly justify Kolin sir's caching design:
 | GPU | NVIDIA GTX 1650, 4 GB VRAM |
 | OS | Windows 11 + WSL2 (Ubuntu 24.04) |
 
-WSL2 note: Hyper-V blocks LLC-specific perf counters. perf also needs to be built from source for the Microsoft WSL2 kernel (linux-tools-generic doesn't cover it). full build instructions in `knowledge_base.md §15.3`.
+WSL2 note: Hyper-V blocks LLC-specific perf counters. perf also needs to be built from source for the Microsoft WSL2 kernel (linux-tools-generic doesn't cover it). full build instructions in `docs/knowledge_base.md §15.3`.
 
 **lab servers:**
 
@@ -417,17 +417,26 @@ Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all u
 
 ```
 ├── README.md                    ← this file
-├── final_report.md              ← single consolidated report — all numbers, meeting-ready
-├── tables_and_graphs.md         ← all stats with Mermaid pie/bar charts (renders on GitHub)
-├── tables_and_graphs_basic.md   ← same stats, plain ASCII bars (works everywhere)
-├── report.md                    ← full narrative report with commands + failures (historical)
-├── report1.md                   ← original 2-page profiling report (historical)
-├── knowledge_base.md            ← deep-dive notes on everything (§0–§21)
-├── summary.md                   ← quick reference — what goes in, what comes out
-├── updates.md                   ← chronological session log
-├── meeting_minutes.md           ← notes from meetings with mam and Kolin sir
-├── plan.md                      ← research plan and next steps
-├── Luna_vs_Minerva.md           ← side-by-side hardware comparison of both lab servers
+├── docs/
+│   ├── plan.md                  ← research plan and next steps
+│   ├── updates.md               ← chronological session log
+│   ├── meeting_minutes.md       ← notes from meetings with mam and Kolin sir
+│   ├── knowledge_base.md        ← deep-dive notes on everything (§0–§21)
+│   ├── Luna_vs_Minerva.md       ← side-by-side hardware comparison of both lab servers
+│   ├── reports/
+│   │   ├── final_report.md      ← single consolidated report — all numbers, meeting-ready
+│   │   ├── summary.md           ← quick reference — what goes in, what comes out
+│   │   ├── tables_and_graphs.md ← all stats with Mermaid pie/bar charts (renders on GitHub)
+│   │   ├── tables_and_graphs_basic.md ← same stats, plain ASCII bars (works everywhere)
+│   │   ├── kraken2_optimisation_report.md
+│   │   ├── kraken2_get_optimizations.md / _v2.md
+│   │   └── kraken2_execution_checklist.md
+│   ├── archive/
+│   │   ├── report.md            ← full narrative report with commands + failures (historical)
+│   │   ├── report1.md           ← original 2-page profiling report (historical)
+│   │   └── plan_old.md          ← superseded plan
+│   └── resources/
+│       └── profiling_from_zero_*.pdf  ← 5 reference PDFs
 ├── All_Matric_Mul_perf_stats/   ← matrix multiply benchmark suite (WSL2 perf stat)
 │   ├── PERF_REPORT.md           ← full results: N=1024/2048/10000, cache analysis
 │   ├── README.md                ← build/run instructions
@@ -449,17 +458,24 @@ Luna has `perf_event_paranoid = 1` — all hardware perf counters work for all u
 │   ├── install_tools.md         ← tool install commands (needs sudo)
 │   ├── user_guide.md            ← first-login checklist, run matmul on Luna
 │   ├── user_management.md       ← create/restrict accounts (student account guide)
+│   ├── experiments/
+│   │   ├── kraken2_opt_v1.patch ← optimization patch
+│   │   ├── run_kraken2_opt_v1.sh
+│   │   ├── pending_measurements.md
+│   │   └── tmpfs_fastq/
 │   └── profiling/
 │       ├── plan.md              ← 4-phase Luna profiling plan
 │       ├── results_matmul_luna.md
 │       ├── results_kraken2.md
-│       └── results_dorado.md
+│       ├── results_dorado.md
+│       ├── amd_uprof/           ← AMD uProf session outputs
+│       ├── matmul/              ← CPU matmul re-run on Sapphire Rapids
+│       └── matmul_gpu_bundle/   ← CUDA kernels + NCU profiling on L40S
 ├── scripts/
 │   ├── tag_genomes.py           ← tags ESKAPE genome FASTAs with kraken taxon IDs
 │   ├── fix_seqid_map.py         ← builds seqid2taxid.map from tagged FASTAs
 │   └── fix_prelim_maps.py       ← fixes ACCNUM→TAXID in kraken prelim_map files
-└── resources/
-    └── profiling_from_zero_part1.pdf
+└── results/                     ← pipeline output data (BAM, nsys traces)
 ```
 
 ---
