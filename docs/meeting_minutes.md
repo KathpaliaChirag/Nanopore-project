@@ -213,3 +213,63 @@ Dorado / GPU work is deprioritised for now. The memory-bound nature of Kraken-2 
 
 ### Next meeting
 TBD — after 3-day Kraken-2 report is submitted (target ~2026-05-31)
+
+---
+
+## Meeting 5 — 2026-06-02
+
+**Attendees:** Kolin sir, Chirag Suthar, Chirag Kathpalia
+**Format:** Direction setting + new experiments
+
+### Topics covered
+
+1. **MHA in NVIDIA GPUs — research item**
+   - Kolin sir asked the team to read about MHA (Multi-Head Attention, the core operation in transformer models — for each token, it computes attention scores against all other tokens using Q, K, V matrices)
+   - Specific question: is NVIDIA GPU hardware designed to accelerate MHA, or does MHA happen to map well to existing GEMM units?
+   - Context: Dorado is a transformer-based basecaller, so understanding MHA hardware support is relevant to Dorado profiling
+
+2. **Neural data prefetcher — new research direction**
+   - Current Kraken-2 work uses `__builtin_prefetch` (explicit software prefetch hints, as in Patch 1 of the optimisation series)
+   - New direction: replace or augment this with a small neural network that learns access patterns from a sequence of historical memory reads and predicts the next address to prefetch
+   - The NN observes a window of recent read addresses and outputs a predicted next address
+   - The model should be lightweight enough to run alongside the application without adding overhead
+   - Target accuracy: **70-80%** — a miss prediction still falls back to hardware prefetch, so partial accuracy is useful
+
+3. **End goal: LLC miss rate to near zero**
+   - Current Kraken-2 LLC miss rate on Luna is approximately 80% (confirmed from `perf stat` profiling)
+   - If LLC miss rate reaches near 0, the prefetcher has succeeded and can be considered complete
+   - If LLC miss rate is already near 0 (e.g., data fits entirely in cache), no prefetcher is needed at all
+   - This gives a clear stopping criterion: keep improving the prefetcher until LLC miss drops to an acceptable level
+
+4. **Documentation on multiple machines**
+   - All experiments must be properly documented across different hardware
+   - Systems to cover: Minerva (CK account), Luna (Intel Xeon), Chirag Suthar's system, lab Linux desktop
+   - Reason: LLC miss rates are hardware-dependent — same workload behaves differently on 16 MB Ryzen L3 vs 105 MB Xeon L3
+
+5. **Key experiment — Kraken-2 LLC miss rate vs dataset size (most important action item)**
+   - Run Kraken-2 with multiple database/dataset sizes: 650 MB, 8 GB, 16 GB, and others as available
+   - Record LLC miss rate at each size, on all four systems
+   - The expected finding: as dataset size exceeds L3 capacity, LLC miss rate should jump sharply
+   - Output: clean tables and graphs comparing miss rate vs dataset size across machines
+   - This gives direct empirical data on where the cache cliff is for each system
+
+### Action items
+
+| owner | task | notes |
+|---|---|---|
+| Chirag K | research MHA in NVIDIA — what is MHA, does Hopper/Ada hardware have dedicated MHA units, how does Flash Attention exploit memory hierarchy | write a short summary doc |
+| Chirag K + Chirag S | design neural prefetcher concept — pick a simple NN architecture (e.g., LSTM or MLP on recent access delta sequence), define input window, output prediction, accuracy metric | idea sketch first, no code yet |
+| Chirag K + Chirag S | **run Kraken-2 LLC miss rate vs dataset size** on Minerva, Luna, Chirag S's system, lab Linux desktop — sizes: 650 MB, 8 GB, 16 GB minimum | produce tables + graphs, push report to GitHub |
+| Chirag K + Chirag S | documentation: ensure profiling results on all four machines are captured with system specs and dataset sizes | needed before the neural prefetcher phase |
+
+### Key numbers to track
+
+| system | L3 cache | expected cliff size |
+|---|---|---|
+| Luna (Xeon Platinum 8468, dual-socket) | 105 MB | ~100 MB dataset |
+| Minerva (account: CK) | TBD | TBD |
+| Chirag Suthar's system | TBD | TBD |
+| Lab Linux desktop | TBD | TBD |
+
+### Next meeting
+TBD

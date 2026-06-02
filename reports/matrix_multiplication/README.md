@@ -75,6 +75,25 @@ at N=10000, `omp+tile` dominates on WSL2 at 112,506 ms, 2.1x faster than `tile+A
 
 Luna confirms the N=1024 ranking: `tile+AVX2` fastest at 220 ms, `naive` at 5,703 ms (25.9x slower). absolute times are faster than WSL2 because the Xeon sustains higher clock speed, but the relative ordering of cache-sensitive variants is the same.
 
+**all metrics at N=1024 (Luna):**
+
+| variant | time (ms) | IPC | L1 miss % | LLC miss % | stall % |
+|---|---|---|---|---|---|
+| `naive` | 5,703.9 | 0.22 | 48.87 | 0.022 | 83.3 |
+| `ikj` | 333.7 | 0.81 | 15.81 | 0.074 | 44.6 |
+| `kij` | 400.9 | 0.99 | 9.17 | 0.295 | 41.7 |
+| `transpose` | 717.4 | 1.29 | 0.23 | 3.997 | 17.2 |
+| `tiled` | 267.1 | 1.42 | 25.68 | 0.960 | 29.0 |
+| `omp` | 352.2 | 1.17 | 10.76 | 0.395 | 32.1 |
+| `omp+tile` | 426.6 | 1.32 | 19.86 | 16.36 | 37.3 |
+| `unrolled` | 352.1 | 1.19 | 9.10 | 0.092 | 33.0 |
+| `AVX2` | 330.2 | 1.14 | 10.84 | 0.019 | 35.8 |
+| `auto-vec` | 321.8 | 0.83 | 16.06 | 0.282 | 46.9 |
+| `tile+AVX2` | **220.4** | **2.84** | 13.08 | 4.965 | **13.5** |
+| `prefetch` | 501.4 | **4.00** | **0.65** | 1.581 | **6.8** |
+
+`omp+tile` has the highest LLC miss % (16.36%) at N=1024 because the 4 threads compete for shared cache lines when their tile regions are interleaved in memory. `prefetch` achieves the highest IPC (4.00) and lowest stall % (6.8%), yet finishes 2.3x slower than `tile+AVX2` due to 3.4x more instructions (5,976M vs 1,757M).
+
 ---
 
 ## the platform flip at N=10000
@@ -145,6 +164,12 @@ Luna N=10000 pipeline stall percentages confirm the story:
 
 `prefetch` has 0.65% L1 miss, near zero, because the prefetch instructions pre-load data into cache before it is needed. but the total instruction count (5,976M vs `tile+AVX2`'s 1,757M) dominates.
 
+the miss rate trend across all three sizes shows how drastically the picture changes at N=10000:
+
+![llc miss rate line](graphs/15_llc_miss_rate_line.png)
+
+at N=10000 on Luna, `ikj` reaches 92.3% LLC miss and `kij` reaches 94.5%, meaning essentially every cache request goes to DRAM. `tile+AVX2` limits the damage to 14.4% by keeping 64x64 tiles in L2. `prefetch` surges to 68.2% LLC miss at N=10000 despite near-zero miss rates at smaller N: the prefetch lookahead distance is insufficient for a 2.4 GB working set.
+
 ---
 
 ## stalled cycles (Luna N=1024)
@@ -156,6 +181,12 @@ Luna N=10000 pipeline stall percentages confirm the story:
 `naive` stalls 83.3% of the time. `tile+AVX2` stalls only 13.5%. that 70-point gap is the difference between a memory-bound and a compute-bound program. `prefetch` achieves the lowest stall at 6.8%, because the cache pre-loads reduce pipeline waits. but all that freed pipeline time is spent issuing prefetch micro-ops instead of FMA compute.
 
 `auto-vec` stalls 46.9% despite using the same vectorisation strategy as `AVX2` (330 ms vs 321 ms on Luna at N=1024, effectively the same time). the compiler vectorises but does not tile, so it still processes large memory regions between loop iterations.
+
+stall % trends across all three sizes show which variants stay compute-bound as N grows:
+
+![stall pct line](graphs/16_stall_pct_line.png)
+
+`tile+AVX2` stall % falls continuously: 13.5% at N=1024, 11.3% at N=2048, 8.3% at N=10000. tiles keep fitting in L2 regardless of N, so the variant becomes progressively more compute-bound at larger sizes. `prefetch` reverses: 6.8% stall at N=1024 becomes 44.1% at N=10000, when the 2.4 GB working set overwhelms the prefetch lookahead. `ikj` climbs from 44.6% to 70.4% at N=10000 as it goes fully DRAM-bound.
 
 ---
 
@@ -196,6 +227,24 @@ at N=10000: `tile+AVX2` goes to 39.1% memory-bound with 2.3% DRAM-bound, the 2.4
 
 the lesson: a naive GPU port of a CPU algorithm does not automatically win. kernel quality determines whether you use the hardware.
 
+**GPU performance across all tested sizes (time ms / GFLOPS):**
+
+| kernel | prec | N=1024 | N=2048 | N=4096 | N=10000 |
+|---|---|---|---|---|---|
+| `naive` | FP32 | 0.40 / 5,329 | 3.06 / 5,613 | 24.18 / 5,685 | -- |
+| `coalesced` | FP32 | 0.72 / 2,978 | 5.98 / 2,872 | 48.46 / 2,836 | 5,209 / 384 |
+| `shared tiled` | FP32 | 0.34 / 6,336 | 2.43 / 7,063 | 19.48 / 7,057 | 338 / 5,915 |
+| `shared tiled 2D` | FP32 | 0.15 / 14,752 | 0.60 / 28,589 | 4.57 / 30,044 | 68 / 29,399 |
+| `cuBLAS sgemm` | FP32 | 0.08 / 27,236 | 0.39 / 44,502 | 3.01 / 45,718 | 45 / 44,475 |
+| `WMMA FP16` | FP16 | 0.06 / 33,059 | 0.47 / 36,194 | 3.45 / 39,845 | 40 / 50,001 |
+| `cuBLAS tensor TF32` | TF32 | 0.04 / 47,935 | 0.16 / 110,376 | 1.12 / 122,461 | 16 / 122,923 |
+
+`naive_gpu` was not run at N=10000. `coalesced` GFLOPS collapses at N=10000 (384 vs ~2,900 at smaller N), confirming poor thread occupancy becomes the dominant bottleneck at high matrix counts. `cuBLAS tensor TF32` maintains ~122,000 GFLOPS from N=4096 to N=10000, reaching its hardware ceiling.
+
+![gpu gflops scaling line](graphs/17_gpu_gflops_scaling_line.png)
+
+the flat GFLOPS curves for `shared tiled 2D`, `cuBLAS sgemm`, `WMMA FP16`, and `cuBLAS tensor TF32` confirm they saturate the GPU's tensor cores from N=1024 onwards. `coalesced` degrades sharply at N=10000 because poor thread utilisation compounds with the larger problem size.
+
 ---
 
 ## scaling behaviour
@@ -211,6 +260,27 @@ the lesson: a naive GPU port of a CPU algorithm does not automatically win. kern
 `kij` degrades at 18.1x, super-linear. in kij order, the outer loop iterates over k and on each k-iteration reads the entire B[k][:] row while updating all of C. the B matrix is 8 MB at N=1024 and fits in the Ryzen's 16 MB L3, so B rows warm up after the first k-pass and are cache-resident on re-access. at N=2048, B grows to 32 MB, larger than the 16 MB L3. each k-iteration now evicts the previous k's B row before it can be reused. the WSL2 L3 miss rate measurement confirms this: `kij` L3 miss rate doubles from 2.2% at N=1024 to 4.3% at N=2048, while `ikj` miss rate actually improves (6.0% to 3.5%) over the same size increase. that doubling of miss rate, compounding over N^3 operations, explains the super-linear timing growth.
 
 `naive` L3 cache miss count grows 17.2x when N doubles (expected 8x), confirming the access pattern degrades super-linearly.
+
+**Luna wall time scaling (absolute times and ratios):**
+
+| variant | N=1024 (ms) | N=2048 (ms) | N=10000 (ms) | 2048/1024 | 10000/2048 |
+|---|---|---|---|---|---|
+| `naive` | 5,703.9 | 47,301.6 | -- | 8.3x | -- |
+| `ikj` | 333.7 | 2,459.7 | 552,097.8 | 7.4x | 224.5x |
+| `kij` | 400.9 | 2,975.4 | 660,594.2 | 7.4x | 222.0x |
+| `transpose` | 717.4 | 5,682.1 | 799,484.6 | 7.9x | 140.7x |
+| `tiled` | 267.1 | 2,005.1 | 135,663.2 | **7.5x** | **67.7x** |
+| `omp` | 352.2 | 2,618.7 | 883,940.9 | 7.4x | 337.7x |
+| `omp+tile` | 426.6 | 3,126.8 | 256,721.1 | 7.3x | 82.1x |
+| `unrolled` | 352.1 | 2,613.7 | 634,317.0 | 7.4x | 242.7x |
+| `AVX2` | 330.2 | 2,493.8 | 629,532.9 | 7.6x | 252.5x |
+| `auto-vec` | 321.8 | 2,493.7 | 553,386.1 | 7.7x | 222.0x |
+| `tile+AVX2` | **220.4** | **1,621.2** | **168,349.6** | 7.4x | 103.8x |
+| `prefetch` | 501.4 | 3,904.1 | 884,051.2 | 7.8x | 226.4x |
+
+the 10000/2048 ratios expose the real winners. O(N^3) theory predicts (10000/2048)^3 = 117.1x. `tiled` achieves only 67.7x (sub-linear: tile setup is amortised at large N and L2 reuse stays constant). `omp` reaches 337.7x (super-linear: NUMA contention compounds at large N). `tile+AVX2` comes closest to theory at 103.8x.
+
+![luna time scaling line](graphs/14_luna_time_scaling_line.png)
 
 ---
 

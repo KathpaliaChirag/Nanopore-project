@@ -290,4 +290,104 @@ style_ax(ax, "Luna CPU — IPC trend across matrix sizes", "matrix size", "IPC")
 fig.tight_layout()
 save(fig, "13_ipc_trend_across_sizes.png")
 
+# ── Line graph: Luna wall time scaling across N ───────────────────────────────
+N_sizes = [1024, 2048, 10000]
+line_variants = {
+    "naive":     ([5703.91, 47301.6, None],     ACCENT[0]),
+    "ikj":       ([333.65,  2459.71, 552097.79], ACCENT[1]),
+    "tiled":     ([267.05,  2005.11, 135663.23], ACCENT[4]),
+    "omp+tile":  ([426.59,  3126.82, 256721.11], ACCENT[6]),
+    "tile+AVX2": ([220.4,   1621.15, 168349.55], ACCENT[10]),
+    "prefetch":  ([501.4,   3904.12, 884051.2],  ACCENT[11]),
+}
+fig, ax = plt.subplots(figsize=(10, 5), facecolor=BG)
+for label, (vals, col) in line_variants.items():
+    xs = [N_sizes[i] for i, v in enumerate(vals) if v is not None]
+    ys = [v for v in vals if v is not None]
+    ax.plot(xs, ys, marker='o', markersize=6, linewidth=2, color=col, label=label, zorder=3)
+    for x, y in zip(xs, ys):
+        ax.annotate(f"{y/1000:.0f}s" if y > 10000 else f"{y:.0f}ms",
+                    (x, y), textcoords="offset points", xytext=(0, 8),
+                    ha='center', color=col, fontsize=7)
+ax.set_yscale('log')
+ax.set_xscale('log')
+ax.set_xticks(N_sizes); ax.set_xticklabels(["N=1024","N=2048","N=10000"])
+ax.legend(facecolor=PANEL, edgecolor=GRID, labelcolor=TEXT, fontsize=8, loc='upper left')
+style_ax(ax, "Luna CPU — wall time scaling across matrix sizes (log-log)", "matrix size N", "time (ms)")
+fig.tight_layout()
+save(fig, "14_luna_time_scaling_line.png")
+
+# ── Line graph: LLC miss rate vs N ────────────────────────────────────────────
+llc_variants = {
+    "naive":     ([0.022,  0.270,  None],     ACCENT[0]),
+    "ikj":       ([0.074,  0.109,  92.255],   ACCENT[1]),
+    "kij":       ([0.295,  0.214,  94.455],   ACCENT[2]),
+    "tiled":     ([0.960,  2.380,  32.286],   ACCENT[4]),
+    "tile+AVX2": ([4.965,  3.196,  14.386],   ACCENT[10]),
+    "prefetch":  ([1.581,  3.677,  68.183],   ACCENT[11]),
+}
+fig, ax = plt.subplots(figsize=(10, 5), facecolor=BG)
+for label, (vals, col) in llc_variants.items():
+    xs = [N_sizes[i] for i, v in enumerate(vals) if v is not None]
+    ys = [v for v in vals if v is not None]
+    ax.plot(xs, ys, marker='o', markersize=6, linewidth=2, color=col, label=label, zorder=3)
+    for x, y in zip(xs, ys):
+        ax.annotate(f"{y:.1f}%", (x, y), textcoords="offset points",
+                    xytext=(0, 8), ha='center', color=col, fontsize=7)
+ax.set_xscale('log')
+ax.set_xticks(N_sizes); ax.set_xticklabels(["N=1024","N=2048","N=10000"])
+ax.legend(facecolor=PANEL, edgecolor=GRID, labelcolor=TEXT, fontsize=8)
+style_ax(ax, "Luna CPU — LLC (L3) miss rate vs matrix size", "matrix size N", "LLC miss rate (%)")
+fig.tight_layout()
+save(fig, "15_llc_miss_rate_line.png")
+
+# ── Line graph: Stall % vs N ──────────────────────────────────────────────────
+stall_variants = {
+    "naive":     ([83.34, 83.92, None],   ACCENT[0]),
+    "ikj":       ([44.56, 46.48, 70.37],  ACCENT[1]),
+    "tiled":     ([29.02, 29.36, 13.50],  ACCENT[4]),
+    "omp+tile":  ([37.31, 35.19, 34.11],  ACCENT[6]),
+    "tile+AVX2": ([13.47, 11.27,  8.32],  ACCENT[10]),
+    "prefetch":  ([ 6.84,  5.96, 44.06],  ACCENT[11]),
+}
+fig, ax = plt.subplots(figsize=(10, 5), facecolor=BG)
+for label, (vals, col) in stall_variants.items():
+    xs = [N_sizes[i] for i, v in enumerate(vals) if v is not None]
+    ys = [v for v in vals if v is not None]
+    ax.plot(xs, ys, marker='o', markersize=6, linewidth=2, color=col, label=label, zorder=3)
+    for x, y in zip(xs, ys):
+        ax.annotate(f"{y:.1f}%", (x, y), textcoords="offset points",
+                    xytext=(0, 8), ha='center', color=col, fontsize=7)
+ax.set_xscale('log')
+ax.set_xticks(N_sizes); ax.set_xticklabels(["N=1024","N=2048","N=10000"])
+ax.axhline(50, color="#f38ba8", linewidth=1.0, linestyle="--", zorder=4, alpha=0.5, label="50% line")
+ax.legend(facecolor=PANEL, edgecolor=GRID, labelcolor=TEXT, fontsize=8)
+style_ax(ax, "Luna CPU — pipeline stall % vs matrix size", "matrix size N", "stall % of cycles")
+fig.tight_layout()
+save(fig, "16_stall_pct_line.png")
+
+# ── Line graph: GPU GFLOPS scaling across sizes ───────────────────────────────
+gpu_sizes = [1024, 2048, 4096, 10000]
+gpu_line_variants = {
+    "naive GPU":           ([5328.6,  5613.3, 5684.7,  None],      ACCENT[0]),
+    "coalesced":           ([2977.9,  2872.0, 2836.2,  384.0],     ACCENT[2]),
+    "shared tiled":        ([6335.8,  7063.2, 7056.9,  5915.3],    ACCENT[4]),
+    "shared tiled 2D":     ([14752.4, 28588.9,30044.0, 29398.9],   ACCENT[5]),
+    "cuBLAS sgemm":        ([27235.7, 44501.9,45717.9, 44475.3],   ACCENT[7]),
+    "cuBLAS tensor TF32":  ([47934.9,110376.4,122461.4,122923.1],  ACCENT[9]),
+    "WMMA FP16":           ([33058.6, 36194.4,39845.3, 50000.9],   ACCENT[6]),
+}
+fig, ax = plt.subplots(figsize=(11, 6), facecolor=BG)
+for label, (vals, col) in gpu_line_variants.items():
+    xs = [gpu_sizes[i] for i, v in enumerate(vals) if v is not None]
+    ys = [v for v in vals if v is not None]
+    ax.plot(xs, ys, marker='D', markersize=5, linewidth=2, color=col, label=label, zorder=3)
+ax.set_xscale('log')
+ax.set_yscale('log')
+ax.set_xticks(gpu_sizes); ax.set_xticklabels(["N=1024","N=2048","N=4096","N=10000"])
+ax.legend(facecolor=PANEL, edgecolor=GRID, labelcolor=TEXT, fontsize=8, loc='upper left')
+style_ax(ax, "L40S GPU — GFLOPS scaling across matrix sizes (log-log)", "matrix size N", "GFLOPS")
+fig.tight_layout()
+save(fig, "17_gpu_gflops_scaling_line.png")
+
 print("all graphs generated.")
