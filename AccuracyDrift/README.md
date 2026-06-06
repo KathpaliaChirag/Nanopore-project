@@ -13,12 +13,12 @@ Test how Kraken2 classification accuracy and cache behavior change across differ
 
 ## Databases
 
-| Name | Size | Type | Status on Luna |
-|------|------|------|----------------|
-| eskape_650mb | ~650 MB | ESKAPE pathogens only, custom build | taxonomy ready, build pending |
-| eskape_human_4gb | ~4 GB | ESKAPE + human, custom build | taxonomy ready, build pending |
-| standard_8gb | 8 GB | Pre-built standard | extracted, ready |
-| standard_16gb | 16 GB | Pre-built standard | downloaded, extract pending |
+| Name | Actual Size | Type | Status on Luna |
+|------|-------------|------|----------------|
+| eskape_650mb | 142 MB | ESKAPE pathogens only, custom build | done |
+| eskape_human_4gb | ~4 GB | ESKAPE + human, custom build | build in progress |
+| standard_8gb | 8 GB | Pre-built standard | done |
+| standard_16gb | 16 GB | Pre-built standard | done |
 
 ## Setup on any machine
 
@@ -43,18 +43,22 @@ pip3 install --user ncbi-genome-download
 # binary will be at ~/.local/bin/ncbi-genome-download
 ```
 
-Note: Luna blocks rsync so `kraken2-build --download-taxonomy` will fail. Download taxonomy manually via wget instead (see below).
+**Notes for Luna:**
+- rsync is blocked, so `kraken2-build --download-taxonomy` will fail — download taxonomy manually via wget instead
+- genome files must be gunzipped before adding to library — kraken2-build does not handle .fna.gz
+- taxonomy folder (~14 GB) can be deleted after build is complete, only hash.k2d / taxo.k2d / opts.k2d are needed
 
 ESKAPE taxids: E.faecium=1352, S.aureus=1280, K.pneumoniae=573, A.baumannii=470, P.aeruginosa=287, Enterobacter=547
 
 ```bash
 cd ~/AccuracyDrift/databases
 
-# Download ESKAPE genomes (1149 complete assemblies, ~2.2 GB)
+# Download ESKAPE genomes (1149 complete assemblies, ~7 GB uncompressed)
 mkdir -p eskape_genomes
 ~/.local/bin/ncbi-genome-download --taxids 1352,1280,573,470,287,547 --formats fasta --assembly-levels complete bacteria -o eskape_genomes --verbose
+find eskape_genomes -name "*.fna.gz" -exec gunzip {} \;
 
-# Download taxonomy manually (rsync is blocked on Luna)
+# Download taxonomy manually (rsync blocked on Luna)
 mkdir -p eskape_650mb/taxonomy
 cd eskape_650mb/taxonomy
 wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz && tar -xzf taxdump.tar.gz && rm taxdump.tar.gz
@@ -65,14 +69,16 @@ cd ~/AccuracyDrift/databases
 cp -r eskape_650mb/taxonomy eskape_human_4gb/
 
 # Build eskape_650mb
-find eskape_genomes -name "*.fna.gz" | xargs -I{} kraken2-build --add-to-library {} --db eskape_650mb
+find eskape_genomes -name "*.fna" | xargs -I{} kraken2-build --add-to-library {} --db eskape_650mb
 kraken2-build --build --db eskape_650mb --max-db-size 700000000 --threads 8
+rm -rf eskape_650mb/taxonomy eskape_650mb/library
 
 # Build eskape_human_4gb
 kraken2-build --download-library human --db eskape_human_4gb
-find eskape_genomes -name "*.fna.gz" | xargs -I{} kraken2-build --add-to-library {} --db eskape_human_4gb
+find eskape_genomes -name "*.fna" | xargs -I{} kraken2-build --add-to-library {} --db eskape_human_4gb
 kraken2-build --build --db eskape_human_4gb --max-db-size 4000000000 --threads 8
+rm -rf eskape_human_4gb/taxonomy eskape_human_4gb/library
 
-# Cleanup after both builds done
-rm -rf eskape_genomes eskape_650mb/library eskape_human_4gb/library
+# Cleanup genomes after both builds done
+rm -rf eskape_genomes
 ```
