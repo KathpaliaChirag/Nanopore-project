@@ -132,8 +132,8 @@ Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache
 | 8  | 66.13 | 33.87 | 82.46 | 59.27 | 5.490  | 5.43x | 1.22 |
 | 16 | 66.13 | 33.87 | 83.17 | 59.34 | 3.761  | 7.93x | 1.21 |
 | 32 | 66.13 | 33.87 | 82.97 | 59.03 | 2.976  | 10.02x | 1.16 |
-| 64 | - | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - | - |
+| 64 | 66.13 | 33.87 | 81.70 | 58.73 | 2.823  | 10.57x | 1.03 |
+| 96 | 66.13 | 33.87 | 81.48 | 58.94 | 2.947  | 10.12x | 0.98 |
 
 #### reads_hac — standard_8gb
 
@@ -312,8 +312,8 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna (96T) | Minerva (TBD) | Lab Desktop (TBD) | Orion (TBD) |
 |----|-----------|---------------|------------------|------------|
-| eskape_650mb (142 MB) | - | - | - | - |
-| eskape_human_4gb (3.8 GB) | - | - | - | - |
+| eskape_650mb (142 MB) | 32.56 | - | - | - |
+| eskape_human_4gb (3.8 GB) | 58.94 | - | - | - |
 | standard_8gb (7.6 GB) | - | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
 
@@ -348,7 +348,7 @@ How classification rate changes as DB grows. Expected: more classified with larg
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
 | eskape_650mb (142 MB) | 65.28% | - | - | - |
-| eskape_human_4gb (3.8 GB) | - | - | - | - |
+| eskape_human_4gb (3.8 GB) | 66.13% | - | - | - |
 | standard_8gb (7.6 GB) | - | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
 

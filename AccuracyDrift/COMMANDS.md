@@ -402,3 +402,47 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **66.13** | **82.97** | **59.03** | **2.976** | **1.16** |
 
 Speedup vs 1T: 10.02x (31.3% efficiency). 16T→32T only gained 26% (7.93x → 10.02x). LLC miss rate ticked down slightly (59.34% → 59.03%) — same 16-32T dip pattern seen with eskape_650mb.
+
+---
+
+### reads_hac × eskape_human_4gb × 64T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_human_4gb \
+  --threads 64 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 66.13 | 81.54 | 58.67 | 2.841 | 1.02 |
+| 2 | 66.13 | 81.78 | 58.75 | 2.816 | 1.03 |
+| 3 | 66.13 | 81.79 | 58.76 | 2.812 | 1.03 |
+| **avg** | **66.13** | **81.70** | **58.73** | **2.823** | **1.03** |
+
+Speedup vs 1T: 10.57x (16.5% efficiency). 32T→64T gained only 5% (10.02x → 10.57x). Scaling ceiling essentially reached.
+
+---
+
+### reads_hac × eskape_human_4gb × 96T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_human_4gb \
+  --threads 96 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 66.13 | 81.49 | 58.92 | 2.952 | 0.98 |
+| 2 | 66.13 | 81.52 | 58.96 | 2.938 | 0.98 |
+| 3 | 66.13 | 81.43 | 58.95 | 2.950 | 0.98 |
+| **avg** | **66.13** | **81.48** | **58.94** | **2.947** | **0.98** |
+
+96T is SLOWER than 64T (2.947s vs 2.823s) — same pattern as eskape_650mb. Speedup 10.12x, down from 10.57x at 64T. IPC drops below 1.0 — more stall cycles than executed instructions. hac × eskape_human_4gb thread scaling complete.

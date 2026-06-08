@@ -56,6 +56,12 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 21. **16T→32T gain only 26% on eskape_human_4gb** — speedup goes 7.93x → 10.02x. On eskape_650mb the same doubling went 13.45x → 21.03x (56% gain). The post-cliff DRAM bandwidth wall completely kills the benefit of adding threads beyond 16. IPC dropped from 1.21 to 1.16 — threads are spending more time stalled, not executing.
 
+22. **Scaling ceiling ~10.6x for eskape_human_4gb vs ~22x for eskape_650mb** — 32T: 10.02x, 64T: 10.57x, 96T: 10.12x — essentially flat. The maximum achievable speedup on Luna is halved by the cache cliff. Post-cliff, DRAM bandwidth is the hard ceiling; more threads cannot overcome it.
+
+23. **96T slower than 64T on both DBs** — eskape_650mb: 1.001s (64T) vs 1.164s (96T). eskape_human_4gb: 2.823s (64T) vs 2.947s (96T). The pattern is consistent across DB sizes. On a single socket, 96 threads generate more overhead (scheduler contention, cache line sharing, NUMA effects) than they contribute. 64T is the practical thread ceiling for Luna single-socket Kraken2 runs.
+
+24. **IPC drops below 1.0 at 96T post-cliff** — 0.98 IPC means the CPU is stalling for more than one cycle per instruction executed on average. This is the clearest signature of a memory-bound workload at its limit — the pipeline is almost entirely idle, waiting on DRAM. At eskape_650mb 96T, IPC was 1.13 — still above 1.0, meaning some useful execution was still happening between stalls.
+
 ---
 
 ## Cross-Machine Comparison
