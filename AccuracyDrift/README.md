@@ -16,11 +16,25 @@ Test how Kraken2 classification accuracy and cache behavior change across differ
 | Name | Actual Size | Type | Status on Luna |
 |------|-------------|------|----------------|
 | eskape_650mb | 142 MB | ESKAPE pathogens only, custom build | done |
-| eskape_human_4gb | ~4 GB | ESKAPE + human, custom build | build in progress |
+| eskape_human_4gb | 3.8 GB | ESKAPE + human, custom build | done |
 | standard_8gb | 8 GB | Pre-built standard | done |
 | standard_16gb | 16 GB | Pre-built standard | done |
 
-## Setup on any machine
+All 4 databases are ready on Luna at `~/AccuracyDrift/databases/`.
+
+## Transferring to other machines
+
+Each database is just 3 files — fully portable, no rebuild needed:
+
+```bash
+# Copy a database to another machine
+scp ~/AccuracyDrift/databases/eskape_650mb/{hash.k2d,taxo.k2d,opts.k2d} user@machine:~/AccuracyDrift/databases/eskape_650mb/
+
+# Or copy the whole databases folder
+rsync -av ~/AccuracyDrift/databases/ user@machine:~/AccuracyDrift/databases/
+```
+
+## Setup on any machine (fresh)
 
 ```bash
 mkdir -p ~/AccuracyDrift/databases/{standard_8gb,standard_16gb,eskape_650mb,eskape_human_4gb}
@@ -44,9 +58,9 @@ pip3 install --user ncbi-genome-download
 ```
 
 **Notes for Luna:**
-- rsync is blocked, so `kraken2-build --download-taxonomy` will fail — download taxonomy manually via wget instead
+- rsync is blocked — `kraken2-build --download-taxonomy` and `--download-library human` will fail, use wget instead
 - genome files must be gunzipped before adding to library — kraken2-build does not handle .fna.gz
-- taxonomy folder (~14 GB) can be deleted after build is complete, only hash.k2d / taxo.k2d / opts.k2d are needed
+- taxonomy folder (~14 GB) and library folder can be deleted after build, only hash.k2d / taxo.k2d / opts.k2d are needed
 
 ESKAPE taxids: E.faecium=1352, S.aureus=1280, K.pneumoniae=573, A.baumannii=470, P.aeruginosa=287, Enterobacter=547
 
@@ -73,8 +87,13 @@ find eskape_genomes -name "*.fna" | xargs -I{} kraken2-build --add-to-library {}
 kraken2-build --build --db eskape_650mb --max-db-size 700000000 --threads 8
 rm -rf eskape_650mb/taxonomy eskape_650mb/library
 
+# Download human genome manually (rsync blocked on Luna)
+mkdir -p eskape_human_4gb/library/added
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GCF_000001405.40_GRCh38.p14_genomic.fna.gz -P eskape_human_4gb/library/added/
+gunzip eskape_human_4gb/library/added/GCF_000001405.40_GRCh38.p14_genomic.fna.gz
+
 # Build eskape_human_4gb
-kraken2-build --download-library human --db eskape_human_4gb
+kraken2-build --add-to-library eskape_human_4gb/library/added/GCF_000001405.40_GRCh38.p14_genomic.fna --db eskape_human_4gb
 find eskape_genomes -name "*.fna" | xargs -I{} kraken2-build --add-to-library {} --db eskape_human_4gb
 kraken2-build --build --db eskape_human_4gb --max-db-size 4000000000 --threads 8
 rm -rf eskape_human_4gb/taxonomy eskape_human_4gb/library
