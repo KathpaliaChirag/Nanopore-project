@@ -78,6 +78,10 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 30. **LLC miss rate climbing faster than other DBs** — standard_8gb: 1T=76.59%, 2T=77.78%, 4T=79.60%, 8T=82.32% — a 5.7 point rise across 3 doublings. eskape_human_4gb rose only 2.4 points (56.85%→59.27%) over the same range. With a larger DB and higher baseline miss rate, each additional thread generates more DRAM contention with less LLC to absorb it.
 
+31. **Amdahl ceiling fully hit at 16-32T for standard_8gb** — 16T wall: 5.096s, 32T wall: 4.830s — only 0.27s difference from doubling threads. At 32T, Kraken2 classification finishes in ~0.69s but wall time is 4.83s because ~4.7s of sys time (DB loading) cannot be parallelized. This is qualitatively different from the bandwidth wall seen with smaller DBs — here the bottleneck is purely sequential I/O, not DRAM bandwidth.
+
+32. **LLC miss rate dip at 16-32T universal across all DBs** — eskape_650mb: 32.26%→30.53%, eskape_human_4gb: 59.34%→59.03%, standard_8gb: 83.34%→82.90%. All three DBs show the same slight retreat at this thread count. Likely the same mechanism: at 32T the classification finishes so fast that steady-state cache pressure never fully builds, slightly improving measured hit rate.
+
 ---
 
 ## Cross-Machine Comparison

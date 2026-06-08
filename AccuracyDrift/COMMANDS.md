@@ -534,3 +534,47 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **95.77** | **81.10** | **82.32** | **5.836** | **2.02** |
 
 Wall speedup: 2.87x (35.9% eff). Classification-phase speedup: (12.53/1.57) = 7.99x (~100% of ideal 8T). Classification scaling is near-perfect — all degradation is the DB loading serial overhead.
+
+---
+
+### reads_hac × standard_8gb × 16T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb \
+  --threads 16 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 95.77 | 86.36 | 83.30 | 5.111 | 1.95 |
+| 2 | 95.77 | 86.29 | 83.32 | 5.099 | 1.96 |
+| 3 | 95.77 | 86.24 | 83.39 | 5.078 | 1.94 |
+| **avg** | **95.77** | **86.30** | **83.34** | **5.096** | **1.95** |
+
+Wall speedup: 3.29x (20.6% eff). Kraken2 classification time ~0.974s → classification speedup ~13x. Amdahl ceiling dominating — sys time ~4.4s is most of wall time.
+
+---
+
+### reads_hac × standard_8gb × 32T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb \
+  --threads 32 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 95.77 | 87.97 | 83.01 | 4.799 | 1.83 |
+| 2 | 95.77 | 88.05 | 82.84 | 4.824 | 1.85 |
+| 3 | 95.77 | 88.02 | 82.86 | 4.868 | 1.79 |
+| **avg** | **95.77** | **88.01** | **82.90** | **4.830** | **1.82** |
+
+Wall speedup: 3.47x (10.8% eff). Kraken2 classification ~0.692s → classification speedup ~18x. Wall time almost entirely sys time (~4.7s). Only 0.27s gained going from 16T to 32T — Amdahl ceiling fully hit.
