@@ -42,6 +42,10 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 14. **IPC unchanged from 1T to 2T on eskape_human_4gb** — stays at 1.25 for both 1T and 2T. Contrast with eskape_650mb where IPC dropped from 1.47 (1T) to 1.46 (2T). Post-cliff, the CPU is already spending so much time waiting on DRAM at 1T that adding a second thread does not change the per-instruction stall profile — both threads stall on DRAM independently.
 
+15. **Efficiency collapse at 4T post-cliff vs pre-cliff** — eskape_650mb 4T: 3.85x (96.3% efficiency). eskape_human_4gb 4T: 3.33x (83.2%). A 13-point efficiency gap at just 4 threads. With LLC miss rate at 58%, each thread generates far more DRAM requests than with the smaller DB — bandwidth saturation kicks in sooner, and scaling ceiling will be lower across the board.
+
+16. **LLC miss rate climbing steadily with threads (eskape_human_4gb)** — 1T: 56.85%, 2T: 57.44%, 4T: 58.41%. Consistent ~0.5-1% climb per doubling of threads. On eskape_650mb the same metric was flat (30.70% → 31.49% → 32.09%). The post-cliff DB is sensitive to thread count: more threads = more concurrent DRAM inflight = higher measured miss rate as the DRAM queue stays full.
+
 ---
 
 ## Cross-Machine Comparison

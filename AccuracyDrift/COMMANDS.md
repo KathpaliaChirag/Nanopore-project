@@ -314,3 +314,25 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **66.13** | **78.77** | **57.44** | **15.949** | **1.25** |
 
 Speedup vs 1T: 1.87x (93.5% efficiency).
+
+---
+
+### reads_hac × eskape_human_4gb × 4T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_human_4gb \
+  --threads 4 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 66.13 | 80.36 | 58.49 | 8.929 | 1.24 |
+| 2 | 66.13 | 80.18 | 58.40 | 8.982 | 1.24 |
+| 3 | 66.13 | 80.19 | 58.33 | 8.989 | 1.24 |
+| **avg** | **66.13** | **80.24** | **58.41** | **8.966** | **1.24** |
+
+Speedup vs 1T: 3.33x (83.2% efficiency). Compare: eskape_650mb 4T was 3.85x (96.3%). Efficiency has dropped 13 points at just 4T — higher DRAM traffic per thread saturates bandwidth earlier post-cache-cliff.
