@@ -358,3 +358,25 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **66.13** | **82.46** | **59.27** | **5.490** | **1.22** |
 
 Speedup vs 1T: 5.43x (67.9% efficiency). Compare: eskape_650mb 8T was 7.37x (92.1%). Gap widens — DRAM bandwidth saturation hitting harder with the larger DB.
+
+---
+
+### reads_hac × eskape_human_4gb × 16T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_human_4gb \
+  --threads 16 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 66.13 | 83.12 | 59.31 | 3.761 | 1.21 |
+| 2 | 66.13 | 83.09 | 59.29 | 3.759 | 1.21 |
+| 3 | 66.13 | 83.30 | 59.42 | 3.764 | 1.21 |
+| **avg** | **66.13** | **83.17** | **59.34** | **3.761** | **1.21** |
+
+Speedup vs 1T: 7.93x (49.5% efficiency). LLC miss rate has flatlined — 59.27% at 8T vs 59.34% at 16T, essentially no change. DRAM fully saturated; adding more threads only adds overhead.

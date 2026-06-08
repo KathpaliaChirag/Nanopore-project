@@ -46,7 +46,11 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 16. **LLC miss rate climbing steadily with threads (eskape_human_4gb)** — 1T: 56.85%, 2T: 57.44%, 4T: 58.41%, 8T: 59.27%. Consistent ~0.5-1% climb per doubling of threads. On eskape_650mb the same metric was flat (30.70% → 31.49% → 32.09% → 32.26%). The post-cliff DB is sensitive to thread count: more threads = more concurrent DRAM inflight = higher measured miss rate as the DRAM queue stays full.
 
-17. **Efficiency gap widens rapidly past 4T** — eskape_650mb vs eskape_human_4gb efficiency at each thread count: 2T=98.5% vs 93.5% (5pt gap), 4T=96.3% vs 83.2% (13pt gap), 8T=92.1% vs 67.9% (24pt gap). The gap more than doubles between 4T and 8T. On the larger DB, DRAM bandwidth is the dominant bottleneck well before 8 threads — the scaling ceiling will be reached much sooner than the 32T sweet spot seen with eskape_650mb.
+17. **Efficiency gap widens rapidly past 4T** — eskape_650mb vs eskape_human_4gb efficiency at each thread count: 2T=98.5% vs 93.5% (5pt gap), 4T=96.3% vs 83.2% (13pt gap), 8T=92.1% vs 67.9% (24pt gap), 16T=84.1% vs 49.5% (35pt gap). The gap keeps growing. On the larger DB, DRAM bandwidth is the dominant bottleneck — the scaling ceiling is well below the 32T sweet spot seen with eskape_650mb.
+
+18. **LLC miss rate plateaus at 8-16T for eskape_human_4gb** — 8T: 59.27%, 16T: 59.34% — essentially no change. Contrast with 1T→8T where it climbed from 56.85% to 59.27%. The DRAM is fully saturated from 8T onward: every LLC load is a miss, there is no headroom left. On eskape_650mb this plateau never appeared in the same range — miss rate even dipped at 16T. The difference reveals how completely the larger DB overwhelms the LLC.
+
+19. **Efficiency below 50% at 16T post-cliff** — 7.93x out of possible 16x. For eskape_650mb, efficiency did not drop below 50% until somewhere past 32T. The cache cliff effectively halves the useful thread count: the bandwidth wall hits at ~8T instead of ~32T.
 
 ---
 
