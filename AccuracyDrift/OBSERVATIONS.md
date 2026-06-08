@@ -52,6 +52,10 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 19. **Efficiency below 50% at 16T post-cliff** — 7.93x out of possible 16x. For eskape_650mb, efficiency did not drop below 50% until somewhere past 32T. The cache cliff effectively halves the useful thread count: the bandwidth wall hits at ~8T instead of ~32T.
 
+20. **LLC miss rate dip at 16-32T is consistent across both DBs** — eskape_650mb: 32.26% (8T) → 31.31% (16T) → 30.53% (32T). eskape_human_4gb: 59.27% (8T) → 59.34% (16T) → 59.03% (32T). Both show the same slight retreat at 32T despite the absolute values being completely different. Likely a measurement artifact: at higher thread counts the run completes faster, so the perf counters capture less steady-state cache pressure per unit time.
+
+21. **16T→32T gain only 26% on eskape_human_4gb** — speedup goes 7.93x → 10.02x. On eskape_650mb the same doubling went 13.45x → 21.03x (56% gain). The post-cliff DRAM bandwidth wall completely kills the benefit of adding threads beyond 16. IPC dropped from 1.21 to 1.16 — threads are spending more time stalled, not executing.
+
 ---
 
 ## Cross-Machine Comparison

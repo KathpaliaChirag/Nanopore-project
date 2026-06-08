@@ -380,3 +380,25 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **66.13** | **83.17** | **59.34** | **3.761** | **1.21** |
 
 Speedup vs 1T: 7.93x (49.5% efficiency). LLC miss rate has flatlined — 59.27% at 8T vs 59.34% at 16T, essentially no change. DRAM fully saturated; adding more threads only adds overhead.
+
+---
+
+### reads_hac × eskape_human_4gb × 32T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_human_4gb \
+  --threads 32 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 66.13 | 83.01 | 59.08 | 2.975 | 1.16 |
+| 2 | 66.13 | 82.98 | 59.04 | 2.977 | 1.17 |
+| 3 | 66.13 | 82.93 | 58.96 | 2.977 | 1.16 |
+| **avg** | **66.13** | **82.97** | **59.03** | **2.976** | **1.16** |
+
+Speedup vs 1T: 10.02x (31.3% efficiency). 16T→32T only gained 26% (7.93x → 10.02x). LLC miss rate ticked down slightly (59.34% → 59.03%) — same 16-32T dip pattern seen with eskape_650mb.
