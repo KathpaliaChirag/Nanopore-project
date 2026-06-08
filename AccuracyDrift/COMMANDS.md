@@ -145,3 +145,28 @@ perf stat -e cache-misses,cache-references,instructions,cycles \
 | **avg** | **65.28** | **37.11** | **5.722** |
 
 Speedup vs 1T: 3.83x (95.7% efficiency). Cache miss rate increase slowing: +1.97% (1T→2T) vs +0.93% (2T→4T).
+
+---
+
+### reads_hac × eskape_650mb × 8T (with numactl)
+
+Run 3 times:
+
+```bash
+perf stat -e cache-misses,cache-references,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 8 \
+  --report ~/AccuracyDrift/runs/hac_eskape_650mb_8T_report.txt \
+  --output ~/AccuracyDrift/runs/hac_eskape_650mb_8T_output.txt \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------|------|
+| 1 | 65.28 | 37.08 | 2.978 | 1.43 |
+| 2 | 65.28 | 37.10 | 3.003 | 1.43 |
+| 3 | 65.28 | 37.02 | 3.000 | 1.42 |
+| **avg** | **65.28** | **37.07** | **2.993** | **1.43** |
+
+Speedup vs 1T: 7.32x (91.5% efficiency). Cache miss rate plateaued — 4T was 37.11%, 8T is 37.07%. LLC saturated for this DB size.
