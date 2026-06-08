@@ -18,7 +18,7 @@ Goal: Understand how Kraken2 classification accuracy and cache behavior change a
 ## Perf Command (standard across all x86 machines)
 
 ```bash
-perf stat -e cache-misses,cache-references,instructions,cycles \
+perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
   numactl --cpunodebind=0 --membind=0 \
   kraken2 --db ~/AccuracyDrift/databases/<DB> \
   --threads <T> \
@@ -27,8 +27,8 @@ perf stat -e cache-misses,cache-references,instructions,cycles \
   /home/student/results/basecalling/<READ>.fastq
 ```
 
-LLC Miss Rate% = cache-misses / cache-references × 100
-Note: perf stat `cache-misses` maps to the hardware LLC (Last Level Cache) miss counter on x86. This IS the LLC miss rate.
+LLC Miss Rate% = LLC-load-misses / LLC-loads × 100
+Note: `LLC-load-misses` counts retired demand load misses only — actual loads that missed LLC and went to DRAM. This is more accurate than the generic `cache-misses` event which includes speculative accesses and inflates the count (~5x higher on this machine).
 
 ---
 
