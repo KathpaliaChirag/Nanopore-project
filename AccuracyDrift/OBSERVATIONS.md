@@ -74,6 +74,10 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 28. **Amdahl's law visible in standard_8gb thread scaling** — sys time ~4.2s is sequential DB loading that does not parallelize. This is ~25% of 1T wall time (16.778s). Wall-time speedup at 2T: 1.59x (79.4%). But classification-phase-only speedup: ~1.96x — the classification itself still scales well. The fixed DB loading overhead will cap wall-time speedup no matter how many threads are used: even with instant classification, wall time cannot drop below ~4.2s, so the maximum possible speedup is 16.778/4.2 ≈ 4.0x. This is a real practical limit for standard_8gb on Luna.
 
+29. **Classification phase scales near-perfectly to 8T on standard_8gb** — 4T classification speedup: 3.92x (~98%), 8T: 7.99x (~100%). Despite 82% LLC miss rate, the classification work itself parallelizes almost ideally. The DRAM bandwidth is not yet saturated for the classification phase alone at 8T — the high miss rate means more DRAM traffic per thread but the memory bus can still handle it. The wall-time speedup (2.87x at 8T) is misleading — the bottleneck is purely the serial DB loading, not thread scaling or DRAM bandwidth.
+
+30. **LLC miss rate climbing faster than other DBs** — standard_8gb: 1T=76.59%, 2T=77.78%, 4T=79.60%, 8T=82.32% — a 5.7 point rise across 3 doublings. eskape_human_4gb rose only 2.4 points (56.85%→59.27%) over the same range. With a larger DB and higher baseline miss rate, each additional thread generates more DRAM contention with less LLC to absorb it.
+
 ---
 
 ## Cross-Machine Comparison

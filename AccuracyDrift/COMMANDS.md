@@ -490,3 +490,47 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **95.77** | **77.06** | **77.78** | **10.571** | **2.08** |
 
 Wall-time speedup: 1.59x (79.4% efficiency). Note: sys time ~4.2s is sequential DB loading overhead constant across thread counts. Classification-phase-only speedup: (16.778-4.27)/(10.571-4.19) = 12.51/6.38 = 1.96x — consistent with other DBs at 2T.
+
+---
+
+### reads_hac × standard_8gb × 4T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb \
+  --threads 4 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 95.77 | 77.89 | 79.59 | 7.433 | 2.06 |
+| 2 | 95.77 | 77.92 | 79.63 | 7.401 | 2.07 |
+| 3 | 95.77 | 78.00 | 79.59 | 7.423 | 2.06 |
+| **avg** | **95.77** | **77.94** | **79.60** | **7.419** | **2.06** |
+
+Wall speedup: 2.26x (56.5% eff). Classification-phase speedup: (12.53/3.20) = 3.92x (~98% of ideal 4T). The ~4.2s DB loading overhead dominates wall time at low thread counts.
+
+---
+
+### reads_hac × standard_8gb × 8T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb \
+  --threads 8 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 95.77 | 81.04 | 82.40 | 5.822 | 2.03 |
+| 2 | 95.77 | 81.26 | 82.25 | 5.853 | 2.02 |
+| 3 | 95.77 | 81.01 | 82.32 | 5.834 | 2.02 |
+| **avg** | **95.77** | **81.10** | **82.32** | **5.836** | **2.02** |
+
+Wall speedup: 2.87x (35.9% eff). Classification-phase speedup: (12.53/1.57) = 7.99x (~100% of ideal 8T). Classification scaling is near-perfect — all degradation is the DB loading serial overhead.
