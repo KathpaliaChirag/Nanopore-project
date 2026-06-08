@@ -4,7 +4,7 @@
 
 Goal: Understand how Kraken2 classification accuracy and cache behavior change across database sizes and machines.
 
-- **Read files:** reads_fast.fastq (104,832 reads), reads_hac.fastq (104,918 reads), reads_sup.fastq (TBD after permission fix)
+- **Read files:** reads_fast.fastq (104,832 reads, 708 MB), reads_hac.fastq (104,918 reads, 703 MB), reads_sup.fastq (104,980 reads, 723 MB)
 - **Databases:** eskape_650mb (142 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB)
 - **Machines:** Luna (dell-R760), Minerva, Lab Desktop, Orion (Jetson, last)
 - **Threads tested:** powers of 2 from 1 up to machine max
@@ -92,14 +92,16 @@ Columns: threads | classified% | unclassified% | cache miss rate% | time (s)
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
-| 1 | - | - | - | - |
+| 1 | 65.28 | 34.72 | 34.21 | 21.924 |
 | 2 | - | - | - | - |
 | 4 | - | - | - | - |
 | 8 | - | - | - | - |
 | 16 | - | - | - | - |
-| 32 | 65.28 | 34.72 | 38.48 (avg 3 runs) | 1.10 |
+| 32 | 65.28 | 34.72 | 38.48 | 1.10 |
 | 64 | - | - | - | - |
 | 96 | - | - | - | - |
+
+Note: 32T run was done without numactl (pre-experiment). All other runs use numactl --cpunodebind=0 --membind=0.
 
 #### reads_hac — eskape_human_4gb
 
@@ -282,7 +284,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| eskape_650mb (142 MB) | - | - | - | - |
+| eskape_650mb (142 MB) | 34.21 | - | - | - |
 | eskape_human_4gb (3.8 GB) | - | - | - | - |
 | standard_8gb (7.6 GB) | - | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
@@ -300,7 +302,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| eskape_650mb (142 MB) | - | - | - | - |
+| eskape_650mb (142 MB) | 21.924 | - | - | - |
 | eskape_human_4gb (3.8 GB) | - | - | - | - |
 | standard_8gb (7.6 GB) | - | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
@@ -309,7 +311,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| eskape_650mb (142 MB) | - | - | - | - |
+| eskape_650mb (142 MB) | 65.28 | - | - | - |
 | eskape_human_4gb (3.8 GB) | - | - | - | - |
 | standard_8gb (7.6 GB) | - | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
