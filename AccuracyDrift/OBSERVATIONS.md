@@ -82,6 +82,10 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 32. **LLC miss rate dip at 16-32T universal across all DBs** — eskape_650mb: 32.26%→30.53%, eskape_human_4gb: 59.34%→59.03%, standard_8gb: 83.34%→82.90%. All three DBs show the same slight retreat at this thread count. Likely the same mechanism: at 32T the classification finishes so fast that steady-state cache pressure never fully builds, slightly improving measured hit rate.
 
+33. **96T slower than 64T for both wall and classification time on standard_8gb** — wall: 5.119s vs 4.949s; Kraken2 classification: 0.943s vs 0.802s. For eskape_650mb and eskape_human_4gb, 96T was slower only in wall time (the classification was just dominated by overhead). Here, the classification phase itself is slower at 96T — thread spawn/join overhead and cache contention from 96 threads competing on a single socket hurts the actual compute.
+
+34. **Wall speedup ceiling for standard_8gb: ~3.5x (32T)** — across all three DBs the practical limit differs entirely: eskape_650mb peaks at ~22x (64T), eskape_human_4gb at ~10.6x (64T), standard_8gb at ~3.5x (32T). The different mechanisms: eskape_650mb is DRAM-bandwidth-limited, eskape_human_4gb is also bandwidth-limited but more severely, standard_8gb is Amdahl-limited by DB loading overhead.
+
 ---
 
 ## Cross-Machine Comparison

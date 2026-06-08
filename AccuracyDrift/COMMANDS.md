@@ -578,3 +578,47 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **95.77** | **88.01** | **82.90** | **4.830** | **1.82** |
 
 Wall speedup: 3.47x (10.8% eff). Kraken2 classification ~0.692s → classification speedup ~18x. Wall time almost entirely sys time (~4.7s). Only 0.27s gained going from 16T to 32T — Amdahl ceiling fully hit.
+
+---
+
+### reads_hac × standard_8gb × 64T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb \
+  --threads 64 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 95.77 | 87.13 | 83.06 | 4.961 | 1.57 |
+| 2 | 95.77 | 86.89 | 82.96 | 4.932 | 1.60 |
+| 3 | 95.77 | 87.22 | 82.76 | 4.954 | 1.54 |
+| **avg** | **95.77** | **87.08** | **82.93** | **4.949** | **1.57** |
+
+Wall speedup: 3.39x. Kraken2 classification ~0.802s → ~15.8x classification speedup. IPC drops sharply from 1.82 (32T) to 1.57.
+
+---
+
+### reads_hac × standard_8gb × 96T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb \
+  --threads 96 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 95.77 | 85.91 | 82.49 | 5.101 | 1.50 |
+| 2 | 95.77 | 86.03 | 82.59 | 5.122 | 1.50 |
+| 3 | 95.77 | 86.06 | 82.67 | 5.136 | 1.51 |
+| **avg** | **95.77** | **86.00** | **82.58** | **5.119** | **1.50** |
+
+96T slower than 64T on both wall time (5.119s vs 4.949s) and classification time (0.943s vs 0.802s). Speedup 3.28x, below 64T's 3.39x. hac × standard_8gb thread scaling complete.

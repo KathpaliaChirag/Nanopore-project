@@ -145,8 +145,8 @@ Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache
 | 8  | 95.77 | 4.23 | 81.10 | 82.32 | 5.836  | 2.87x | 2.02 |
 | 16 | 95.77 | 4.23 | 86.30 | 83.34 | 5.096  | 3.29x | 1.95 |
 | 32 | 95.77 | 4.23 | 88.01 | 82.90 | 4.830  | 3.47x | 1.82 |
-| 64 | - | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - | - |
+| 64 | 95.77 | 4.23 | 87.08 | 82.93 | 4.949  | 3.39x | 1.57 |
+| 96 | 95.77 | 4.23 | 86.00 | 82.58 | 5.119  | 3.28x | 1.50 |
 
 #### reads_hac — standard_16gb
 
@@ -314,7 +314,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 |----|-----------|---------------|------------------|------------|
 | eskape_650mb (142 MB) | 32.56 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 58.94 | - | - | - |
-| standard_8gb (7.6 GB) | - | - | - | - |
+| standard_8gb (7.6 GB) | 82.58 | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
 
 ### 2.3 Time (s) at 1 Thread — reads_hac
