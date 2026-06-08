@@ -116,11 +116,11 @@ Columns: threads | classified% | unclassified% | cache miss rate% | time (s)
 | 4  | 65.28 | 34.72 | 37.11 | 32.09 | 5.701  | 3.85x  | 1.45 |
 | 8  | 65.28 | 34.72 | 37.07 | 32.26 | 2.981  | 7.37x  | 1.43 |
 | 16 | 65.28 | 34.72 | 36.70 | 31.31 | 1.634  | 13.45x | 1.41 |
-| 32 | 65.28 | 34.72 | -     | 30.44 | 1.053  | 20.87x | 1.38 |
+| 32 | 65.28 | 34.72 | 36.23 | 30.53 | 1.045  | 21.03x | 1.37 |
 | 64 | - | - | - | - | - | - | - |
 | 96 | - | - | - | - | - | - | - |
 
-Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache-misses/cache-references (includes speculative+prefetch). LLC Miss Rate% = LLC-load-misses/LLC-loads (retired demand loads only). 32T cache-miss rate pending re-run with full 6-event command.
+Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache-misses/cache-references (includes speculative+prefetch). LLC Miss Rate% = LLC-load-misses/LLC-loads (retired demand loads only).
 
 #### reads_hac — eskape_human_4gb
 

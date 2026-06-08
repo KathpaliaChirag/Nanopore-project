@@ -203,4 +203,26 @@ perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
 | 3 | 65.28 | 30.29 | 1.053 | 1.38 |
 | **avg** | **65.28** | **30.44** | **1.053** | **1.38** |
 
-Speedup vs 1T: 20.87x (65.2% efficiency) — big drop from 16T's 84.1%. DRAM bandwidth wall hit. Cache miss rate pending full 6-event re-run.
+Speedup vs 1T: 20.87x (65.2% efficiency) — big drop from 16T's 84.1%. DRAM bandwidth wall hit.
+
+---
+
+### reads_hac × eskape_650mb × 32T — full 6-event re-run
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 32 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 65.28 | 36.14 | 30.33 | 1.036 | 1.37 |
+| 2 | 65.28 | 36.34 | 30.69 | 1.054 | 1.37 |
+| 3 | 65.28 | 36.22 | 30.58 | 1.044 | 1.38 |
+| **avg** | **65.28** | **36.23** | **30.53** | **1.045** | **1.37** |
+
+Speedup vs 1T: 21.03x (65.7% efficiency). Both metrics peaked at 4-8T and declining — at high thread counts, runs finish faster leaving less time for cache pressure to build.

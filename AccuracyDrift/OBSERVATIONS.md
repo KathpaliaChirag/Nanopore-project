@@ -16,7 +16,9 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 4. **IPC declines steadily with thread count** — 1T: 1.47, 2T: 1.46, 4T: 1.45, 8T: 1.43, 16T: 1.41. More threads = more concurrent DRAM stalls = lower IPC. Will likely drop faster at very high thread counts.
 
-5. **Speedup efficiency degrading** — 2T: 98.5%, 4T: 96.3%, 8T: 92.1%, 16T: 84.1%. Consistent drop of ~4% per doubling past 4T. Expected to accelerate past 32T when DRAM bandwidth fully saturates.
+5. **Speedup efficiency degrading** — 2T: 98.5%, 4T: 96.3%, 8T: 92.1%, 16T: 84.1%, 32T: 65.7%. Big jump in degradation between 16T and 32T — confirms DRAM bandwidth fully saturated. Adding more threads past 32T will likely yield diminishing returns.
+
+6. **Both miss rate metrics peak at 4-8T then decline** — Cache miss rate: 1T=34.21%, 4T=37.11%, 8T=37.07%, 16T=36.70%, 32T=36.23%. LLC miss rate: 1T=30.70%, 4T=32.09%, 8T=32.26%, 16T=31.31%, 32T=30.53%. At high thread counts, wall time shrinks so fast that total cache pressure per run decreases even though per-thread pressure is high.
 
 6. **cache-misses vs LLC-load-misses** — `cache-misses` was ~317M vs `LLC-load-misses` ~57M at 1T (5.6x difference). `cache-misses` includes speculative loads and prefetcher activity. `LLC-load-misses` counts only retired demand loads. We switched to LLC-load-misses as it reflects actual program-driven DRAM traffic.
 
