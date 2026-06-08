@@ -38,6 +38,10 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 12. **1T runtime increased only 35% despite 26x larger DB** — eskape_650mb: 21.981s, eskape_human_4gb: 29.818s. DB is 26x larger but only 35% slower. At 1T the bottleneck is sequential DRAM latency — the larger DB causes more misses per lookup but the single thread can only issue one lookup at a time anyway, so the increase is proportional to miss rate increase not DB size.
 
+13. **2T scaling stays strong even post-cache-cliff** — eskape_human_4gb 2T: 1.87x speedup (93.5% efficiency) vs eskape_650mb 2T: 1.97x (98.5%). Despite LLC miss rate nearly doubling (57% vs 31%), two threads still scale close to linearly. At just 2 threads, DRAM bandwidth is not yet saturated even with a 3.8 GB DB. The cliff affects latency per access but not bandwidth headroom at low thread counts.
+
+14. **IPC unchanged from 1T to 2T on eskape_human_4gb** — stays at 1.25 for both 1T and 2T. Contrast with eskape_650mb where IPC dropped from 1.47 (1T) to 1.46 (2T). Post-cliff, the CPU is already spending so much time waiting on DRAM at 1T that adding a second thread does not change the per-instruction stall profile — both threads stall on DRAM independently.
+
 ---
 
 ## Cross-Machine Comparison

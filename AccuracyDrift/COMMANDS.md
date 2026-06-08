@@ -292,3 +292,25 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **66.13** | **78.04** | **56.85** | **29.818** | **1.25** |
 
 Cache cliff confirmed: LLC miss rate jumped from 30.70% (eskape_650mb) to 56.85% (eskape_human_4gb). Cache miss rate from 34.21% to 78.04%. Classified% up slightly: 65.28% → 66.13% (human genome adds coverage).
+
+---
+
+### reads_hac × eskape_human_4gb × 2T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_human_4gb \
+  --threads 2 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 66.13 | 78.83 | 57.43 | 16.004 | 1.24 |
+| 2 | 66.13 | 78.73 | 57.40 | 15.936 | 1.25 |
+| 3 | 66.13 | 78.76 | 57.50 | 15.906 | 1.25 |
+| **avg** | **66.13** | **78.77** | **57.44** | **15.949** | **1.25** |
+
+Speedup vs 1T: 1.87x (93.5% efficiency).
