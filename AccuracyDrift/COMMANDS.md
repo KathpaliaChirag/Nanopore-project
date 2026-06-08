@@ -64,7 +64,7 @@ perf stat -e cache-misses,cache-references,instructions,cycles \
   /home/student/results/basecalling/reads_hac.fastq
 ```
 
-| Run | Classified% | Cache Miss Rate% | Time (s) |
+| Run | Classified% | LLC Miss Rate% | Time (s) |
 |-----|-------------|-----------------|----------|
 | 1 | 65.28 | 38.49 | 1.107 |
 | 2 | 65.28 | 38.57 | 1.097 |
@@ -89,7 +89,7 @@ perf stat -e cache-misses,cache-references,instructions,cycles \
   /home/student/results/basecalling/reads_hac.fastq
 ```
 
-| Run | Classified% | Cache Miss Rate% | Time (s) |
+| Run | Classified% | LLC Miss Rate% | Time (s) |
 |-----|-------------|-----------------|----------|
 | 1 | 65.28 | 34.44 | 21.843 |
 | 2 | 65.28 | 34.08 | 21.967 |
@@ -112,7 +112,7 @@ perf stat -e cache-misses,cache-references,instructions,cycles \
   /home/student/results/basecalling/reads_hac.fastq
 ```
 
-| Run | Classified% | Cache Miss Rate% | Time (s) |
+| Run | Classified% | LLC Miss Rate% | Time (s) |
 |-----|-------------|-----------------|----------|
 | 1 | 65.28 | 36.34 | 11.197 |
 | 2 | 65.28 | 36.01 | 11.186 |
@@ -137,7 +137,7 @@ perf stat -e cache-misses,cache-references,instructions,cycles \
   /home/student/results/basecalling/reads_hac.fastq
 ```
 
-| Run | Classified% | Cache Miss Rate% | Time (s) |
+| Run | Classified% | LLC Miss Rate% | Time (s) |
 |-----|-------------|-----------------|----------|
 | 1 | 65.28 | 37.08 | 5.708 |
 | 2 | 65.28 | 37.18 | 5.741 |
@@ -162,11 +162,36 @@ perf stat -e cache-misses,cache-references,instructions,cycles \
   /home/student/results/basecalling/reads_hac.fastq
 ```
 
-| Run | Classified% | Cache Miss Rate% | Time (s) | IPC  |
+| Run | Classified% | LLC Miss Rate% | Time (s) | IPC  |
 |-----|-------------|-----------------|----------|------|
 | 1 | 65.28 | 37.08 | 2.978 | 1.43 |
 | 2 | 65.28 | 37.10 | 3.003 | 1.43 |
 | 3 | 65.28 | 37.02 | 3.000 | 1.42 |
 | **avg** | **65.28** | **37.07** | **2.993** | **1.43** |
 
-Speedup vs 1T: 7.32x (91.5% efficiency). Cache miss rate plateaued — 4T was 37.11%, 8T is 37.07%. LLC saturated for this DB size.
+Speedup vs 1T: 7.32x (91.5% efficiency). LLC miss rate plateaued — 4T was 37.11%, 8T is 37.07%. LLC saturated for this DB size.
+
+---
+
+### reads_hac × eskape_650mb × 16T (with numactl)
+
+Run 3 times:
+
+```bash
+perf stat -e cache-misses,cache-references,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 16 \
+  --report ~/AccuracyDrift/runs/hac_eskape_650mb_16T_report.txt \
+  --output ~/AccuracyDrift/runs/hac_eskape_650mb_16T_output.txt \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|----------------|----------|------|
+| 1 | 65.28 | 36.64 | 1.645 | 1.41 |
+| 2 | 65.28 | 36.67 | 1.650 | 1.40 |
+| 3 | 65.28 | 36.78 | 1.639 | 1.41 |
+| **avg** | **65.28** | **36.70** | **1.644** | **1.41** |
+
+Speedup vs 1T: 13.33x (83.3% efficiency). LLC miss rate slightly dropped vs 8T (37.07% → 36.70%) — unexpected, worth watching at 32T.

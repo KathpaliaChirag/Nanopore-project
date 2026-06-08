@@ -27,7 +27,8 @@ perf stat -e cache-misses,cache-references,instructions,cycles \
   /home/student/results/basecalling/<READ>.fastq
 ```
 
-Cache miss rate = cache-misses / cache-references × 100
+LLC Miss Rate% = cache-misses / cache-references × 100
+Note: perf stat `cache-misses` maps to the hardware LLC (Last Level Cache) miss counter on x86. This IS the LLC miss rate.
 
 ---
 
@@ -90,13 +91,13 @@ Columns: threads | classified% | unclassified% | cache miss rate% | time (s)
 
 #### reads_hac — eskape_650mb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------|---------------|------|
 | 1 | 65.28 | 34.72 | 34.21 | 21.924 | 1.00x | 1.47 |
 | 2 | 65.28 | 34.72 | 36.18 | 11.150 | 1.97x | 1.46 |
 | 4 | 65.28 | 34.72 | 37.11 | 5.722 | 3.83x | 1.45 |
 | 8 | 65.28 | 34.72 | 37.07 | 2.993 | 7.32x | 1.43 |
-| 16 | - | - | - | - | - | - |
+| 16 | 65.28 | 34.72 | 36.70 | 1.644 | 13.33x | 1.41 |
 | 32 | 65.28 | 34.72 | 38.48 | 1.10 | - | 1.33 |
 | 64 | - | - | - | - | - | - |
 | 96 | - | - | - | - | - | - |
@@ -105,7 +106,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_hac — eskape_human_4gb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -118,7 +119,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_hac — standard_8gb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -131,7 +132,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_hac — standard_16gb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -144,7 +145,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_fast — eskape_650mb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -157,7 +158,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_fast — eskape_human_4gb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -170,7 +171,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_fast — standard_8gb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -183,7 +184,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_fast — standard_16gb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -196,7 +197,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_sup — eskape_650mb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -209,7 +210,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_sup — eskape_human_4gb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -222,7 +223,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_sup — standard_8gb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -235,7 +236,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 #### reads_sup — standard_16gb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
+| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) |
 |---------|-------------|---------------|-----------------|----------|
 | 1 | - | - | - | - |
 | 2 | - | - | - | - |
@@ -280,7 +281,7 @@ Note: 32T run was done without numactl (pre-experiment). All other runs use numa
 
 Comparison at 1T and max-T across all machines. Fixed read model and DB to isolate machine effect.
 
-### 2.1 Cache Miss Rate% at 1 Thread — reads_hac
+### 2.1 LLC Miss Rate% at 1 Thread — reads_hac
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
@@ -289,7 +290,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | standard_8gb (7.6 GB) | - | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
 
-### 2.2 Cache Miss Rate% at Max Thread — reads_hac
+### 2.2 LLC Miss Rate% at Max Thread — reads_hac
 
 | DB | Luna (96T) | Minerva (TBD) | Lab Desktop (TBD) | Orion (TBD) |
 |----|-----------|---------------|------------------|------------|
