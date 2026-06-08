@@ -95,3 +95,53 @@ perf stat -e cache-misses,cache-references,instructions,cycles \
 | 2 | 65.28 | 34.08 | 21.967 |
 | 3 | 65.28 | 34.11 | 21.962 |
 | **avg** | **65.28** | **34.21** | **21.924** |
+
+---
+
+### reads_hac × eskape_650mb × 2T (with numactl)
+
+Run 3 times:
+
+```bash
+perf stat -e cache-misses,cache-references,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 2 \
+  --report ~/AccuracyDrift/runs/hac_eskape_650mb_2T_report.txt \
+  --output ~/AccuracyDrift/runs/hac_eskape_650mb_2T_output.txt \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | Time (s) |
+|-----|-------------|-----------------|----------|
+| 1 | 65.28 | 36.34 | 11.197 |
+| 2 | 65.28 | 36.01 | 11.186 |
+| 3 | 65.28 | 36.19 | 11.067 |
+| **avg** | **65.28** | **36.18** | **11.150** |
+
+Observation: near-perfect 2x speedup (1T=21.924s, 2T=11.150s = 1.97x). Cache miss rate already climbing: 1T=34.21%, 2T=36.18% — more threads = more LLC pressure.
+
+---
+
+### reads_hac × eskape_650mb × 4T (with numactl)
+
+Run 3 times:
+
+```bash
+perf stat -e cache-misses,cache-references,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 4 \
+  --report ~/AccuracyDrift/runs/hac_eskape_650mb_4T_report.txt \
+  --output ~/AccuracyDrift/runs/hac_eskape_650mb_4T_output.txt \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | Time (s) |
+|-----|-------------|-----------------|----------|
+| 1 | 65.28 | 37.08 | 5.708 |
+| 2 | 65.28 | 37.18 | 5.741 |
+| 3 | 65.28 | 37.06 | 5.718 |
+| **avg** | **65.28** | **37.11** | **5.722** |
+
+Speedup vs 1T: 3.83x (95.7% efficiency). Cache miss rate increase slowing: +1.97% (1T→2T) vs +0.93% (2T→4T).

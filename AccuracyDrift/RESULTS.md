@@ -90,18 +90,18 @@ Columns: threads | classified% | unclassified% | cache miss rate% | time (s)
 
 #### reads_hac — eskape_650mb
 
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) |
-|---------|-------------|---------------|-----------------|----------|
-| 1 | 65.28 | 34.72 | 34.21 | 21.924 |
-| 2 | - | - | - | - |
-| 4 | - | - | - | - |
-| 8 | - | - | - | - |
-| 16 | - | - | - | - |
-| 32 | 65.28 | 34.72 | 38.48 | 1.10 |
-| 64 | - | - | - | - |
-| 96 | - | - | - | - |
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | Time (s) | Speedup vs 1T |
+|---------|-------------|---------------|-----------------|----------|---------------|
+| 1 | 65.28 | 34.72 | 34.21 | 21.924 | 1.00x |
+| 2 | 65.28 | 34.72 | 36.18 | 11.150 | 1.97x |
+| 4 | 65.28 | 34.72 | 37.11 | 5.722 | 3.83x |
+| 8 | - | - | - | - | - |
+| 16 | - | - | - | - | - |
+| 32 | 65.28 | 34.72 | 38.48 | 1.10 | - |
+| 64 | - | - | - | - | - |
+| 96 | - | - | - | - | - |
 
-Note: 32T run was done without numactl (pre-experiment). All other runs use numactl --cpunodebind=0 --membind=0.
+Note: 32T run was done without numactl (pre-experiment). All other runs use numactl --cpunodebind=0 --membind=0. 32T speedup excluded from column as it used a different setup.
 
 #### reads_hac — eskape_human_4gb
 
