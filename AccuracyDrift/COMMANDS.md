@@ -248,3 +248,25 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **65.28** | **38.27** | **31.35** | **1.001** | **1.18** |
 
 Speedup vs 1T: 21.96x (34.3% efficiency). 32T→64T gained only 4% in wall time. IPC crashed from 1.37 to 1.18. Both miss rates jumped back up — 64 threads generate enough pressure even in short wall time to saturate cache again.
+
+---
+
+### reads_hac × eskape_650mb × 96T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 96 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 65.28 | 40.03 | 32.81 | 1.220 | 1.12 |
+| 2 | 65.28 | 39.70 | 32.36 | 1.130 | 1.13 |
+| 3 | 65.28 | 39.60 | 32.50 | 1.143 | 1.14 |
+| **avg** | **65.28** | **39.78** | **32.56** | **1.164** | **1.13** |
+
+96T is SLOWER than 64T (1.164s vs 1.001s). Speedup 18.88x — lower than 64T's 21.96x. Thread overhead and cache thrashing outweigh parallelism. hac × eskape_650mb thread scaling complete.

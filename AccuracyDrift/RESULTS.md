@@ -118,7 +118,7 @@ Columns: threads | classified% | unclassified% | cache miss rate% | time (s)
 | 16 | 65.28 | 34.72 | 36.70 | 31.31 | 1.634  | 13.45x | 1.41 |
 | 32 | 65.28 | 34.72 | 36.23 | 30.53 | 1.045  | 21.03x | 1.37 |
 | 64 | 65.28 | 34.72 | 38.27 | 31.35 | 1.001  | 21.96x | 1.18 |
-| 96 | - | - | - | - | - | - | - |
+| 96 | 65.28 | 34.72 | 39.78 | 32.56 | 1.164  | 18.88x | 1.13 |
 
 Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache-misses/cache-references (includes speculative+prefetch). LLC Miss Rate% = LLC-load-misses/LLC-loads (retired demand loads only).
 
