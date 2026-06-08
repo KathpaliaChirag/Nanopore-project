@@ -336,3 +336,25 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **66.13** | **80.24** | **58.41** | **8.966** | **1.24** |
 
 Speedup vs 1T: 3.33x (83.2% efficiency). Compare: eskape_650mb 4T was 3.85x (96.3%). Efficiency has dropped 13 points at just 4T — higher DRAM traffic per thread saturates bandwidth earlier post-cache-cliff.
+
+---
+
+### reads_hac × eskape_human_4gb × 8T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_human_4gb \
+  --threads 8 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 66.13 | 82.45 | 59.28 | 5.499 | 1.22 |
+| 2 | 66.13 | 82.45 | 59.30 | 5.495 | 1.22 |
+| 3 | 66.13 | 82.47 | 59.24 | 5.476 | 1.23 |
+| **avg** | **66.13** | **82.46** | **59.27** | **5.490** | **1.22** |
+
+Speedup vs 1T: 5.43x (67.9% efficiency). Compare: eskape_650mb 8T was 7.37x (92.1%). Gap widens — DRAM bandwidth saturation hitting harder with the larger DB.
