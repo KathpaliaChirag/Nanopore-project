@@ -468,3 +468,25 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **95.77** | **76.57** | **76.59** | **16.778** | **2.11** |
 
 Note: sys time is ~4.3s (vs ~2s for smaller DBs) — significant DB loading overhead included in wall time. Cache miss rate ≈ LLC miss rate (both ~76%) — with a DB this large, all accesses (speculative, prefetch, demand) miss at the same rate since the hardware prefetcher cannot predict random hash table accesses.
+
+---
+
+### reads_hac × standard_8gb × 2T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb \
+  --threads 2 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 95.77 | 77.09 | 77.85 | 10.560 | 2.09 |
+| 2 | 95.77 | 77.06 | 77.78 | 10.578 | 2.08 |
+| 3 | 95.77 | 77.04 | 77.70 | 10.576 | 2.08 |
+| **avg** | **95.77** | **77.06** | **77.78** | **10.571** | **2.08** |
+
+Wall-time speedup: 1.59x (79.4% efficiency). Note: sys time ~4.2s is sequential DB loading overhead constant across thread counts. Classification-phase-only speedup: (16.778-4.27)/(10.571-4.19) = 12.51/6.38 = 1.96x — consistent with other DBs at 2T.

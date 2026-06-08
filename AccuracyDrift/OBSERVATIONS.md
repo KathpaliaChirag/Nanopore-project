@@ -72,6 +72,8 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 27. **IPC 2.11 at standard_8gb 1T — surprisingly high despite 76% LLC miss rate** — but sys time is 4.3s vs ~2s for smaller DBs. The perf counters capture the full process including DB loading from disk, which is likely more sequential/cache-friendly and inflates IPC. The classification phase IPC is probably lower; this number is not directly comparable to the other DBs.
 
+28. **Amdahl's law visible in standard_8gb thread scaling** — sys time ~4.2s is sequential DB loading that does not parallelize. This is ~25% of 1T wall time (16.778s). Wall-time speedup at 2T: 1.59x (79.4%). But classification-phase-only speedup: ~1.96x — the classification itself still scales well. The fixed DB loading overhead will cap wall-time speedup no matter how many threads are used: even with instant classification, wall time cannot drop below ~4.2s, so the maximum possible speedup is 16.778/4.2 ≈ 4.0x. This is a real practical limit for standard_8gb on Luna.
+
 ---
 
 ## Cross-Machine Comparison
