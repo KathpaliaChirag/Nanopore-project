@@ -18,7 +18,9 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 5. **Speedup efficiency degrading** — 2T: 98.5%, 4T: 96.3%, 8T: 92.1%, 16T: 84.1%, 32T: 65.7%. Big jump in degradation between 16T and 32T — confirms DRAM bandwidth fully saturated. Adding more threads past 32T will likely yield diminishing returns.
 
-6. **Both miss rate metrics peak at 4-8T then decline** — Cache miss rate: 1T=34.21%, 4T=37.11%, 8T=37.07%, 16T=36.70%, 32T=36.23%. LLC miss rate: 1T=30.70%, 4T=32.09%, 8T=32.26%, 16T=31.31%, 32T=30.53%. At high thread counts, wall time shrinks so fast that total cache pressure per run decreases even though per-thread pressure is high.
+6. **Miss rates peak at 4-8T, dip 16-32T, then jump again at 64T** — Cache miss rate: 1T=34.21%, 4T=37.11%, 8T=37.07%, 16T=36.70%, 32T=36.23%, 64T=38.27%. LLC: same pattern. At 64T the sheer number of concurrent threads generates enough LLC pressure even within a short wall time to push miss rates back to their peak. The dip at 16-32T was a transitional phase.
+
+7. **32T→64T: almost no benefit** — 1.045s → 1.001s, only 4% faster. Efficiency dropped from 65.7% to 34.3%. IPC crashed from 1.37 to 1.18. For this 142 MB database on Luna, 32T is the practical ceiling — beyond that you're spending 2x the CPU resources for a marginal gain.
 
 6. **cache-misses vs LLC-load-misses** — `cache-misses` was ~317M vs `LLC-load-misses` ~57M at 1T (5.6x difference). `cache-misses` includes speculative loads and prefetcher activity. `LLC-load-misses` counts only retired demand loads. We switched to LLC-load-misses as it reflects actual program-driven DRAM traffic.
 
