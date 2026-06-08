@@ -35,7 +35,7 @@ Goal: Understand how Kraken2 classification accuracy and cache behavior change a
 ## Perf Command (standard across all x86 machines)
 
 ```bash
-perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
   numactl --cpunodebind=0 --membind=0 \
   kraken2 --db ~/AccuracyDrift/databases/<DB> \
   --threads <T> \
@@ -44,8 +44,9 @@ perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
   /home/student/results/basecalling/<READ>.fastq
 ```
 
-LLC Miss Rate% = LLC-load-misses / LLC-loads × 100
-Note: `LLC-load-misses` counts retired demand load misses only — actual loads that missed LLC and went to DRAM. This is more accurate than the generic `cache-misses` event which includes speculative accesses and inflates the count (~5x higher on this machine).
+Both metrics tracked:
+- **Cache Miss Rate%** = cache-misses / cache-references × 100 (includes speculative + prefetch activity)
+- **LLC Miss Rate%** = LLC-load-misses / LLC-loads × 100 (retired demand loads only — the real DRAM traffic)
 
 ---
 
@@ -108,18 +109,18 @@ Columns: threads | classified% | unclassified% | cache miss rate% | time (s)
 
 #### reads_hac — eskape_650mb
 
-| Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
-|---------|-------------|---------------|----------------|----------|---------------|------|
-| 1  | 65.28 | 34.72 | 30.70 | 21.981 | 1.00x  | 1.47 |
-| 2  | 65.28 | 34.72 | 31.49 | 11.136 | 1.97x  | 1.46 |
-| 4  | 65.28 | 34.72 | 32.09 | 5.701  | 3.85x  | 1.45 |
-| 8  | 65.28 | 34.72 | 32.26 | 2.981  | 7.37x  | 1.43 |
-| 16 | 65.28 | 34.72 | 31.31 | 1.634  | 13.45x | 1.41 |
-| 32 | - | - | - | - | - | - |
-| 64 | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - |
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 65.28 | 34.72 | 34.21 | 30.70 | 21.981 | 1.00x  | 1.47 |
+| 2  | 65.28 | 34.72 | 36.18 | 31.49 | 11.136 | 1.97x  | 1.46 |
+| 4  | 65.28 | 34.72 | 37.11 | 32.09 | 5.701  | 3.85x  | 1.45 |
+| 8  | 65.28 | 34.72 | 37.07 | 32.26 | 2.981  | 7.37x  | 1.43 |
+| 16 | 65.28 | 34.72 | 36.70 | 31.31 | 1.634  | 13.45x | 1.41 |
+| 32 | 65.28 | 34.72 | -     | 30.44 | 1.053  | 20.87x | 1.38 |
+| 64 | - | - | - | - | - | - | - |
+| 96 | - | - | - | - | - | - | - |
 
-Note: all runs use numactl --cpunodebind=0 --membind=0. IPC = instructions/cycles from perf stat. LLC Miss Rate% = LLC-load-misses / LLC-loads × 100.
+Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache-misses/cache-references (includes speculative+prefetch). LLC Miss Rate% = LLC-load-misses/LLC-loads (retired demand loads only). 32T cache-miss rate pending re-run with full 6-event command.
 
 #### reads_hac — eskape_human_4gb
 

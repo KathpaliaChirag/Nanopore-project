@@ -182,3 +182,25 @@ perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
 | **avg** | **65.28** | **31.31** | **1.634** | **1.41** |
 
 Speedup vs 1T: 13.45x (84.1% efficiency). LLC miss rate dipped vs 8T (32.26% → 31.31%) — same pattern as before, watch at 32T+.
+
+---
+
+### reads_hac × eskape_650mb × 32T (LLC-load-misses only, cache-miss re-run pending)
+
+```bash
+perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 32 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|----------------|----------|------|
+| 1 | 65.28 | 30.74 | 1.048 | 1.38 |
+| 2 | 65.28 | 30.30 | 1.058 | 1.38 |
+| 3 | 65.28 | 30.29 | 1.053 | 1.38 |
+| **avg** | **65.28** | **30.44** | **1.053** | **1.38** |
+
+Speedup vs 1T: 20.87x (65.2% efficiency) — big drop from 16T's 84.1%. DRAM bandwidth wall hit. Cache miss rate pending full 6-event re-run.
