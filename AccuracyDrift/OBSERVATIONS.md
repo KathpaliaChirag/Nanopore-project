@@ -88,6 +88,44 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 ---
 
+## Database Size vs Classification (Luna, reads_hac, standard_16gb, 1T+2T)
+
+35. **Classified% reaches 97.77% with standard_16gb** — standard_8gb: 95.77%, standard_16gb: 97.77%. Another 2-point gain from doubling the DB size. Diminishing returns — going from 650mb to 4gb added ~1%, 4gb to 8gb added ~30%, 8gb to 16gb adds ~2%. The standard DB at 8gb already captured most classifiable reads.
+
+36. **LLC miss rate 80.15% at 1T — only 3.5 points higher than standard_8gb** — standard_8gb was 76.59%, standard_16gb is 80.15%. The DB is twice as large but LLC miss rate barely moved. Both DBs are far above the LLC capacity; the incremental miss rate impact of doubling an already-uncacheable DB is small.
+
+37. **sys time jumped to ~7.5s from ~4.2s for standard_8gb** — consistent with ~2x larger DB loading from disk. This is the serial non-parallelizable component. Amdahl ceiling for standard_16gb: 23.914 / 7.5 ≈ 3.19x — lower than standard_8gb's ~4.0x ceiling. The extra DB loading overhead directly raises the wall time floor.
+
+38. **1T wall time 23.914s vs 16.778s for standard_8gb** — 7.1s longer, mostly explained by the ~3.3s extra sys time (DB loading). Classification phase itself (wall minus sys) is roughly similar: ~16.4s here vs ~12.5s for standard_8gb — slightly longer due to higher LLC miss rate.
+
+39. **2T speedup only 1.51x vs 1.59x for standard_8gb** — the lower 2T speedup is explained purely by Amdahl: with 7.5s serial overhead instead of 4.2s, even perfect classification parallelism yields less wall speedup. Classification phase speedup at 2T: (23.914-7.5) / (15.827-7.4) ≈ 16.4 / 8.4 ≈ 1.95x — near-perfect. The wall time bottleneck is serial DB loading, not thread scaling.
+
+40. **IPC 1.86 at 1T — lower than standard_8gb's 2.11** — despite standard_16gb having a larger sys time contribution (which is usually cache-friendly sequential I/O and inflates IPC), the overall IPC is lower. The higher LLC miss rate (80% vs 76%) during the classification phase outweighs the sys-time inflation effect.
+
+41. **LLC miss rate climbs sharply 1T→8T: 80.15%→86.04%** — a 5.9-point rise across 3 doublings. standard_8gb rose 5.7 points (76.59%→82.32%) over the same range. Very similar rate of climb despite the larger DB — both are equally past the LLC capacity, and more threads cause the same proportional increase in DRAM contention.
+
+42. **Wall speedup approaching Amdahl ceiling by 8T: 2.49x out of ~3.19x max** — at 8T the classification finishes in ~2.2s but wall time is 9.6s because ~7.5s of sys time (DB loading) is serial. We have only ~0.7x of headroom left before hitting the ceiling, and there are still 16T, 32T, 64T, 96T runs ahead. The Amdahl ceiling will be fully hit earlier than standard_8gb.
+
+43. **Classification phase still scales near-ideally to 8T** — classification time at 4T: ~4.3s (3.81x speedup, 95.3% efficiency); at 8T: ~2.2s (7.56x speedup, 94.5% efficiency). The thread scaling of the compute work itself is excellent — the wall time bottleneck is entirely the serial DB load, not DRAM bandwidth or thread overhead.
+
+44. **Amdahl ceiling essentially hit at 32T: 2.93x out of ~3.19x max** — wall time 8.153s vs theoretical minimum of ~7.5s (sys time). 16T: 2.79x, 32T: 2.93x — only 0.14x gain from doubling threads. Classification itself finishes in ~0.8s at 32T; the run is 92% sys time. 64T and 96T will add essentially nothing to wall speedup.
+
+45. **LLC miss rate dip at 32T holds for standard_16gb** — 8T: 86.04%, 16T: 85.73%, 32T: 85.03%. The same slight retreat seen on all three previous DBs (eskape_650mb, eskape_human_4gb, standard_8gb). Universal pattern confirmed: the 16-32T dip is consistent regardless of DB size or absolute miss rate level.
+
+46. **Classification phase efficiency degrades at 32T: 63.9%** — kraken2-reported processing time: 1T=16.49s, 8T=2.29s (7.2x/89.9%), 16T=1.24s (13.3x/83.4%), 32T=0.81s (20.5x/64%). The classification work starts hitting DRAM bandwidth limits between 16T and 32T — this is separate from the Amdahl wall. At standard_8gb the classification phase scaled well to 32T; at standard_16gb with higher miss rates the bandwidth ceiling is lower.
+
+47. **Peak wall speedup at 32T: 2.93x — 64T and 96T both regress** — 32T=8.153s (2.93x), 64T=8.253s (2.90x), 96T=8.385s (2.85x). Unlike the bandwidth-limited DBs where 64T was the peak, standard_16gb peaks at 32T. The mechanism is different: the Amdahl floor means classification is already done in ~0.8s at 32T; adding more threads only increases OS overhead (thread creation, context switches), which shows up as growing sys time (32T: 7.86s, 64T: 8.38s, 96T: 9.05s).
+
+48. **sys time grows with thread count at 64T+** — 32T: 7.86s, 64T: 8.38s, 96T: 9.05s. The sys time is not a fixed constant — spawning 64-96 threads adds measurable OS overhead to the DB loading phase. This raises the effective Amdahl floor at high thread counts and explains why 64T and 96T are slower than 32T in wall time.
+
+49. **IPC crashes at 64T: 1.43 (down from 1.67 at 32T)** — at 32T the classification finishes in 0.8s and the CPU spends most of the measured time in the sys/overhead phase. By 64T with 96T, IPC 1.37 — the perf counters mostly capture thread management and OS work, not meaningful Kraken2 classification. These IPC values are not directly comparable to the lower-thread-count values which captured more actual classification work.
+
+50. **LLC miss rate dip at 32T holds, then essentially flat 32T→96T** — 8T: 86.04%, 16T: 85.73%, 32T: 85.03%, 64T: 85.04%, 96T: 84.93%. The universal 16-32T dip appears again. Post-32T the rate is flat — the DB is so far above LLC capacity that DRAM pressure from classification barely changes once the classification time is sub-second.
+
+51. **standard_16gb thread scaling summary vs standard_8gb** — standard_8gb peak: 3.47x at 32T; standard_16gb peak: 2.93x at 32T. Both Amdahl-limited with the same peak thread count, but standard_16gb's larger DB loading adds ~3.3s to the serial floor, cutting the ceiling from 4.0x to 3.19x. The classified% gain (95.77%→97.77%) costs ~0.54x of maximum achievable speedup.
+
+---
+
 ## Cross-Machine Comparison
 
 *(to be filled after other machines are run)*

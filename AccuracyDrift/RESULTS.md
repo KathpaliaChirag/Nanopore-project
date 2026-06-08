@@ -58,10 +58,10 @@ Both metrics tracked:
 - [ ] reads_fast × eskape_human_4gb × all thread counts
 - [ ] reads_fast × standard_8gb × all thread counts
 - [ ] reads_fast × standard_16gb × all thread counts
-- [ ] reads_hac × eskape_650mb × all thread counts
-- [ ] reads_hac × eskape_human_4gb × all thread counts
-- [ ] reads_hac × standard_8gb × all thread counts
-- [ ] reads_hac × standard_16gb × all thread counts
+- [x] reads_hac × eskape_650mb × all thread counts
+- [x] reads_hac × eskape_human_4gb × all thread counts
+- [x] reads_hac × standard_8gb × all thread counts
+- [x] reads_hac × standard_16gb × all thread counts
 - [ ] reads_sup × eskape_650mb × all thread counts
 - [ ] reads_sup × eskape_human_4gb × all thread counts
 - [ ] reads_sup × standard_8gb × all thread counts
@@ -152,14 +152,14 @@ Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 2  | - | - | - | - | - | - | - |
-| 4  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
-| 16 | - | - | - | - | - | - | - |
-| 32 | - | - | - | - | - | - | - |
-| 64 | - | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - | - |
+| 1  | 97.77 | 2.23 | 82.00 | 80.15 | 23.914 | 1.00x | 1.86 |
+| 2  | 97.77 | 2.23 | 82.46 | 81.61 | 15.827 | 1.51x | 1.83 |
+| 4  | 97.77 | 2.23 | 83.52 | 83.81 | 11.707 | 2.04x | 1.80 |
+| 8  | 97.77 | 2.23 | 86.94 | 86.04 | 9.618  | 2.49x | 1.76 |
+| 16 | 97.77 | 2.23 | 89.98 | 85.73 | 8.575  | 2.79x | 1.74 |
+| 32 | 97.77 | 2.23 | 90.58 | 85.03 | 8.153  | 2.93x | 1.67 |
+| 64 | 97.77 | 2.23 | 89.63 | 85.04 | 8.253  | 2.90x | 1.43 |
+| 96 | 97.77 | 2.23 | 88.98 | 84.93 | 8.385  | 2.85x | 1.37 |
 
 #### reads_fast — eskape_650mb
 
@@ -306,7 +306,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | eskape_650mb (142 MB) | 30.70 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 56.85 | - | - | - |
 | standard_8gb (7.6 GB) | 76.59 | - | - | - |
-| standard_16gb (15 GB) | - | - | - | - |
+| standard_16gb (15 GB) | 80.15 | - | - | - |
 
 ### 2.2 LLC Miss Rate% at Max Thread — reads_hac
 
@@ -315,7 +315,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | eskape_650mb (142 MB) | 32.56 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 58.94 | - | - | - |
 | standard_8gb (7.6 GB) | 82.58 | - | - | - |
-| standard_16gb (15 GB) | - | - | - | - |
+| standard_16gb (15 GB) | 84.93 | - | - | - |
 
 ### 2.3 Time (s) at 1 Thread — reads_hac
 
@@ -324,7 +324,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | eskape_650mb (142 MB) | 21.981 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 29.818 | - | - | - |
 | standard_8gb (7.6 GB) | 16.778 | - | - | - |
-| standard_16gb (15 GB) | - | - | - | - |
+| standard_16gb (15 GB) | 23.914 | - | - | - |
 
 ### 2.4 Classified% at 1 Thread — reads_hac
 
@@ -333,7 +333,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | eskape_650mb (142 MB) | 65.28 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 66.13 | - | - | - |
 | standard_8gb (7.6 GB) | 95.77 | - | - | - |
-| standard_16gb (15 GB) | - | - | - | - |
+| standard_16gb (15 GB) | 97.77 | - | - | - |
 
 *(Repeat sections 2.1–2.4 for reads_fast and reads_sup once data is collected)*
 
@@ -350,7 +350,7 @@ How classification rate changes as DB grows. Expected: more classified with larg
 | eskape_650mb (142 MB) | 65.28% | - | - | - |
 | eskape_human_4gb (3.8 GB) | 66.13% | - | - | - |
 | standard_8gb (7.6 GB) | 95.77% | - | - | - |
-| standard_16gb (15 GB) | - | - | - | - |
+| standard_16gb (15 GB) | 97.77% | - | - | - |
 
 *(Repeat for reads_fast and reads_sup)*
 
