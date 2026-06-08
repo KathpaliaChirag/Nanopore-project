@@ -6,19 +6,19 @@ Running list of interesting findings as data comes in. Organized by theme.
 
 ## Thread Scaling (Luna, reads_hac, eskape_650mb)
 
-1. **Near-perfect linear speedup at low thread counts** — 1T=21.924s, 2T=11.150s = 1.97x speedup (98.5% efficiency). 4T=5.722s = 3.83x speedup (95.7% efficiency). The workload parallelizes almost perfectly at low thread counts. This is expected since each thread independently processes reads with no inter-thread communication.
+Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Earlier runs used cache-misses / cache-references which was ~5.6x inflated due to speculative and prefetch activity.
 
-2. **LLC miss rate climbs then plateaus** — 1T: 34.21%, 2T: 36.18%, 4T: 37.11%, 8T: 37.07%. Rate of increase slowed (+1.97% → +0.93%) and fully stopped by 8T. The LLC is saturated for this 142 MB database — all threads are hitting DRAM at the same rate, adding more threads doesn't increase the miss rate further.
+1. **Near-perfect linear speedup at low thread counts** — 1T=21.981s, 2T=11.136s = 1.97x (98.5% efficiency), 4T=5.701s = 3.85x (96.3%), 8T=2.981s = 7.37x (92.1%), 16T=1.634s = 13.45x (84.1%). Still good but degrading as memory bandwidth fills up.
 
-3. **User time stays constant across thread counts** — 1T: 21.58s user, 2T: 22.00s user, 4T: 22.08s user, 8T: 22.36s user. Wall time scales down, total CPU work is the same. Confirms true parallelism with negligible overhead.
+2. **LLC miss rate climbs with threads then dips at 16T** — 1T: 30.70%, 2T: 31.49%, 4T: 32.09%, 8T: 32.26%, 16T: 31.31%. Peaks at 8T and drops at 16T — same pattern seen with old metric. Likely noise or a real effect where shorter wall time means less total LLC pressure. Watch at 32T+.
 
-4. **IPC declines steadily with thread count** — 1T: 1.47, 2T: 1.46, 4T: 1.45, 8T: 1.43, 32T: 1.33 (no numactl). More threads = more concurrent LLC/DRAM stalls = lower instructions-per-cycle. Small per-step but will likely accelerate at high thread counts when memory bandwidth saturates.
+3. **User time stays constant across thread counts** — ~21.7s to ~22.6s user time regardless of thread count. Wall time scales down. Confirms true parallelism with negligible synchronization overhead.
 
-5. **Speedup efficiency degrades as threads increase** — 2T: 98.5%, 4T: 95.7%, 8T: 91.5%, 16T: 83.3%. Dropping faster now. Memory bandwidth becoming the limiter. Expected to degrade sharply past 32T.
+4. **IPC declines steadily with thread count** — 1T: 1.47, 2T: 1.46, 4T: 1.45, 8T: 1.43, 16T: 1.41. More threads = more concurrent DRAM stalls = lower IPC. Will likely drop faster at very high thread counts.
 
-6. **LLC miss rate dipped at 16T** — 8T: 37.07%, 16T: 36.70%. Small unexpected decrease. Could be measurement noise or a real effect (faster runs = less time for LLC pressure to accumulate). Watch at 32T and 64T to determine if this is a trend or noise.
+5. **Speedup efficiency degrading** — 2T: 98.5%, 4T: 96.3%, 8T: 92.1%, 16T: 84.1%. Consistent drop of ~4% per doubling past 4T. Expected to accelerate past 32T when DRAM bandwidth fully saturates.
 
-7. **`cache-misses` in perf stat = LLC miss count on x86** — this is the hardware Last Level Cache miss counter, not L1/L2. So LLC Miss Rate% = cache-misses / cache-references × 100. We are measuring the right thing.
+6. **cache-misses vs LLC-load-misses** — `cache-misses` was ~317M vs `LLC-load-misses` ~57M at 1T (5.6x difference). `cache-misses` includes speculative loads and prefetcher activity. `LLC-load-misses` counts only retired demand loads. We switched to LLC-load-misses as it reflects actual program-driven DRAM traffic.
 
 ---
 

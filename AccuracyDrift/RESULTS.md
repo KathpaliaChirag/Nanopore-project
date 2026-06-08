@@ -1,5 +1,22 @@
 # AccuracyDrift Results
 
+## cache-misses vs LLC-load-misses: Why They Are Different
+
+Two perf events that sound similar but measure very different things:
+
+| Event | What it counts | Includes speculative loads? | Includes prefetches? |
+|-------|---------------|----------------------------|----------------------|
+| `cache-misses` | All LLC miss events (LONGEST_LAT_CACHE.MISS on Intel) | Yes | Yes |
+| `cache-references` | All LLC lookup attempts | Yes | Yes |
+| `LLC-load-misses` | Only retired demand load instructions that missed LLC (MEM_LOAD_RETIRED.L3_MISS) | No | No |
+| `LLC-loads` | Only retired demand load instructions that accessed LLC | No | No |
+
+On this machine (Luna, 1T run): `cache-misses` = 317M vs `LLC-load-misses` = 57M — ~5.6x difference. The extra ~260M in `cache-misses` are speculative loads (fetched by CPU but never actually used by the program) and hardware prefetcher activity.
+
+**We use `LLC-load-misses / LLC-loads` throughout this experiment** because it measures actual program-driven DRAM accesses — the ones we want to minimize with a prefetcher. Speculative and prefetch activity is not what we are optimizing.
+
+---
+
 ## Experiment Overview
 
 Goal: Understand how Kraken2 classification accuracy and cache behavior change across database sizes and machines.
@@ -92,17 +109,17 @@ Columns: threads | classified% | unclassified% | cache miss rate% | time (s)
 #### reads_hac — eskape_650mb
 
 | Threads | Classified% | Unclassified% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
-|---------|-------------|---------------|-----------------|----------|---------------|------|
-| 1 | 65.28 | 34.72 | 34.21 | 21.924 | 1.00x | 1.47 |
-| 2 | 65.28 | 34.72 | 36.18 | 11.150 | 1.97x | 1.46 |
-| 4 | 65.28 | 34.72 | 37.11 | 5.722 | 3.83x | 1.45 |
-| 8 | 65.28 | 34.72 | 37.07 | 2.993 | 7.32x | 1.43 |
-| 16 | 65.28 | 34.72 | 36.70 | 1.644 | 13.33x | 1.41 |
-| 32 | 65.28 | 34.72 | 38.48 | 1.10 | - | 1.33 |
+|---------|-------------|---------------|----------------|----------|---------------|------|
+| 1  | 65.28 | 34.72 | 30.70 | 21.981 | 1.00x  | 1.47 |
+| 2  | 65.28 | 34.72 | 31.49 | 11.136 | 1.97x  | 1.46 |
+| 4  | 65.28 | 34.72 | 32.09 | 5.701  | 3.85x  | 1.45 |
+| 8  | 65.28 | 34.72 | 32.26 | 2.981  | 7.37x  | 1.43 |
+| 16 | 65.28 | 34.72 | 31.31 | 1.634  | 13.45x | 1.41 |
+| 32 | - | - | - | - | - | - |
 | 64 | - | - | - | - | - | - |
 | 96 | - | - | - | - | - | - |
 
-Note: 32T run was done without numactl (pre-experiment). All other runs use numactl --cpunodebind=0 --membind=0. 32T speedup excluded — different setup. IPC = instructions/cycles from perf stat.
+Note: all runs use numactl --cpunodebind=0 --membind=0. IPC = instructions/cycles from perf stat. LLC Miss Rate% = LLC-load-misses / LLC-loads × 100.
 
 #### reads_hac — eskape_human_4gb
 

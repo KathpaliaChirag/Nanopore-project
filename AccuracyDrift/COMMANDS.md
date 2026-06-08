@@ -75,123 +75,110 @@ Note: numactl not used here. Added from next set of runs onward.
 
 ---
 
-### reads_hac × eskape_650mb × 1T (with numactl)
+### reads_hac × eskape_650mb × 1T — CORRECTED (LLC-load-misses)
 
-Run 3 times:
+Previous runs used wrong event (cache-misses). Re-run 3 times with correct events:
 
 ```bash
-perf stat -e cache-misses,cache-references,instructions,cycles \
+perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
   numactl --cpunodebind=0 --membind=0 \
   kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
   --threads 1 \
-  --report ~/AccuracyDrift/runs/hac_eskape_650mb_1T_report.txt \
-  --output ~/AccuracyDrift/runs/hac_eskape_650mb_1T_output.txt \
-  /home/student/results/basecalling/reads_hac.fastq
-```
-
-| Run | Classified% | LLC Miss Rate% | Time (s) |
-|-----|-------------|-----------------|----------|
-| 1 | 65.28 | 34.44 | 21.843 |
-| 2 | 65.28 | 34.08 | 21.967 |
-| 3 | 65.28 | 34.11 | 21.962 |
-| **avg** | **65.28** | **34.21** | **21.924** |
-
----
-
-### reads_hac × eskape_650mb × 2T (with numactl)
-
-Run 3 times:
-
-```bash
-perf stat -e cache-misses,cache-references,instructions,cycles \
-  numactl --cpunodebind=0 --membind=0 \
-  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
-  --threads 2 \
-  --report ~/AccuracyDrift/runs/hac_eskape_650mb_2T_report.txt \
-  --output ~/AccuracyDrift/runs/hac_eskape_650mb_2T_output.txt \
-  /home/student/results/basecalling/reads_hac.fastq
-```
-
-| Run | Classified% | LLC Miss Rate% | Time (s) |
-|-----|-------------|-----------------|----------|
-| 1 | 65.28 | 36.34 | 11.197 |
-| 2 | 65.28 | 36.01 | 11.186 |
-| 3 | 65.28 | 36.19 | 11.067 |
-| **avg** | **65.28** | **36.18** | **11.150** |
-
-Observation: near-perfect 2x speedup (1T=21.924s, 2T=11.150s = 1.97x). Cache miss rate already climbing: 1T=34.21%, 2T=36.18% — more threads = more LLC pressure.
-
----
-
-### reads_hac × eskape_650mb × 4T (with numactl)
-
-Run 3 times:
-
-```bash
-perf stat -e cache-misses,cache-references,instructions,cycles \
-  numactl --cpunodebind=0 --membind=0 \
-  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
-  --threads 4 \
-  --report ~/AccuracyDrift/runs/hac_eskape_650mb_4T_report.txt \
-  --output ~/AccuracyDrift/runs/hac_eskape_650mb_4T_output.txt \
-  /home/student/results/basecalling/reads_hac.fastq
-```
-
-| Run | Classified% | LLC Miss Rate% | Time (s) |
-|-----|-------------|-----------------|----------|
-| 1 | 65.28 | 37.08 | 5.708 |
-| 2 | 65.28 | 37.18 | 5.741 |
-| 3 | 65.28 | 37.06 | 5.718 |
-| **avg** | **65.28** | **37.11** | **5.722** |
-
-Speedup vs 1T: 3.83x (95.7% efficiency). Cache miss rate increase slowing: +1.97% (1T→2T) vs +0.93% (2T→4T).
-
----
-
-### reads_hac × eskape_650mb × 8T (with numactl)
-
-Run 3 times:
-
-```bash
-perf stat -e cache-misses,cache-references,instructions,cycles \
-  numactl --cpunodebind=0 --membind=0 \
-  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
-  --threads 8 \
-  --report ~/AccuracyDrift/runs/hac_eskape_650mb_8T_report.txt \
-  --output ~/AccuracyDrift/runs/hac_eskape_650mb_8T_output.txt \
-  /home/student/results/basecalling/reads_hac.fastq
-```
-
-| Run | Classified% | LLC Miss Rate% | Time (s) | IPC  |
-|-----|-------------|-----------------|----------|------|
-| 1 | 65.28 | 37.08 | 2.978 | 1.43 |
-| 2 | 65.28 | 37.10 | 3.003 | 1.43 |
-| 3 | 65.28 | 37.02 | 3.000 | 1.42 |
-| **avg** | **65.28** | **37.07** | **2.993** | **1.43** |
-
-Speedup vs 1T: 7.32x (91.5% efficiency). LLC miss rate plateaued — 4T was 37.11%, 8T is 37.07%. LLC saturated for this DB size.
-
----
-
-### reads_hac × eskape_650mb × 16T (with numactl)
-
-Run 3 times:
-
-```bash
-perf stat -e cache-misses,cache-references,instructions,cycles \
-  numactl --cpunodebind=0 --membind=0 \
-  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
-  --threads 16 \
-  --report ~/AccuracyDrift/runs/hac_eskape_650mb_16T_report.txt \
-  --output ~/AccuracyDrift/runs/hac_eskape_650mb_16T_output.txt \
+  --output /dev/null --report /dev/null \
   /home/student/results/basecalling/reads_hac.fastq
 ```
 
 | Run | Classified% | LLC Miss Rate% | Time (s) | IPC  |
 |-----|-------------|----------------|----------|------|
-| 1 | 65.28 | 36.64 | 1.645 | 1.41 |
-| 2 | 65.28 | 36.67 | 1.650 | 1.40 |
-| 3 | 65.28 | 36.78 | 1.639 | 1.41 |
-| **avg** | **65.28** | **36.70** | **1.644** | **1.41** |
+| 1 | 65.28 | 30.79 | 21.966 | 1.47 |
+| 2 | 65.28 | 30.72 | 21.998 | 1.47 |
+| 3 | 65.28 | 30.58 | 21.978 | 1.47 |
+| **avg** | **65.28** | **30.70** | **21.981** | **1.47** |
 
-Speedup vs 1T: 13.33x (83.3% efficiency). LLC miss rate slightly dropped vs 8T (37.07% → 36.70%) — unexpected, worth watching at 32T.
+---
+
+### reads_hac × eskape_650mb × 2T — CORRECTED (LLC-load-misses)
+
+```bash
+perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 2 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|----------------|----------|------|
+| 1 | 65.28 | 31.56 | 11.170 | 1.45 |
+| 2 | 65.28 | 31.48 | 11.130 | 1.46 |
+| 3 | 65.28 | 31.43 | 11.109 | 1.46 |
+| **avg** | **65.28** | **31.49** | **11.136** | **1.46** |
+
+Speedup vs 1T: 1.97x (98.5% efficiency).
+
+---
+
+### reads_hac × eskape_650mb × 4T — CORRECTED (LLC-load-misses)
+
+```bash
+perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 4 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|----------------|----------|------|
+| 1 | 65.28 | 31.87 | 5.722 | 1.45 |
+| 2 | 65.28 | 32.12 | 5.688 | 1.45 |
+| 3 | 65.28 | 32.29 | 5.693 | 1.45 |
+| **avg** | **65.28** | **32.09** | **5.701** | **1.45** |
+
+Speedup vs 1T: 3.85x (96.3% efficiency).
+
+---
+
+### reads_hac × eskape_650mb × 8T — CORRECTED (LLC-load-misses)
+
+```bash
+perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 8 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|----------------|----------|------|
+| 1 | 65.28 | 31.94 | 2.977 | 1.44 |
+| 2 | 65.28 | 32.83 | 2.981 | 1.43 |
+| 3 | 65.28 | 32.02 | 2.986 | 1.43 |
+| **avg** | **65.28** | **32.26** | **2.981** | **1.43** |
+
+Speedup vs 1T: 7.37x (92.1% efficiency).
+
+---
+
+### reads_hac × eskape_650mb × 16T — CORRECTED (LLC-load-misses)
+
+```bash
+perf stat -e LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/eskape_650mb \
+  --threads 16 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|----------------|----------|------|
+| 1 | 65.28 | 31.30 | 1.649 | 1.40 |
+| 2 | 65.28 | 31.26 | 1.626 | 1.42 |
+| 3 | 65.28 | 31.36 | 1.626 | 1.42 |
+| **avg** | **65.28** | **31.31** | **1.634** | **1.41** |
+
+Speedup vs 1T: 13.45x (84.1% efficiency). LLC miss rate dipped vs 8T (32.26% → 31.31%) — same pattern as before, watch at 32T+.
