@@ -446,3 +446,25 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **66.13** | **81.48** | **58.94** | **2.947** | **0.98** |
 
 96T is SLOWER than 64T (2.947s vs 2.823s) — same pattern as eskape_650mb. Speedup 10.12x, down from 10.57x at 64T. IPC drops below 1.0 — more stall cycles than executed instructions. hac × eskape_human_4gb thread scaling complete.
+
+---
+
+### reads_hac × standard_8gb × 1T
+
+```bash
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb \
+  --threads 1 \
+  --output /dev/null --report /dev/null \
+  /home/student/results/basecalling/reads_hac.fastq
+```
+
+| Run | Classified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | IPC  |
+|-----|-------------|-----------------|----------------|----------|------|
+| 1 | 95.77 | 76.43 | 76.49 | 16.831 | 2.10 |
+| 2 | 95.77 | 76.61 | 76.67 | 16.821 | 2.11 |
+| 3 | 95.77 | 76.66 | 76.62 | 16.683 | 2.12 |
+| **avg** | **95.77** | **76.57** | **76.59** | **16.778** | **2.11** |
+
+Note: sys time is ~4.3s (vs ~2s for smaller DBs) — significant DB loading overhead included in wall time. Cache miss rate ≈ LLC miss rate (both ~76%) — with a DB this large, all accesses (speculative, prefetch, demand) miss at the same rate since the hardware prefetcher cannot predict random hash table accesses.

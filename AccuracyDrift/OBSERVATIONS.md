@@ -64,6 +64,16 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 ---
 
+## Database Size vs Classification (Luna, reads_hac, standard_8gb, 1T)
+
+25. **Classified% jumps to 95.77% with standard_8gb** — eskape_650mb: 65.28%, eskape_human_4gb: 66.13%, standard_8gb: 95.77%. The standard database has comprehensive taxonomic coverage across bacteria, viruses, and human — nearly all nanopore reads find a match. The ESKAPE databases only covered a narrow set of pathogens.
+
+26. **LLC miss rate converges to cache miss rate at standard_8gb** — both are ~76.6% at 1T. With eskape_650mb they diverged by 4 points (cache 34% vs LLC 30%) and with eskape_human_4gb by ~21 points (cache 78% vs LLC 57%). With a 7.6 GB DB, every LLC access — speculative, prefetcher-driven, or demand — misses because the random hash table access pattern defeats the hardware prefetcher entirely. No differentiation left between access types.
+
+27. **IPC 2.11 at standard_8gb 1T — surprisingly high despite 76% LLC miss rate** — but sys time is 4.3s vs ~2s for smaller DBs. The perf counters capture the full process including DB loading from disk, which is likely more sequential/cache-friendly and inflates IPC. The classification phase IPC is probably lower; this number is not directly comparable to the other DBs.
+
+---
+
 ## Cross-Machine Comparison
 
 *(to be filled after other machines are run)*

@@ -139,7 +139,7 @@ Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
+| 1  | 95.77 | 4.23 | 76.57 | 76.59 | 16.778 | 1.00x | 2.11 |
 | 2  | - | - | - | - | - | - | - |
 | 4  | - | - | - | - | - | - | - |
 | 8  | - | - | - | - | - | - | - |
@@ -305,7 +305,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 |----|------|---------|-------------|-------|
 | eskape_650mb (142 MB) | 30.70 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 56.85 | - | - | - |
-| standard_8gb (7.6 GB) | - | - | - | - |
+| standard_8gb (7.6 GB) | 76.59 | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
 
 ### 2.2 LLC Miss Rate% at Max Thread — reads_hac
@@ -323,7 +323,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 |----|------|---------|-------------|-------|
 | eskape_650mb (142 MB) | 21.981 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 29.818 | - | - | - |
-| standard_8gb (7.6 GB) | - | - | - | - |
+| standard_8gb (7.6 GB) | 16.778 | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
 
 ### 2.4 Classified% at 1 Thread — reads_hac
@@ -332,7 +332,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 |----|------|---------|-------------|-------|
 | eskape_650mb (142 MB) | 65.28 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 66.13 | - | - | - |
-| standard_8gb (7.6 GB) | - | - | - | - |
+| standard_8gb (7.6 GB) | 95.77 | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
 
 *(Repeat sections 2.1–2.4 for reads_fast and reads_sup once data is collected)*
@@ -349,7 +349,7 @@ How classification rate changes as DB grows. Expected: more classified with larg
 |----|------|---------|-------------|-------|
 | eskape_650mb (142 MB) | 65.28% | - | - | - |
 | eskape_human_4gb (3.8 GB) | 66.13% | - | - | - |
-| standard_8gb (7.6 GB) | - | - | - | - |
+| standard_8gb (7.6 GB) | 95.77% | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
 
 *(Repeat for reads_fast and reads_sup)*
