@@ -189,3 +189,27 @@ Alternative direction to Phase 3: instead of caching the 8 GB DB, **replace it**
 - **Baseline ground-truth run** (`reads_fast.fastq`, 8 GB DB, p8, measured): 104,832 reads, **93.18% classified**, 2.398 s, RSS 8.5 GB. ESKAPE: **P. aeruginosa 54,122 (51.63%)** + **K. pneumoniae 8,193 (7.82%)** strong; trace E. cloacae 28 / A. baumannii 6 / S. aureus 1; E. faecium absent. Non-ESKAPE background (E. coli 18.19%, human 0.57%) must be rejected. Outputs in `results/kraken2/manual_run/`.
 
 ---
+
+## AccuracyDrift — Minerva (Intel Xeon Gold 6330, 112T, 251 GB RAM)
+
+> Full tables, per-combo observations, and final findings: **[reports/accuracydrift_minerva.md](reports/accuracydrift_minerva.md)**
+
+**Setup:** 3 reads (fast/hac/sup) × 4 DBs (eskape_650mb, eskape_human_4gb, standard_8gb, standard_16gb) × 5 thread counts (1,2,4,8,16) × 3 runs each = 180 runs. Values are 3-run averages.
+
+Key findings:
+
+- **Scaling governed by LLC miss rate** — eskape_650mb scales 13–14× at 16T (LLC miss drops with threads); standard DBs plateau at 3–5× (fully DRAM-bound at 1T, no improvement with more threads)
+- **Minerva is ~10× slower than Luna at 1T on eskape_650mb** — root cause: Minerva L3 ~42 MB cannot hold the 142 MB DB; Luna L3 = 210 MB fits it almost entirely (Luna LLC miss 30.70% vs Minerva 68.58%)
+- **eskape_human_4gb has the highest LLC miss rate (83%) despite not being the largest DB** — ESKAPE + human k-mer space is highly diverse and non-repetitive; standard DBs have lower miss rates (~51%) due to repetitive common-organism k-mers
+- **standard_8gb is the practical sweet spot** — 95.77% (hac) / 97.09% (sup) classified; standard_16gb adds only 2 pp for 38% longer runtime
+- **Read model matters more on standard DBs** — fast vs hac gap is 14.4 pp on standard_8gb but only 4.1 pp on eskape_650mb; DB coverage is the bottleneck for ESKAPE-targeted DBs, not read quality
+- **All runs IPC < 1.2** — Minerva is entirely memory-bound across all DB sizes; no run approaches compute saturation
+
+| DB | LLC Miss% (hac, 1T) | Speedup at 16T (hac) | hac Classified% |
+|----|--------------------:|---------------------:|----------------:|
+| eskape_650mb | 68.58 | 13.97× | 65.28 |
+| eskape_human_4gb | 83.25 | 7.91× | 66.13 |
+| standard_8gb | 50.70 | 4.59× | 95.77 |
+| standard_16gb | 50.36 | 3.39× | 97.77 |
+
+---
