@@ -16,7 +16,7 @@ from html.parser import HTMLParser
 SLEEP_TIMER = 100
 LOGIN_ATTEMPTS = 5
 MAX_CONN_ATTEMPTS = 10
-PROXY_BASE_URL = 'proxy61.iitd.ac.in'
+PROXY_BASE_URL = 'proxy62.iitd.ac.in'
 PROXY_PORT = 3128
 address = 'https://' + PROXY_BASE_URL + '/cgi-bin/proxy.cgi'
 
