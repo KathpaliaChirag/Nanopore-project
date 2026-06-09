@@ -144,6 +144,20 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 ---
 
+## Sample-Targeted DB (50 MB, Luna, reads_hac)
+
+59. **LLC miss rate 10.19% at 1T — 3x lower than eskape_650mb** — the 50 MB hash table fits deep inside the LLC. Every hash lookup is served from cache. Compare: eskape_650mb (150 MB) = 30.70%, eskape_human_4gb (3.8 GB) = 56.85%. This is the lowest LLC miss rate in the experiment and confirms the cache cliff is between 50 MB and 150 MB on Luna.
+
+60. **sample_targeted is faster than eskape_650mb at 1T despite classifying more reads** — 19.73s vs 21.98s. More reads classified (84.80% vs 65.28%) but faster overall because each hash lookup costs far less time (cache hit vs DRAM fetch). Lower miss rate outweighs higher classification count.
+
+61. **Classified% 84.80% — far better than eskape_650mb (65.28%) with a smaller DB** — the 50 MB targeted DB classifies 19.52 percentage points more reads than the 150 MB eskape DB. The eskape DB had correct P. aeruginosa references but lacked E. coli and K. pneumoniae. A targeted DB with the right species beats a generic narrow DB of 3x the size.
+
+62. **sys time ~0.21s — essentially no Amdahl overhead** — the 50 MB DB loads in milliseconds. Contrast: standard_8gb = 4.2s sys, standard_16gb = 7.5s sys. Thread scaling for sample_targeted will be limited only by DRAM bandwidth (similar to eskape_650mb pattern), not DB loading. Expect near-linear scaling up to the bandwidth wall.
+
+63. **Cache cliff confirmed: between 50 MB and 150 MB on Luna** — sample_targeted (50 MB) = 10.19% LLC miss, eskape_650mb (150 MB) = 30.70% LLC miss. The LLC is larger than 50 MB but smaller than 150 MB on this machine (or more precisely, the working set of Kraken2's hash table access pattern exceeds LLC capacity somewhere in this range). This is the tightest bracket we have on the cliff location.
+
+---
+
 ## Cross-Machine Comparison
 
 *(to be filled after other machines are run)*

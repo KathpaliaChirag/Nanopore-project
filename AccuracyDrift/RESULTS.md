@@ -22,7 +22,7 @@ On this machine (Luna, 1T run): `cache-misses` = 317M vs `LLC-load-misses` = 57M
 Goal: Understand how Kraken2 classification accuracy and cache behavior change across database sizes and machines.
 
 - **Read files:** reads_fast.fastq (104,832 reads, 708 MB), reads_hac.fastq (104,918 reads, 703 MB), reads_sup.fastq (104,980 reads, 723 MB)
-- **Databases:** eskape_650mb (142 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB)
+- **Databases:** eskape_650mb (150 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB), sample_targeted (50 MB)
 - **Machines:** Luna (dell-R760), Minerva, Lab Desktop, Orion (Jetson, last)
 - **Threads tested:** powers of 2 from 1 up to machine max
 - **Metrics per run:** classified%, unclassified%, cache miss rate% (LLC), time (s)
@@ -54,6 +54,7 @@ Both metrics tracked:
 
 ### Luna
 - [ ] Fix reads_sup.fastq permissions
+- [x] reads_hac × sample_targeted × 1T (baseline done; 2T–96T pending)
 - [ ] reads_fast × eskape_650mb × all thread counts
 - [ ] reads_fast × eskape_human_4gb × all thread counts
 - [ ] reads_fast × standard_8gb × all thread counts
@@ -92,6 +93,44 @@ Both metrics tracked:
 - [ ] reads_hac × all DBs × all thread counts
 - [ ] reads_sup × all DBs × all thread counts
 - [ ] Species breakdown
+
+---
+
+## Sample-Targeted Database Construction
+
+After analyzing the species breakdown, we built a custom Kraken2 DB containing only the organisms present in this sample. This gives a 5th data point — smaller than eskape_650mb but with much better accuracy.
+
+**Motivation:** eskape_650mb (150 MB) classifies 65.28% of reads but misassigns ~33k E. coli/K. pneumoniae reads as P. aeruginosa (no competing references). We know from standard DBs exactly what species are present, so we can build a minimal but correct DB.
+
+**Reference genomes included (6 total):**
+
+| Accession | Species | Role in sample |
+|-----------|---------|---------------|
+| GCF_000006765.1 | *Pseudomonas aeruginosa* PAO1 | Dominant pathogen (~35%) |
+| GCF_000005845.2 | *Escherichia coli* K-12 MG1655 | 2nd most common (~16%) |
+| GCF_000240185.1 | *Klebsiella pneumoniae* HS11286 | 3rd most common (~5%) |
+| GCF_000174395.2 | *Enterococcus faecium* 62415 | ESKAPE member, present |
+| GCF_000013425.1 | *Staphylococcus aureus* MRSA252 | ESKAPE member, present |
+| GCF_000025565.1 | *Enterobacter cloacae* ATCC 13047 | ESKAPE member, present |
+
+Note: *Acinetobacter baumannii* (GCF_000012085.1) was suppressed on NCBI and could not be downloaded.
+
+**Build process on Luna:**
+```bash
+# 1. Download genomes via ncbi-genome-download
+ncbi-genome-download bacteria -A <accessions> -F fasta -o .../library/added/ --flat-output
+
+# 2. Download taxonomy (rsync blocked by IITD proxy — used wget instead)
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip          # ~60 MB
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz   # 13 GB compressed
+wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_wgs.accession2taxid.gz  # 38 GB compressed
+
+# 3. Add genomes and build
+for f in library/added/*.fna; do kraken2-build --add-to-library $f --db sample_targeted; done
+kraken2-build --build --db sample_targeted --threads 32  # completes in 22s
+```
+
+**Result:** hash.k2d = 50 MB. Scanned 231M accession IDs to map 17 sequences. The 51 GB taxonomy files are build-only — deleted after construction.
 
 ---
 
@@ -160,6 +199,21 @@ Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache
 | 32 | 97.77 | 2.23 | 90.58 | 85.03 | 8.153  | 2.93x | 1.67 |
 | 64 | 97.77 | 2.23 | 89.63 | 85.04 | 8.253  | 2.90x | 1.43 |
 | 96 | 97.77 | 2.23 | 88.98 | 84.93 | 8.385  | 2.85x | 1.37 |
+
+#### reads_hac — sample_targeted
+
+Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. pneumoniae HS11286, E. faecium 62415, S. aureus MRSA252, E. cloacae ATCC 13047). hash.k2d = 50 MB. Built using taxonomy from standard_8gb build; no Amdahl overhead (sys time ~0.2s).
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 84.80 | 15.20 | 7.23 | 10.19 | 19.729 | 1.00x | 1.78 |
+| 2  | - | - | - | - | - | - | - |
+| 4  | - | - | - | - | - | - | - |
+| 8  | - | - | - | - | - | - | - |
+| 16 | - | - | - | - | - | - | - |
+| 32 | - | - | - | - | - | - | - |
+| 64 | - | - | - | - | - | - | - |
+| 96 | - | - | - | - | - | - | - |
 
 #### reads_fast — eskape_650mb
 
@@ -303,7 +357,8 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| eskape_650mb (142 MB) | 30.70 | - | - | - |
+| sample_targeted (50 MB) | 10.19 | - | - | - |
+| eskape_650mb (150 MB) | 30.70 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 56.85 | - | - | - |
 | standard_8gb (7.6 GB) | 76.59 | - | - | - |
 | standard_16gb (15 GB) | 80.15 | - | - | - |
@@ -312,7 +367,8 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna (96T) | Minerva (TBD) | Lab Desktop (TBD) | Orion (TBD) |
 |----|-----------|---------------|------------------|------------|
-| eskape_650mb (142 MB) | 32.56 | - | - | - |
+| sample_targeted (50 MB) | - (TBD) | - | - | - |
+| eskape_650mb (150 MB) | 32.56 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 58.94 | - | - | - |
 | standard_8gb (7.6 GB) | 82.58 | - | - | - |
 | standard_16gb (15 GB) | 84.93 | - | - | - |
@@ -321,7 +377,8 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| eskape_650mb (142 MB) | 21.981 | - | - | - |
+| sample_targeted (50 MB) | 19.729 | - | - | - |
+| eskape_650mb (150 MB) | 21.981 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 29.818 | - | - | - |
 | standard_8gb (7.6 GB) | 16.778 | - | - | - |
 | standard_16gb (15 GB) | 23.914 | - | - | - |
@@ -330,7 +387,8 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| eskape_650mb (142 MB) | 65.28 | - | - | - |
+| sample_targeted (50 MB) | 84.80 | - | - | - |
+| eskape_650mb (150 MB) | 65.28 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 66.13 | - | - | - |
 | standard_8gb (7.6 GB) | 95.77 | - | - | - |
 | standard_16gb (15 GB) | 97.77 | - | - | - |
@@ -347,7 +405,8 @@ How classification rate changes as DB grows. Expected: more classified with larg
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| eskape_650mb (142 MB) | 65.28% | - | - | - |
+| sample_targeted (50 MB) | 84.80% | - | - | - |
+| eskape_650mb (150 MB) | 65.28% | - | - | - |
 | eskape_human_4gb (3.8 GB) | 66.13% | - | - | - |
 | standard_8gb (7.6 GB) | 95.77% | - | - | - |
 | standard_16gb (15 GB) | 97.77% | - | - | - |
@@ -373,14 +432,14 @@ ESKAPE species taxids for reference:
 
 Only species reaching >1% in at least one DB get a row. Homo sapiens included because it hits 1.28% in eskape_human_4gb; sub-1% values shown for completeness. "—" means the species is not in that DB's reference set.
 
-| Species | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
-|---------|-------------|-----------------|--------------|---------------|
-| *Pseudomonas aeruginosa* | 65.28% (68,493) | 64.82% (68,008) | 31.41% (32,956) | 35.62% (37,373) |
-| *Escherichia coli* | — | — | 14.45% (15,159) | 16.54% (17,350) |
-| *Klebsiella pneumoniae* | — | — | 4.52% (4,739) | 5.50% (5,774) |
-| *Pseudomonas* sp. p1(2021b) | — | — | 2.13% (2,237) | 2.21% (2,315) |
-| *Homo sapiens* | — | 1.28% (1,344) | 0.66% (695) | 0.77% (803) |
-| Other classified (<1% each) | 0% (0) | ~0% (28) | 42.60% (44,695) | 37.14% (38,965) |
-| Unclassified | 34.72% (36,425) | 33.87% (35,538) | 4.23% (4,437) | 2.23% (2,338) |
+| Species | sample_targeted | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
+|---------|----------------|-------------|-----------------|--------------|---------------|
+| *Pseudomonas aeruginosa* | - (TBD) | 65.28% (68,493) | 64.82% (68,008) | 31.41% (32,956) | 35.62% (37,373) |
+| *Escherichia coli* | - (TBD) | — | — | 14.45% (15,159) | 16.54% (17,350) |
+| *Klebsiella pneumoniae* | - (TBD) | — | — | 4.52% (4,739) | 5.50% (5,774) |
+| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.13% (2,237) | 2.21% (2,315) |
+| *Homo sapiens* | — | — | 1.28% (1,344) | 0.66% (695) | 0.77% (803) |
+| Other classified (<1% each) | - (TBD) | 0% (0) | ~0% (28) | 42.60% (44,695) | 37.14% (38,965) |
+| Unclassified | 15.20% (15,945) | 34.72% (36,425) | 33.87% (35,538) | 4.23% (4,437) | 2.23% (2,338) |
 
 *(Repeat for each machine × read model combination)*
