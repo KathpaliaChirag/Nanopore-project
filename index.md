@@ -18,14 +18,6 @@ Update this every time a new major topic is pushed.
 - §8 Kolin sir's caching project (Hot-K-mer LRU cache + Signal-to-Base cache)
 - §11 Full Colab pipeline results (fast/hac/sup modes, all 14 barcodes)
 
-**plan.md** →
-- [2026-05-18] Full profiling plan: Nsight (Dorado GPU) + gprof + cachegrind + perf (Kraken-2 CPU)
-- Phase 0: Setup (WSL2 vs Linux, build Kraken-2 from source with -pg)
-- Phase 1: Dorado GPU profiling with Nsight Systems + Nsight Compute
-- Phase 2: Kraken-2 CPU profiling (gprof / cachegrind / perf)
-- Phase 3: Interpret results (memory-bound vs compute-bound verdict)
-- Phase 4: 2-page report structure for Kolin sir (due ~2026-05-25)
-
 **report.md** →
 - Phase 1a: Dorado fast model nsys profiling — 186.8s, 27.2M samples/s, compute-bound (beam_search 26%, GEMM 17%, LSTM 23%)
 - Phase 1b: Dorado HAC model nsys profiling — 502.0s, 10.1M samples/s, CUTLASS LstmKernel 69.8%, 2.69× slower than fast
@@ -67,3 +59,25 @@ Update this every time a new major topic is pushed.
 - 2026-05-25
 - 2026-05-28
 - 2026-05-29
+
+**reports/accuracydrift_minerva.md** → AccuracyDrift experiment on Minerva (2026-06-09)
+- 4 DBs × 3 read types × 5 thread counts × 3 runs = 180 runs; all values are 3-run averages
+- eskape_650mb scales near-linearly to 16T (13.56×); eskape_human_4gb degrades (8.39×) due to diverse k-mer LLC pressure
+- Classified% constant across threads — thread count has zero effect on classification accuracy
+- standard_16gb: scaling collapses at 16T (6.67×, IPC 0.68) — DRAM bandwidth saturated by 15 GB working set
+- Key cross-DB finding: LLC miss rate driven by k-mer diversity, not DB size (eskape_human_4gb > standard_16gb)
+
+**reports/phase1_dummytesting_dorado_kraken2.md** → Phase 1/2a complete run data (Phases 1a–2a)
+- Full tables and verdicts for Dorado fast/HAC GPU profiling + Kraken2 gprof
+
+**reports/kraken2_perf_lru_cache.md** → Kraken2 perf profiling + K-mer→Taxon LRU associativity table (2026-05-29)
+- Profiling confirming memory-bound verdict; LRU cache design justification
+
+**reports/kraken2_thread_scaling.md** → Kraken2 thread-scaling summary (2026-05-29, condensed)
+- Companion summary to `kraken2_thread_scaling_full.md`
+
+**reports/pfz_batch1_report.md** → perf profiling from zero — Batch 1: matmul N=1024
+- Full perf toolchain walkthrough: naive → loop-reorder → tiling → OpenMP, quantifying why naive is slow
+
+**summer_report1.md** → submitted report to Kolin sir (2026-05-22)
+- Dorado compute-bound + Kraken2 memory-bound verdicts + LRU cache proposal; 2-page format
