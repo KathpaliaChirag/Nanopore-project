@@ -371,16 +371,16 @@ ESKAPE species taxids for reference:
 
 ### Luna — reads_hac (32T)
 
+Only species reaching >1% in at least one DB get a row. Homo sapiens included because it hits 1.28% in eskape_human_4gb; sub-1% values shown for completeness. "—" means the species is not in that DB's reference set.
+
 | Species | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
 |---------|-------------|-----------------|--------------|---------------|
-| Enterococcus faecium | - | - | - | - |
-| Staphylococcus aureus | - | - | - | - |
-| Klebsiella pneumoniae | - | - | - | - |
-| Acinetobacter baumannii | - | - | - | - |
-| Pseudomonas aeruginosa | - | - | - | - |
-| Enterobacter spp. | - | - | - | - |
-| Human (if applicable) | - | - | - | - |
-| Other classified | - | - | - | - |
-| Unclassified | - | - | - | - |
+| *Pseudomonas aeruginosa* | 65.28% (68,493) | 64.82% (68,008) | 31.41% (32,956) | 35.62% (37,373) |
+| *Escherichia coli* | — | — | 14.45% (15,159) | 16.54% (17,350) |
+| *Klebsiella pneumoniae* | — | — | 4.52% (4,739) | 5.50% (5,774) |
+| *Pseudomonas* sp. p1(2021b) | — | — | 2.13% (2,237) | 2.21% (2,315) |
+| *Homo sapiens* | — | 1.28% (1,344) | 0.66% (695) | 0.77% (803) |
+| Other classified (<1% each) | 0% (0) | ~0% (28) | 42.60% (44,695) | 37.14% (38,965) |
+| Unclassified | 34.72% (36,425) | 33.87% (35,538) | 4.23% (4,437) | 2.23% (2,338) |
 
 *(Repeat for each machine × read model combination)*

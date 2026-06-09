@@ -126,6 +126,24 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 ---
 
+## Species Breakdown (Luna, reads_hac, 32T)
+
+52. **Sample is a polymicrobial infection dominated by P. aeruginosa** — standard DBs confirm: P. aeruginosa ~35%, E. coli ~16%, K. pneumoniae ~5%, Pseudomonas sp. p1(2021b) ~2%, human background ~0.7%. Classic nosocomial (hospital-acquired) profile — P. aeruginosa + E. coli + K. pneumoniae together is typical of ICU patients (ventilator-associated pneumonia, catheter UTI) or cystic fibrosis lung infection. All three are ESKAPE pathogens.
+
+53. **eskape_650mb inflates P. aeruginosa count by ~33k false positives** — eskape_650mb classifies 68,493 reads as P. aeruginosa, but standard DBs show only ~35,193 true Pseudomonas reads. The ~33,300 difference are E. coli and K. pneumoniae reads that share conserved k-mers with the P. aeruginosa reference — with no competing reference in the small DB, they get forced to P. aeruginosa. This is a fundamental limitation of narrow reference DBs: they inflate the dominant species count by absorbing reads from absent species.
+
+54. **eskape_650mb unclassified (34.72%) are mostly the E. coli and K. pneumoniae reads** — ~36k reads unclassified in eskape DBs. Standard_8gb classifies 31,988 more reads than eskape_650mb, almost exactly accounting for E. coli (15,159) + K. pneumoniae (4,739) + misc species. These reads found no k-mer match in the small eskape DB at all, or were partially absorbed as false P. aeruginosa.
+
+55. **eskape_human_4gb adds only human reads over eskape_650mb** — 1,344 human reads (1.28%) newly classified. E. coli and K. pneumoniae still undetected — the 4gb DB adds the human genome but still has no E. coli/K. pneumoniae references. The 0.41% gain in overall classified% (65.28% → 66.13%) is entirely human DNA.
+
+56. **Massive long tail in standard DBs — ~40% of reads in sub-1% species each** — standard_8gb: 42.60% of all reads (44,695) classify to species each under 1%. Standard_16gb reduces this to 37.14% (38,965) by resolving more ambiguous reads. This long tail is real biological diversity in the sample — many low-abundance organisms — not noise.
+
+57. **standard_16gb increases all major species counts over standard_8gb** — P. aeruginosa: +4,417, E. coli: +2,191, K. pneumoniae: +1,035. The 16gb DB has more strain references, pulling reads that were ambiguous in 8gb into known species. The long tail shrinks by ~5,730 reads correspondingly.
+
+58. **Phikmvvirus LKD16 present in standard DBs (~0.08%)** — a bacteriophage that specifically infects P. aeruginosa. Its presence confirms active phage predation on the dominant pathogen in the sample. Not detectable with eskape DBs (no phage references).
+
+---
+
 ## Cross-Machine Comparison
 
 *(to be filled after other machines are run)*
