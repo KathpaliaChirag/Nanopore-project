@@ -92,7 +92,9 @@ Both metrics tracked:
 - [x] sample_targeted DB transferred
 - [x] reads_hac × sample_targeted × 1T
 - [x] reads_hac × sample_targeted × 2T,4T,6T,8T,10T,12T
-- [ ] Transfer remaining DBs (eskape_650mb, eskape_human_4gb, standard_8gb, standard_16gb)
+- [x] Transfer eskape_650mb
+- [x] reads_hac × eskape_650mb × all thread counts
+- [ ] Transfer remaining DBs (eskape_human_4gb, standard_8gb, standard_16gb)
 - [ ] reads_hac × all remaining DBs × all thread counts
 - [ ] reads_fast × all DBs × all thread counts
 - [ ] reads_sup × all DBs × all thread counts
@@ -376,6 +378,20 @@ sudo /usr/lib/linux-tools-5.4.0-26/perf stat -e cache-misses,cache-references,LL
 sys time: 1T=0.274s, 2T=0.269s, 4T=0.318s, 6T=0.347s, 8T=0.430s, 10T=0.399s, 12T=0.461s.
 cache-references ~47B (L1D accesses, not LLC — not comparable to Luna). LLC-loads ~588M per run regardless of thread count.
 
+#### reads_hac — eskape_650mb
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 65.28 | 34.72 | 0.632 | 80.75 | 47.05  | 1.00x  | 0.93 |
+| 2  | 65.28 | 34.72 | 0.635 | 80.04 | 23.30  | 2.02x  | 0.94 |
+| 4  | 65.28 | 34.72 | 0.637 | 80.68 | 11.85  | 3.97x  | 0.94 |
+| 6  | 65.28 | 34.72 | 0.637 | 81.48 | 7.96   | 5.91x  | 0.94 |
+| 8  | 65.28 | 34.72 | 0.637 | 82.55 | 6.02   | 7.82x  | 0.94 |
+| 10 | 65.28 | 34.72 | 0.638 | 83.05 | 4.91   | 9.58x  | 0.94 |
+| 12 | 65.28 | 34.72 | 0.640 | 83.61 | 4.15   | 11.34x | 0.93 |
+
+sys time: 1T=0.307s, 2T=0.299s, 4T=0.361s, 6T=0.386s, 8T=0.377s, 10T=0.417s, 12T=0.453s.
+
 ---
 
 ## Section 2: Cross-Machine Comparison
@@ -387,7 +403,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
 | sample_targeted (50 MB) | 10.19 | - | - | 78.92 |
-| eskape_650mb (150 MB) | 30.70 | - | - | - |
+| eskape_650mb (150 MB) | 30.70 | - | - | 80.75 |
 | eskape_human_4gb (3.8 GB) | 56.85 | - | - | - |
 | standard_8gb (7.6 GB) | 76.59 | - | - | - |
 | standard_16gb (15 GB) | 80.15 | - | - | - |
@@ -397,7 +413,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | DB | Luna (96T) | Minerva (TBD) | Lab Desktop (TBD) | Orion (12T) |
 |----|-----------|---------------|------------------|------------|
 | sample_targeted (50 MB) | - (TBD) | - | - | 82.80 |
-| eskape_650mb (150 MB) | 32.56 | - | - | - |
+| eskape_650mb (150 MB) | 32.56 | - | - | 83.61 |
 | eskape_human_4gb (3.8 GB) | 58.94 | - | - | - |
 | standard_8gb (7.6 GB) | 82.58 | - | - | - |
 | standard_16gb (15 GB) | 84.93 | - | - | - |
@@ -407,7 +423,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
 | sample_targeted (50 MB) | 19.729 | - | - | 47.53 |
-| eskape_650mb (150 MB) | 21.981 | - | - | - |
+| eskape_650mb (150 MB) | 21.981 | - | - | 47.05 |
 | eskape_human_4gb (3.8 GB) | 29.818 | - | - | - |
 | standard_8gb (7.6 GB) | 16.778 | - | - | - |
 | standard_16gb (15 GB) | 23.914 | - | - | - |
