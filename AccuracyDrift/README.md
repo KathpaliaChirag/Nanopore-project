@@ -7,6 +7,7 @@ Test how Kraken2 classification accuracy and cache behavior change across differ
 | Machine | RAM | Notes |
 |---------|-----|-------|
 | Luna (dell-R760) | 504 GB | student@luna.cse.iitd.ac.in |
+| Orion (Jetson AGX Orin 64GB) | 64 GB unified | jetsonagx@10.154.233.173, ARM64, 12 cores, see machines/Orion.md |
 | Minerva | TBD | student account CK |
 | Chirag Suthar's system | TBD | - |
 | Lab desktop | TBD | - |

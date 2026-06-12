@@ -164,6 +164,14 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 ---
 
-## Orion (Jetson) Notes
+## Orion (Jetson AGX Orin 64GB) — reads_hac × sample_targeted × 1T
 
-*(to be filled when Orion runs are done — ARM unified memory behavior expected to differ significantly)*
+64. **LLC miss rate 78.92% on Orion vs 10.19% on Luna for the same 50 MB DB** — the most striking cross-machine finding so far. On Luna (105 MB L3 per socket), the 50 MB hash table fits in cache — only 10% of LLC loads miss. On Orion, the ARM Cortex-A78's SLC (System Level Cache) is only ~4 MB — the 50 MB DB doesn't fit at all, giving 79% miss rate. The cache cliff on Orion is below 50 MB. Every single DB in the experiment will be above the cliff on Orion.
+
+65. **Orion 1T is 2.41x slower than Luna 1T for the same workload** — Luna: 19.73s, Orion: 47.53s. Two compounding factors: (1) LLC miss rate 78.92% vs 10.19% means far more DRAM accesses per read; (2) Cortex-A78 at ~1.7 GHz vs Sapphire Rapids at ~3+ GHz, and lower memory bandwidth (LPDDR5 ~68 GB/s vs DDR5 ~307 GB/s on Luna). Both the CPU and memory subsystem are slower.
+
+66. **IPC 1.00 on Orion vs 1.78 on Luna at 1T for sample_targeted** — despite Orion having a 79% LLC miss rate vs Luna's 10%, the IPC difference is stark. Luna's Sapphire Rapids has deeper out-of-order execution (512 ROB entries) and can hide DRAM latency better. Cortex-A78 has a smaller ROB and stalls harder per cache miss. At 79% LLC miss rate, the ARM core spends most of its time waiting on DRAM with no ILP to hide the latency.
+
+67. **cache-references on Orion (~47B) vs Luna (~29B for eskape_650mb 1T) — ARM L1D counts are different** — on ARM, cache-references maps to L1D accesses (all L1 data cache lookups). On x86/Luna it maps to LLC accesses. These are not directly comparable. The LLC Miss Rate% (LLC-load-misses / LLC-loads) is the directly comparable metric across architectures — both measure last-level cache demand load behavior.
+
+68. **Classified% 84.80% matches Luna exactly** — confirms Kraken2 2.1.3 on ARM64 produces identical classification to x86 for the same DB and reads. The algorithm is deterministic and architecture-independent. This validates the cross-machine comparison — any performance differences are purely hardware, not software.

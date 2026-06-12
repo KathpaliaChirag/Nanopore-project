@@ -85,12 +85,16 @@ Both metrics tracked:
 - [ ] reads_sup × all DBs × all thread counts
 - [ ] Species breakdown
 
-### Orion (Jetson, do last)
-- [ ] Transfer databases + reads
-- [ ] Check perf event names (ARM, not x86)
-- [ ] Check available threads and RAM
+### Orion (Jetson AGX Orin 64GB)
+- [x] SSH setup, storage cleanup, Kraken2 2.1.3 install
+- [x] perf verified working (sudo /usr/lib/linux-tools-5.4.0-26/perf)
+- [x] reads_hac transferred (703 MB)
+- [x] sample_targeted DB transferred
+- [x] reads_hac × sample_targeted × 1T
+- [ ] reads_hac × sample_targeted × 2T,4T,8T,12T
+- [ ] Transfer remaining DBs (eskape_650mb, eskape_human_4gb, standard_8gb, standard_16gb)
+- [ ] reads_hac × all remaining DBs × all thread counts
 - [ ] reads_fast × all DBs × all thread counts
-- [ ] reads_hac × all DBs × all thread counts
 - [ ] reads_sup × all DBs × all thread counts
 - [ ] Species breakdown
 
@@ -339,13 +343,35 @@ Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. p
 
 ---
 
-### 1.4 Orion (Jetson Orin)
+### 1.4 Orion (Jetson AGX Orin 64GB)
 
-**Specs:** ~64 GB unified memory, ARM architecture
-**Thread counts tested:** TBD (powers of 2 up to max)
-**Note:** perf event names differ on ARM — check available events before running
+**Specs:** 64 GB LPDDR5 unified memory (CPU+GPU share), 12-core ARM Cortex-A78AE, no hyperthreading
+**JetPack:** R35.4.1, Ubuntu 20.04, kernel 5.10.120-tegra
+**Thread counts tested:** 1, 2, 4, 8, 12
+**perf binary:** `sudo /usr/lib/linux-tools-5.4.0-26/perf` (5.4 binary works on 5.10 kernel, requires sudo)
+**No numactl** — single NUMA node (unified memory), binding flags not applicable
+**kraken2:** `~/tools/kraken2/kraken2` (2.1.3, explicit path required — sudo strips PATH)
 
-*(same table structure as Luna — fill in after specs confirmed and perf events verified)*
+Perf command:
+```bash
+sudo /usr/lib/linux-tools-5.4.0-26/perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  ~/tools/kraken2/kraken2 --db ~/AccuracyDrift/databases/<DB> \
+  --threads <T> \
+  --output /dev/null --report /dev/null \
+  ~/reads/reads_hac.fastq
+```
+
+#### reads_hac — sample_targeted
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 84.80 | 15.20 | 0.643 | 78.92 | 47.53 | 1.00x | 1.00 |
+| 2  | - | - | - | - | - | - | - |
+| 4  | - | - | - | - | - | - | - |
+| 8  | - | - | - | - | - | - | - |
+| 12 | - | - | - | - | - | - | - |
+
+sys time 1T: 0.274s. cache-references ~47B (L1D accesses). LLC-loads ~588M, LLC-load-misses ~463M.
 
 ---
 
@@ -357,7 +383,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| sample_targeted (50 MB) | 10.19 | - | - | - |
+| sample_targeted (50 MB) | 10.19 | - | - | 78.92 |
 | eskape_650mb (150 MB) | 30.70 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 56.85 | - | - | - |
 | standard_8gb (7.6 GB) | 76.59 | - | - | - |
@@ -377,7 +403,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| sample_targeted (50 MB) | 19.729 | - | - | - |
+| sample_targeted (50 MB) | 19.729 | - | - | 47.53 |
 | eskape_650mb (150 MB) | 21.981 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 29.818 | - | - | - |
 | standard_8gb (7.6 GB) | 16.778 | - | - | - |
@@ -387,7 +413,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| sample_targeted (50 MB) | 84.80 | - | - | - |
+| sample_targeted (50 MB) | 84.80 | - | - | 84.80 |
 | eskape_650mb (150 MB) | 65.28 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 66.13 | - | - | - |
 | standard_8gb (7.6 GB) | 95.77 | - | - | - |
