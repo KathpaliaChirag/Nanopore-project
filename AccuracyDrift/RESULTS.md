@@ -91,7 +91,7 @@ Both metrics tracked:
 - [x] reads_hac transferred (703 MB)
 - [x] sample_targeted DB transferred
 - [x] reads_hac × sample_targeted × 1T
-- [ ] reads_hac × sample_targeted × 2T,4T,8T,12T
+- [x] reads_hac × sample_targeted × 2T,4T,6T,8T,10T,12T
 - [ ] Transfer remaining DBs (eskape_650mb, eskape_human_4gb, standard_8gb, standard_16gb)
 - [ ] reads_hac × all remaining DBs × all thread counts
 - [ ] reads_fast × all DBs × all thread counts
@@ -347,7 +347,7 @@ Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. p
 
 **Specs:** 64 GB LPDDR5 unified memory (CPU+GPU share), 12-core ARM Cortex-A78AE, no hyperthreading
 **JetPack:** R35.4.1, Ubuntu 20.04, kernel 5.10.120-tegra
-**Thread counts tested:** 1, 2, 4, 8, 12
+**Thread counts tested:** 1, 2, 4, 6, 8, 10, 12
 **perf binary:** `sudo /usr/lib/linux-tools-5.4.0-26/perf` (5.4 binary works on 5.10 kernel, requires sudo)
 **No numactl** — single NUMA node (unified memory), binding flags not applicable
 **kraken2:** `~/tools/kraken2/kraken2` (2.1.3, explicit path required — sudo strips PATH)
@@ -365,13 +365,16 @@ sudo /usr/lib/linux-tools-5.4.0-26/perf stat -e cache-misses,cache-references,LL
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | 84.80 | 15.20 | 0.643 | 78.92 | 47.53 | 1.00x | 1.00 |
-| 2  | - | - | - | - | - | - | - |
-| 4  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
-| 12 | - | - | - | - | - | - | - |
+| 1  | 84.80 | 15.20 | 0.643 | 78.92 | 47.53  | 1.00x  | 1.00 |
+| 2  | 84.80 | 15.20 | 0.637 | 78.97 | 23.44  | 2.03x  | 1.02 |
+| 4  | 84.80 | 15.20 | 0.635 | 79.87 | 11.81  | 4.02x  | 1.02 |
+| 6  | 84.80 | 15.20 | 0.637 | 80.78 | 7.96   | 5.97x  | 1.02 |
+| 8  | 84.80 | 15.20 | 0.639 | 81.60 | 6.01   | 7.91x  | 1.02 |
+| 10 | 84.80 | 15.20 | 0.640 | 82.28 | 4.93   | 9.64x  | 1.02 |
+| 12 | 84.80 | 15.20 | 0.640 | 82.80 | 4.15   | 11.44x | 1.01 |
 
-sys time 1T: 0.274s. cache-references ~47B (L1D accesses). LLC-loads ~588M, LLC-load-misses ~463M.
+sys time: 1T=0.274s, 2T=0.269s, 4T=0.318s, 6T=0.347s, 8T=0.430s, 10T=0.399s, 12T=0.461s.
+cache-references ~47B (L1D accesses, not LLC — not comparable to Luna). LLC-loads ~588M per run regardless of thread count.
 
 ---
 
@@ -391,9 +394,9 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 ### 2.2 LLC Miss Rate% at Max Thread — reads_hac
 
-| DB | Luna (96T) | Minerva (TBD) | Lab Desktop (TBD) | Orion (TBD) |
+| DB | Luna (96T) | Minerva (TBD) | Lab Desktop (TBD) | Orion (12T) |
 |----|-----------|---------------|------------------|------------|
-| sample_targeted (50 MB) | - (TBD) | - | - | - |
+| sample_targeted (50 MB) | - (TBD) | - | - | 82.80 |
 | eskape_650mb (150 MB) | 32.56 | - | - | - |
 | eskape_human_4gb (3.8 GB) | 58.94 | - | - | - |
 | standard_8gb (7.6 GB) | 82.58 | - | - | - |

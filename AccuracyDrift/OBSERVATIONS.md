@@ -160,7 +160,92 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 ## Cross-Machine Comparison
 
-*(to be filled after other machines are run)*
+### Luna vs Orion — reads_hac × sample_targeted (50 MB DB) × 1T
+
+#### 1. Cache architecture difference — why cache-miss% diverges but LLC miss% is the right metric
+
+The 0.643% cache miss rate on Orion vs 7.23% on Luna is not evidence that Orion has better cache behavior — it is a measurement artifact from the different perf event mappings on each architecture.
+
+On Luna (x86 Sapphire Rapids), `cache-references` maps to LLC accesses and `cache-misses` maps to LLC misses. The denominator is LLC-level loads — a relatively small count of requests that already survived L1 and L2. A 7.23% miss rate there means 7.23% of LLC accesses went to DRAM.
+
+On Orion (ARM Cortex-A78AE), `cache-references` maps to L1D accesses — every single data memory instruction. The denominator is roughly all memory operations. Most of these hit L1 or L2, so the miss rate looks tiny (0.643%) even though the last-level cache is being hammered. The ~47 billion cache-references on Orion vs Luna's LLC-level counts are measuring completely different things.
+
+The correct cross-machine metric is LLC-load-misses / LLC-loads: both architectures expose this as demand-load traffic to the last-level cache. On Luna this is 10.19%. On Orion it is 78.92%. That 7.7x difference in LLC miss rate is the real signal, and it explains most of the performance gap.
+
+#### 2. Cache cliff location — where Orion crosses its cliff
+
+Luna's SLC per socket is ~105 MB. The cliff (LLC miss rate jumps sharply) lands between 50 MB and 150 MB — sample_targeted (50 MB) = 10.19%, eskape_650mb (150 MB) = 30.70%.
+
+Orion's SLC is ~4 MB. The 50 MB sample_targeted DB is already 12.5x larger than the SLC. With a 78.92% LLC miss rate at 50 MB, Orion is not approaching the cliff — it cleared the cliff well before 50 MB. The cliff on Orion is somewhere below 4 MB, likely between 1 MB and 4 MB given the SLC size and the fact that a Kraken2 hash table has a random-access pattern that rarely reuses the same cache line.
+
+The practical consequence: every database in the AccuracyDrift experiment — sample_targeted, eskape_650mb, eskape_human_4gb, standard_8gb, standard_16gb — will run post-cliff on Orion. There is no "pre-cliff" regime to observe on Orion at any of the planned DB sizes. Luna's pre-cliff behavior (fast, low-latency hash lookups, near-linear thread scaling with high efficiency) does not have an Orion equivalent.
+
+#### 3. Speed difference — quantifying LLC miss rate vs raw hardware contribution
+
+Orion 1T: 47.53s. Luna 1T: 19.73s. Ratio: 2.41x slower.
+
+To isolate the two factors, consider a simplified model. At 1T on a memory-bound workload the dominant cost per read is: (hash lookups per read) × (fraction that miss LLC) × (DRAM latency per miss) + (fraction that hit LLC) × (LLC latency) + (CPU compute overhead).
+
+Luna sample_targeted, 1T: LLC miss rate 10.19%, LLC latency ~10–15 ns, DRAM latency ~80–100 ns. Most lookups hit LLC. DRAM stall cost is modest.
+
+Orion sample_targeted, 1T: LLC miss rate 78.92%, LPDDR5 latency ~100–130 ns (unified memory, higher than DDR5 in absolute ns). 79% of LLC loads go to DRAM — the workload is almost entirely memory-latency-bound.
+
+If Orion had the same 10.19% LLC miss rate as Luna, the DRAM latency contribution would drop by ~(78.92 - 10.19) / 78.92 ≈ 87%. At 1T the thread spends most of its time stalled on DRAM misses. Restoring a 10% miss rate would roughly cut the stall time by ~87%, which would reduce the pure DRAM stall portion of Orion's 47.53s substantially. A rough estimate: if ~70% of Orion's wall time is DRAM stall (consistent with IPC=1.00 and 79% miss rate), that is ~33s of stall time. Reducing the miss rate to 10% cuts that to ~4s, giving a notional ~18–19s — very close to Luna's 19.73s. This suggests roughly 70–80% of the 2.41x slowdown is attributable to LLC miss rate alone.
+
+The remaining 20–30% is raw CPU and memory speed: Cortex-A78 at ~1.7 GHz vs Sapphire Rapids at ~3.0–3.5 GHz (2x clock), plus Sapphire Rapids' deeper pipeline and higher per-clock throughput. Clock speed alone would give ~2x compute advantage to Luna independent of cache behavior, but Kraken2 is not compute-bound — so the clock difference matters less here than the memory subsystem difference.
+
+Summary: the LLC miss rate difference accounts for roughly 70–80% of the 2.41x slowdown. Raw clock speed and memory bandwidth differences account for the rest.
+
+#### 4. IPC difference — out-of-order execution depth and latency hiding
+
+Luna 1T IPC: 1.78. Orion 1T IPC: 1.00.
+
+IPC is determined by how well the CPU fills its pipeline while waiting on memory. The key hardware mechanism is the ROB (reorder buffer): a larger ROB means more instructions can be in-flight simultaneously, letting the CPU find independent instructions to execute while a long-latency DRAM access resolves.
+
+Sapphire Rapids ROB: 512 entries. It can have hundreds of independent instructions queued and executing while one DRAM miss (typically ~200–300 cycles at 3 GHz) resolves. For a workload like Kraken2 where each read generates many hash lookups with significant computation between them, there is meaningful instruction-level parallelism available across lookups. Luna exploits this: IPC 1.78 means nearly 2 instructions retire per cycle on average, even with 10% LLC miss rate producing real DRAM stalls.
+
+Cortex-A78 ROB: approximately 128 entries (Arm's public docs for the A78 family indicate a 6-wide out-of-order core with ROB depth in the ~128 range, substantially smaller than Sapphire Rapids). With 78.92% LLC miss rate, nearly every hash lookup goes to DRAM. DRAM latency at ~100–130 ns on LPDDR5, at ~1.7 GHz, is ~170–220 cycles per miss. With a 128-entry ROB and most outstanding loads stalled waiting on DRAM, the ROB fills with stalled instructions and the frontend stalls — no new instructions can enter. The result is IPC ≈ 1.00: on average the core retires exactly one instruction per cycle, which means it is spending nearly half its time completely stalled (a pipeline with full stalls would have IPC approaching 0; IPC=1.0 in a 4-wide issue machine means the pipeline is ~25% utilized).
+
+In short: Luna hides memory latency behind a deep ROB and finds other work to do. Orion's smaller ROB fills up fast under high LLC miss rates and the core stalls hard.
+
+#### 5. Memory bandwidth — ceiling for thread scaling
+
+Luna DDR5: ~307 GB/s aggregate across both sockets (2 × 8-channel DDR5-4800, roughly 307 GB/s theoretical peak, ~250–280 GB/s practical).
+Orion LPDDR5: ~68 GB/s (LPDDR5-6400 × 128-bit bus, ~102 GB/s theoretical peak, ~68 GB/s practical; this pool is shared with the GPU).
+
+Bandwidth ratio: approximately 4.5x in Luna's favor.
+
+For a memory-bound workload at high thread counts, the bandwidth ceiling determines when adding threads stops helping. On Luna, each thread generates a DRAM traffic stream proportional to its LLC miss rate. With sample_targeted at ~10% LLC miss rate, the per-thread DRAM traffic is low — Luna can sustain many threads before hitting its ~250 GB/s bandwidth ceiling, consistent with near-linear scaling to 32T+ observed on eskape_650mb.
+
+On Orion, each thread generates a DRAM traffic stream with ~79% LLC miss rate — roughly 7.7x more DRAM traffic per thread than Luna has for sample_targeted. Orion's bandwidth ceiling is also 4.5x lower. The combined effect: Orion hits its bandwidth ceiling at roughly (4.5 / 7.7) ≈ 0.58x as many threads as Luna would for the equivalent workload. Since Luna's bandwidth wall for a pre-cliff workload is well above 12T, Orion's wall for a post-cliff workload at 79% miss rate should appear within the 1–12T range available on Orion.
+
+The unified memory constraint makes this worse: the GPU driver and background processes consume some portion of the 68 GB/s baseline, so the effective headroom for Kraken2 is below the theoretical ceiling.
+
+#### 6. Prediction for Orion thread scaling (sample_targeted DB)
+
+On Luna, sample_targeted scales near-linearly with essentially no Amdahl overhead (sys time ~0.21s). The expectation was bandwidth-limited scaling similar to eskape_650mb but with a lower miss rate making the bandwidth wall appear later.
+
+On Orion, with 78.92% LLC miss rate already at 1T, the situation is different:
+
+- The 50 MB DB loads in negligible time (~0.274s sys on Orion, comparable to Luna). Amdahl overhead is not a concern — same as Luna.
+- Each thread is DRAM-bound from the first instruction. DRAM bandwidth is the only scaling limit.
+- Orion has 12 physical cores. At 79% miss rate per thread, the per-thread DRAM demand is high.
+- Estimated bandwidth wall: with 47 billion L1D accesses at 1T, and ~588 million LLC-loads of which ~463 million miss to DRAM, each LLC miss transfers a 64-byte cache line: 463M × 64 bytes = ~29.6 GB of DRAM traffic in 47.53s = ~624 MB/s per thread. Scaling linearly, 12 threads would need ~7.5 GB/s. This is well below the 68 GB/s ceiling — so at face value, Orion should scale linearly to 12T.
+- However, this estimate assumes ideal scaling with no memory latency effects. In practice, LPDDR5 latency does not improve with parallelism — more threads queuing DRAM requests increases queuing delay. DRAM latency is the bottleneck at 1T (IPC=1.00), not bandwidth. Adding threads increases throughput at the cost of each thread's individual latency. IPC per thread will stay near 1.0 or degrade with more threads.
+- Prediction: 2T and 4T should scale near-linearly (2T ~24s, 4T ~12s) because the DRAM bandwidth is not close to saturation and Orion can issue more DRAM requests by having more threads in flight. By 8–12T the bandwidth wall may start to bite — estimate 8T ~7–8s (6–7x speedup from 1T rather than ideal 8x). The scaling efficiency will likely be 80–90% at 4T and drop to 65–75% at 12T. This is worse than Luna's sample_targeted scaling (which would approach 95%+ efficiency at these thread counts) but better than Luna's post-cliff DB scaling.
+- The DRAM bandwidth wall on Orion for sample_targeted will appear somewhere between 8T and 12T. Luna would not hit this wall for sample_targeted until well beyond 12T (possibly beyond 32T). Orion hits the wall earlier because its per-thread DRAM traffic is 7.7x higher relative to its bandwidth ceiling.
+
+#### 7. Prediction for larger DBs on Orion
+
+Since the 50 MB DB already gives 78.92% LLC miss rate, larger DBs cannot make the miss rate much worse — the only room to move is from 78.92% toward 100%.
+
+eskape_650mb (150 MB DB): LLC miss rate on Luna jumped from 10.19% to 30.70% going from 50 MB to 150 MB. On Orion, the 50 MB DB is already 12.5x above the SLC; the 150 MB DB is 37.5x above. The incremental miss rate increase will be small — perhaps 82–86% vs 78.92%. The workload character does not change meaningfully. Wall time at 1T will be somewhat slower (more DB entries to hash through, more DRAM traffic) but the miss rate itself is already near its ceiling. Expect ~55–60s at 1T, roughly 15–25% slower than sample_targeted. Classified% will drop from 84.80% to approximately the same ratio as on Luna (~65%), since classification accuracy is independent of hardware.
+
+standard_8gb (7.6 GB DB): LLC miss rate on Luna was 76.59% at 1T. On Orion with a 4 MB SLC, a 7.6 GB DB is 1900x larger than the SLC — the miss rate will be at or above 95%, essentially every LLC load missing to DRAM. The extra wrinkle: standard_8gb on Luna had ~4.2s sys time (DB loading). On Orion's eMMC storage, DB loading will be substantially slower — eMMC read speed is typically 200–400 MB/s vs NVMe/SSD. Loading 7.6 GB from eMMC at ~300 MB/s takes ~25 seconds. This means Amdahl's law will severely limit thread scaling on standard_8gb for Orion in a way it did not for Luna. The wall time at 1T for standard_8gb on Orion could easily exceed 120–150s, with the dominant cost split between DB loading overhead and the per-read DRAM latency.
+
+standard_16gb (15 GB DB): likely infeasible on Orion's current storage (8.5 GB free, confirmed in Orion.md). Even if storage were cleared, a 15 GB DB load from eMMC at ~300 MB/s takes ~50 seconds per run — the Amdahl ceiling would be extremely low (50s serial / 50s wall = near 1.0x at any thread count).
+
+Summary: every DB on Orion will be post-cliff. The meaningful variation between DBs on Orion will be in (a) classified% (bigger DB = better accuracy), (b) DB loading time from eMMC (grows with DB size, adds Amdahl overhead), and (c) classification phase wall time (grows modestly since miss rate is already near ceiling). The LLC miss rate itself will saturate in the 80–95% range across all DBs and provide little differentiation. The interesting cross-machine story is not "where is Orion's cliff" (below 4 MB, too small for any practical DB) but "how does Orion's fixed-near-ceiling miss rate interact with thread scaling and DB loading overhead across the DB size range."
 
 ---
 
@@ -172,6 +257,20 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 66. **IPC 1.00 on Orion vs 1.78 on Luna at 1T for sample_targeted** — despite Orion having a 79% LLC miss rate vs Luna's 10%, the IPC difference is stark. Luna's Sapphire Rapids has deeper out-of-order execution (512 ROB entries) and can hide DRAM latency better. Cortex-A78 has a smaller ROB and stalls harder per cache miss. At 79% LLC miss rate, the ARM core spends most of its time waiting on DRAM with no ILP to hide the latency.
 
-67. **cache-references on Orion (~47B) vs Luna (~29B for eskape_650mb 1T) — ARM L1D counts are different** — on ARM, cache-references maps to L1D accesses (all L1 data cache lookups). On x86/Luna it maps to LLC accesses. These are not directly comparable. The LLC Miss Rate% (LLC-load-misses / LLC-loads) is the directly comparable metric across architectures — both measure last-level cache demand load behavior.
+67. **cache-references on Orion (~47B) vs Luna (~29B for eskape_650mb 1T) — ARM L1D counts are different** — on ARM, cache-references counts L1D accesses (~47 billion total); on x86, cache-references counts LLC (L3) accesses. These measure completely different cache levels. Orion's 0.643% cache miss rate means 0.643% of L1D accesses missed L1D — expected, L1D has a very high hit rate. Luna's 7.23% means 7.23% of LLC accesses missed the last level — higher because you are already at the bottom of the hierarchy. The two numbers are not comparable at all. The LLC Miss Rate% (LLC-load-misses / LLC-loads) is the apples-to-apples metric: both architectures expose it as demand-load traffic to the last-level cache. That is where the real story is — 78.92% on Orion vs 10.19% on Luna.
 
 68. **Classified% 84.80% matches Luna exactly** — confirms Kraken2 2.1.3 on ARM64 produces identical classification to x86 for the same DB and reads. The algorithm is deterministic and architecture-independent. This validates the cross-machine comparison — any performance differences are purely hardware, not software.
+
+---
+
+## Thread Scaling (Orion, reads_hac, sample_targeted)
+
+69. **Near-perfect scaling on Orion despite 79%+ LLC miss rate** — actual efficiencies: 2T=101.4%, 4T=100.6%, 6T=99.5%, 8T=98.8%, 10T=96.4%, 12T=95.4%. The prediction in section 6 of the cross-machine analysis estimated 80–90% at 4T and 65–75% at 12T — the actual numbers are dramatically better. The bandwidth wall never appeared within the 12-core range. The reason: per-thread DRAM traffic at ~624 MB/s × 12 threads = ~7.5 GB/s, which is well below the 68 GB/s LPDDR5 ceiling. Bandwidth is not the bottleneck here. With enough thread-level parallelism, the CPU stays busy even when each thread is DRAM-latency-bound.
+
+70. **LLC miss rate climbs steadily with threads: 78.92% (1T) → 82.80% (12T)** — a 3.9-point rise across the full range. Compare: eskape_650mb on Luna rose from 30.70% (1T) to 32.56% (96T) over a much larger thread range. The Orion climb is steeper per doubling, reflecting the higher baseline miss rate and tighter bandwidth headroom, but the total range is small. IPC stays essentially flat throughout (1.00 at 1T, 1.02 at 2T–10T, 1.01 at 12T) — adding threads does not worsen per-instruction stall behavior. Each thread independently stalls on DRAM while other threads make progress, which is exactly how latency-tolerant thread scaling works.
+
+71. **Peak speedup 11.44x at 12T — better than Luna's post-cliff DBs at far fewer threads** — Luna on eskape_human_4gb (post-cliff, 57% miss rate) reached only 10.57x at 64T with a 307 GB/s DRAM system. Orion reaches 11.44x at 12T with a 68 GB/s DRAM system and 83% miss rate. The difference is architectural: Orion has 12 physical cores with no hyperthreading and extremely low Amdahl overhead (sys time stays under 0.5s throughout). Luna's 64T runs included NUMA effects and thread management overhead that Orion avoids entirely with a single-node, single-socket design.
+
+72. **sys time grows slightly with thread count: 0.274s (1T) → 0.461s (12T)** — a 0.19s increase across the full range. Negligible compared to the wall time reduction (47.53s → 4.15s). No Amdahl floor visible — unlike Luna's standard_8gb and standard_16gb where sys time (DB loading) was 4–8s and capped speedup below 4x. The 50 MB DB loads in milliseconds on Orion's eMMC, same as on Luna. This will change dramatically with larger DBs.
+
+73. **Orion sample_targeted thread scaling summary** — 1T: 47.53s, 12T: 4.15s, peak speedup 11.44x at 12T (95.4% efficiency). No bandwidth wall, no Amdahl floor, IPC flat. The workload is latency-bound but thread-level parallelism hides that latency almost perfectly across all 12 cores. Contrast with Luna on the same DB: near-linear scaling also expected but with a much lower per-thread DRAM load due to 10% miss rate. Both machines scale well on sample_targeted, but for completely different reasons — Luna because the DB fits in cache, Orion because the thread count ceiling is reached before bandwidth saturates.
