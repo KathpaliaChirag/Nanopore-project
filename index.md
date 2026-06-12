@@ -67,6 +67,13 @@ Update this every time a new major topic is pushed.
 - standard_16gb: scaling collapses at 16T (6.67×, IPC 0.68) — DRAM bandwidth saturated by 15 GB working set
 - Key cross-DB finding: LLC miss rate driven by k-mer diversity, not DB size (eskape_human_4gb > standard_16gb)
 
+**reports/accuracydrift_dell_optiplex.md** → AccuracyDrift experiment on Dell OptiPlex 5090 (2026-06-12)
+- Same 180-run matrix on i7-11700 (8c/16t, 16 MB L3); all values are 3-run averages
+- Scaling capped at 8 physical cores — best case eskape_650mb 8.11× (hac 16T); HT only helps latency-bound small DBs
+- ~10-13× faster than Minerva at 1T (4.9 GHz boost + Rocket Lake IPC; Minerva is a loaded shared server)
+- Classified% identical to Minerva — accuracy is hardware-independent; standard_8gb remains the sweet spot
+- IPC governed by access pattern not miss rate: standard_8gb highest IPC (2.17) despite 63% miss; eskape_human_4gb worst (1.20); IPC drops 15-29% at 16T from HT
+
 **reports/phase1_dummytesting_dorado_kraken2.md** → Phase 1/2a complete run data (Phases 1a–2a)
 - Full tables and verdicts for Dorado fast/HAC GPU profiling + Kraken2 gprof
 

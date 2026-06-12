@@ -213,3 +213,28 @@ Key findings:
 | standard_16gb | 50.36 | 3.39× | 97.77 |
 
 ---
+
+## AccuracyDrift — Dell OptiPlex 5090 (Intel Core i7-11700, 8c/16T, 16 MB L3)
+
+> Full tables, per-combo observations, and final findings: **[reports/accuracydrift_dell_optiplex.md](reports/accuracydrift_dell_optiplex.md)**
+
+**Setup:** identical matrix to Minerva — 3 reads × 4 DBs × 5 thread counts × 3 runs = 180 runs (3-run averages). Same fastq files and read counts (104,832 / 104,918 / 104,980), so **Classified% is byte-for-byte identical to Minerva** — accuracy is hardware-independent.
+
+Key findings:
+
+- **Scaling capped by 8 physical cores** — best case eskape_650mb 8.11× (hac, 16T) vs Minerva's 13.97×; 16T runs on hyperthreads (2/core)
+- **Hyperthreading is selective** — 8T→16T gains 1.35–1.46× on latency-bound small DBs (HT hides memory stalls) but only 1.04–1.10× on bandwidth-bound standard DBs (8 cores already saturate DRAM)
+- **~10–13× faster than Minerva at 1T** (18.2 s vs 233.3 s, hac/eskape_650mb) — 4.9 GHz boost + Rocket Lake IPC; part of the gap is Minerva being a loaded shared server
+- **IPC set by access pattern, not miss rate** — standard_8gb posts the highest IPC (2.17) despite a 63% miss rate (well-pipelined, high MLP), while eskape_human_4gb is worst (1.20) on serialised misses
+- **HT cuts per-thread IPC 15–29% at 16T** — flat 1T→8T, then drops as two hyperthreads share each core's execution units
+
+| DB | LLC Miss% (hac, 1T) | Speedup at 16T (hac) | hac Classified% |
+|----|--------------------:|---------------------:|----------------:|
+| eskape_650mb | 56.50 | 8.11× | 65.28 |
+| eskape_human_4gb | 72.51 | 6.42× | 66.13 |
+| standard_8gb | 63.29 | 3.37× | 95.77 |
+| standard_16gb | 69.08 | 2.51× | 97.77 |
+
+**Observation:** the two machines tell complementary stories — Minerva is core-rich but per-thread slow (scales to 56 cores, IPC < 1.2), Dell is core-poor but per-thread fast (caps at 8 cores, IPC up to 2.2). Same DB + reads give identical accuracy on both; only throughput and the scaling ceiling change with hardware. On Dell's smaller 16 MB L3 every DB is fully DRAM-bound from 1T, so the practical recipe is unchanged: **standard_8gb at the 8-core sweet spot** — past 8 threads you pay an IPC penalty for little throughput.
+
+---
