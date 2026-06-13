@@ -158,6 +158,20 @@ Corrected data uses LLC-load-misses / LLC-loads (retired demand loads only). Ear
 
 ---
 
+## Species Breakdown (Luna, reads_hac, sample_targeted)
+
+92. **P. aeruginosa 52.50% in sample_targeted vs 31.41% in standard_8gb — same reads, different DB, 21-point gap** — the sample contains the same reads regardless of DB. In standard_8gb, many reads that would go to P. aeruginosa find closer matches in related Pseudomonas species (*Pseudomonas* sp. p1(2021b): 2.13%), other Gammaproteobacteria, and the broader bacterial diversity. The targeted DB has only PAO1 as its Pseudomonas reference, so all reads with Pseudomonas-like k-mers accumulate there. This is not contamination — it is reference competition. The true P. aeruginosa abundance is closer to the standard_16gb estimate of 35.62%.
+
+93. **eskape_650mb calls 100% of classified reads as P. aeruginosa — a complete artefact** — the narrow DB has only ESKAPE references and no E. coli or K. pneumoniae. E. coli reads (true abundance ~21.79%) and K. pneumoniae reads (~9.92%) have no match in the DB, so they either go unclassified (34.72%) or their conserved k-mers match P. aeruginosa by proximity. This is the starkest example of how DB composition determines apparent results more than sample biology does.
+
+94. **E. cloacae detects only 0.48% (503 reads) despite being a targeted reference species** — the 6-genome sample_targeted DB includes E. cloacae ATCC 13047, yet only 503 reads are assigned to it. This is consistent with the standard DB results where E. cloacae is a low-abundance organism in this sample. By contrast, P. aeruginosa (52.50%), E. coli (21.79%), and K. pneumoniae (9.92%) are the three dominant species. S. aureus (7 reads) and E. faecium (5 reads) are essentially absent — they were included in the DB because they are ESKAPE species, but this particular sample is not an S. aureus or E. faecium infection. The DB choice was correct but the biology says these organisms are not present in this sample at detectable levels.
+
+95. **110 reads (0.10%) could not be resolved below family or class level in sample_targeted** — 9 reads assigned to Bacteria root, 11 to Gammaproteobacteria, 90 to Enterobacteriaceae. The 90 Enterobacteriaceae-level reads are ambiguous between E. coli K-12 and K. pneumoniae HS11286 — their k-mers are conserved at family level but do not distinguish between the two strains. In standard_8gb, these same reads likely resolve because the broader DB includes k-mers that break the ambiguity.
+
+96. **True sample composition (best estimate from standard_16gb)** — the sample is a polymicrobial infection: P. aeruginosa ~35.6%, E. coli ~16.5%, K. pneumoniae ~5.5%, Pseudomonas-related species ~2.2%, human DNA ~0.8%, diverse low-abundance bacteria ~37.1%, unclassified 2.2%. The 37% "other classified" in standard_8gb (38% in standard_16gb) represents genuine microbial diversity — hundreds of species each below 1%. This is typical of environmental or nosocomial samples: dominated by 2–3 pathogens but containing a long tail of colonising organisms.
+
+---
+
 ## Cross-Machine Comparison
 
 ### Luna vs Orion — reads_hac × sample_targeted (50 MB DB) × 1T

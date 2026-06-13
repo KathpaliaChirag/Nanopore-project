@@ -527,12 +527,45 @@ Only species reaching >1% in at least one DB get a row. Homo sapiens included be
 
 | Species | sample_targeted | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
 |---------|----------------|-------------|-----------------|--------------|---------------|
-| *Pseudomonas aeruginosa* | - (TBD) | 65.28% (68,493) | 64.82% (68,008) | 31.41% (32,956) | 35.62% (37,373) |
-| *Escherichia coli* | - (TBD) | — | — | 14.45% (15,159) | 16.54% (17,350) |
-| *Klebsiella pneumoniae* | - (TBD) | — | — | 4.52% (4,739) | 5.50% (5,774) |
+| *Pseudomonas aeruginosa* | 52.50% (55,077) | 65.28% (68,493) | 64.82% (68,008) | 31.41% (32,956) | 35.62% (37,373) |
+| *Escherichia coli* | 21.79% (22,860) | — | — | 14.45% (15,159) | 16.54% (17,350) |
+| *Klebsiella pneumoniae* | 9.92% (10,411) | — | — | 4.52% (4,739) | 5.50% (5,774) |
 | *Pseudomonas* sp. p1(2021b) | — | — | — | 2.13% (2,237) | 2.21% (2,315) |
 | *Homo sapiens* | — | — | 1.28% (1,344) | 0.66% (695) | 0.77% (803) |
-| Other classified (<1% each) | - (TBD) | 0% (0) | ~0% (28) | 42.60% (44,695) | 37.14% (38,965) |
+| Other classified (<1% each) | 0.59% (625) | 0% (0) | ~0.03% (28) | 42.60% (44,695) | 37.14% (38,965) |
 | Unclassified | 15.20% (15,945) | 34.72% (36,425) | 33.87% (35,538) | 4.23% (4,437) | 2.23% (2,338) |
 
-*(Repeat for each machine × read model combination)*
+sample_targeted "other classified" breakdown: *E. cloacae* ATCC 13047 = 0.48% (503), *S. aureus* NCTC 8325 = 0.01% (7), *E. faecium* DO = <0.01% (5), unresolved at higher ranks (Bacteria/Gammaproteobacteria/Enterobacteriaceae) = 0.10% (110).
+
+---
+
+### 4.2 Cross-DB Species Comparison — % of All Reads (Luna, reads_hac, 32T)
+
+How the apparent composition of the same read pool changes purely as a function of which reference database is used.
+
+| Species | sample_targeted | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
+|---------|:--------------:|:-----------:|:---------------:|:-----------:|:------------:|
+| *P. aeruginosa* | 52.50% | 65.28% | 64.82% | 31.41% | 35.62% |
+| *E. coli* | 21.79% | — | — | 14.45% | 16.54% |
+| *K. pneumoniae* | 9.92% | — | — | 4.52% | 5.50% |
+| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.13% | 2.21% |
+| *Homo sapiens* | — | — | 1.28% | 0.66% | 0.77% |
+| Other classified | 0.59% | 0% | ~0.03% | 42.60% | 37.14% |
+| Unclassified | 15.20% | 34.72% | 33.87% | 4.23% | 2.23% |
+
+### 4.3 Cross-DB Species Comparison — % of Classified Reads (Luna, reads_hac, 32T)
+
+Normalises out the unclassified fraction so DB width effects on apparent composition are visible directly.
+
+| Species | sample_targeted (88,973 cl.) | eskape_650mb (68,493 cl.) | eskape_human_4gb (69,380 cl.) | standard_8gb (100,481 cl.) | standard_16gb (102,580 cl.) |
+|---------|:---------------------------:|:------------------------:|:----------------------------:|:-------------------------:|:--------------------------:|
+| *P. aeruginosa* | 61.90% | 100.00% | 98.02% | 32.80% | 36.43% |
+| *E. coli* | 25.69% | — | — | 15.09% | 16.91% |
+| *K. pneumoniae* | 11.70% | — | — | 4.72% | 5.63% |
+| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.23% | 2.26% |
+| *Homo sapiens* | — | — | 1.94% | 0.69% | 0.78% |
+| Other classified | 0.70% | 0% | 0.04% | 44.48% | 38.00% |
+
+Key insight: in eskape_650mb, 100% of classified reads are called P. aeruginosa — a complete artefact of the narrow DB having no competing references. In standard_8gb, P. aeruginosa drops to 32.80% of classified reads, which is closer to its true abundance. The classified-reads view makes the artefact unmistakable.
+
+*(Repeat sections 4.1–4.3 for reads_fast and reads_sup once data is collected)*
