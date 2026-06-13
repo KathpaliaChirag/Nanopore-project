@@ -346,3 +346,65 @@ All attendees: **Kolin sir**, Chayanika mam, Chirag K (CK), Chirag Suthar, Risha
   - perf annotate with -g debug symbols — source-line hotspots inside CompactHashTable::Get
   - VTune — check if installed on Luna
   - k-mer reuse measurement script (validate LRU cache ROI)
+
+---
+
+## 2026-05-30 to 2026-06-13 — AccuracyDrift experiment (Luna + Orion)
+
+Full experiment to understand how Kraken2 classification accuracy and cache behaviour change across database sizes, thread counts, basecalling models, and machines. All data and analysis in `AccuracyDrift/`.
+
+### Experiment design
+- **Read files:** reads_fast, reads_hac, reads_sup (~104k reads each, same pod5 file, 700 MB each)
+- **Databases (5):** sample_targeted (50 MB), eskape_650mb (150 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB)
+- **Machines:** Luna (96-core Sapphire Rapids, 504 GB RAM) and Orion (12-core ARM Cortex-A78AE, 64 GB LPDDR5, Jetson AGX Orin)
+- **Metrics per run:** classified%, LLC miss rate% (LLC-load-misses/LLC-loads), wall time, IPC, speedup
+
+### Sample-targeted DB construction
+- Built a minimal 50 MB Kraken2 DB from 6 reference genomes matching exactly what is in this sample: P. aeruginosa PAO1, E. coli K-12, K. pneumoniae HS11286, E. faecium 62415, S. aureus MRSA252, E. cloacae ATCC 13047
+- Taxonomy download from NCBI required wget (rsync blocked by IITD proxy); nucl_gb + nucl_wgs accession2taxid files = 51 GB combined, deleted after build
+- hash.k2d = 50 MB; build time 22s at 32T; provides a 5th DB data point smaller than eskape_650mb but with correct species coverage
+
+### Luna — reads_hac × all 5 DBs × all thread counts
+- All runs with numactl --cpunodebind=0 --membind=0, 3 runs averaged
+- Key findings:
+  - **Cache cliff at ~100 MB on Luna** — sample_targeted (50 MB) = 10.19% LLC miss, eskape_650mb (150 MB) = 30.70%; the 105 MB L3 per socket fits the smaller DB but not the larger
+  - **Pre-cliff DB (sample_targeted):** near-linear scaling to 64T peak (22x), DRAM bandwidth not the ceiling
+  - **Post-cliff mid-size DB (eskape_human_4gb, 57% LLC miss):** bandwidth wall at ~16T, ceiling ~10.6x, efficiency collapses from 84% at 8T
+  - **Large DBs (standard_8gb, standard_16gb):** Amdahl-limited, not bandwidth-limited — DB loading from disk takes 4.2s and 7.5s respectively (serial, non-parallelisable); wall speedup ceilings of 3.5x and 3.2x regardless of thread count
+  - **IPC drops below 1.0 at 96T post-cliff** — CPU spending more than one cycle per instruction on average; DRAM stall dominant
+  - **Universal 16T→32T LLC dip** across all DB sizes — shorter wall time means perf counters capture less steady-state cache pressure
+
+### Species breakdown (Luna, reads_hac, 32T)
+- **True sample composition confirmed via standard_16gb:** P. aeruginosa ~35.6%, E. coli ~16.5%, K. pneumoniae ~5.5%, Pseudomonas sp. p1(2021b) ~2.2%, Homo sapiens ~0.8%, diverse other bacteria ~37%, unclassified 2.2%
+- **Classic nosocomial (hospital-acquired) profile** — ICU/ventilator-associated or cystic fibrosis pattern; all three dominant species are ESKAPE pathogens
+- **eskape_650mb artefact exposed:** 100% of its classified reads are called P. aeruginosa, including ~33k reads that are actually E. coli and K. pneumoniae — narrow DB forces them onto the only available reference
+- **Phikmvvirus LKD16 detected** in standard DBs — a P. aeruginosa bacteriophage, confirming active phage predation in the sample
+
+### Orion — reads_hac × all 5 DBs × all thread counts
+- Orion: ARM Cortex-A78AE, 12 cores, 4 MB SLC (system-level cache), 64 GB LPDDR5 unified memory
+- **Key finding: Orion's cache cliff is below 4 MB** — the 50 MB sample_targeted DB is already 12.5x above SLC, giving 78.92% LLC miss at 1T vs Luna's 10.19% for the same DB. Every DB in the experiment is post-cliff on Orion
+- **Despite 79% LLC miss, Orion scales near-perfectly to 12T for small DBs** (95.4% efficiency at 12T) — each thread generates only ~624 MB/s DRAM traffic, so 12 threads total ~7.5 GB/s, far below the 68 GB/s LPDDR5 ceiling. Scaling is latency-hiding via thread-level parallelism, not bandwidth
+- **Orion vs Luna speed gap shrinks with DB size:** 2.41x slower at sample_targeted (Luna pre-cliff, Orion post-cliff) → 1.54x at eskape_human_4gb (both post-cliff) → 1.19x at standard_16gb (both ~80% LLC miss, gap is raw CPU speed only)
+- **Orion eMMC is NVMe-class** (~2.5 GB/s effective) — predicted 60–90s wall time for standard_8gb was wrong; actual was 21s warm. Revised Amdahl floors accordingly
+- **standard_16gb on Orion peaks at 4.50x at 12T** vs Luna's 2.93x at 32T — Orion's larger RAM (64 GB) means the 15 GB DB pages into RAM fully, no re-reads; but the 4.2s eMMC serial load is the Amdahl floor
+- **IPC on standard DBs (2.24) is 2.4x higher than ESKAPE DBs (0.93) on Orion** — standard DB access pattern generates more compute between DRAM stalls regardless of DB size
+
+### reads_sup × all DBs × all thread counts (Luna + Orion, 2026-06-13)
+- **Classification rate 0.6–1.3 pp higher for reads_sup across all DBs** — sup-mode basecalling produces fewer substitution errors so more k-mers exactly match reference; effect is real but small
+- **Species composition virtually identical between reads_hac and reads_sup** — e.g., P. aeruginosa in standard_16gb: 35.62% (hac) vs 36.03% (sup); differences within 0.4 pp for every species. DB choice dominates; basecalling model is a second-order effect
+- **LLC miss rate essentially unchanged between models** (<1.5 pp difference at all DB sizes) — Kraken2's hash access pattern depends on DB structure and k-mer distribution, not read quality
+- **Thread scaling at every thread count (1T–96T on Luna, 1T–12T on Orion) is within 0.5 pp efficiency between reads_hac and reads_sup** — basecalling model has zero effect on parallel scaling; the bottleneck is always DRAM bandwidth or Amdahl DB loading
+- reads_fast expected to follow the same pattern (runs pending)
+
+### Three behavioural classes confirmed (Luna)
+1. **Pre-cliff / just-past-cliff** (sample_targeted, eskape_650mb): scales to 64T peak (~21x), LLC miss slowly rising, bandwidth headroom sustains gains
+2. **Post-cliff bandwidth-saturated** (eskape_human_4gb): plateau from 16T at ~10.5x, LLC frozen at 58%, DRAM bus is the hard ceiling
+3. **Amdahl-limited** (standard_8gb, standard_16gb): peaks at 32T (3.5x, 2.9x), wall time increases after due to OS thread overhead; serial DB loading is the floor
+
+### AccuracyChase — gold-standard DB selection (2026-06-13)
+- Identified that standard_16gb (15 GB) is a downsampled version of the full Standard database (96.8 GB extracted)
+- Goal: run the largest practical DB on Luna to establish a true accuracy ceiling per read model, then use that ceiling when evaluating smaller or custom DBs
+- **Chose PlusPF (103.4 GB extracted, 79.8 GB download)** — Standard + protozoa + fungi; only 6.6 GB larger than Standard but covers fungi (Candida is common in nosocomial infections matching this sample's profile); plants and full GTDB not needed for this sample type
+- All other DBs up to PlusPFP (221.8 GB), core_nt (316.2 GB), GTDB v226 (644 GB) documented in `AccuracyDrift/AccuracyChase.md`
+- Luna (504 GB RAM) can load 103.4 GB comfortably; Orion (64 GB) cannot
+- Download: `wget https://genome-idx.s3.amazonaws.com/kraken/k2_pluspf_20260226.tar.gz` (run on Luna)
