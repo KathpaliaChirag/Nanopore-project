@@ -354,3 +354,61 @@ Summary: every DB on Orion will be post-cliff. The meaningful variation between 
 100. **reads_sup eskape_650mb: still 100% P. aeruginosa of classified reads** — exactly the same artefact as reads_hac. Even with higher-quality sup-mode reads, no E. coli or K. pneumoniae reads break through into classification because the reference sequences simply are not in the DB. sup-mode cannot create new references; it can only help reads better match existing ones.
 
 101. **Standard_16gb gives the most accurate and stable species estimate across both models** — the agreement between reads_hac (97.77% classified, 36.43% P. aeruginosa of classified) and reads_sup (98.48% classified, 36.58% P. aeruginosa) is within measurement noise. Standard_16gb is the recommended DB for this sample type: it covers the full diversity needed, its classifications are stable under basecalling model changes, and the unclassified fraction (1.52–2.23%) is low enough that the "other classified" category captures genuine microbial diversity rather than DB gaps.
+
+---
+
+## reads_sup × all DBs × 1T perf stat (Luna, 2026-06-13)
+
+102. **reads_sup LLC miss rates essentially identical to reads_hac across all DBs** — sample_targeted: 10.55% (sup) vs 10.19% (hac). eskape_650mb: 30.83% vs 30.70%. eskape_human_4gb: 55.85% vs 56.85%. standard_8gb: 75.24% vs 76.59%. standard_16gb: 78.68% vs 80.15%. The differences are <1.5 pp in all cases. This was the key open question from the session briefing: does the access pattern change between basecalling models? Answer: no. Kraken2's LLC miss probability depends on DB size and k-mer distribution, not read quality. The basecalling model is irrelevant to cache behavior — reads with slightly fewer errors produce k-mers that hash to the same memory locations with the same miss probability.
+
+103. **IPC consistently ~3–5% higher for reads_sup than reads_hac** — sample_targeted: 1.83 (sup) vs 1.78 (hac). eskape_650mb: 1.53 vs 1.47. standard_8gb: 2.19 vs 2.11. standard_16gb: 1.92 vs 1.86. The mechanism: reads_sup classifies ~0.6–1.3 pp more reads, meaning more successful k-mer lookups (which terminate early with a hit) relative to exhaustive traversals for unclassified reads. More work done per DRAM stall = slightly higher IPC. The effect is real but small; it does not change any architectural conclusions.
+
+104. **Wall times indistinguishable between reads_hac and reads_sup** — sample_targeted: 19.797s (sup) vs 19.729s (hac). eskape_650mb: 21.638s vs 21.981s. standard_8gb: 16.982s vs 16.778s. standard_16gb: 24.240s vs 23.914s. All within <0.3s — within run-to-run noise. The 0.6–1.3 pp gain in classification rate from sup-mode produces no measurable change in Kraken2 runtime. From a throughput perspective, hac and sup are interchangeable for Kraken2 workloads on these DB sizes.
+
+105. **eskape_human_4gb run 2 anomaly: 34.471s vs ~29.7s for runs 1 and 3** — IPC dropped to 1.13 in run 2 vs 1.31 for runs 1 and 3. LLC miss rate was identical across all three runs (55.83%, 55.85%, 55.88%), confirming the DB access pattern was unchanged — only wall time and cycle count changed. This rules out cold start or DB-size effects. Probable cause: another user's process causing memory bandwidth contention on the shared Luna machine. Including run 2 gives avg 31.294s; the clean two-run avg is 29.706s. Shared machines reduce statistical reliability — a single interference event in 3 runs inflates the average by 5.5%.
+
+106. **standard_8gb IPC 2.19 for reads_sup — confirms IPC >2.0 for standard DBs across both models** — reads_hac standard_8gb was 2.11. Both models show markedly higher IPC on standard DBs than ESKAPE DBs (hac eskape_650mb 1.47, sup eskape_650mb 1.53). The standard DB's lookup structure generates more compute between DRAM stalls regardless of basecalling quality. IPC difference is DB-driven, not model-driven.
+
+107. **standard_16gb LLC miss rate 78.68% — only 3.44 pp above standard_8gb (75.24%)** — same pattern as reads_hac (80.15% vs 76.59%, a 3.56 pp gap). Doubling the DB from 7.6 GB to 15 GB barely changes LLC miss rate when both are far above the 105 MB LLC. The gap is consistent across both basecalling models, confirming it is a DB structure effect. Once past the cliff, miss rate saturates in the high-70s to low-80s% range regardless of whether DB size doubles.
+
+---
+
+## reads_sup × all DBs × 2T (Luna, 2026-06-13)
+
+108. **reads_sup 2T speedup matches reads_hac pattern exactly on ESKAPE DBs** — sample_targeted: 1.96x (98.0%), eskape_650mb: 1.96x (98.2%). Reads_hac × eskape_650mb 2T was 1.97x (98.5%) — within noise. Basecalling model has no effect on thread scaling, consistent with obs 102 showing identical LLC miss rates. At 2 threads the DRAM bandwidth is not close to saturation on any pre/mid-cliff DB, so both models scale near-linearly.
+
+109. **standard_8gb 2T speedup 1.59x (79.3%) — Amdahl-limited, matches reads_hac exactly** — hac was 1.59x (79.4%). The ~4.2s sys time (DB loading) caps speedup identically regardless of basecalling model. The first thread to finish classification releases no serial overhead — both threads must wait for the same DB load before classification begins. This is one of the clearest demonstrations in the dataset that Amdahl's floor is hardware+DB driven, not read-quality driven.
+
+110. **standard_16gb 2T speedup 1.52x (76.0%) — matches hac (1.51x, 75.6%)** — same Amdahl mechanism with 7.5s sys time floor. The ~0.5% difference between models is within run-to-run noise. Pattern confirmed: for any DB large enough to have a significant serial loading component (standard_8gb, standard_16gb), 2T wall speedup is determined purely by sys time fraction — model choice is irrelevant.
+
+111. **LLC miss rate rise from 1T to 2T is largest on standard DBs** — per-DB increase: sample_targeted +0.34pp (10.55→10.89), eskape_650mb +1.09pp (30.83→31.92), eskape_human_4gb +0.84pp (55.85→56.69), standard_8gb +1.34pp (75.24→76.58), standard_16gb +1.57pp (78.68→80.25). The standard DBs show the most cache pressure growth per added thread. At 75–78% baseline miss rate, both threads are continuously hammering DRAM; their combined pressure evicts LLC lines faster. At lower miss rates (sample_targeted at 10%), threads largely hit cached data and their combined DRAM traffic barely changes.
+
+112. **eskape_human_4gb 2T clean speedup 1.86x (93.0%)** — using clean 1T avg (runs 1+3 only: 29.706s) vs 2T avg 15.966s. Compare reads_hac × eskape_human_4gb: 1.87x (93.5%). Essentially identical. The anomalous 1T run 2 (34.471s) made the recorded 2T speedup look like 1.96x — that is an artefact of the inflated 1T denominator. The real speedup is 1.86x, confirming post-cliff DBs at ~57% LLC miss rate still scale well at 2T since bandwidth is not yet saturated at this thread count.
+
+---
+
+## reads_sup × all DBs × 4T (Luna, 2026-06-13)
+
+113. **ESKAPE DBs still scaling at 95%+ efficiency at 4T** — sample_targeted: 3.79x (94.7%), eskape_650mb: 3.81x (95.2%). Compare reads_hac × eskape_650mb 4T: 3.85x (96.3%). Essentially identical. Both pre-cliff (10% miss) and just-past-cliff (32% miss) DBs remain bandwidth-headroom-plentiful at 4T — the DRAM bus has capacity for 4 concurrent threads at these miss rates. The tiny efficiency drop from 2T→4T (eskape_650mb: 98.2%→95.2%) is the first sign of bandwidth pressure, but it is minor.
+
+114. **standard_8gb 4T: 2.28x (56.9%) — below 60% efficiency, Amdahl dominant** — hac was 2.26x (56.6%). The ~4.2s sys time (DB loading) is now the dominant wall time component; at 4T, classification finishes in ~3.3s but the run takes 7.5s. Adding more threads beyond 4 will yield almost no gain. Pattern tracking reads_hac exactly — both models hit the same ceiling from DB loading, not DRAM bandwidth.
+
+115. **standard_16gb 4T: 2.06x (51.4%) — Amdahl ceiling nearly fully hit** — hac was 2.04x (51.1%). The ~7.5s sys time floor means the maximum achievable speedup is ~3.2x; we are at 2.06x and will not gain much more. LLC miss rate at 4T is 82.53% — essentially identical to what it will be at any higher thread count (the saturation pattern from hac was flat at 83–85% from 8T through 96T).
+
+116. **eskape_human_4gb 4T clean speedup 3.29x (82.3%)** — using clean 1T avg of 29.706s vs 4T avg 9.019s. Reads_hac was 3.33x (83.2%). Sup is ~1pp less efficient — within noise. The post-cliff efficiency gap continues to widen: 2T=93%, 4T=82%. The LLC miss rate is now 57.86% (+2pp from 1T), confirming each added thread is increasing DRAM competition meaningfully.
+
+---
+
+## reads_sup × all DBs × 8T (Luna, 2026-06-13)
+
+117. **reads_sup 8T scaling matches reads_hac at every DB** — efficiencies: sample_targeted 93.3%, eskape_650mb 90.7%, eskape_human_4gb 67.7%, standard_8gb 36.2%, standard_16gb 31.4%. Compare reads_hac at 8T: eskape_human_4gb 67.9%, standard_8gb 35.9%, standard_16gb 31.1%. All within 0.5pp. Wall times are also essentially identical: standard_8gb 5.870s (sup) vs 5.836s (hac), standard_16gb 9.661s vs 9.618s. The basecalling model has no effect on thread scaling, confirmed now across 1T, 2T, 4T, and 8T.
+
+118. **sample_targeted LLC miss rate acceleration: +0.34pp (1T→2T), +0.78pp (2T→4T), +1.36pp (4T→8T)** — the rate of increase is growing with each thread doubling. At 1T the 50 MB DB fits comfortably in Luna's 105 MB LLC; a single thread's working set stays cached and only 10.55% of LLC loads miss. At 8T, eight threads concurrently access different regions of the hash table. Their combined working set pressure starts to compete for LLC space — some cache lines evicted by one thread's lookups are misses when another thread needs them. The DB is still pre-cliff in the single-thread sense, but the multi-thread aggregate cache demand is approaching the LLC capacity. The miss rate at 8T (13.03%) is still low compared to post-cliff DBs, but the acceleration suggests the effective cliff for multi-thread workloads is not far above 8T for this DB size.
+
+119. **eskape_650mb LLC miss rate frozen 4T→8T: +0.02pp (32.78% → 32.80%)** — after rising 1.09pp (1T→2T) and 0.86pp (2T→4T), the miss rate essentially stopped climbing. The 150 MB DB is consistently past the cliff regardless of thread count; the LLC holds a hot working set of ~10–15% of the DB and the remaining 85–90% always goes to DRAM. Adding threads does not meaningfully change this steady-state distribution. The LLC cannot cache more or less of the DB regardless of how many threads are running — the miss probability per lookup is fixed by DB size, not thread count.
+
+120. **eskape_human_4gb efficiency gap widens to 25.6pp at 8T** — sample_targeted 93.3% vs eskape_human_4gb 67.7%, a 25.6pp gap. The gap at previous thread counts: 1T=0pp (both 100%), 2T=5pp, 4T=12.4pp, 8T=25.6pp. The divergence accelerates with each doubling. At 57% LLC miss rate and 8 concurrent threads, the DRAM bus is under sustained heavy load from eskape_human_4gb; sample_targeted at 13% miss rate barely stresses it. IPC confirms the difference: eskape_human_4gb 1.28 vs sample_targeted 1.79 at 8T — the post-cliff DB threads stall on DRAM while the pre-cliff threads keep the pipeline busier.
+
+121. **standard_8gb 8T wall time matches Amdahl prediction within 0.04s** — sys time at 8T is ~4.33s (from per-run user/sys breakdown). Amdahl prediction: 4.33s + (16.982 − 4.33)/8 = 4.33 + 1.581 = 5.911s. Actual: 5.870s. The classification phase alone is scaling near-ideally at 8T; all wall-time overhead is the serial DB load. LLC miss rate climbed to 81.46% (+6.2pp from 1T) — by 8T the DRAM is under heavy pressure from the classification threads, but since the classification is already done in ~1.5s, the extra DRAM traffic per thread translates to negligible wall time cost on top of the 4.33s serial floor.
+
+122. **standard_16gb 8T: only 0.45x gain from 4T→8T** — 4T=11.768s (2.06x), 8T=9.661s (2.51x). Doubling threads from 4 to 8 saved only 2.1s out of a possible ~8.2s total. Amdahl prediction with ~7.58s sys time: 7.58 + (24.240 − 7.58)/8 = 7.58 + 2.083 = 9.663s. Actual: 9.661s — an exact match. The headroom remaining before hitting the ceiling is just 9.661 − 7.58 = 2.08s of classification time. Spreading that across 16T, 32T, 64T, and 96T will yield only 2.08s of combined further improvement — the next four thread counts will all cluster within 0.5s of each other in the 8.0–9.7s range.
