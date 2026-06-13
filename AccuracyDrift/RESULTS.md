@@ -104,7 +104,8 @@ Both metrics tracked:
 - [x] reads_hac × standard_16gb × all thread counts
 - [ ] reads_fast × all DBs × all thread counts
 - [x] reads_sup × all DBs × 1T and 2T (Orion, 2026-06-13)
-- [ ] reads_sup × all DBs × 4T,6T,8T,10T,12T
+- [x] reads_sup × all DBs × 4T and 6T (Orion, 2026-06-13)
+- [ ] reads_sup × all DBs × 8T,10T,12T
 - [ ] Species breakdown
 
 ---
@@ -482,8 +483,8 @@ All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RA
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
 | 1  | 85.40 | 14.60 | 0.617 | 79.01 | 47.43  | 1.00x  | 1.04 |
 | 2  | 85.40 | 14.60 | 0.610 | 78.68 | 23.51  | 2.02x  | 1.05 |
-| 4  | -     | -     | -     | -     | -      | -      | -    |
-| 6  | -     | -     | -     | -     | -      | -      | -    |
+| 4  | 85.40 | 14.60 | 0.614 | 79.47 | 11.77  | 4.03x  | 1.06 |
+| 6  | 85.40 | 14.60 | 0.612 | 80.37 | 7.903  | 6.00x  | 1.06 |
 | 8  | -     | -     | -     | -     | -      | -      | -    |
 | 10 | -     | -     | -     | -     | -      | -      | -    |
 | 12 | -     | -     | -     | -     | -      | -      | -    |
@@ -496,8 +497,8 @@ All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RA
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
 | 1  | 65.87 | 34.13 | 0.611 | 80.13 | 46.70  | 1.00x  | 0.96 |
 | 2  | 65.87 | 34.13 | 0.611 | 79.86 | 23.34  | 2.00x  | 0.96 |
-| 4  | -     | -     | -     | -     | -      | -      | -    |
-| 6  | -     | -     | -     | -     | -      | -      | -    |
+| 4  | 65.87 | 34.13 | 0.610 | 80.46 | 11.67  | 4.00x  | 0.97 |
+| 6  | 65.87 | 34.13 | 0.611 | 81.18 | 7.834  | 5.96x  | 0.97 |
 | 8  | -     | -     | -     | -     | -      | -      | -    |
 | 10 | -     | -     | -     | -     | -      | -      | -    |
 | 12 | -     | -     | -     | -     | -      | -      | -    |
@@ -508,13 +509,13 @@ All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RA
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
 | 1  | 66.68 | 33.32 | 0.567 | 77.44 | 45.86  | 1.00x  | 1.12 |
 | 2  | 66.68 | 33.32 | 0.568 | 76.72 | 23.21  | 1.98x  | 1.13 |
-| 4  | -     | -     | -     | -     | -      | -      | -    |
-| 6  | -     | -     | -     | -     | -      | -      | -    |
+| 4  | 66.68 | 33.32 | 0.570 | 77.30 | 12.183 | 3.77x  | 1.13 |
+| 6  | 66.68 | 33.32 | 0.569 | 78.21 | 8.496  | 5.40x  | 1.13 |
 | 8  | -     | -     | -     | -     | -      | -      | -    |
 | 10 | -     | -     | -     | -     | -      | -      | -    |
 | 12 | -     | -     | -     | -     | -      | -      | -    |
 
-sys time: ~1.1–1.2s constant (DB loading). Pattern matches reads_hac eskape_human_4gb.
+sys time: ~1.2s constant (DB loading). Pattern matches reads_hac eskape_human_4gb.
 
 #### reads_sup — standard_8gb
 
@@ -522,13 +523,13 @@ sys time: ~1.1–1.2s constant (DB loading). Pattern matches reads_hac eskape_hu
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
 | 1  | 97.09 | 2.91 | 0.464 | 67.95 | 20.31  | 1.00x  | 2.32 |
 | 2  | 97.09 | 2.91 | 0.467 | 67.70 | 11.23  | 1.81x  | 2.32 |
-| 4  | -     | -     | -     | -     | -      | -      | -    |
-| 6  | -     | -     | -     | -     | -      | -      | -    |
+| 4  | 97.09 | 2.91 | 0.467 | 69.93 | 6.801  | 2.99x  | 2.28 |
+| 6  | 97.09 | 2.91 | 0.467 | 71.97 | 5.296  | 3.83x  | 2.25 |
 | 8  | -     | -     | -     | -     | -      | -      | -    |
 | 10 | -     | -     | -     | -     | -      | -      | -    |
 | 12 | -     | -     | -     | -     | -      | -      | -    |
 
-sys time: ~2.1–2.2s constant (DB loading). All 3 runs at 1T warm — DB already page-cached from reads_hac runs. IPC=2.32 highest of all DBs, same as reads_hac.
+sys time: ~2.2s constant (DB loading). IPC drops with threads as LLC miss rate climbs — more DRAM pressure per unit of parallel work. Amdahl ceiling from 2.2s load floor limits scaling.
 
 #### reads_sup — standard_16gb
 
@@ -536,13 +537,13 @@ sys time: ~2.1–2.2s constant (DB loading). All 3 runs at 1T warm — DB alread
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
 | 1  | 98.48 | 1.52 | 0.580 | 71.15 | 32.75  | 1.00x  | 1.99 |
 | 2  | 98.48 | 1.52 | 0.576 | 72.14 | 16.37  | 2.00x  | 1.98 |
-| 4  | -     | -     | -     | -     | -      | -      | -    |
-| 6  | -     | -     | -     | -     | -      | -      | -    |
+| 4  | 98.48 | 1.52 | 0.566 | 73.57 | 10.299 | 3.18x  | 1.97 |
+| 6  | 98.48 | 1.52 | 0.566 | 75.00 | 8.312  | 3.94x  | 1.94 |
 | 8  | -     | -     | -     | -     | -      | -      | -    |
 | 10 | -     | -     | -     | -     | -      | -      | -    |
 | 12 | -     | -     | -     | -     | -      | -      | -    |
 
-Note: 1T run 1 cold (40.91s wall); runs 2–3 warm (28.83s, 28.52s). Average of all 3 = 32.75s. sys time: 1T avg ~5.4s (run1 8.0s cold, runs 2–3 ~4.1s), 2T avg ~4.0s.
+Note: 1T run 1 cold (40.91s wall); runs 2–3 warm (28.83s, 28.52s). Average of all 3 = 32.75s. 4T and 6T fully warm. sys time ~4.0s constant across all thread counts.
 
 ---
 
