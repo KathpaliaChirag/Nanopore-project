@@ -105,7 +105,7 @@ Both metrics tracked:
 - [ ] reads_fast × all DBs × all thread counts
 - [x] reads_sup × all DBs × 1T and 2T (Orion, 2026-06-13)
 - [x] reads_sup × all DBs × 4T and 6T (Orion, 2026-06-13)
-- [ ] reads_sup × all DBs × 8T,10T,12T
+- [x] reads_sup × all DBs × 8T,10T,12T (Orion, 2026-06-13)
 - [ ] Species breakdown
 
 ---
@@ -485,9 +485,9 @@ All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RA
 | 2  | 85.40 | 14.60 | 0.610 | 78.68 | 23.51  | 2.02x  | 1.05 |
 | 4  | 85.40 | 14.60 | 0.614 | 79.47 | 11.77  | 4.03x  | 1.06 |
 | 6  | 85.40 | 14.60 | 0.612 | 80.37 | 7.903  | 6.00x  | 1.06 |
-| 8  | -     | -     | -     | -     | -      | -      | -    |
-| 10 | -     | -     | -     | -     | -      | -      | -    |
-| 12 | -     | -     | -     | -     | -      | -      | -    |
+| 8  | 85.40 | 14.60 | 0.614 | 81.31 | 6.027  | 7.87x  | 1.05 |
+| 10 | 85.40 | 14.60 | 0.615 | 82.08 | 4.895  | 9.69x  | 1.05 |
+| 12 | 85.40 | 14.60 | 0.616 | 82.76 | 4.106  | 11.55x | 1.05 |
 
 3 runs averaged per thread count. LLC-loads ~585M per run, consistent with reads_hac.
 
@@ -499,9 +499,9 @@ All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RA
 | 2  | 65.87 | 34.13 | 0.611 | 79.86 | 23.34  | 2.00x  | 0.96 |
 | 4  | 65.87 | 34.13 | 0.610 | 80.46 | 11.67  | 4.00x  | 0.97 |
 | 6  | 65.87 | 34.13 | 0.611 | 81.18 | 7.834  | 5.96x  | 0.97 |
-| 8  | -     | -     | -     | -     | -      | -      | -    |
-| 10 | -     | -     | -     | -     | -      | -      | -    |
-| 12 | -     | -     | -     | -     | -      | -      | -    |
+| 8  | 65.87 | 34.13 | 0.614 | 81.98 | 5.991  | 7.80x  | 0.97 |
+| 10 | 65.87 | 34.13 | 0.614 | 82.90 | 4.841  | 9.65x  | 0.97 |
+| 12 | 65.87 | 34.13 | 0.616 | 83.54 | 4.087  | 11.43x | 0.96 |
 
 #### reads_sup — eskape_human_4gb
 
@@ -511,9 +511,9 @@ All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RA
 | 2  | 66.68 | 33.32 | 0.568 | 76.72 | 23.21  | 1.98x  | 1.13 |
 | 4  | 66.68 | 33.32 | 0.570 | 77.30 | 12.183 | 3.77x  | 1.13 |
 | 6  | 66.68 | 33.32 | 0.569 | 78.21 | 8.496  | 5.40x  | 1.13 |
-| 8  | -     | -     | -     | -     | -      | -      | -    |
-| 10 | -     | -     | -     | -     | -      | -      | -    |
-| 12 | -     | -     | -     | -     | -      | -      | -    |
+| 8  | 66.68 | 33.32 | 0.572 | 78.88 | 6.684  | 6.86x  | 1.12 |
+| 10 | 66.68 | 33.32 | 0.573 | 79.71 | 5.599  | 8.19x  | 1.12 |
+| 12 | 66.68 | 33.32 | 0.574 | 80.16 | 4.851  | 9.45x  | 1.11 |
 
 sys time: ~1.2s constant (DB loading). Pattern matches reads_hac eskape_human_4gb.
 
@@ -525,9 +525,9 @@ sys time: ~1.2s constant (DB loading). Pattern matches reads_hac eskape_human_4g
 | 2  | 97.09 | 2.91 | 0.467 | 67.70 | 11.23  | 1.81x  | 2.32 |
 | 4  | 97.09 | 2.91 | 0.467 | 69.93 | 6.801  | 2.99x  | 2.28 |
 | 6  | 97.09 | 2.91 | 0.467 | 71.97 | 5.296  | 3.83x  | 2.25 |
-| 8  | -     | -     | -     | -     | -      | -      | -    |
-| 10 | -     | -     | -     | -     | -      | -      | -    |
-| 12 | -     | -     | -     | -     | -      | -      | -    |
+| 8  | 97.09 | 2.91 | 0.467 | 73.71 | 4.549  | 4.46x  | 2.22 |
+| 10 | 97.09 | 2.91 | 0.468 | 75.14 | 4.072  | 4.99x  | 2.20 |
+| 12 | 97.09 | 2.91 | 0.469 | 76.37 | 3.785  | 5.37x  | 2.17 |
 
 sys time: ~2.2s constant (DB loading). IPC drops with threads as LLC miss rate climbs — more DRAM pressure per unit of parallel work. Amdahl ceiling from 2.2s load floor limits scaling.
 
@@ -539,9 +539,9 @@ sys time: ~2.2s constant (DB loading). IPC drops with threads as LLC miss rate c
 | 2  | 98.48 | 1.52 | 0.576 | 72.14 | 16.37  | 2.00x  | 1.98 |
 | 4  | 98.48 | 1.52 | 0.566 | 73.57 | 10.299 | 3.18x  | 1.97 |
 | 6  | 98.48 | 1.52 | 0.566 | 75.00 | 8.312  | 3.94x  | 1.94 |
-| 8  | -     | -     | -     | -     | -      | -      | -    |
-| 10 | -     | -     | -     | -     | -      | -      | -    |
-| 12 | -     | -     | -     | -     | -      | -      | -    |
+| 8  | 98.48 | 1.52 | 0.568 | 76.45 | 7.310  | 4.48x  | 1.92 |
+| 10 | 98.48 | 1.52 | 0.566 | 77.75 | 6.688  | 4.90x  | 1.90 |
+| 12 | 98.48 | 1.52 | 0.569 | 78.53 | 6.327  | 5.18x  | 1.88 |
 
 Note: 1T run 1 cold (40.91s wall); runs 2–3 warm (28.83s, 28.52s). Average of all 3 = 32.75s. 4T and 6T fully warm. sys time ~4.0s constant across all thread counts.
 
