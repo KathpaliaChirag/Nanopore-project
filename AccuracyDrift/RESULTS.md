@@ -53,7 +53,7 @@ Both metrics tracked:
 ## Run Checklist
 
 ### Luna
-- [ ] Fix reads_sup.fastq permissions
+- [x] Fix reads_sup.fastq permissions
 - [x] reads_hac × sample_targeted × 1T (baseline done; 2T–96T pending)
 - [ ] reads_fast × eskape_650mb × all thread counts
 - [ ] reads_fast × eskape_human_4gb × all thread counts
@@ -63,11 +63,12 @@ Both metrics tracked:
 - [x] reads_hac × eskape_human_4gb × all thread counts
 - [x] reads_hac × standard_8gb × all thread counts
 - [x] reads_hac × standard_16gb × all thread counts
-- [ ] reads_sup × eskape_650mb × all thread counts
-- [ ] reads_sup × eskape_human_4gb × all thread counts
-- [ ] reads_sup × standard_8gb × all thread counts
-- [ ] reads_sup × standard_16gb × all thread counts
-- [ ] Species breakdown for all Luna runs
+- [x] reads_sup × all DBs × 1T (species/report only, no perf stat — quick model comparison)
+- [ ] reads_sup × eskape_650mb × all thread counts (perf stat)
+- [ ] reads_sup × eskape_human_4gb × all thread counts (perf stat)
+- [ ] reads_sup × standard_8gb × all thread counts (perf stat)
+- [ ] reads_sup × standard_16gb × all thread counts (perf stat)
+- [ ] Species breakdown for all Luna runs (full perf runs)
 
 ### Minerva
 - [ ] Transfer databases + reads from Luna
@@ -486,7 +487,19 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | standard_8gb (7.6 GB) | 95.77 | - | - | 95.77 |
 | standard_16gb (15 GB) | 97.77 | - | - | 97.77 |
 
-*(Repeat sections 2.1–2.4 for reads_fast and reads_sup once data is collected)*
+### 2.5 Classified% at 1 Thread — reads_sup
+
+| DB | Luna | Minerva | Lab Desktop | Orion |
+|----|------|---------|-------------|-------|
+| sample_targeted (50 MB) | 85.40 | - | - | - |
+| eskape_650mb (150 MB) | 65.87 | - | - | - |
+| eskape_human_4gb (3.8 GB) | 66.68 | - | - | - |
+| standard_8gb (7.6 GB) | 97.09 | - | - | - |
+| standard_16gb (15 GB) | 98.48 | - | - | - |
+
+reads_sup classification rates are 0.6–1.3 pp higher than reads_hac across all DBs, consistent with the higher-quality basecalling producing k-mers that more precisely match reference sequences.
+
+*(Repeat sections 2.1–2.4 for reads_fast and reads_sup perf stat runs once data is collected)*
 
 ---
 
@@ -504,7 +517,17 @@ How classification rate changes as DB grows. Expected: more classified with larg
 | standard_8gb (7.6 GB) | 95.77% | - | - | 95.77% |
 | standard_16gb (15 GB) | 97.77% | - | - | 97.77% |
 
-*(Repeat for reads_fast and reads_sup)*
+### reads_sup — all machines, 1T (species run only; perf stat runs pending)
+
+| DB | Luna (1T) | Minerva | Lab Desktop | Orion |
+|----|-----------|---------|-------------|-------|
+| sample_targeted (50 MB) | 85.40% | - | - | - |
+| eskape_650mb (150 MB) | 65.87% | - | - | - |
+| eskape_human_4gb (3.8 GB) | 66.68% | - | - | - |
+| standard_8gb (7.6 GB) | 97.09% | - | - | - |
+| standard_16gb (15 GB) | 98.48% | - | - | - |
+
+*(Repeat for reads_fast)*
 
 ---
 
@@ -568,4 +591,49 @@ Normalises out the unclassified fraction so DB width effects on apparent composi
 
 Key insight: in eskape_650mb, 100% of classified reads are called P. aeruginosa — a complete artefact of the narrow DB having no competing references. In standard_8gb, P. aeruginosa drops to 32.80% of classified reads, which is closer to its true abundance. The classified-reads view makes the artefact unmistakable.
 
-*(Repeat sections 4.1–4.3 for reads_fast and reads_sup once data is collected)*
+*(Repeat sections 4.1–4.3 for reads_fast once data is collected)*
+
+---
+
+### Luna — reads_sup (1T, single run, no perf stat)
+
+Quick 1-thread run to compare species calls across DBs under the highest-quality basecalling model. Same read pool as reads_hac (104,980 reads, 723 MB).
+
+| Species | sample_targeted | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
+|---------|----------------|-------------|-----------------|--------------|---------------|
+| *Pseudomonas aeruginosa* | 52.86% (55,495) | 65.87% (69,149) | 65.35% (68,603) | 32.06% (33,655) | 36.03% (37,824) |
+| *Escherichia coli* | 21.94% (23,028) | — | — | 14.17% (14,879) | 16.13% (16,931) |
+| *Klebsiella pneumoniae* | 10.01% (10,512) | — | — | 4.52% (4,746) | 5.42% (5,688) |
+| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.17% (2,275) | 2.23% (2,337) |
+| *Homo sapiens* | — | — | 1.31% (1,372) | 0.66% (696) | 0.75% (786) |
+| Other classified (<1% each) | 0.53% (561) | 0% (0) | ~0.02% (22) | 43.51% (45,671) | 38.52% (40,454) |
+| Unclassified | 14.60% (15,322) | 34.13% (35,831) | 33.32% (34,983) | 2.91% (3,058) | 1.52% (1,600) |
+
+sample_targeted "other classified" breakdown: *E. cloacae* ATCC 13047 = 0.48% (508), *S. aureus* NCTC 8325 = 0.01% (7), *E. faecium* DO = <0.01% (3), unresolved at higher ranks = 0.04% (43).
+
+---
+
+### 4.5 Cross-DB Species Comparison — % of All Reads (Luna, reads_sup, 1T)
+
+| Species | sample_targeted | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
+|---------|:--------------:|:-----------:|:---------------:|:-----------:|:------------:|
+| *P. aeruginosa* | 52.86% | 65.87% | 65.35% | 32.06% | 36.03% |
+| *E. coli* | 21.94% | — | — | 14.17% | 16.13% |
+| *K. pneumoniae* | 10.01% | — | — | 4.52% | 5.42% |
+| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.17% | 2.23% |
+| *Homo sapiens* | — | — | 1.31% | 0.66% | 0.75% |
+| Other classified | 0.53% | 0% | ~0.02% | 43.51% | 38.52% |
+| Unclassified | 14.60% | 34.13% | 33.32% | 2.91% | 1.52% |
+
+### 4.6 Cross-DB Species Comparison — % of Classified Reads (Luna, reads_sup, 1T)
+
+| Species | sample_targeted (89,658 cl.) | eskape_650mb (69,149 cl.) | eskape_human_4gb (69,997 cl.) | standard_8gb (101,922 cl.) | standard_16gb (103,380 cl.) |
+|---------|:---------------------------:|:------------------------:|:----------------------------:|:-------------------------:|:--------------------------:|
+| *P. aeruginosa* | 61.90% | 100.00% | 98.01% | 33.02% | 36.58% |
+| *E. coli* | 25.69% | — | — | 14.60% | 16.38% |
+| *K. pneumoniae* | 11.73% | — | — | 4.66% | 5.50% |
+| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.23% | 2.26% |
+| *Homo sapiens* | — | — | 1.96% | 0.68% | 0.76% |
+| Other classified | 0.63% | 0% | 0.03% | 44.81% | 39.13% |
+
+Key insight: reads_sup classified-reads pattern is essentially identical to reads_hac (e.g., P. aeruginosa in standard_16gb: 36.43% hac vs 36.58% sup). The basecalling model (hac vs sup) has negligible effect on species composition calls at the Kraken2 level — the small gain in classification rate (98.48% vs 97.77%) does not shift which species get credited.
