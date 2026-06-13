@@ -96,8 +96,9 @@ Both metrics tracked:
 - [x] reads_hac × eskape_650mb × all thread counts
 - [x] Transfer eskape_human_4gb
 - [x] reads_hac × eskape_human_4gb × all thread counts
-- [ ] Transfer remaining DBs (standard_8gb, standard_16gb)
-- [ ] reads_hac × all remaining DBs × all thread counts
+- [x] Transfer remaining DBs (standard_8gb, standard_16gb)
+- [x] reads_hac × standard_8gb × all thread counts
+- [x] reads_hac × standard_16gb × all thread counts
 - [ ] reads_fast × all DBs × all thread counts
 - [ ] reads_sup × all DBs × all thread counts
 - [ ] Species breakdown
@@ -409,6 +410,36 @@ sys time: 1T=0.307s, 2T=0.299s, 4T=0.361s, 6T=0.386s, 8T=0.377s, 10T=0.417s, 12T
 sys time: 1T=1.226s, 2T=1.207s, 4T=1.168s, 6T=1.280s, 8T=1.255s, 10T=1.291s, 12T=1.355s.
 DB loading (~1.2s constant) is the Amdahl floor. Classification-phase-only speedup at 12T: (45.82-1.23)/(4.88-1.36) = 44.59/3.52 = 12.67x — near-ideal.
 
+#### reads_hac — standard_8gb
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 95.77 | 4.23 | 0.494 | 68.19 | 21.19  | 1.00x  | 2.24 |
+| 2  | 95.77 | 4.23 | 0.484 | 68.56 | 11.12  | 1.91x  | 2.24 |
+| 4  | 95.77 | 4.23 | 0.484 | 70.35 | 6.745  | 3.14x  | 2.20 |
+| 6  | 95.77 | 4.23 | 0.486 | 72.13 | 5.277  | 4.02x  | 2.17 |
+| 8  | 95.77 | 4.23 | 0.486 | 74.08 | 4.555  | 4.65x  | 2.14 |
+| 10 | 95.77 | 4.23 | 0.486 | 75.30 | 4.107  | 5.16x  | 2.12 |
+| 12 | 95.77 | 4.23 | 0.486 | 76.55 | 3.823  | 5.54x  | 2.10 |
+
+sys time: 1T=2.35s, 2T=2.18s, 4T=2.26s, 6T=2.23s, 8T=2.24s, 10T=2.28s, 12T=2.34s.
+Note: 1T run 1 cold (23.17s wall); runs 2–3 warm averaged 20.20s. Average of all 3 = 21.19s. Amdahl ceiling: 21.19/2.35 ≈ 9.0x max wall speedup. IPC ~2.24 is markedly higher than ESKAPE DBs (0.93–1.08) — standard DB has more compute-intensive lookup patterns.
+
+#### reads_hac — standard_16gb
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 97.77 | 2.23 | 0.603 | 71.36 | 28.42  | 1.00x  | 1.92 |
+| 2  | 97.77 | 2.23 | 0.592 | 72.27 | 16.15  | 1.76x  | 1.91 |
+| 4  | 97.77 | 2.23 | 0.592 | 73.67 | 10.22  | 2.78x  | 1.89 |
+| 6  | 97.77 | 2.23 | 0.593 | 75.18 | 8.304  | 3.42x  | 1.86 |
+| 8  | 97.77 | 2.23 | 0.596 | 76.58 | 7.340  | 3.87x  | 1.84 |
+| 10 | 97.77 | 2.23 | 0.594 | 77.76 | 6.741  | 4.22x  | 1.82 |
+| 12 | 97.77 | 2.23 | 0.595 | 78.64 | 6.323  | 4.50x  | 1.80 |
+
+sys time: 1T=4.23s, 2T=4.03s, 4T=4.04s, 6T=4.06s, 8T=4.16s, 10T=4.19s, 12T=4.17s.
+All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RAM from prior runs. Amdahl ceiling: 28.42/4.23 ≈ 6.7x max wall speedup. Peak 4.50x at 12T — lowest of all DBs on Orion.
+
 ---
 
 ## Section 2: Cross-Machine Comparison
@@ -422,8 +453,8 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | sample_targeted (50 MB) | 10.19 | - | - | 78.92 |
 | eskape_650mb (150 MB) | 30.70 | - | - | 80.75 |
 | eskape_human_4gb (3.8 GB) | 56.85 | - | - | 77.28 |
-| standard_8gb (7.6 GB) | 76.59 | - | - | - |
-| standard_16gb (15 GB) | 80.15 | - | - | - |
+| standard_8gb (7.6 GB) | 76.59 | - | - | 68.19 |
+| standard_16gb (15 GB) | 80.15 | - | - | 71.36 |
 
 ### 2.2 LLC Miss Rate% at Max Thread — reads_hac
 
@@ -432,8 +463,8 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | sample_targeted (50 MB) | - (TBD) | - | - | 82.80 |
 | eskape_650mb (150 MB) | 32.56 | - | - | 83.61 |
 | eskape_human_4gb (3.8 GB) | 58.94 | - | - | 80.42 |
-| standard_8gb (7.6 GB) | 82.58 | - | - | - |
-| standard_16gb (15 GB) | 84.93 | - | - | - |
+| standard_8gb (7.6 GB) | 82.58 | - | - | 76.55 |
+| standard_16gb (15 GB) | 84.93 | - | - | 78.64 |
 
 ### 2.3 Time (s) at 1 Thread — reads_hac
 
@@ -442,18 +473,18 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | sample_targeted (50 MB) | 19.729 | - | - | 47.53 |
 | eskape_650mb (150 MB) | 21.981 | - | - | 47.05 |
 | eskape_human_4gb (3.8 GB) | 29.818 | - | - | 45.82 |
-| standard_8gb (7.6 GB) | 16.778 | - | - | - |
-| standard_16gb (15 GB) | 23.914 | - | - | - |
+| standard_8gb (7.6 GB) | 16.778 | - | - | 21.19 |
+| standard_16gb (15 GB) | 23.914 | - | - | 28.42 |
 
 ### 2.4 Classified% at 1 Thread — reads_hac
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
 | sample_targeted (50 MB) | 84.80 | - | - | 84.80 |
-| eskape_650mb (150 MB) | 65.28 | - | - | - |
-| eskape_human_4gb (3.8 GB) | 66.13 | - | - | - |
-| standard_8gb (7.6 GB) | 95.77 | - | - | - |
-| standard_16gb (15 GB) | 97.77 | - | - | - |
+| eskape_650mb (150 MB) | 65.28 | - | - | 65.28 |
+| eskape_human_4gb (3.8 GB) | 66.13 | - | - | 66.13 |
+| standard_8gb (7.6 GB) | 95.77 | - | - | 95.77 |
+| standard_16gb (15 GB) | 97.77 | - | - | 97.77 |
 
 *(Repeat sections 2.1–2.4 for reads_fast and reads_sup once data is collected)*
 
@@ -465,13 +496,13 @@ How classification rate changes as DB grows. Expected: more classified with larg
 
 ### reads_hac — all machines, 32T (or max available)
 
-| DB | Luna | Minerva | Lab Desktop | Orion |
+| DB | Luna (32T) | Minerva | Lab Desktop | Orion (12T) |
 |----|------|---------|-------------|-------|
-| sample_targeted (50 MB) | 84.80% | - | - | - |
-| eskape_650mb (150 MB) | 65.28% | - | - | - |
-| eskape_human_4gb (3.8 GB) | 66.13% | - | - | - |
-| standard_8gb (7.6 GB) | 95.77% | - | - | - |
-| standard_16gb (15 GB) | 97.77% | - | - | - |
+| sample_targeted (50 MB) | 84.80% | - | - | 84.80% |
+| eskape_650mb (150 MB) | 65.28% | - | - | 65.28% |
+| eskape_human_4gb (3.8 GB) | 66.13% | - | - | 66.13% |
+| standard_8gb (7.6 GB) | 95.77% | - | - | 95.77% |
+| standard_16gb (15 GB) | 97.77% | - | - | 97.77% |
 
 *(Repeat for reads_fast and reads_sup)*
 
