@@ -64,10 +64,12 @@ Both metrics tracked:
 - [x] reads_hac × standard_8gb × all thread counts
 - [x] reads_hac × standard_16gb × all thread counts
 - [x] reads_sup × all DBs × 1T (species/report only, no perf stat — quick model comparison)
-- [ ] reads_sup × eskape_650mb × all thread counts (perf stat)
-- [ ] reads_sup × eskape_human_4gb × all thread counts (perf stat)
-- [ ] reads_sup × standard_8gb × all thread counts (perf stat)
-- [ ] reads_sup × standard_16gb × all thread counts (perf stat)
+- [x] reads_sup × all DBs × 1T perf stat — DONE 2026-06-13
+- [ ] reads_sup × sample_targeted × all thread counts (perf stat) — 1T–8T done
+- [ ] reads_sup × eskape_650mb × all thread counts (perf stat) — 1T–8T done
+- [ ] reads_sup × eskape_human_4gb × all thread counts (perf stat) — 1T–8T done
+- [ ] reads_sup × standard_8gb × all thread counts (perf stat) — 1T–8T done
+- [ ] reads_sup × standard_16gb × all thread counts (perf stat) — 1T–8T done
 - [ ] Species breakdown for all Luna runs (full perf runs)
 
 ### Minerva
@@ -101,7 +103,8 @@ Both metrics tracked:
 - [x] reads_hac × standard_8gb × all thread counts
 - [x] reads_hac × standard_16gb × all thread counts
 - [ ] reads_fast × all DBs × all thread counts
-- [ ] reads_sup × all DBs × all thread counts
+- [x] reads_sup × all DBs × 1T and 2T (Orion, 2026-06-13)
+- [ ] reads_sup × all DBs × 4T,6T,8T,10T,12T
 - [ ] Species breakdown
 
 ---
@@ -225,6 +228,21 @@ Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. p
 | 64 | - | - | - | - | - | - | - |
 | 96 | - | - | - | - | - | - | - |
 
+#### reads_fast — sample_targeted
+
+Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB.
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | - | - | - | - | - | - | - |
+| 2  | - | - | - | - | - | - | - |
+| 4  | - | - | - | - | - | - | - |
+| 8  | - | - | - | - | - | - | - |
+| 16 | - | - | - | - | - | - | - |
+| 32 | - | - | - | - | - | - | - |
+| 64 | - | - | - | - | - | - | - |
+| 96 | - | - | - | - | - | - | - |
+
 #### reads_fast — eskape_650mb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
@@ -281,10 +299,10 @@ Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. p
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 2  | - | - | - | - | - | - | - |
-| 4  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
+| 1  | 65.87 | 34.13 | 33.94 | 30.83 | 21.638 | 1.00x | 1.53 |
+| 2  | 65.87 | 34.13 | 36.43 | 31.92 | 11.020 | 1.96x | 1.51 |
+| 4  | 65.87 | 34.13 | 37.78 | 32.78 | 5.685 | 3.81x | 1.49 |
+| 8  | 65.87 | 34.13 | 38.10 | 32.80 | 2.981 | 7.26x | 1.47 |
 | 16 | - | - | - | - | - | - | - |
 | 32 | - | - | - | - | - | - | - |
 | 64 | - | - | - | - | - | - | - |
@@ -294,10 +312,10 @@ Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. p
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 2  | - | - | - | - | - | - | - |
-| 4  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
+| 1  | 66.68 | 33.32 | 76.05 | 55.85 | 31.294 | 1.00x | 1.25 |
+| 2  | 66.68 | 33.32 | 77.02 | 56.69 | 15.966 | 1.86x† | 1.30 |
+| 4  | 66.68 | 33.32 | 78.68 | 57.86 | 9.019 | 3.29x† | 1.28 |
+| 8  | 66.68 | 33.32 | 81.43 | 58.91 | 5.485 | 5.42x† | 1.28 |
 | 16 | - | - | - | - | - | - | - |
 | 32 | - | - | - | - | - | - | - |
 | 64 | - | - | - | - | - | - | - |
@@ -307,10 +325,10 @@ Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. p
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 2  | - | - | - | - | - | - | - |
-| 4  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
+| 1  | 97.09 | 2.91 | 75.49 | 75.24 | 16.982 | 1.00x | 2.19 |
+| 2  | 97.09 | 2.91 | 75.87 | 76.58 | 10.697 | 1.59x | 2.15 |
+| 4  | 97.09 | 2.91 | 76.80 | 78.42 | 7.464 | 2.28x | 2.12 |
+| 8  | 97.09 | 2.91 | 80.16 | 81.46 | 5.870 | 2.89x | 2.07 |
 | 16 | - | - | - | - | - | - | - |
 | 32 | - | - | - | - | - | - | - |
 | 64 | - | - | - | - | - | - | - |
@@ -320,14 +338,31 @@ Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. p
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 2  | - | - | - | - | - | - | - |
-| 4  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
+| 1  | 98.48 | 1.52 | 81.05 | 78.68 | 24.240 | 1.00x | 1.92 |
+| 2  | 98.48 | 1.52 | 81.59 | 80.25 | 15.936 | 1.52x | 1.90 |
+| 4  | 98.48 | 1.52 | 82.61 | 82.53 | 11.768 | 2.06x | 1.87 |
+| 8  | 98.48 | 1.52 | 86.20 | 85.22 | 9.661 | 2.51x | 1.83 |
 | 16 | - | - | - | - | - | - | - |
 | 32 | - | - | - | - | - | - | - |
 | 64 | - | - | - | - | - | - | - |
 | 96 | - | - | - | - | - | - | - |
+
+#### reads_sup — sample_targeted
+
+Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB.
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 85.40 | 14.60 | 7.86 | 10.55 | 19.797 | 1.00x | 1.83 |
+| 2  | 85.40 | 14.60 | 8.44 | 10.89 | 10.104 | 1.96x | 1.80 |
+| 4  | 85.40 | 14.60 | 9.88 | 11.67 | 5.228 | 3.79x | 1.78 |
+| 8  | 85.40 | 14.60 | 12.26 | 13.03 | 2.652 | 7.46x | 1.79 |
+| 16 | - | - | - | - | - | - | - |
+| 32 | - | - | - | - | - | - | - |
+| 64 | - | - | - | - | - | - | - |
+| 96 | - | - | - | - | - | - | - |
+
+Note (eskape_human_4gb): run 2 = 34.471s vs runs 1+3 = 29.675s/29.736s — system load spike on shared Luna machine. LLC miss rates were identical across all 3 runs (55.83/55.85/55.88%), confirming no cache effect. Average of all 3 runs = 31.294s.
 
 ---
 
@@ -441,6 +476,74 @@ Note: 1T run 1 cold (23.17s wall); runs 2–3 warm averaged 20.20s. Average of a
 sys time: 1T=4.23s, 2T=4.03s, 4T=4.04s, 6T=4.06s, 8T=4.16s, 10T=4.19s, 12T=4.17s.
 All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RAM from prior runs. Amdahl ceiling: 28.42/4.23 ≈ 6.7x max wall speedup. Peak 4.50x at 12T — lowest of all DBs on Orion.
 
+#### reads_sup — sample_targeted
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 85.40 | 14.60 | 0.617 | 79.01 | 47.43  | 1.00x  | 1.04 |
+| 2  | 85.40 | 14.60 | 0.610 | 78.68 | 23.51  | 2.02x  | 1.05 |
+| 4  | -     | -     | -     | -     | -      | -      | -    |
+| 6  | -     | -     | -     | -     | -      | -      | -    |
+| 8  | -     | -     | -     | -     | -      | -      | -    |
+| 10 | -     | -     | -     | -     | -      | -      | -    |
+| 12 | -     | -     | -     | -     | -      | -      | -    |
+
+3 runs averaged per thread count. LLC-loads ~585M per run, consistent with reads_hac.
+
+#### reads_sup — eskape_650mb
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 65.87 | 34.13 | 0.611 | 80.13 | 46.70  | 1.00x  | 0.96 |
+| 2  | 65.87 | 34.13 | 0.611 | 79.86 | 23.34  | 2.00x  | 0.96 |
+| 4  | -     | -     | -     | -     | -      | -      | -    |
+| 6  | -     | -     | -     | -     | -      | -      | -    |
+| 8  | -     | -     | -     | -     | -      | -      | -    |
+| 10 | -     | -     | -     | -     | -      | -      | -    |
+| 12 | -     | -     | -     | -     | -      | -      | -    |
+
+#### reads_sup — eskape_human_4gb
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 66.68 | 33.32 | 0.567 | 77.44 | 45.86  | 1.00x  | 1.12 |
+| 2  | 66.68 | 33.32 | 0.568 | 76.72 | 23.21  | 1.98x  | 1.13 |
+| 4  | -     | -     | -     | -     | -      | -      | -    |
+| 6  | -     | -     | -     | -     | -      | -      | -    |
+| 8  | -     | -     | -     | -     | -      | -      | -    |
+| 10 | -     | -     | -     | -     | -      | -      | -    |
+| 12 | -     | -     | -     | -     | -      | -      | -    |
+
+sys time: ~1.1–1.2s constant (DB loading). Pattern matches reads_hac eskape_human_4gb.
+
+#### reads_sup — standard_8gb
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 97.09 | 2.91 | 0.464 | 67.95 | 20.31  | 1.00x  | 2.32 |
+| 2  | 97.09 | 2.91 | 0.467 | 67.70 | 11.23  | 1.81x  | 2.32 |
+| 4  | -     | -     | -     | -     | -      | -      | -    |
+| 6  | -     | -     | -     | -     | -      | -      | -    |
+| 8  | -     | -     | -     | -     | -      | -      | -    |
+| 10 | -     | -     | -     | -     | -      | -      | -    |
+| 12 | -     | -     | -     | -     | -      | -      | -    |
+
+sys time: ~2.1–2.2s constant (DB loading). All 3 runs at 1T warm — DB already page-cached from reads_hac runs. IPC=2.32 highest of all DBs, same as reads_hac.
+
+#### reads_sup — standard_16gb
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | 98.48 | 1.52 | 0.580 | 71.15 | 32.75  | 1.00x  | 1.99 |
+| 2  | 98.48 | 1.52 | 0.576 | 72.14 | 16.37  | 2.00x  | 1.98 |
+| 4  | -     | -     | -     | -     | -      | -      | -    |
+| 6  | -     | -     | -     | -     | -      | -      | -    |
+| 8  | -     | -     | -     | -     | -      | -      | -    |
+| 10 | -     | -     | -     | -     | -      | -      | -    |
+| 12 | -     | -     | -     | -     | -      | -      | -    |
+
+Note: 1T run 1 cold (40.91s wall); runs 2–3 warm (28.83s, 28.52s). Average of all 3 = 32.75s. sys time: 1T avg ~5.4s (run1 8.0s cold, runs 2–3 ~4.1s), 2T avg ~4.0s.
+
 ---
 
 ## Section 2: Cross-Machine Comparison
@@ -491,13 +594,25 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
-| sample_targeted (50 MB) | 85.40 | - | - | - |
-| eskape_650mb (150 MB) | 65.87 | - | - | - |
-| eskape_human_4gb (3.8 GB) | 66.68 | - | - | - |
-| standard_8gb (7.6 GB) | 97.09 | - | - | - |
-| standard_16gb (15 GB) | 98.48 | - | - | - |
+| sample_targeted (50 MB) | 85.40 | - | - | 85.40 |
+| eskape_650mb (150 MB) | 65.87 | - | - | 65.87 |
+| eskape_human_4gb (3.8 GB) | 66.68 | - | - | 66.68 |
+| standard_8gb (7.6 GB) | 97.09 | - | - | 97.09 |
+| standard_16gb (15 GB) | 98.48 | - | - | 98.48 |
 
-reads_sup classification rates are 0.6–1.3 pp higher than reads_hac across all DBs, consistent with the higher-quality basecalling producing k-mers that more precisely match reference sequences.
+reads_sup classification rates are 0.6–1.3 pp higher than reads_hac across all DBs, consistent with the higher-quality basecalling producing k-mers that more precisely match reference sequences. Orion matches Luna exactly — classification is machine-independent.
+
+### 2.6 LLC Miss Rate% at 1 Thread — reads_sup
+
+| DB | Luna | Minerva | Lab Desktop | Orion |
+|----|------|---------|-------------|-------|
+| sample_targeted (50 MB) | 10.55 | - | - | 79.01 |
+| eskape_650mb (150 MB) | 30.83 | - | - | 80.13 |
+| eskape_human_4gb (3.8 GB) | 55.85 | - | - | 77.44 |
+| standard_8gb (7.6 GB) | 75.24 | - | - | 67.95 |
+| standard_16gb (15 GB) | 78.68 | - | - | 71.15 |
+
+reads_sup LLC miss rates match reads_hac within 1–2 pp on both machines. The basecalling model does not meaningfully change Kraken2's LLC access pattern. The Luna vs Orion contrast is identical to reads_hac: small DBs that fit Luna's L3 (sample_targeted, eskape_650mb) run at 10–31% miss on Luna but 79–80% on Orion.
 
 *(Repeat sections 2.1–2.4 for reads_fast and reads_sup perf stat runs once data is collected)*
 
@@ -517,15 +632,15 @@ How classification rate changes as DB grows. Expected: more classified with larg
 | standard_8gb (7.6 GB) | 95.77% | - | - | 95.77% |
 | standard_16gb (15 GB) | 97.77% | - | - | 97.77% |
 
-### reads_sup — all machines, 1T (species run only; perf stat runs pending)
+### reads_sup — all machines, 1T
 
-| DB | Luna (1T) | Minerva | Lab Desktop | Orion |
-|----|-----------|---------|-------------|-------|
-| sample_targeted (50 MB) | 85.40% | - | - | - |
-| eskape_650mb (150 MB) | 65.87% | - | - | - |
-| eskape_human_4gb (3.8 GB) | 66.68% | - | - | - |
-| standard_8gb (7.6 GB) | 97.09% | - | - | - |
-| standard_16gb (15 GB) | 98.48% | - | - | - |
+| DB | Luna (1T) | Minerva | Lab Desktop | Orion (1T) |
+|----|-----------|---------|-------------|------------|
+| sample_targeted (50 MB) | 85.40% | - | - | 85.40% |
+| eskape_650mb (150 MB) | 65.87% | - | - | 65.87% |
+| eskape_human_4gb (3.8 GB) | 66.68% | - | - | 66.68% |
+| standard_8gb (7.6 GB) | 97.09% | - | - | 97.09% |
+| standard_16gb (15 GB) | 98.48% | - | - | 98.48% |
 
 *(Repeat for reads_fast)*
 
