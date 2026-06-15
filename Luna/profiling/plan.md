@@ -3,7 +3,7 @@
 > **STATUS NOTE (2026-06-15):** This 4-phase plan was written on 2026-05-28.
 > Phase 2 (Kraken2) is complete through Step 12 (Steps 1–51 in bash_history.md).
 > Phase 3 (Dorado GPU) and Phase 4 (AMX matmul) are DEPRIORITIZED — summer focus is Kraken2 optimisation only (decided at Meeting 4, 2026-05-28).
-> Phase 1 (matmul re-run on Luna) was not done — deemed unnecessary after the WSL2 results were sufficient for the report.
+> Phase 1 (matmul re-run on Luna) was completed — perf stat results for all 12 N=1024 variants and N=2048 wall times are in `profiling/results_matmul_luna.md`.
 > AccuracyDrift experiment (2026-05-30 to 2026-06-13) ran between Phase 2 completion and the next optimisation phase. See `AccuracyDrift/` directory.
 > Next active work: Kraken2 source optimisation (proposals A/D/E/F from docs/reports/).
 

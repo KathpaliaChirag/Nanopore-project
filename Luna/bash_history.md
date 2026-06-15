@@ -1,6 +1,7 @@
 # Luna Bash History
 
-Chronological log of all commands run on Luna (dell-R760) as `student` user, with explanations.
+Chronological log of commands run on Luna (dell-R760) as `student` user, with explanations.
+**Partial log — covers Sessions 1 (setup) through Step 51 (tmpfs experiment, 2026-06-15). AccuracyDrift and AccuracyChase commands are logged separately in `AccuracyDrift/COMMANDS.md`.**
 Status: ✅ Done | 🔜 Upcoming | ❌ Failed
 
 ---

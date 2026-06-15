@@ -488,7 +488,7 @@ Three behavioral classes emerged:
 | Class | DBs | Bottleneck | Peak thread speedup |
 |---|---|---|---|
 | Pre-cliff (DB fits in LLC) | sample_targeted 50 MB | DRAM latency, near-linear scaling | ~22× at 64T |
-| Post-cliff (DB > LLC, < Amdahl wall) | eskape_650mb 142 MB, eskape_human_4gb 3.8 GB | DRAM bandwidth | 10–22× |
+| Bandwidth-saturated (DB > LLC, < Amdahl wall) | eskape_650mb 142 MB, eskape_human_4gb 3.8 GB | DRAM bandwidth | 10–22× |
 | Amdahl-limited (DB load serial) | standard_8gb, standard_16gb | Single-threaded DB mmap load | 3–4× |
 
 Cache cliff on Luna: between 50 MB and 142 MB (LLC is 210 MB but hash table random-access pattern exceeds effective cache capacity in that range).

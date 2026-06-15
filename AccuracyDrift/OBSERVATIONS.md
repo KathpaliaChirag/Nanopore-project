@@ -449,7 +449,7 @@ Summary: every DB on Orion will be post-cliff. The meaningful variation between 
 
 ---
 
-## AccuracyChase — PlusPF 103 GB (Luna, 32T, cold runs, 2026-06-15)
+## AccuracyChase — PlusPF 103 GB (Luna, 32T, cold runs, 2026-06-13)
 
 136. **Gold-standard accuracy ceiling established: reads_fast 96.79%, reads_hac 98.86%, reads_sup 99.24%** — the unclassified fraction is now 0.76–3.21% depending on model. PlusPF adds protozoa and fungi over standard_16gb; the ~1 pp gain (hac: 97.77%→98.86%, sup: 98.48%→99.24%) confirms a small but real fungal/protozoan fraction in the sample. The remaining unclassified in PlusPF is the hard floor — truly novel sequence not in any RefSeq reference.
 

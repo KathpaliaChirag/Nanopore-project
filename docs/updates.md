@@ -425,7 +425,7 @@ Full experiment to understand how Kraken2 classification accuracy and cache beha
 
 ## 2026-06-16 — Multi-agent hierarchical review and cleanup
 
-Full sweep of the project repository using a hierarchical agent structure (R1-R7 background agents + foreground review agent + R7 consistency audit + C1-C5 coordinator agents). 25+ files audited and corrected across two commits (56afc69 and d77ab66).
+Full sweep of the project repository using a hierarchical agent structure (R1-R7 background agents + foreground review agent + R7 consistency audit + C1-C5 coordinator agents). 25+ files audited and corrected across three commits (56afc69, d77ab66, 4c18fe7).
 
 Key fixes applied:
 

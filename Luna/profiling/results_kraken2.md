@@ -702,7 +702,7 @@ numactl --cpunodebind=X --membind=Y perf stat \
 
 | Config | IPC | LLC miss% | Total stalls (B) | Stall% | DRAM stalls (B) | Wall time |
 |---|---|---|---|---|---|---|
-| node0+node0 (local) | **1.86** | 83.1% | 25.38 | **42.1%** | **6.44** | **4.45s** |
+| node0+node0 (local) | **1.86** | 83.1% | 25.38 | **42.1%** | **6.44** | **4.405s** |
 | node1+node1 (local) | 1.82 | 81.8% | 26.53 | 43.3% | 8.28 | 5.04s |
 | node1 CPU + node0 mem (cross) | 1.62 | 83.6% | 34.08 | 49.4% | 12.19 | 5.56s |
 | node0 CPU + node1 mem (cross) | 1.59 | 82.0% | 35.59 | 50.3% | 12.17 | 5.80s |
@@ -751,7 +751,7 @@ Both are "local" but node0 is faster (DRAM stalls 6.44B vs 8.28B). The FASTQ fil
 | core_bound % | 21.7% | **15.2%** | −6.5 pp |
 | retiring % | 26.9% | **30.7%** | +3.8 pp |
 | LLC miss rate | 80.9% | 83.1% | unchanged (expected) |
-| Wall time | 5.63s | **4.39s** | −22.0% |
+| Wall time | 5.63s | **4.405s** | −21.8% |
 
 ---
 

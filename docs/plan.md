@@ -436,7 +436,7 @@ diff baseline.kraken optimized.kraken  # expect zero diff for Proposals A/D/E/F
 
 ---
 
-## IMMEDIATE ACTIONS STATUS (as of 2026-06-15)
+## IMMEDIATE ACTIONS STATUS (as of 2026-06-16)
 
 - [x] SSH to Luna, run Phase A (perf stat cold/warm) — done, all 3 models, all NUMA configs
 - [x] Run Phase B (TMA) — done, all 3 models + all 4 NUMA configs

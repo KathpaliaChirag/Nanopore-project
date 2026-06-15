@@ -154,10 +154,11 @@ Orion is a third experiment machine added to the project during AccuracyDrift (2
 |---|---|
 | Platform | NVIDIA Jetson AGX Orin 64GB |
 | Architecture | ARM64 (aarch64) |
-| CPU | 12-core Arm Cortex-A78AE |
+| CPU | 12-core ARM Cortex-A78AE (3 clusters × 4 cores, no hyperthreading) |
+| SLC (L3) | 4 MB System Level Cache (shared across all 12 cores) |
 | GPU | Ampere GPU, 2048 CUDA cores, integrated (unified memory) |
 | RAM | 64 GB LPDDR5 (unified CPU + GPU memory) |
-| OS | Linux (JetPack / Ubuntu-based) |
+| OS | Ubuntu 20.04.6 LTS (JetPack R35.4.1) |
 | CUDA | Available (integrated) |
 | Campus network | Yes — not reachable from outside IIT Delhi network |
 
@@ -171,7 +172,22 @@ Orion is a third experiment machine added to the project during AccuracyDrift (2
 
 ## Verdict
 
-### Luna wins on every hardware dimension:
+### Luna vs Minerva vs Orion — hardware dimension summary:
+
+| Dimension | Luna | Minerva | Orion |
+|---|---|---|---|
+| CPU compute (single-thread) | **3.8 GHz Xeon Platinum 8468** | 2.0 GHz Xeon Gold 6330 | ~1.7 GHz ARM Cortex-A78AE |
+| CPU compute (multi-thread) | **192 logical CPUs** | 112 logical CPUs | 12 cores (no HT) |
+| Cache (L2) | **2 MB per core** | 1 MB per core | — (ARM cluster cache) |
+| Cache (LLC/SLC) | **210 MB** | ~66 MB | 4 MB SLC |
+| RAM | **503 GB DDR5** | 251 GB DDR4 | 64 GB LPDDR5 (unified) |
+| GPU compute | **2× L40S (91.6 TFLOPS FP32 each)** | 2× A40 (37.4 TFLOPS FP32 each) | Ampere, 2048 CUDA cores (integrated) |
+| Disk health | **74% used, 236 GB free** | 100% full — blocked | 85% used, 8.5 GB free |
+| AMX (tile matrix multiply) | **Yes (Sapphire Rapids)** | No | No (ARM architecture) |
+| SIMD | **AVX-512 + AMX** | AVX-512 | NEON (ARM) |
+| Memory architecture | Discrete DRAM | Discrete DRAM | **Unified (CPU+GPU share pool)** |
+
+### Luna wins on x86 dimensions:
 
 | Dimension | Winner | Margin |
 |---|---|---|

@@ -365,6 +365,8 @@ PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.
 | 64 | 66.68 | 33.32 | 80.52 | 58.09 | 2.823 | 10.52x† | 1.07 |
 | 96 | 66.68 | 33.32 | 80.41 | 58.24 | 2.973 | 9.99x† | 1.03 |
 
+†Speedup denominator is the 3-run average 1T time (31.294s), which includes an anomalous run 2 (34.471s) caused by a system load spike on shared Luna. The clean 2-run average (runs 1+3 only) is 29.706s. True speedups using the clean 1T time are ~5% higher: 2T=1.96x, 4T=3.29x, 8T=5.42x, 16T=7.88x, 32T=9.95x, 64T=10.54x, 96T=9.99x. Architectural conclusions are unchanged.
+
 #### reads_sup — standard_8gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
@@ -744,7 +746,7 @@ ESKAPE species taxids for reference:
 - Pseudomonas aeruginosa: 287
 - Enterobacter spp.: 547
 
-### Luna — reads_hac (32T)
+### 4.1 Species Breakdown — Luna, reads_hac, 32T
 
 Only species reaching >1% in at least one DB get a row. Homo sapiens included because it hits 1.28% in eskape_human_4gb; sub-1% values shown for completeness. "—" means the species is not in that DB's reference set.
 
