@@ -78,6 +78,8 @@ pv ~/barcode02.fastq | perf stat \
 
 ## Phase 3 — Dorado GPU Profiling
 
+> **DEPRIORITIZED as of Meeting 4 (2026-05-28).** No runs will be done. See STATUS NOTE at top.
+
 Same as Minerva but on L40S (Ada Lovelace) instead of A40 (Ampere).
 L40S has higher FP32 throughput — expect faster basecalling.
 
@@ -92,6 +94,8 @@ Key comparison: A40 GEMM % vs L40S GEMM % — same bottleneck, different through
 ---
 
 ## Phase 4 — AMX Matrix Multiply (Luna-exclusive)
+
+> **DEPRIORITIZED as of Meeting 4 (2026-05-28).** No runs will be done. See STATUS NOTE at top.
 
 The Xeon Platinum 8468 has AMX (Advanced Matrix Extensions) — a dedicated
 tile-based matrix multiply unit for INT8 and BF16. This is the hardware

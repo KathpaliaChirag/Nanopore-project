@@ -350,15 +350,15 @@ Three behavioral classes found:
 | Class | Example DBs | Primary bottleneck | Peak thread speedup |
 |---|---|---|---|
 | Pre-cliff | sample_targeted 50 MB | DRAM latency; near-linear | ~22× at 64T |
-| Post-cliff | eskape_650mb 142 MB, eskape_human_4gb 3.8 GB | DRAM bandwidth | 10–22× |
+| bandwidth-saturated | eskape_650mb 142 MB, eskape_human_4gb 3.8 GB | DRAM bandwidth | 10–22× |
 | Amdahl-limited | standard_8gb, standard_16gb | Serial DB mmap load | 3–4× |
 
 Key findings:
 - Cache cliff on Luna is between 50 MB and 142 MB. sample_targeted (50 MB) = 10.19% LLC miss rate; eskape_650mb (142 MB) = 30.70%.
-- Orion (4 MB LLC): every DB in the experiment is post-cliff. Even 50 MB gives 78.92% LLC miss rate. 2.41× slower than Luna at 1T; ~70–80% of that gap is explained by LLC miss rate.
+- Orion (4 MB SLC): every DB in the experiment is post-cliff. Even 50 MB gives 78.92% LLC miss rate. 2.41× slower than Luna at 1T; ~70–80% of that gap is explained by LLC miss rate.
 - Standard_8gb (7.6 GB) classification scales near-ideally to 8T but Amdahl wall (4.2s serial DB load) caps wall speedup at ~3.5× regardless of thread count.
 - Standard_16gb (15 GB): Amdahl ceiling 3.19×, 7.5s serial floor. Peaked at 32T; 64T and 96T both regressed.
-- AccuracyChase: PlusPF 103 GB cold run on Luna = gold-standard accuracy ceiling established.
+- AccuracyChase (PlusPF 103 GB cold runs, Luna 32T): gold-standard accuracy ceiling — reads_fast 96.79%, reads_hac 98.86%, reads_sup 99.24% classified. LLC miss rate 90–91% (highest in experiment).
 - eskape_650mb inflates P. aeruginosa count by ~33k false positives (reads from absent E. coli + K. pneumoniae absorbed by closest match). True sample composition from standard_16gb: P. aeruginosa ~35.6%, E. coli ~16.5%, K. pneumoniae ~5.5%, ~37% diverse low-abundance species.
 
 → full data: [AccuracyDrift/RESULTS.md](../../AccuracyDrift/RESULTS.md)  

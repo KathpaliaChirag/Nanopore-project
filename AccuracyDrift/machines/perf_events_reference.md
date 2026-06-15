@@ -41,7 +41,7 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 ```
 
 Note: `numactl` omitted — Orion has unified memory (single NUMA node, no binding needed).
-Thread counts to test: 1, 2, 4, 8, 12 (12-core CPU, no hyperthreading).
+Thread counts to test: 1, 2, 4, 6, 8, 10, 12 (12-core CPU, no hyperthreading).
 
 | Event | Maps to on ARM Cortex-A78 |
 |-------|--------------------------|

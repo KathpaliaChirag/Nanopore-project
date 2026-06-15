@@ -3338,12 +3338,12 @@ AccuracyChase is the follow-on: PlusPF (103 GB) was identified as the gold-stand
 | Class | DB(s) | LLC miss rate | Thread scaling | Peak speedup |
 |---|---|---|---|---|
 | Pre-cliff | sample_targeted (50 MB) | ~10% | Near-linear to 64T | ~22x |
-| Post-cliff bandwidth-saturated | eskape_650mb (142 MB), eskape_human_4gb (3.8 GB) | 30–58% | Plateau at ~16–32T | ~10–21x |
+| bandwidth-saturated | eskape_650mb (142 MB), eskape_human_4gb (3.8 GB) | 30–58% | Plateau at ~16–32T | ~10–21x |
 | Amdahl-limited | standard_8gb (7.6 GB), standard_16gb (15 GB) | 76–80% | Peak at 32T, limited by serial DB loading (4.2s / 7.5s) | ~3.5x / 2.9x |
 
 **Cache cliff on Luna:** between 50 MB and 142 MB — the 105 MB L3 per socket fits sample_targeted but not eskape_650mb. LLC miss rate jumps from 10.19% to 30.70% across this boundary.
 
-**Cache cliff on Orion (ARM, 4 MB SLC):** below 50 MB — every DB in the experiment is post-cliff on Orion. Orion's LLC miss rate for sample_targeted is 78.92% vs Luna's 10.19%.
+**Cache cliff on Orion (ARM, 4 MB SLC):** below 4 MB SLC — every DB in the experiment is post-cliff on Orion. Orion's LLC miss rate for sample_targeted is 78.92% vs Luna's 10.19%.
 
 ### Key results — AccuracyChase (PlusPF 103 GB cold runs, Luna 32T, 2026-06-13)
 
@@ -3354,6 +3354,8 @@ AccuracyChase is the follow-on: PlusPF (103 GB) was identified as the gold-stand
 | reads_sup | 99.24% | 91.21% | 57.00 |
 
 Wall times are cold-run (DB paging from disk). Warm-run estimates ~10–15s at 32T. LLC miss 90–91% is highest in the experiment.
+
+**NUMA speedup (Luna, reads_hac, eskape_650mb, 32T):** numactl --cpunodebind=0 --membind=0 reduced wall time from 5.635s (default 96T) to 4.405s (node0 pinned) — **21.8% reduction**, zero code changes. LLC miss% unchanged — NUMA reduces miss latency, not miss count.
 
 ### Sample composition (best estimate, standard_16gb, reads_hac)
 

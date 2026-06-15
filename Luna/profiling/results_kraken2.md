@@ -307,6 +307,8 @@ done 2>&1 | tee ~/results/profiling/thread_scaling_fast.txt
 
 **Output file:** `~/results/profiling/thread_scaling_fast.txt`
 
+### 5a — Thread Scaling: fast model
+
 | Threads | Run 1 | Run 2 | Run 3 | Run 4 | Run 5 | Avg (s) | Speedup vs 2T |
 |---|---|---|---|---|---|---|---|
 | 2 | 11.488 | 11.301 | 12.268 | 12.561 | 11.077 | 11.739 | 1.00x |
@@ -802,12 +804,12 @@ node1+node1 (5.037s) beats unpinned (5.235s) despite the DB being on node 0. Con
 
 ### 9c — Complete Optimisation Ladder (hac model)
 
-| Configuration | Floor (s) | vs 96T default | Cumulative gain |
+| Configuration | Floor (s) | vs 96T default | vs prev step |
 |---|---|---|---|
 | 96T, no pin (original baseline) | 5.635 | — | — |
 | 32T, no pin | 5.235 | −7.1% | −7.1% |
-| 32T, node1+node1 | 5.037 | −10.6% | −10.6% |
-| 32T, node0+node0 | **4.405** | **−21.8%** | **−21.8%** |
+| 32T, node1+node1 | 5.037 | −10.6% | −3.8% |
+| 32T, node0+node0 | **4.405** | **−21.8%** | **−12.5%** |
 
 Zero code changes. Zero recompilation. Just thread count + numactl.
 

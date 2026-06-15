@@ -33,6 +33,7 @@ Socket(s):            2
 | Total logical CPUs   | 112                             |
 | NUMA nodes           | 2 (node0: even, node1: odd)     |
 | Architecture         | x86_64                          |
+| L3 Cache             | ~66 MB total (42 MB per socket × 2 sockets; Xeon Gold 6330) |
 
 ---
 
@@ -254,8 +255,8 @@ ps aux --sort=-%mem | head -15
 
 | Action | Command | Status |
 |---|---|---|
-| perf_event_paranoid → 1 | `sudo sysctl -w kernel.perf_event_paranoid=1` | Pending |
-| nsys PATH fix | `/etc/profile.d/nsys.sh` | Pending |
+| perf_event_paranoid → 1 | `sudo sysctl -w kernel.perf_event_paranoid=1` | Done |
+| nsys PATH fix | `/etc/profile.d/nsys.sh` | Done |
 | LIKWID msr module | `sudo modprobe msr` + `/etc/modules` | Pending (after LIKWID install) |
 | VTune | standalone `.sh` installer → `/opt/intel/vtune/` | Pending |
 | DCGM | `sudo dpkg -i dcgm.deb` + systemctl | Pending |

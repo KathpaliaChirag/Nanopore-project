@@ -47,13 +47,15 @@ tar -xzf k2_pluspf_20260226.tar.gz -C ~/AccuracyDrift/databases/pluspf_103gb/
 
 ## Results
 
-### Classification Accuracy — Gold Standard (Luna, 32T, cold run)
+### Classification Accuracy — Gold-Standard Ceiling (Luna, 32T, cold run, 2026-06-13)
 
 | Read model | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | IPC | Wall time (s) |
 |------------|-------------|---------------|-----------------|----------------|-----|---------------|
 | reads_fast | 96.79 | 3.21 | 93.79 | 90.11 | 0.90 | 57.75 |
 | reads_hac  | 98.86 | 1.14 | 94.18 | 91.07 | 0.97 | 57.17 |
 | reads_sup  | 99.24 | 0.76 | 94.16 | 91.21 | 1.00 | 57.00 |
+
+**reads_sup at 32T is the definitive accuracy ceiling for this sample.** 99.24% classified represents the highest achievable classification rate with any RefSeq-based Kraken2 database of this scope — the remaining 0.76% unclassified is likely truly novel sequence absent from all RefSeq references. All smaller-DB accuracy figures should be evaluated against this ceiling.
 
 **Cold-run caveat:** sys time was ~56s ≈ wall time across all three runs. With 32 threads and ~57s wall, only ~100 CPU-seconds were active — the other ~1,700 CPU-seconds of available thread time were idle, waiting on I/O. The 103 GB DB was being paged from disk during each run (first access after extraction). Wall times here reflect I/O-dominated cold starts. Warm repeats needed for steady-state classification speed (expect ~10–15s wall at 32T once 103 GB is page-cached in Luna's 503 GB RAM).
 

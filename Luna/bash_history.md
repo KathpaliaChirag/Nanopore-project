@@ -573,7 +573,7 @@ for T in 2 4 8 16 32 64 96 128 192; do
   echo ""
 done 2>&1 | tee ~/results/profiling/thread_scaling_perf_summary.txt
 ```
-**Status:** ✅ Done — IPC 1.81 peak at 4T, degrades to 1.28 at 192T. DRAM saturates at 8T. Sweet spot 32T (5.52s). See results_kraken2.md Step 5b.
+**Status:** ✅ Done — IPC 1.81 peak at 4T, degrades to 1.28 at 192T. DRAM saturates at 8T. Sweet spot 32T (5.52s). See results_kraken2.md Step 5f.
 
 ---
 

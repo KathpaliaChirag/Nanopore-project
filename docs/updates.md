@@ -401,13 +401,22 @@ Full experiment to understand how Kraken2 classification accuracy and cache beha
 2. **Post-cliff bandwidth-saturated** (eskape_human_4gb): plateau from 16T at ~10.5x, LLC frozen at 58%, DRAM bus is the hard ceiling
 3. **Amdahl-limited** (standard_8gb, standard_16gb): peaks at 32T (3.5x, 2.9x), wall time increases after due to OS thread overhead; serial DB loading is the floor
 
-### AccuracyChase — gold-standard DB selection (2026-06-13)
+### AccuracyChase — gold-standard DB selection and cold runs (2026-06-13)
 - Identified that standard_16gb (15 GB) is a downsampled version of the full Standard database (96.8 GB extracted)
 - Goal: run the largest practical DB on Luna to establish a true accuracy ceiling per read model, then use that ceiling when evaluating smaller or custom DBs
 - **Chose PlusPF (103.4 GB extracted, 79.8 GB download)** — Standard + protozoa + fungi; only 6.6 GB larger than Standard but covers fungi (Candida is common in nosocomial infections matching this sample's profile); plants and full GTDB not needed for this sample type
 - All other DBs up to PlusPFP (221.8 GB), core_nt (316.2 GB), GTDB v226 (644 GB) documented in `AccuracyDrift/AccuracyChase.md`
 - Luna (503 GB RAM) can load 103.4 GB comfortably; Orion (64 GB) cannot
 - Download: `wget https://genome-idx.s3.amazonaws.com/kraken/k2_pluspf_20260226.tar.gz` (run on Luna)
+- **Cold runs completed (Luna, 32T, 2026-06-13)** — all three models run back-to-back against the 103 GB PlusPF DB:
+
+  | Read model | Classified% | LLC Miss Rate% | Wall time (s) |
+  |------------|-------------|----------------|---------------|
+  | reads_fast | 96.79       | 90.11          | 57.75         |
+  | reads_hac  | 98.86       | 91.07          | 57.17         |
+  | reads_sup  | **99.24**   | 91.21          | 57.00         |
+
+  reads_sup at 32T (99.24%) is the definitive accuracy ceiling. Wall times are cold-run (DB paging from disk; warm estimate ~10–15s at 32T once 103 GB is page-cached in Luna's 503 GB RAM). Full results and species breakdown in `AccuracyDrift/AccuracyChase.md`.
 
 ---
 

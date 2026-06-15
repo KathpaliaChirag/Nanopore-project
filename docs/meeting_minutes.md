@@ -4,7 +4,7 @@
 
 ## Meeting 1 — 2026-05-11 (3–5 pm)
 
-**Attendees:** Chayanika mam, Chirag K, Rohit, Rishabh, Chirag S   
+**Attendees:** Chayanika ma'am, Chirag K, Rohit, Rishabh, Chirag S   
 **Format:** First introductory meeting
 
 ### Topics covered
@@ -48,15 +48,16 @@
 - Start reading through all topics and building knowledge base
 
 ### Next meeting
-**2026-05-17**
+**2026-05-15**
 
 ---
 
 ## Meeting 2 — 2026-05-15
 
-**Attendees:** Chayanika mam, Chirag K, Chirag S  
-**Format:** Discussion / planning
+**Attendees:** Chayanika ma'am, Chirag K, Chirag S  
+**Format:** Discussion / planning  
 **Important update:** Next meeting shifted to Monday, i.e., 2026-05-18
+
 ### Topics covered
 
 1. **Golden data — ESKAPE toy dataset**
@@ -68,7 +69,7 @@
    - Goal: get the pipeline actually running end-to-end on real ESKAPE data
 
 3. **Reduce the Kraken-2 database size**
-   - mam mentioned she has done this before using a **utility section** in Kraken-2
+   - Chayanika ma'am mentioned she has done this before using a **utility section** in Kraken-2
    - Kraken-2 has built-in tools to build a custom, smaller database from a subset of reference genomes
    - This is the practical path to running Kraken-2 without needing 100 GB RAM
    - **Action item:** find and study this utility in Kraken-2's docs/source
@@ -85,7 +86,7 @@
 
 ### Action items
 - Pull ESKAPE pathogen sequences from NCBI
-- Build a reduced Kraken-2 database (target 8–16 GB) using the built-in utility mam mentioned
+- Build a reduced Kraken-2 database (target 8–16 GB) using the built-in utility Chayanika ma'am mentioned
 - Run Dorado → Kraken-2 pipeline on this golden data in Colab
 - Measure accuracy and runtime at each DB size
 - Study Kraken-2 internals / source code
@@ -94,7 +95,7 @@
 
 ## Meeting 3 — 2026-05-18
 
-**Attendees:** Kolin sir, Chayanika mam, Chirag K, Chirag S, Rohit, Rishabh
+**Attendees:** Kolin sir, Chayanika ma'am, Chirag K, Chirag S, Rohit, Rishabh
 **Format:** Task assignment + research direction
 
 ### Topics covered
@@ -147,7 +148,7 @@
 
 ## Meeting 4 — 2026-05-28
 
-**Attendees:** Kolin sir, Chayanika mam, Chirag K (CK), Chirag Suthar, Rishabh, Rohit
+**Attendees:** Kolin sir, Chayanika ma'am, Chirag K (CK), Chirag S, Rishabh, Rohit
 **Format:** Progress review + summer direction assignment
 
 ### Profiling results presented
@@ -218,7 +219,7 @@ Dorado / GPU work is deprioritised for now. The memory-bound nature of Kraken-2 
 
 ## Meeting 5 — 2026-06-02
 
-**Attendees:** Kolin sir, Chirag Suthar, Chirag Kathpalia
+**Attendees:** Kolin sir, Chirag K, Chirag S
 **Format:** Direction setting + new experiments
 
 ### Topics covered

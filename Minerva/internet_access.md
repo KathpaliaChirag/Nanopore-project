@@ -2,14 +2,14 @@
 
 > IITD internet works through a proxy server that requires login with IITD credentials.
 > Each user has their own IITD ID and runs the login script independently.
-> Server: minerva | Proxy: proxy61.iitd.ac.in:3128
+> Server: minerva | Proxy: proxy62.iitd.ac.in:3128
 
 ---
 
 ## How IITD Internet Works
 
 ```
-Your Server ──→ proxy61.iitd.ac.in:3128 ──→ Internet
+Your Server ──→ proxy62.iitd.ac.in:3128 ──→ Internet
                 (must be logged in to pass through)
 ```
 
@@ -27,7 +27,7 @@ Location on Minerva: `/home/chayanika/iitd-login.py`
 
 | Step | What happens |
 |------|-------------|
-| 1 | Fetches the proxy login page from `proxy61.iitd.ac.in` |
+| 1 | Fetches the proxy login page from `proxy62.iitd.ac.in` |
 | 2 | Extracts a `sessionid` from the HTML |
 | 3 | POSTs your userid + password + sessionid to authenticate |
 | 4 | Tests connection by fetching `http://example.com` through proxy |
@@ -41,7 +41,7 @@ Location on Minerva: `/home/chayanika/iitd-login.py`
 | `SLEEP_TIMER`      | 100 seconds            | How often heartbeat is sent        |
 | `LOGIN_ATTEMPTS`   | 5                      | Retries per login attempt          |
 | `MAX_CONN_ATTEMPTS`| 10                     | Max reconnect attempts before quit |
-| `PROXY_BASE_URL`   | proxy61.iitd.ac.in     | IITD proxy server                  |
+| `PROXY_BASE_URL`   | proxy62.iitd.ac.in     | IITD proxy server                  |
 | `PROXY_PORT`       | 3128                   | Proxy port                         |
 
 ---
@@ -157,10 +157,10 @@ Some tools (pip, wget, curl, conda) need proxy environment variables set:
 
 ```bash
 # Add to ~/.bashrc so it applies every login
-echo 'export http_proxy=http://proxy61.iitd.ac.in:3128' >> ~/.bashrc
-echo 'export https_proxy=http://proxy61.iitd.ac.in:3128' >> ~/.bashrc
-echo 'export HTTP_PROXY=http://proxy61.iitd.ac.in:3128' >> ~/.bashrc
-echo 'export HTTPS_PROXY=http://proxy61.iitd.ac.in:3128' >> ~/.bashrc
+echo 'export http_proxy=http://proxy62.iitd.ac.in:3128' >> ~/.bashrc
+echo 'export https_proxy=http://proxy62.iitd.ac.in:3128' >> ~/.bashrc
+echo 'export HTTP_PROXY=http://proxy62.iitd.ac.in:3128' >> ~/.bashrc
+echo 'export HTTPS_PROXY=http://proxy62.iitd.ac.in:3128' >> ~/.bashrc
 source ~/.bashrc
 ```
 

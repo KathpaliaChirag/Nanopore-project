@@ -795,9 +795,11 @@ Key insight: in eskape_650mb, 100% of classified reads are called P. aeruginosa 
 
 *(Repeat sections 4.1–4.3 for reads_fast once data is collected)*
 
+Note: section 4.4 covers the PlusPF 103 GB gold-standard cross-model comparison. Sections 4.5–4.7 cover reads_sup species breakdown and cross-DB comparison tables.
+
 ---
 
-### 4.7 Species Breakdown — PlusPF 103 GB, All Models (Luna, 32T)
+### 4.4 Species Breakdown — PlusPF 103 GB, All Models (Luna, 32T)
 
 Gold-standard species calls using the largest practical Kraken2 DB. Cross-model comparison for the same read pool.
 
@@ -821,7 +823,7 @@ Key findings:
 
 ---
 
-### Luna — reads_sup (1T, single run, no perf stat)
+### 4.5 Species Breakdown — Luna, reads_sup, 1T
 
 Quick 1-thread run to compare species calls across DBs under the highest-quality basecalling model. Same read pool as reads_hac (104,980 reads, 723 MB).
 
@@ -839,7 +841,7 @@ sample_targeted "other classified" breakdown: *E. cloacae* ATCC 13047 = 0.48% (5
 
 ---
 
-### 4.5 Cross-DB Species Comparison — % of All Reads (Luna, reads_sup, 1T)
+### 4.6 Cross-DB Species Comparison — % of All Reads (Luna, reads_sup, 1T)
 
 | Species | sample_targeted | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
 |---------|:--------------:|:-----------:|:---------------:|:-----------:|:------------:|
@@ -851,7 +853,7 @@ sample_targeted "other classified" breakdown: *E. cloacae* ATCC 13047 = 0.48% (5
 | Other classified | 0.53% | 0% | ~0.02% | 43.51% | 38.52% |
 | Unclassified | 14.60% | 34.13% | 33.32% | 2.91% | 1.52% |
 
-### 4.6 Cross-DB Species Comparison — % of Classified Reads (Luna, reads_sup, 1T)
+### 4.7 Cross-DB Species Comparison — % of Classified Reads (Luna, reads_sup, 1T)
 
 | Species | sample_targeted (89,658 cl.) | eskape_650mb (69,149 cl.) | eskape_human_4gb (69,997 cl.) | standard_8gb (101,922 cl.) | standard_16gb (103,380 cl.) |
 |---------|:---------------------------:|:------------------------:|:----------------------------:|:-------------------------:|:--------------------------:|
