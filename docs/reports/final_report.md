@@ -2,6 +2,8 @@
 **Chirag Kathpalia | IIT Delhi | Under Prof. Kolin Paul**
 **Date: 2026-05-28**
 
+> **Scope note:** This is a snapshot report as of 2026-05-28, covering WSL2 + early Luna profiling data (Steps 1–12). It uses WSL2 gprof numbers (CompactHashTable::Get = 67% of runtime, IPC = 0.55) which are from the 650 MB ESKAPE DB on local hardware. Authoritative Luna bare-metal results (cachegrind, flamegraph, NUMA, Steps 1–51+) and the AccuracyDrift experiment (2026-05-30 to 2026-06-13) are not reflected here. For current findings see `Luna/profiling/results_kraken2.md` and `AccuracyDrift/`.
+
 ---
 
 ## The Pipeline (30 seconds)

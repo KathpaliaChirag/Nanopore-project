@@ -355,8 +355,8 @@ Full experiment to understand how Kraken2 classification accuracy and cache beha
 
 ### Experiment design
 - **Read files:** reads_fast, reads_hac, reads_sup (~104k reads each, same pod5 file, 700 MB each)
-- **Databases (5):** sample_targeted (50 MB), eskape_650mb (150 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB)
-- **Machines:** Luna (96-core Sapphire Rapids, 504 GB RAM) and Orion (12-core ARM Cortex-A78AE, 64 GB LPDDR5, Jetson AGX Orin)
+- **Databases (5):** sample_targeted (50 MB), eskape_650mb (142 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB)
+- **Machines:** Luna (96-core Sapphire Rapids, 503 GB RAM) and Orion (12-core ARM Cortex-A78AE, 64 GB LPDDR5, Jetson AGX Orin)
 - **Metrics per run:** classified%, LLC miss rate% (LLC-load-misses/LLC-loads), wall time, IPC, speedup
 
 ### Sample-targeted DB construction
@@ -367,7 +367,7 @@ Full experiment to understand how Kraken2 classification accuracy and cache beha
 ### Luna — reads_hac × all 5 DBs × all thread counts
 - All runs with numactl --cpunodebind=0 --membind=0, 3 runs averaged
 - Key findings:
-  - **Cache cliff at ~100 MB on Luna** — sample_targeted (50 MB) = 10.19% LLC miss, eskape_650mb (150 MB) = 30.70%; the 105 MB L3 per socket fits the smaller DB but not the larger
+  - **Cache cliff at ~100 MB on Luna** — sample_targeted (50 MB) = 10.19% LLC miss, eskape_650mb (142 MB) = 30.70%; the 105 MB L3 per socket fits the smaller DB but not the larger
   - **Pre-cliff DB (sample_targeted):** near-linear scaling to 64T peak (22x), DRAM bandwidth not the ceiling
   - **Post-cliff mid-size DB (eskape_human_4gb, 57% LLC miss):** bandwidth wall at ~16T, ceiling ~10.6x, efficiency collapses from 84% at 8T
   - **Large DBs (standard_8gb, standard_16gb):** Amdahl-limited, not bandwidth-limited — DB loading from disk takes 4.2s and 7.5s respectively (serial, non-parallelisable); wall speedup ceilings of 3.5x and 3.2x regardless of thread count
@@ -406,7 +406,7 @@ Full experiment to understand how Kraken2 classification accuracy and cache beha
 - Goal: run the largest practical DB on Luna to establish a true accuracy ceiling per read model, then use that ceiling when evaluating smaller or custom DBs
 - **Chose PlusPF (103.4 GB extracted, 79.8 GB download)** — Standard + protozoa + fungi; only 6.6 GB larger than Standard but covers fungi (Candida is common in nosocomial infections matching this sample's profile); plants and full GTDB not needed for this sample type
 - All other DBs up to PlusPFP (221.8 GB), core_nt (316.2 GB), GTDB v226 (644 GB) documented in `AccuracyDrift/AccuracyChase.md`
-- Luna (504 GB RAM) can load 103.4 GB comfortably; Orion (64 GB) cannot
+- Luna (503 GB RAM) can load 103.4 GB comfortably; Orion (64 GB) cannot
 - Download: `wget https://genome-idx.s3.amazonaws.com/kraken/k2_pluspf_20260226.tar.gz` (run on Luna)
 
 ---

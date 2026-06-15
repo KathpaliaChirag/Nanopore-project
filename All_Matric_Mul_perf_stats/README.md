@@ -2,6 +2,12 @@
 
 A collection of matrix multiplication implementations designed for `perf stat` analysis. Each variant isolates a specific optimisation technique so you can directly compare cache behaviour, IPC, vectorisation, and parallelism.
 
+**WSL2 results** (wall time, cache miss rates, N=1024/2048/10000): `All_Matric_Mul_perf_stats/PERF_REPORT.md`
+
+**Luna re-run** (bare metal Xeon, accurate IPC, TMA, stall %, N=1024/2048/10000): `reports/matrix_multiplication/README.md` and `Luna/profiling/results_matmul_luna.md`
+
+**GPU benchmark** (L40S, 6 kernels, N=1024 to N=10000, cuBLAS tensor TF32 at 122,923 GFLOPS): `reports/matrix_multiplication/README.md`, section "GPU performance (L40S, N=10000)"
+
 ---
 
 ## Implementations

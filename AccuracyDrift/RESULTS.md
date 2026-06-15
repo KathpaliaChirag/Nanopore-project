@@ -22,7 +22,7 @@ On this machine (Luna, 1T run): `cache-misses` = 317M vs `LLC-load-misses` = 57M
 Goal: Understand how Kraken2 classification accuracy and cache behavior change across database sizes and machines.
 
 - **Read files:** reads_fast.fastq (104,832 reads, 708 MB), reads_hac.fastq (104,918 reads, 703 MB), reads_sup.fastq (104,980 reads, 723 MB)
-- **Databases:** eskape_650mb (150 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB), sample_targeted (50 MB)
+- **Databases:** eskape_650mb (142 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB), sample_targeted (50 MB)
 - **Machines:** Luna (dell-R760), Minerva, Lab Desktop, Orion (Jetson, last)
 - **Threads tested:** powers of 2 from 1 up to machine max
 - **Metrics per run:** classified%, unclassified%, cache miss rate% (LLC), time (s)
@@ -126,7 +126,7 @@ Both metrics tracked:
 
 After analyzing the species breakdown, we built a custom Kraken2 DB containing only the organisms present in this sample. This gives a 5th data point — smaller than eskape_650mb but with much better accuracy.
 
-**Motivation:** eskape_650mb (150 MB) classifies 65.28% of reads but misassigns ~33k E. coli/K. pneumoniae reads as P. aeruginosa (no competing references). We know from standard DBs exactly what species are present, so we can build a minimal but correct DB.
+**Motivation:** eskape_650mb (142 MB) classifies 65.28% of reads but misassigns ~33k E. coli/K. pneumoniae reads as P. aeruginosa (no competing references). We know from standard DBs exactly what species are present, so we can build a minimal but correct DB.
 
 **Reference genomes included (6 total):**
 
@@ -169,7 +169,7 @@ Columns: threads | classified% | unclassified% | cache miss rate% | time (s)
 
 ### 1.1 Luna
 
-**Specs:** 504 GB RAM, 96 threads (dell-R760)
+**Specs:** 503 GB RAM, 96 threads (dell-R760)
 **Thread counts tested:** 1, 2, 4, 8, 16, 32, 64, 96
 
 #### reads_hac — eskape_650mb
@@ -613,7 +613,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
 | sample_targeted (50 MB) | 10.19 | - | - | 78.92 |
-| eskape_650mb (150 MB) | 30.70 | - | - | 80.75 |
+| eskape_650mb (142 MB) | 30.70 | - | - | 80.75 |
 | eskape_human_4gb (3.8 GB) | 56.85 | - | - | 77.28 |
 | standard_8gb (7.6 GB) | 76.59 | - | - | 68.19 |
 | standard_16gb (15 GB) | 80.15 | - | - | 71.36 |
@@ -623,7 +623,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | DB | Luna (96T) | Minerva (TBD) | Lab Desktop (TBD) | Orion (12T) |
 |----|-----------|---------------|------------------|------------|
 | sample_targeted (50 MB) | - (TBD) | - | - | 82.80 |
-| eskape_650mb (150 MB) | 32.56 | - | - | 83.61 |
+| eskape_650mb (142 MB) | 32.56 | - | - | 83.61 |
 | eskape_human_4gb (3.8 GB) | 58.94 | - | - | 80.42 |
 | standard_8gb (7.6 GB) | 82.58 | - | - | 76.55 |
 | standard_16gb (15 GB) | 84.93 | - | - | 78.64 |
@@ -633,7 +633,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
 | sample_targeted (50 MB) | 19.729 | - | - | 47.53 |
-| eskape_650mb (150 MB) | 21.981 | - | - | 47.05 |
+| eskape_650mb (142 MB) | 21.981 | - | - | 47.05 |
 | eskape_human_4gb (3.8 GB) | 29.818 | - | - | 45.82 |
 | standard_8gb (7.6 GB) | 16.778 | - | - | 21.19 |
 | standard_16gb (15 GB) | 23.914 | - | - | 28.42 |
@@ -645,7 +645,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
 | sample_targeted (50 MB) | 84.80 | - | - | 84.80 |
-| eskape_650mb (150 MB) | 65.28 | - | - | 65.28 |
+| eskape_650mb (142 MB) | 65.28 | - | - | 65.28 |
 | eskape_human_4gb (3.8 GB) | 66.13 | - | - | 66.13 |
 | standard_8gb (7.6 GB) | 95.77 | - | - | 95.77 |
 | standard_16gb (15 GB) | 97.77 | - | - | 97.77 |
@@ -658,7 +658,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
 | sample_targeted (50 MB) | 85.40 | - | - | 85.40 |
-| eskape_650mb (150 MB) | 65.87 | - | - | 65.87 |
+| eskape_650mb (142 MB) | 65.87 | - | - | 65.87 |
 | eskape_human_4gb (3.8 GB) | 66.68 | - | - | 66.68 |
 | standard_8gb (7.6 GB) | 97.09 | - | - | 97.09 |
 | standard_16gb (15 GB) | 98.48 | - | - | 98.48 |
@@ -671,7 +671,7 @@ reads_sup classification rates are 0.6–1.3 pp higher than reads_hac across all
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
 | sample_targeted (50 MB) | - | - | - | - |
-| eskape_650mb (150 MB) | - | - | - | - |
+| eskape_650mb (142 MB) | - | - | - | - |
 | eskape_human_4gb (3.8 GB) | - | - | - | - |
 | standard_8gb (7.6 GB) | - | - | - | - |
 | standard_16gb (15 GB) | - | - | - | - |
@@ -684,7 +684,7 @@ reads_sup classification rates are 0.6–1.3 pp higher than reads_hac across all
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
 | sample_targeted (50 MB) | 15.34 | - | - | 82.80 |
-| eskape_650mb (150 MB) | 30.53 | - | - | 83.61 |
+| eskape_650mb (142 MB) | 30.53 | - | - | 83.61 |
 | eskape_human_4gb (3.8 GB) | 59.03 | - | - | 80.42 |
 | standard_8gb (7.6 GB) | 82.90 | - | - | 76.55 |
 | standard_16gb (15 GB) | 85.03 | - | - | 78.64 |
@@ -701,7 +701,7 @@ How classification rate changes as DB grows. Expected: more classified with larg
 | DB | Luna (32T) | Minerva | Lab Desktop | Orion (12T) |
 |----|------|---------|-------------|-------|
 | sample_targeted (50 MB) | 84.80% | - | - | 84.80% |
-| eskape_650mb (150 MB) | 65.28% | - | - | 65.28% |
+| eskape_650mb (142 MB) | 65.28% | - | - | 65.28% |
 | eskape_human_4gb (3.8 GB) | 66.13% | - | - | 66.13% |
 | standard_8gb (7.6 GB) | 95.77% | - | - | 95.77% |
 | standard_16gb (15 GB) | 97.77% | - | - | 97.77% |
@@ -712,7 +712,7 @@ How classification rate changes as DB grows. Expected: more classified with larg
 | DB | Luna (32T) | Minerva | Lab Desktop | Orion (12T) |
 |----|-----------|---------|-------------|------------|
 | sample_targeted (50 MB) | 85.40% | - | - | 85.40% |
-| eskape_650mb (150 MB) | 65.87% | - | - | 65.87% |
+| eskape_650mb (142 MB) | 65.87% | - | - | 65.87% |
 | eskape_human_4gb (3.8 GB) | 66.68% | - | - | 66.68% |
 | standard_8gb (7.6 GB) | 97.09% | - | - | 97.09% |
 | standard_16gb (15 GB) | 98.48% | - | - | 98.48% |
@@ -723,7 +723,7 @@ How classification rate changes as DB grows. Expected: more classified with larg
 | DB | Luna (32T) |
 |----|-----------|
 | sample_targeted (50 MB) | - |
-| eskape_650mb (150 MB) | - |
+| eskape_650mb (142 MB) | - |
 | eskape_human_4gb (3.8 GB) | - |
 | standard_8gb (7.6 GB) | - |
 | standard_16gb (15 GB) | - |

@@ -4,7 +4,7 @@
 
 ## Meeting 1 — 2026-05-11 (3–5 pm)
 
-**Attendees:** chayanika mam, chirag K, rohit, rishab, chirag S   
+**Attendees:** Chayanika mam, Chirag K, Rohit, Rishabh, Chirag S   
 **Format:** First introductory meeting
 
 ### Topics covered
@@ -56,7 +56,7 @@
 
 **Attendees:** Chayanika mam, Chirag K, Chirag S  
 **Format:** Discussion / planning
-**important update :** Next meeting shifted to monday i.e, 18-05-26 
+**Important update:** Next meeting shifted to Monday, i.e., 2026-05-18
 ### Topics covered
 
 1. **Golden data — ESKAPE toy dataset**
@@ -141,7 +141,7 @@
 - Document findings in the knowledge base (§14 onwards)
 
 ### Next meeting
-TBD
+2026-05-28
 
 ---
 
@@ -162,7 +162,7 @@ CK presented the baseline profiling report covering both pipeline stages:
 | gprof | 67% of runtime in `CompactHashTable::Get()`, 9.87M calls |
 | AMD uProf | IPC = 0.55 — CPU stalling, not computing |
 
-**Dorado (GPU) — verdict: compute-bound**
+**Dorado (GPU) — verdict: compute-bound** *(source: WSL2 GTX 1650 run — Minerva/Luna Dorado profiling not yet done as of this meeting)*
 
 | Tool | Finding |
 |---|---|
@@ -179,7 +179,7 @@ Two early ideas were discussed in the meeting:
 Instead of loading one large DB and querying everything at once, query each of the 6 ESKAPE pathogens (E, S, K, A, P, E) one at a time. Benefits: smaller active DB per query fits better in cache; can short-circuit once a dominant match is found; reduces working set per lookup. Needs: accuracy vs speed trade-off analysis.
 
 **Idea 2 — L3 cache pinning / frequency-aware partitioning**
-Pre-compute the most frequent k-mers for each ESKAPE pathogen from real clinical samples. Pin or pre-load these hot k-mers into L3 so lookups for the dominant species hit L3 instead of RAM. Basis: clinical samples tend to be dominated by one pathogen (barcode02 = 100% P. aeruginosa), so k-mer access is not uniformly random — a hot set exists. `CompactHashTable::Get()` is confirmed at 67% of runtime and ~30 L3 misses per call.
+Pre-compute the most frequent k-mers for each ESKAPE pathogen from real clinical samples. Pin or pre-load these hot k-mers into L3 so lookups for the dominant species hit L3 instead of RAM. Basis: clinical samples tend to be dominated by one pathogen (barcode02 from the AIIMS POD-5 dataset classifies as 100% P. aeruginosa by reads_sup Kraken2), so k-mer access is not uniformly random — a hot set exists. `CompactHashTable::Get()` is confirmed at 67% of runtime and ~30 L3 misses per call.
 
 More ideas to be proposed by both Chirags in the 3-day deliverable.
 
@@ -212,7 +212,7 @@ Dorado / GPU work is deprioritised for now. The memory-bound nature of Kraken-2 
 - No written report required at this stage
 
 ### Next meeting
-TBD — after 3-day Kraken-2 report is submitted (target ~2026-05-31)
+2026-06-02
 
 ---
 
@@ -267,7 +267,7 @@ TBD — after 3-day Kraken-2 report is submitted (target ~2026-05-31)
 | system | L3 cache | expected cliff size |
 |---|---|---|
 | Luna (Xeon Platinum 8468, dual-socket) | 105 MB | ~100 MB dataset |
-| Minerva (account: CK) | TBD | TBD |
+| Minerva (account: CK) | ~66 MB | ~66 MB dataset |
 | Chirag Suthar's system | TBD | TBD |
 | Lab Linux desktop | TBD | TBD |
 

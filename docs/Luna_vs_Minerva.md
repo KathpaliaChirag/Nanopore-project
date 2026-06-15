@@ -1,8 +1,8 @@
-# Luna vs Minerva — Full Comparison
+# Luna vs Minerva vs Orion — Full Comparison
 
-> Luna: dell-R760 | Minerva: minerva
-> Both: Ubuntu 22.04 LTS, CUDA 12.9, Driver 575.64.03
-> Audited: 2026-05-28
+> Luna: dell-R760 | Minerva: minerva | Orion: Jetson AGX Orin 64GB
+> Luna + Minerva: Ubuntu 22.04 LTS, CUDA 12.9, Driver 575.64.03
+> Audited: 2026-05-28; Orion added 2026-06-15
 
 ---
 
@@ -144,6 +144,31 @@
 
 ---
 
+## Orion — Jetson AGX Orin 64GB
+
+Orion is a third experiment machine added to the project during AccuracyDrift (2026-05-30 onwards). It is campus-network-only and accessed via SSH.
+
+**Access:** `jetsonagx@10.154.233.173` (campus network required)
+
+| Property | Orion |
+|---|---|
+| Platform | NVIDIA Jetson AGX Orin 64GB |
+| Architecture | ARM64 (aarch64) |
+| CPU | 12-core Arm Cortex-A78AE |
+| GPU | Ampere GPU, 2048 CUDA cores, integrated (unified memory) |
+| RAM | 64 GB LPDDR5 (unified CPU + GPU memory) |
+| OS | Linux (JetPack / Ubuntu-based) |
+| CUDA | Available (integrated) |
+| Campus network | Yes — not reachable from outside IIT Delhi network |
+
+**Key difference from Luna/Minerva:** Orion uses unified memory — the CPU and GPU share the same physical RAM pool. There is no discrete VRAM, and no PCIe transfer overhead for GPU workloads. This makes memory bandwidth characteristics fundamentally different from Luna and Minerva.
+
+**Role in experiments:** Orion was used for AccuracyDrift multi-DB accuracy runs (reads_sup × all 5 DBs × 4T through 12T thread counts). Results are in `AccuracyDrift/RESULTS.md`.
+
+**Profiling notes:** ARM64 `perf` counters differ from x86 PMU events. Thread-scaling results from Orion should not be directly compared with Luna without accounting for the architectural difference.
+
+---
+
 ## Verdict
 
 ### Luna wins on every hardware dimension:
@@ -175,5 +200,6 @@
 | Matrix multiply benchmarks | **Luna** | AVX-512 + AMX + larger L3 changes the story |
 | NUMA experiments | **Luna** | 2-socket, 503 GB, numactl available after install |
 | Anything right now | **Luna** | Disk is healthy; Minerva is at 100% — risky |
+| AccuracyDrift / ARM64 cross-validation | **Orion** | ARM64 architecture, unified memory — different perf profile from x86 |
 
-**Bottom line: Luna is the better machine in every meaningful way for this project. Run all future benchmarks on Luna.**
+**Bottom line: Luna is the primary machine for all x86 benchmarks. Orion is used for ARM64 cross-validation and AccuracyDrift experiments. Minerva is on hold until disk is cleared.**

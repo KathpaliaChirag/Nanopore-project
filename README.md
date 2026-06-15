@@ -51,16 +51,18 @@ species report → "patient has Pseudomonas aeruginosa"
 
 WSL2 caveat: Hyper-V throttles the CPU cycle counter to ~7–23% of real rate. IPC is inflated 4–14×. Cache miss counts are real; IPC and stall% are not. All authoritative numbers come from Luna native hardware counters.
 
-**lab servers:**
+**lab servers and experiment machines:**
 
-| server | CPU | cores | L3 | RAM | GPU | disk |
-|---|---|---|---|---|---|---|
-| **Minerva** | Xeon Gold 6330 (Ice Lake) | 56c/112t @ 2 GHz | 66 MB | 251 GB | 2× A40 (45 GB) | **100% full** |
-| **Luna** | Xeon Platinum 8468 (Sapphire Rapids) | 96c/192t @ 3.8 GHz | **210 MB** | **503 GB** | **2× L40S (46 GB)** | 74% (236 GB free) |
+| server | CPU | cores | LLC | RAM | GPU | disk | role |
+|---|---|---|---|---|---|---|---|
+| **Minerva** | Xeon Gold 6330 (Ice Lake) | 56c/112t @ 2 GHz | 66 MB | 251 GB | 2× A40 (45 GB) | **100% full** | blocked — no new data |
+| **Luna** | Xeon Platinum 8468 (Sapphire Rapids) | 96c/192t @ 3.8 GHz | **210 MB** | **503 GB** | **2× L40S (46 GB)** | 74% (236 GB free) | **primary** |
+| **Orion** | Cortex-A78AE (Jetson AGX Orin 64 GB) | 12 cores @ ~1.7 GHz | **4 MB** | 64 GB unified | Ampere GPU | — | AccuracyDrift ARM comparison |
 
-Luna has `perf_event_paranoid=1` — full hardware counters, TMA, all available for all users. Minerva disk is full — cannot store new data.
+Luna has `perf_event_paranoid=1` — full hardware counters, TMA, all available for all users. Minerva disk is full — cannot store new data. Orion is on campus network only (jetsonagx@10.154.233.173).
 
-→ side-by-side comparison: [docs/Luna_vs_Minerva.md](docs/Luna_vs_Minerva.md)
+→ side-by-side comparison: [docs/Luna_vs_Minerva.md](docs/Luna_vs_Minerva.md)  
+→ Orion machine notes: [AccuracyDrift/README.md](AccuracyDrift/README.md)
 
 ---
 
@@ -217,7 +219,7 @@ both servers fully documented with user guides, install procedures, and profilin
 
 ---
 
-## 6. kraken2 profiling: Luna (Steps 3–12)
+## 6. kraken2 profiling: Luna (Steps 1–51+)
 
 input: standard 8 GB DB (`k2_standard_08gb_20240112`), 104,918 reads (hac FASTQ), Luna with `perf_event_paranoid=1`.
 
@@ -477,24 +479,55 @@ the matmul `prefetch_ikj` negative result validates the argument: **prefetch hur
 
 ---
 
-## 10. what's next
+## 10. AccuracyDrift experiment (2026-05-30 to 2026-06-13)
 
-**profiling (Luna) — immediate:**
-- Step 13: Dorado GPU profiling on L40S with nsys + ncu — template at `Luna/profiling/results_dorado.md`
+Systematic sweep: reads_hac + reads_sup × 5 databases × all thread counts (1T through 96T on Luna, 1T through 12T on Orion). Gold-standard ceiling established via AccuracyChase (PlusPF 103 GB cold run on Luna).
 
-**profiling (Luna) — upcoming:**
-- DRAM bandwidth utilisation: actual GB/s consumed vs IMC peak via uncore events
-- `perf c2c` — cache-to-cache false sharing (explains IPC drop past 32T)
-- instruction mix: is MinimizerScanner auto-vectorised? (`objdump`, 2 min, no run needed)
-- k-mer reuse measurement: validate LRU cache ROI on reads_hac.fastq (Python script)
-- `perf annotate` with debug symbols — source-line hotspots inside CompactHashTable::Get
+Three behavioral classes emerged:
 
-**implementation:**
-- run baseline measurements M1–M7 (cell type, load factor, dTLB rate, DRAM bandwidth ratio, k-mer reuse, false sharing, vectorisation status) — these gate which patches apply
-- apply Patch 3 (flags) → measure → Patch 2 (huge pages) → measure → Patch 1 (prefetch) → measure → Patch 4 (LRU)
-- always run at **32T + numactl node0** (21.8% already free)
+| Class | DBs | Bottleneck | Peak thread speedup |
+|---|---|---|---|
+| Pre-cliff (DB fits in LLC) | sample_targeted 50 MB | DRAM latency, near-linear scaling | ~22× at 64T |
+| Post-cliff (DB > LLC, < Amdahl wall) | eskape_650mb 142 MB, eskape_human_4gb 3.8 GB | DRAM bandwidth | 10–22× |
+| Amdahl-limited (DB load serial) | standard_8gb, standard_16gb | Single-threaded DB mmap load | 3–4× |
 
-**AMX matmul (Luna-exclusive):**
+Cache cliff on Luna: between 50 MB and 142 MB (LLC is 210 MB but hash table random-access pattern exceeds effective cache capacity in that range).
+
+Orion (ARM64 Jetson AGX, 12 cores, 4 MB LLC): every DB in the experiment is post-cliff — even the 50 MB DB gives 78.92% LLC miss rate vs 10.19% on Luna. 2.41× slower than Luna at 1T; ~70–80% of that gap is explained by LLC miss rate difference alone.
+
+AccuracyChase: PlusPF 103 GB DB cold run on Luna establishes the gold-standard accuracy ceiling. Fully documented in `AccuracyDrift/AccuracyChase.md`.
+
+→ full results: [AccuracyDrift/RESULTS.md](AccuracyDrift/RESULTS.md)  
+→ observations and analysis: [AccuracyDrift/OBSERVATIONS.md](AccuracyDrift/OBSERVATIONS.md)  
+→ run commands: [AccuracyDrift/COMMANDS.md](AccuracyDrift/COMMANDS.md)  
+→ AccuracyChase: [AccuracyDrift/AccuracyChase.md](AccuracyDrift/AccuracyChase.md)
+
+---
+
+## 11. what's next
+
+**Summer 2026 direction (set Meeting 4, 2026-05-28): Kraken2 optimisation only. Dorado/GPU work deprioritised.**
+
+Dorado GPU profiling on L40S (Step 13) is on hold. All effort goes to Kraken2 source patches.
+
+**pre-implementation measurements (M1–M7) — gate which patches apply:**
+- M1: CompactHashTable cell type (8-byte or 16-byte entries — affects prefetch stride)
+- M2: load factor (hash table fill ratio — affects probe chain length)
+- M3: dTLB miss rate (do huge pages help?)
+- M4: DRAM bandwidth utilisation vs IMC peak
+- M5: k-mer reuse rate (validate LRU cache ROI on reads_hac.fastq)
+- M6: `perf c2c` — cache-to-cache false sharing (explains IPC drop past 32T)
+- M7: instruction mix — is MinimizerScanner auto-vectorised? (`objdump`)
+
+→ tracked in: [Luna/experiments/pending_measurements.md](Luna/experiments/pending_measurements.md)
+
+**implementation order:**
+- apply Patch 3 (compile flags) → measure → Patch 2 (huge pages) → measure → Patch 1 (prefetch) → measure → Patch 4 (LRU)
+- always run at **32T + numactl node0** (21.8% already free — baseline is 4.405s)
+
+**not yet started:** Minerva runs, Lab Desktop runs.
+
+**AMX matmul (Luna-exclusive, lower priority):**
 - Xeon Platinum 8468 has Intel AMX (Advanced Matrix Extensions) — hardware tile matrix multiply
 - compare AMX vs tiled_avx2 vs cublas_tensor_tf32 on L40S
 
@@ -504,6 +537,12 @@ the matmul `prefetch_ikj` negative result validates the argument: **prefetch hur
 
 ```
 ├── README.md                          ← this file
+├── AccuracyDrift/                     ← accuracy vs DB size × threads × machines experiment
+│   ├── README.md                      ← setup, databases, machine list
+│   ├── RESULTS.md                     ← all measured data (classified%, LLC miss rate, time)
+│   ├── OBSERVATIONS.md               ← analysis: 3 behavioral classes, cache cliff, Orion comparison
+│   ├── COMMANDS.md                    ← exact commands run on each machine
+│   └── AccuracyChase.md               ← PlusPF 103 GB gold-standard ceiling (Luna, cold runs)
 ├── docs/
 │   ├── plan.md                        ← research plan
 │   ├── updates.md                     ← chronological session log
@@ -511,7 +550,7 @@ the matmul `prefetch_ikj` negative result validates the argument: **prefetch hur
 │   ├── knowledge_base.md              ← deep-dive notes on everything (§0–§21)
 │   ├── Luna_vs_Minerva.md             ← side-by-side hardware comparison
 │   └── reports/
-│       ├── final_report.md            ← consolidated meeting-ready report
+│       ├── final_report.md            ← consolidated meeting-ready report (snapshot: 2026-05-28)
 │       ├── summary.md                 ← quick reference
 │       ├── tables_and_graphs.md       ← all stats with Mermaid charts
 │       ├── tables_and_graphs_basic.md ← same, plain ASCII bars

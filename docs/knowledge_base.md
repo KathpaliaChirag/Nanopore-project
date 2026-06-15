@@ -3,7 +3,7 @@
 Full deep-dive notes. For a quick reference see `summary.md`.
 
 - 1st meeting with **mam**: 2026-05-11
-- Next meeting: **2026-05-18** (Monday)
+- Last recorded meeting: **Meeting 5 — 2026-06-02** (see meeting_minutes.md)
 
 ---
 
@@ -3320,5 +3320,39 @@ Sapphire Rapids PMU supports full Top-down Microarchitecture Analysis. Hardware 
 | chayanika | admin (lab manager) |
 | CK | Chirag K (this user) |
 | student | to be created — restricted access guide in `Luna/user_management.md` |
+
+---
+
+## 22. AccuracyDrift + AccuracyChase — Multi-DB Accuracy Experiments (2026-05-30 to 2026-06-13)
+
+> Full results and commands are in `AccuracyDrift/RESULTS.md`, `AccuracyDrift/AccuracyChase.md`, and `AccuracyDrift/OBSERVATIONS.md`.
+
+### What this experiment is
+
+AccuracyDrift measures how Kraken-2 classification accuracy changes as the database size changes. Runs were done across multiple model types (reads_fast, reads_hac, reads_sup) and multiple DB sizes. The goal is to find the accuracy-vs-DB-size trade-off curve.
+
+AccuracyChase is the follow-on: once a target DB (PlusPF, 103 GB) was identified as the gold standard, cold runs were performed to confirm accuracy under realistic conditions.
+
+### Key results (AccuracyChase — PlusPF 103 GB cold runs, 2026-06-13)
+
+| Model | Classified % |
+|---|---|
+| reads_fast | 96.79% |
+| reads_hac | 98.86% |
+| reads_sup | 99.24% |
+
+### Machines used
+
+- **Luna** (primary): Intel Xeon Platinum 8468, 503 GB RAM, 210 MB L3
+- **Orion** (Jetson AGX Orin 64GB): ARM64, campus-network-only machine — see `docs/Luna_vs_Minerva.md` for Orion specs
+
+### Reference files
+
+| File | Contents |
+|---|---|
+| `AccuracyDrift/RESULTS.md` | Full numeric tables — all DBs × all models × all thread counts |
+| `AccuracyDrift/AccuracyChase.md` | PlusPF gold-standard plan and cold-run results |
+| `AccuracyDrift/OBSERVATIONS.md` | Interpretations and anomalies |
+| `AccuracyDrift/COMMANDS.md` | Exact commands used on each machine |
 
 Full documentation: `Luna/luna_stats.md`, `Luna/user_management.md`, `Luna_vs_Minerva.md`.

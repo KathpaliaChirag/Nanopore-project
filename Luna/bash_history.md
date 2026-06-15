@@ -884,4 +884,8 @@ rm /dev/shm/reads_hac.fastq
 
 ## Next Steps
 
-- Step 13: Dorado GPU profiling on L40S
+**Note (2026-06-15):** Dorado GPU profiling (Step 13) is DEPRIORITIZED as of Meeting 4 (2026-05-28). Summer focus is Kraken2 source optimisation.
+
+AccuracyDrift experiment commands (2026-05-30 to 2026-06-13) are NOT logged here — they are in `AccuracyDrift/COMMANDS.md`. That experiment ran all 3 read models × 5 databases × all thread counts on Luna and Orion, plus AccuracyChase PlusPF 103 GB cold runs.
+
+Next Luna work: Kraken2 optimisation implementation (proposals A/D/E/F). Commands will be logged in a new session below or in the AccuracyDrift/COMMANDS.md per the relevant experiment.

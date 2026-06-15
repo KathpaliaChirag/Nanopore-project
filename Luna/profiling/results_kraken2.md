@@ -86,6 +86,8 @@ kill $MPSTAT_PID
 
 #### fast model
 
+**Note:** fast was the first model run in Step 2 (classification), so the DB was being loaded from disk for the first time. By the time perf stat was run (Step 3), the DB was already in OS page cache from the Step 2 run.
+
 **Raw output:** `~/results/profiling/perf_stat_fast.txt`
 
 | Metric | Value | Notes |
@@ -111,10 +113,10 @@ kill $MPSTAT_PID
 
 #### hac model
 
-Two runs: cold (first-ever run) and warm (DB already in OS page cache).
-**Raw outputs:** `perf_stat_hac.txt` (cold), `perf_stat_hac_warm.txt` (warm)
+Two runs: first hac run (DB already in OS page cache from fast/sup runs earlier in Step 2) and a second warm run.
+**Raw outputs:** `perf_stat_hac.txt` (first run), `perf_stat_hac_warm.txt` (second run)
 
-| Metric | cold | warm | Notes |
+| Metric | first run | second run | Notes |
 |---|---|---|---|
 | Cycles | 71.7 billion | 72.6 billion | |
 | Instructions | 113.2 billion | 115.1 billion | |
@@ -195,6 +197,8 @@ Key observations to extract from mpstat output:
 | Avg % sys | | | |
 | Avg % usr | | | |
 | Load balanced? | | | |
+
+**Note:** The raw mpstat files were saved to Luna at `~/results/profiling/mpstat_{fast,hac,sup}.txt` but the per-column figures were not manually extracted from them. The key insight (only ~3-4 effective cores despite 96 threads) is already captured in the perf stat user/wall time ratio in Step 3a/3b. These empty cells are a known gap — low priority given the thread scaling sweep (Step 5) covers CPU utilisation comprehensively.
 
 ---
 
@@ -382,7 +386,7 @@ Sweet spot: **32 threads (4.560s)** — but note 16T (4.859s) is already very cl
 
 ---
 
-### 5b — Thread Scaling: perf stat per thread count (5-run avg with stddev)
+### 5f — Thread Scaling: perf stat per thread count (fast model, 5-run avg with stddev)
 
 **Goal:** Capture IPC, LLC miss rate, and stall % at each thread count to see how cache behaviour and CPU efficiency change with parallelism.
 
@@ -446,7 +450,9 @@ IPC falls from 1.81 (4T) to 1.28 (192T). More threads = more lock contention and
 
 ---
 
-## Core Findings (hac at 96T baseline — all findings confirmed consistent across fast/sup)
+## Core Findings
+
+> Scope: hac model at 96T baseline. All findings below confirmed consistent across fast and sup models (see Steps 3-4).
 
 ### 1. Memory is the primary bottleneck
 
@@ -600,12 +606,13 @@ perf sees everything — user mode, kernel mode, interrupt handlers — so all p
 | 2 | FASTQ on tmpfs — quantify ~20% ext4 I/O cost from flamegraph | ✅ Done (Step 12) |
 | 3 | valgrind cachegrind — per-function L1/LLC miss counts | ✅ Done (Step 11) |
 | 4 | gprof on Luna — user-space profile, compare with WSL2 | ✅ Done (Step 10) |
-| 6 | DRAM bandwidth utilization — actual GB/s consumed vs theoretical max via uncore IMC events | 🔜 Next |
-| 7 | perf c2c — cache-to-cache false sharing between threads (explains IPC drop past 32T) | 🔜 Next |
-| 8 | Instruction mix check — is MinimizerScanner auto-vectorized? (objdump, 2 min, no run needed) | 🔜 Next |
-| 9 | perf annotate with -g symbols — source-line hotspots inside CompactHashTable::Get | 🔜 Next |
-| 10 | k-mer reuse measurement — validate LRU cache ROI on reads_hac.fastq (Python script) | 🔜 Next |
-| 11 | VTune — check if installed on Luna, run memory access + threading analysis if available | 🔜 Next |
+| 5 | Thread scaling — find optimal thread count, DRAM bandwidth saturation point across all models and NUMA configs | ✅ Done (Steps 5, 9) |
+| 6 | DRAM bandwidth utilization — actual GB/s consumed vs theoretical max via uncore IMC events | ⏸ On hold — profiling phase complete; useful after optimisation patches applied |
+| 7 | perf c2c — cache-to-cache false sharing between threads (explains IPC drop past 32T) | ⏸ On hold |
+| 8 | Instruction mix check — is MinimizerScanner auto-vectorized? (objdump, 2 min, no run needed) | ⏸ On hold |
+| 9 | perf annotate with -g symbols — source-line hotspots inside CompactHashTable::Get | ⏸ On hold |
+| 10 | k-mer reuse measurement — validate LRU cache ROI on reads_hac.fastq (Python script) | ⏸ On hold |
+| 11 | VTune — check if installed on Luna, run memory access + threading analysis if available | ⏸ On hold |
 
 ---
 
@@ -1088,4 +1095,11 @@ The copy overhead is intrinsic to read()-based I/O. Two approaches that would he
 
 ## Next Steps
 
-- Step 13: Dorado GPU profiling on L40S
+**Note (2026-06-15):** Dorado GPU profiling (Step 13) is DEPRIORITIZED — see Meeting 4 debrief in docs/updates.md.
+Summer focus is Kraken2 source optimisation (proposals A/D/E/F). Remaining profiling goals (6-11 in table above) are on hold pending optimisation implementation; they will be useful for measuring the effect of patches.
+
+AccuracyDrift and AccuracyChase experiment results (2026-05-30 to 2026-06-15) are in `AccuracyDrift/` — separate from this file.
+
+→ results: [AccuracyDrift/RESULTS.md](../../AccuracyDrift/RESULTS.md)  
+→ observations: [AccuracyDrift/OBSERVATIONS.md](../../AccuracyDrift/OBSERVATIONS.md)  
+→ AccuracyChase: [AccuracyDrift/AccuracyChase.md](../../AccuracyDrift/AccuracyChase.md)

@@ -234,17 +234,18 @@ kraken2 --db eskape_db --report report.txt barcode02.fastq > output.kraken
 
 🟩 ### Goal 1 — Kraken-2 Optimisation (active, summer 2026)
 
-**Confirmed bottleneck:** `CompactHashTable::Get()` — 67% of runtime, 9.87M calls, IPC = 0.55, 34% cache miss rate, ~30 L3 misses per call.
+**Confirmed bottleneck (Luna bare-metal, authoritative):** `CompactHashTable::Get()` — 96.24% of all last-level cache read misses, 0.65% of instructions, 11.6M calls at 1T. `MinimizerScanner::NextMinimizer` — 48.23% of instructions, zero LL misses (pure compute). Two distinct regimes. LLC miss rate 80–82% at 32T on the 8 GB standard DB — structural, DB is 38× the 210 MB L3.
 
-**3-day deliverable (due 2026-05-31):**
-- Deeper profiling on Luna: distinguish memory-bound vs I/O-bound
-- Per-function LLC miss rates via cachegrind
-- K-mer reuse measurement from barcode02.fastq
-- 2–3 concrete optimisation proposals with complexity + speedup estimates
+Note: Earlier WSL2 numbers (67% runtime in Get(), IPC = 0.55, 34% cache miss rate) were from the ESKAPE 650 MB DB with gprof user-space only. Luna cachegrind on the 8 GB DB supersedes those. The IPC=0.55 was AMD uProf on local hardware and does not reflect Luna.
 
-**Ideas under consideration:**
-- **Sequential ESKAPE pipeline** — query E/S/K/A/P/E one at a time, short-circuit on dominant match; smaller active DB per query fits in cache
-- **Hot-k-mer LRU cache** — pin most frequent k-mers in L3; barcode02 = 100% P. aeruginosa so k-mer access is highly non-uniform
+**Current status (2026-06-15):** Profiling complete (Steps 1–51+). AccuracyDrift experiment complete. Optimisation proposals drafted (Patches 1–9 in docs/reports/). Implementation phase not yet started.
+
+**Patches drafted (not yet implemented):**
+- Patch 1: `__builtin_prefetch` one cache line ahead in Get() loop (−10% projected)
+- Patch 2: `MADV_HUGEPAGE` on DB mmap — reduce dTLB misses (−5%)
+- Patch 3: compile flags `-march=sapphirerapids -flto -funroll-loops` (−8%)
+- Patch 4: thread-local LRU cache, 16K entries / 256 KB, Fibonacci hash (−20% — Kolin sir's design)
+- Patches 6–9: devirtualise, single MurmurHash, ResolveTree O(N→N), skip /dev/null output
 
 🟩 ### Goal 2 — SNN for Dorado (Rohit + Rishabh, research phase)
 Explore spiking neural networks as replacement/accelerator for Dorado basecaller. Can spike timing from raw nanopore signal replace some or all of the Transformer forward pass? No deliverable date yet.
@@ -339,6 +340,30 @@ Luna: `perf_event_paranoid = 1` confirmed — hardware counters work for all use
 17. omp_tiled at N=10000: **2.1× faster than tiled_avx2** — 2.4 GB working set finally justifies 4-thread DRAM pipelining
 18. prefetch_ikj paradox: lowest L3 miss% (1.23%) but 9.3× more instructions than ikj_order — software prefetch adds overhead when hardware prefetcher already covers sequential access
 19. tiled variants: sub-8× scaling (1024→2048) vs expected O(N³) 8× — tile stays in L2 regardless of N
+
+### AccuracyDrift experiment (2026-05-30 to 2026-06-13) — completed
+
+Sweep: reads_hac + reads_sup × 5 DBs × all thread counts, on Luna (96-core x86) and Orion (12-core ARM64).
+
+Three behavioral classes found:
+
+| Class | Example DBs | Primary bottleneck | Peak thread speedup |
+|---|---|---|---|
+| Pre-cliff | sample_targeted 50 MB | DRAM latency; near-linear | ~22× at 64T |
+| Post-cliff | eskape_650mb 142 MB, eskape_human_4gb 3.8 GB | DRAM bandwidth | 10–22× |
+| Amdahl-limited | standard_8gb, standard_16gb | Serial DB mmap load | 3–4× |
+
+Key findings:
+- Cache cliff on Luna is between 50 MB and 142 MB. sample_targeted (50 MB) = 10.19% LLC miss rate; eskape_650mb (142 MB) = 30.70%.
+- Orion (4 MB LLC): every DB in the experiment is post-cliff. Even 50 MB gives 78.92% LLC miss rate. 2.41× slower than Luna at 1T; ~70–80% of that gap is explained by LLC miss rate.
+- Standard_8gb (7.6 GB) classification scales near-ideally to 8T but Amdahl wall (4.2s serial DB load) caps wall speedup at ~3.5× regardless of thread count.
+- Standard_16gb (15 GB): Amdahl ceiling 3.19×, 7.5s serial floor. Peaked at 32T; 64T and 96T both regressed.
+- AccuracyChase: PlusPF 103 GB cold run on Luna = gold-standard accuracy ceiling established.
+- eskape_650mb inflates P. aeruginosa count by ~33k false positives (reads from absent E. coli + K. pneumoniae absorbed by closest match). True sample composition from standard_16gb: P. aeruginosa ~35.6%, E. coli ~16.5%, K. pneumoniae ~5.5%, ~37% diverse low-abundance species.
+
+→ full data: [AccuracyDrift/RESULTS.md](../../AccuracyDrift/RESULTS.md)  
+→ analysis: [AccuracyDrift/OBSERVATIONS.md](../../AccuracyDrift/OBSERVATIONS.md)  
+→ AccuracyChase: [AccuracyDrift/AccuracyChase.md](../../AccuracyDrift/AccuracyChase.md)
 
 ---
 

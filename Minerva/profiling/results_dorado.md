@@ -4,6 +4,8 @@
 > Dorado: 1.4.0 | Model: fast + hac comparison
 > Pod5 file: [fill in path]
 
+**NOTE: Minerva AccuracyDrift runs not yet started (disk was full as of 2026-05-28; verify disk status before starting — see Minerva/to_do_by_sudo.md Check 2).**
+
 WSL2 baselines: 82% GEMM, `cudaStreamSynchronize` = 98.9% of CUDA API time (GTX 1650).
 
 **Prerequisite check:** confirm pod5 file path on Minerva before running.

@@ -667,6 +667,6 @@ sudo /usr/lib/linux-tools-5.4.0-26/perf stat \
   ~/reads/reads_hac.fastq
 ```
 
-Replace `<DB>` and `<T>`. For reads_sup use `~/reads/reads_sup.fastq`. Each run done 3 times and averaged. Note: `cache-references` on ARM maps to L2 accesses (not LLC), so Cache Miss Rate% on Orion is not comparable to Luna. LLC-load-misses / LLC-loads is the consistent metric across both machines.
+Replace `<DB>` and `<T>`. For reads_sup use `~/reads/reads_sup.fastq`. Each run done 3 times and averaged. Note: `cache-references` on ARM maps to L1D accesses (not LLC), so Cache Miss Rate% on Orion is not comparable to Luna — values are ~0.5–0.6% vs Luna's 30–90%. LLC-load-misses / LLC-loads is the consistent cross-machine metric. `LLC-loads` and `LLC-load-misses` are available and functional on this kernel.
 
 All per-thread results are in RESULTS.md section 1.4.

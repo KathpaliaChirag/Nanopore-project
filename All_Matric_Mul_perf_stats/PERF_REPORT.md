@@ -325,6 +325,18 @@ tiled_avx2 (2500ms) < tiled (3125ms) < auto_vec_O3 (3645ms) < ikj_order (3620ms)
 
 ---
 
+## Luna and GPU Results
+
+Luna re-run (bare metal, Xeon Platinum 8468, AVX-512, accurate IPC and TMA): see `reports/matrix_multiplication/README.md`. That file contains:
+- Full N=1024, N=2048, N=10000 timing tables with accurate IPC, L1 miss %, LLC miss %, stall %
+- TMA breakdown (memory-bound, core-bound, L3-bound, DRAM-bound) for naive vs tile+AVX2 at N=1024 and N=2048
+- Platform flip analysis (WSL2 vs Luna winner differs at N=10000)
+- Luna time scaling table across all three sizes
+
+GPU results (L40S, N=10000, 6 kernels): see `reports/matrix_multiplication/README.md`, section "GPU performance (L40S, N=10000)". Summary: cuBLAS tensor TF32 at 16.3 ms / 122,923 GFLOPS (6,900x vs WSL2 CPU best). Raw Luna profiling file: `Luna/profiling/results_matmul_luna.md`.
+
+---
+
 ## What to Re-run on Minerva
 
 On Minerva (native Linux, Xeon Gold 6330), these events which are blocked by Hyper-V in WSL2 will work:

@@ -4,6 +4,8 @@
 > DB: k2_standard_08gb (8 GB) | Input: barcode02.fastq (687 MB, 104,829 reads)
 > Binary: ~/kraken2-build-pg/classify (built with -pg -g)
 
+**NOTE: Minerva AccuracyDrift runs not yet started (disk was full as of 2026-05-28; verify disk status before starting — see Minerva/to_do_by_sudo.md Check 2).**
+
 WSL2 baselines for comparison: cache miss rate 34.24%, IPC 0.55 (AMD uProf), 67% in `CompactHashTable::Get()` (gprof).
 
 ---

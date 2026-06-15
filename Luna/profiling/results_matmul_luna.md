@@ -35,60 +35,64 @@ perf stat -e \
 
 ## Results — N = 1024
 
-### Timing + Full Cache
+> Data collected and recorded in `reports/matrix_multiplication/README.md`, section "execution time, Luna (bare metal)" and "all metrics at N=1024 (Luna)".
 
-| Binary | Time (ms) | IPC | LLC miss% | Stall-BE% | Notes |
+Condensed table (full data in the report above):
+
+| Binary | Time (ms) | IPC | L1 miss % | LLC miss % | Stall % |
 |---|---|---|---|---|---|
-| `naive_ijk` | | | | | |
-| `ikj_order` | | | | | |
-| `kij_order` | | | | | |
-| `transpose_B` | | | | | |
-| `tiled` | | | | | |
-| `omp_parallel` | | | | | |
-| `omp_tiled` | | | | | |
-| `unrolled_ikj` | | | | | |
-| `avx2_manual` | | | | | |
-| `auto_vec_O3` | | | | | |
-| `tiled_avx2` | | | | | |
-| `prefetch_ikj` | | | | | |
+| `naive_ijk` | 5,703.9 | 0.22 | 48.87 | 0.022 | 83.3 |
+| `ikj_order` | 333.7 | 0.81 | 15.81 | 0.074 | 44.6 |
+| `kij_order` | 400.9 | 0.99 | 9.17 | 0.295 | 41.7 |
+| `transpose_B` | 717.4 | 1.29 | 0.23 | 3.997 | 17.2 |
+| `tiled` | 267.1 | 1.42 | 25.68 | 0.960 | 29.0 |
+| `omp_parallel` | 352.2 | 1.17 | 10.76 | 0.395 | 32.1 |
+| `omp_tiled` | 426.6 | 1.32 | 19.86 | 16.36 | 37.3 |
+| `unrolled_ikj` | 352.1 | 1.19 | 9.10 | 0.092 | 33.0 |
+| `avx2_manual` | 330.2 | 1.14 | 10.84 | 0.019 | 35.8 |
+| `auto_vec_O3` | 321.8 | 0.83 | 16.06 | 0.282 | 46.9 |
+| `tiled_avx2` | **220.4** | **2.84** | 13.08 | 4.965 | **13.5** |
+| `prefetch_ikj` | 501.4 | **4.00** | **0.65** | 1.581 | **6.8** |
 
 ---
 
 ## Results — N = 2048
 
-| Binary | Time (ms) | IPC | LLC miss% | Stall-BE% | Notes |
-|---|---|---|---|---|---|
-| `naive_ijk` | | | | | |
-| `ikj_order` | | | | | |
-| `kij_order` | | | | | |
-| `transpose_B` | | | | | |
-| `tiled` | | | | | |
-| `omp_parallel` | | | | | |
-| `omp_tiled` | | | | | |
-| `unrolled_ikj` | | | | | |
-| `avx2_manual` | | | | | |
-| `auto_vec_O3` | | | | | |
-| `tiled_avx2` | | | | | |
-| `prefetch_ikj` | | | | | |
+> Data collected and recorded in `reports/matrix_multiplication/README.md`, section "scaling behaviour" (Luna wall time scaling table). N=2048 row present for all 12 variants. Detailed per-metric breakdown at N=2048 not separately tabulated here; see that table for timing and scaling ratios.
+
+| Binary | Time (ms) | Notes |
+|---|---|---|
+| `naive_ijk` | 47,301.6 | data present in report |
+| `ikj_order` | 2,459.7 | data present in report |
+| `kij_order` | 2,975.4 | data present in report |
+| `transpose_B` | 5,682.1 | data present in report |
+| `tiled` | 2,005.1 | data present in report |
+| `omp_parallel` | 2,618.7 | data present in report |
+| `omp_tiled` | 3,126.8 | data present in report |
+| `unrolled_ikj` | 2,613.7 | data present in report |
+| `avx2_manual` | 2,493.8 | data present in report |
+| `auto_vec_O3` | 2,493.7 | data present in report |
+| `tiled_avx2` | **1,621.2** | data present in report |
+| `prefetch_ikj` | 3,904.1 | data present in report |
+
+IPC, LLC miss %, and stall % at N=2048 not separately run; only timing collected at this size on Luna.
 
 ---
 
 ## TMA Breakdown (naive_ijk vs tiled_avx2)
 
-```bash
-perf stat -e tma_memory_bound,tma_core_bound,tma_l1_bound,\
-tma_l2_bound,tma_l3_bound,tma_dram_bound \
-./[binary] [N]
-```
+> Data collected and recorded in `reports/matrix_multiplication/README.md`, section "TMA: top-down microarchitecture analysis (Luna)".
 
-| Metric | naive_ijk N=1024 | tiled_avx2 N=1024 | naive_ijk N=2048 | tiled_avx2 N=2048 |
+Key results (see report for full narrative):
+
+| Metric | naive N=1024 | tile+AVX2 N=1024 | naive N=2048 | tile+AVX2 N=10000 |
 |---|---|---|---|---|
-| tma_memory_bound % | | | | |
-| tma_core_bound % | | | | |
-| tma_l1_bound % | | | | |
-| tma_l2_bound % | | | | |
-| tma_l3_bound % | | | | |
-| tma_dram_bound % | | | | |
+| tma_memory_bound % | high (L3-bound 85.4%) | low (L3-bound 1.0%) | L3-bound 85.9% | 39.1% memory-bound |
+| tma_core_bound % | low | 32.4% | low | — |
+| tma_dram_bound % | low (data in L3) | low | increasing | 2.3% |
+| omp+tile DRAM-bound @ N=10000 | — | — | — | 14.7% |
+
+Raw TMA event counts: data pending (not separately tabulated; narrative summary above extracted from perf output during the Luna run).
 
 ---
 
@@ -96,13 +100,13 @@ tma_l2_bound,tma_l3_bound,tma_dram_bound \
 
 | Binary | WSL2 time N=1024 | Luna time N=1024 | Speedup |
 |---|---|---|---|
-| `naive_ijk` | 9,961ms | | |
-| `ikj_order` | 393ms | | |
-| `tiled_avx2` | 335ms | | |
+| `naive_ijk` | 9,961 ms | 5,703.9 ms | 1.7x |
+| `ikj_order` | 393 ms | 333.7 ms | 1.2x |
+| `tiled_avx2` | 335 ms | 220.4 ms | 1.5x |
 
 | Metric | WSL2 (unreliable) | Luna (accurate) |
 |---|---|---|
-| naive_ijk IPC | 0.23† | |
-| tiled_avx2 IPC | 3.04† | |
-| naive_ijk LLC miss% | N/A | |
-| naive_ijk stall-BE% | N/A | |
+| naive_ijk IPC | 0.23† | 0.22 |
+| tiled_avx2 IPC | 3.04† | 2.84 |
+| naive_ijk LLC miss% | N/A (not supported) | 0.022% (data fits in 105 MB L3) |
+| naive_ijk stall-BE% | N/A (not supported) | 83.3% |

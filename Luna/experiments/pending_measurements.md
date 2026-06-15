@@ -1,5 +1,7 @@
 # Luna — Pending Measurements (run before applying patches)
 
+**Status as of 2026-06-15: none of M1-M7 have been run yet. Run these before applying kraken2_opt_v1.patch.**
+
 These five measurements answer questions that **decide which patches matter and which
 parameters to tune**. Run all five on Luna in the order shown. Results paste back to chat
 or commit to `Luna/profiling/results_kraken2.md`. Each command also writes a `.txt`

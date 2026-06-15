@@ -1,8 +1,10 @@
 # Nanopore Pipeline — All Stats, Tables & Graphs
 **Chirag Kathpalia · IIT Delhi · Prof. Kolin Paul · 2026-05-28**
 
-> Mermaid charts render on GitHub. Colour heatmaps (🟦🟩🟨🟧🟥) work everywhere.
+> Mermaid charts render on GitHub. Colour heatmaps work everywhere.
 > Every number is real measured data — no estimates unless labelled.
+>
+> **Scope note (2026-06-15):** This file is a snapshot as of 2026-05-28. Section 1 (Kraken-2 gprof breakdown) uses WSL2 data with the 650 MB ESKAPE DB — CompactHashTable::Get shown at 67% is a gprof user-space-only figure from that context. Luna bare-metal results (cachegrind, flamegraph, Steps 1–51+) and AccuracyDrift data are not in this file. See `Luna/profiling/results_kraken2.md` and `AccuracyDrift/` for current data.
 
 ---
 

@@ -17,6 +17,7 @@ On IITD campus network only (WiFi module, no external access).
 | JetPack | R35.4.1 (released Aug 2023) |
 | Kernel | 5.10.120-tegra (aarch64) |
 | CPU | 12-core ARM Cortex-A78AE, 3 clusters × 4 cores, no hyperthreading |
+| SLC (L3) | 4 MB System Level Cache (shared across all 12 cores) |
 | RAM | 64 GB LPDDR5 unified memory (CPU + GPU share same pool) |
 | GPU | Ampere, 2048 CUDA cores (shares unified memory) |
 | Storage | 57 GB eMMC |
@@ -41,37 +42,25 @@ Remaining ~37 GB is system: CUDA toolkit, JetPack libraries, Ubuntu base — can
 
 ## AccuracyDrift Notes
 
-**perf events differ on ARM.** The standard x86 event names do not exist here:
+**All DBs are post-cliff on Orion.** The SLC is 4 MB. Every AccuracyDrift database is far larger than 4 MB — even the smallest (sample_targeted at 50 MB) is 12.5x the SLC size. This means Orion operates entirely in the DRAM-dominated regime for all databases. There is no "pre-cliff" comparison available on this machine. LLC miss rates cluster at 68–84% across all DBs and all thread counts. See RESULTS.md section 1.4 for full data.
 
-- `LLC-loads`, `LLC-load-misses` — not available
-- `cache-misses`, `cache-references` — may map to L2 or L3 depending on kernel
+**perf events on ARM.** Verified on this kernel (5.10.120-tegra, 5.4 perf binary):
 
-Run this on Orion before starting experiments to see what cache events are actually available:
+- `LLC-loads`, `LLC-load-misses` — available and working (use these for LLC miss rate)
+- `cache-references` — maps to L1D/L2 accesses on this ARM, NOT LLC; values (~47B per run) are not comparable to Luna's cache-references (~LLC-level). Cache Miss Rate% column on Orion is therefore not comparable to Luna.
 
-```bash
-perf list | grep -i cache
-perf list | grep -i LLC
-```
+The consistent cross-machine metric is: LLC-load-misses / LLC-loads (LLC Miss Rate%).
 
-The Cortex-A78 has an L3 cache (system-level cache, SLC). The unified memory architecture means LLC miss behavior is conceptually different — a miss goes to the same LPDDR5 pool the GPU uses.
+The Cortex-A78 SLC is a system-level cache. A miss goes to the same LPDDR5 pool the GPU uses (unified memory).
 
-**DB size constraint.** Only 8.5 GB free currently. standard_16gb (15 GB) will not fit without clearing space first. Candidate: delete `dorado-0.5.3-linux-arm64` (3.7 GB) if not needed, freeing ~12 GB — enough for standard_8gb but still not standard_16gb. Confirm with Kolin sir before deleting anything.
+**Thread count ceiling.** 12 cores, no hyperthreading. Thread counts tested: 1, 2, 4, 6, 8, 10, 12. No point going beyond 12T.
 
-**Thread count ceiling.** 12 cores, no hyperthreading. Thread counts to test: 1, 2, 4, 8, 12. No point going beyond 12T.
+**DB size constraint (as of 2026-06-12).** Only 8.5 GB free. All 5 AccuracyDrift databases fit because the largest (standard_16gb, 15 GB) was transferred after clearing space. PlusPF (103 GB) cannot run on Orion — 64 GB RAM is insufficient to hold the DB in memory.
 
-**Kraken2 install.** Not yet installed. ARM64 binary is available — build from source or check if a pre-built arm64 binary exists.
+**Kraken2 install.** Installed at `~/tools/kraken2/kraken2` (version 2.1.3). Must use explicit path when running under sudo because sudo strips PATH.
 
 ```bash
-# Check if installed
-which kraken2
-
-# Build from source if not
-sudo apt install git wget
-git clone https://github.com/DerrickWood/kraken2.git
-cd kraken2
-./install_kraken2.sh ~/kraken2-bin
-echo 'export PATH=$PATH:~/kraken2-bin' >> ~/.bashrc
-source ~/.bashrc
+~/tools/kraken2/kraken2 --version
 ```
 
 ## tegrastats Reference

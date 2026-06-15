@@ -55,7 +55,7 @@ tar -xzf k2_pluspf_20260226.tar.gz -C ~/AccuracyDrift/databases/pluspf_103gb/
 | reads_hac  | 98.86 | 1.14 | 94.18 | 91.07 | 0.97 | 57.17 |
 | reads_sup  | 99.24 | 0.76 | 94.16 | 91.21 | 1.00 | 57.00 |
 
-**Cold-run caveat:** sys time was ~56s ≈ wall time across all three runs. With 32 threads and ~57s wall, only ~100 CPU-seconds were active — the other ~1,700 CPU-seconds of available thread time were idle, waiting on I/O. The 103 GB DB was being paged from disk during each run (first access after extraction). Wall times here reflect I/O-dominated cold starts. Warm repeats needed for steady-state classification speed (expect ~10–15s wall at 32T once 103 GB is page-cached in Luna's 504 GB RAM).
+**Cold-run caveat:** sys time was ~56s ≈ wall time across all three runs. With 32 threads and ~57s wall, only ~100 CPU-seconds were active — the other ~1,700 CPU-seconds of available thread time were idle, waiting on I/O. The 103 GB DB was being paged from disk during each run (first access after extraction). Wall times here reflect I/O-dominated cold starts. Warm repeats needed for steady-state classification speed (expect ~10–15s wall at 32T once 103 GB is page-cached in Luna's 503 GB RAM).
 
 LLC miss rate 90–91% is the highest of any DB in the experiment, 9–10 pp above standard_16gb's 80–81%. IPC 0.90–1.00 is the lowest, confirming the most severe DRAM saturation observed.
 
@@ -63,9 +63,11 @@ LLC miss rate 90–91% is the highest of any DB in the experiment, 9–10 pp abo
 
 | Read model | standard_16gb | pluspf_103gb | Gain |
 |------------|---------------|--------------|------|
-| reads_fast | — (not collected) | 96.79% | — |
+| reads_fast | — (not collected in AccuracyDrift) | 96.79% | — |
 | reads_hac  | 97.77% | 98.86% | +1.09 pp (+1,146 reads classified) |
 | reads_sup  | 98.48% | 99.24% | +0.76 pp (+797 reads classified) |
+
+Note: reads_fast × standard_16gb was not run during AccuracyDrift thread-scaling experiments, so no direct gain figure is available. The PlusPF reads_fast result (96.79%) is the gold-standard floor for reads_fast accuracy.
 
 The ~1 pp gain from adding protozoa and fungi confirms a fraction of the standard_16gb unclassified reads are genuinely fungal/protozoan. The remaining 0.76–1.14% unclassified in PlusPF is likely truly novel sequence not in any RefSeq reference — this is the hard floor.
 
@@ -94,5 +96,12 @@ Key findings:
 - **Major species counts are higher than standard_16gb** — P. aeruginosa 43,630 (PlusPF) vs 37,373 (standard_16gb), E. coli 21,609 vs 17,350, K. pneumoniae 9,677 vs 5,774. The extra reads come from the "long tail" pool, which shrank from ~37% to ~27%. PlusPF's different reference set shifts some LCA calls from genus/family-level ambiguous assignments to specific species — a reshuffling within classified reads, not just new classifications from unclassified.
 
 ### Next Steps
-- Re-run warm (103 GB should be page-cached after first run): same command, captures steady-state performance
-- Thread scaling for pluspf: 1T, 8T, 16T, 32T (already done), 64T, 96T — to characterize Amdahl+DRAM behavior at 103 GB
+
+**Done:**
+- [x] reads_fast × pluspf_103gb × 32T cold run (Luna)
+- [x] reads_hac × pluspf_103gb × 32T cold run (Luna)
+- [x] reads_sup × pluspf_103gb × 32T cold run (Luna)
+
+**Pending:**
+- [ ] Warm run for all three read models (103 GB should be page-cached in Luna's 503 GB RAM after cold runs; expect ~10–15s wall at 32T vs ~57s cold)
+- [ ] Thread scaling for pluspf_103gb: 1T, 8T, 16T, 32T (done), 64T, 96T — to characterize Amdahl+DRAM behavior at 103 GB scale
