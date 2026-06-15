@@ -3329,22 +3329,40 @@ Sapphire Rapids PMU supports full Top-down Microarchitecture Analysis. Hardware 
 
 ### What this experiment is
 
-AccuracyDrift measures how Kraken-2 classification accuracy changes as the database size changes. Runs were done across multiple model types (reads_fast, reads_hac, reads_sup) and multiple DB sizes. The goal is to find the accuracy-vs-DB-size trade-off curve.
+AccuracyDrift measures how Kraken-2 classification accuracy and cache behaviour change across DB size, thread count, basecalling model, and machine. Databases range from 50 MB (sample_targeted) to 103 GB (PlusPF). The goal is to find the accuracy-vs-DB-size trade-off curve and locate the cache cliff for each machine.
 
-AccuracyChase is the follow-on: once a target DB (PlusPF, 103 GB) was identified as the gold standard, cold runs were performed to confirm accuracy under realistic conditions.
+AccuracyChase is the follow-on: PlusPF (103 GB) was identified as the gold-standard DB, and cold runs were performed on Luna to establish an accuracy ceiling for each read model.
 
-### Key results (AccuracyChase — PlusPF 103 GB cold runs, 2026-06-13)
+### Three behavioural classes (Luna, reads_hac)
 
-| Model | Classified % |
-|---|---|
-| reads_fast | 96.79% |
-| reads_hac | 98.86% |
-| reads_sup | 99.24% |
+| Class | DB(s) | LLC miss rate | Thread scaling | Peak speedup |
+|---|---|---|---|---|
+| Pre-cliff | sample_targeted (50 MB) | ~10% | Near-linear to 64T | ~22x |
+| Post-cliff bandwidth-saturated | eskape_650mb (142 MB), eskape_human_4gb (3.8 GB) | 30–58% | Plateau at ~16–32T | ~10–21x |
+| Amdahl-limited | standard_8gb (7.6 GB), standard_16gb (15 GB) | 76–80% | Peak at 32T, limited by serial DB loading (4.2s / 7.5s) | ~3.5x / 2.9x |
+
+**Cache cliff on Luna:** between 50 MB and 142 MB — the 105 MB L3 per socket fits sample_targeted but not eskape_650mb. LLC miss rate jumps from 10.19% to 30.70% across this boundary.
+
+**Cache cliff on Orion (ARM, 4 MB SLC):** below 50 MB — every DB in the experiment is post-cliff on Orion. Orion's LLC miss rate for sample_targeted is 78.92% vs Luna's 10.19%.
+
+### Key results — AccuracyChase (PlusPF 103 GB cold runs, Luna 32T, 2026-06-13)
+
+| Model | Classified % | LLC Miss Rate % | Wall time (s) |
+|---|---|---|---|
+| reads_fast | 96.79% | 90.11% | 57.75 |
+| reads_hac | 98.86% | 91.07% | 57.17 |
+| reads_sup | 99.24% | 91.21% | 57.00 |
+
+Wall times are cold-run (DB paging from disk). Warm-run estimates ~10–15s at 32T. LLC miss 90–91% is highest in the experiment.
+
+### Sample composition (best estimate, standard_16gb, reads_hac)
+
+P. aeruginosa ~35.6%, E. coli ~16.5%, K. pneumoniae ~5.5%, human DNA ~0.8%, diverse low-abundance bacteria ~37.1%, unclassified 2.2%. Classic nosocomial (hospital-acquired) profile.
 
 ### Machines used
 
 - **Luna** (primary): Intel Xeon Platinum 8468, 503 GB RAM, 210 MB L3
-- **Orion** (Jetson AGX Orin 64GB): ARM64, campus-network-only machine — see `docs/Luna_vs_Minerva.md` for Orion specs
+- **Orion** (secondary): ARM64 Jetson AGX Orin 64GB, 12-core, 4 MB SLC, campus-network-only — see `docs/Luna_vs_Minerva.md`
 
 ### Reference files
 

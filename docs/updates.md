@@ -420,3 +420,24 @@ Full experiment to understand how Kraken2 classification accuracy and cache beha
 - docs/plan.md: updated IMMEDIATE ACTIONS STATUS to 2026-06-15; marked source-reading task done (docs/reports/kraken2_get_optimizations.md confirms source read 2026-05-29); marked overdue deadline; added AccuracyDrift completion note + Phase 1 delay note to STEP 5 timeline.
 - docs/reports/kraken2_optimisation_report.md: added status comment at top noting Section 6 (M1-M7 + patch benchmark tables) is unfilled and what to do to fill it.
 - docs/reports/ duplication check: kraken2_get_optimizations.md (v1) and v2 are additive not duplicate; final_report.md and kraken2_optimisation_report.md cover different phases; tables_and_graphs.md (Mermaid) and tables_and_graphs_basic.md (ASCII) serve different rendering contexts. No files deleted.
+
+---
+
+## 2026-06-16 — Multi-agent hierarchical review and cleanup
+
+Full sweep of the project repository using a hierarchical agent structure (R1-R7 background agents + foreground review agent + R7 consistency audit + C1-C5 coordinator agents). 25+ files audited and corrected across two commits (56afc69 and d77ab66).
+
+Key fixes applied:
+
+- **AccuracyDrift/OBSERVATIONS.md:** duplicate observation number (#10 appeared twice — once in Thread Scaling section as the cache-misses methodology note, once as the first observation in the DB Size section). Thread Scaling instance converted to unnumbered note. Obs 10 is now unique.
+- **AccuracyDrift/RESULTS.md:** eskape_650mb size corrected 150 MB → 142 MB throughout; reads_fast thread scaling checklist items added; pluspf cold-run items added.
+- **AccuracyDrift/README.md, COMMANDS.md, machines/Orion.md, AccuracyChase.md:** structural fixes, companion files table added, Orion section corrected, Next Steps restructured.
+- **Luna/profiling/results_kraken2.md:** hac "cold (first-ever run)" label fixed (DB was warm from fast/sup); fast model DB cache state note added; Goal 5 (thread scaling) added to Profiling Goals table; §5b renamed §5f (was out of order after §5e); Core Findings scope moved from parenthetical header to explicit blockquote.
+- **Luna/profiling/results_dorado.md:** Minerva Baselines section retitled as WSL2 Baselines (GTX 1650); 82% GEMM figure correctly attributed to WSL2 not Minerva; "No runs completed — template only" notes added to all 4 empty result sections; inline "fill in from Minerva run" to-do removed; CUDA/Driver note updated (from nvidia-smi, no runs done); last-updated date added.
+- **Luna/profiling/results_matmul_luna.md:** N=1024 table (12 variants) and N=2048 timing table filled from Luna bare-metal run data.
+- **docs/meeting_minutes.md:** Meeting 1 attendees capitalized; Meeting 2 "Important update" formatting and date (2026-05-18) corrected; Meeting 3/4 next-meeting dates filled (2026-05-28, 2026-06-02); Dorado table WSL2 source note added; barcode02 AIIMS dataset qualifier added; Minerva L3 (~66 MB) filled from Luna_vs_Minerva.md.
+- **docs/knowledge_base.md:** stale "Next meeting: 2026-05-18" header fixed; §22 AccuracyDrift+AccuracyChase stub added with accuracy results table.
+- **docs/Luna_vs_Minerva.md:** expanded to Luna vs Minerva vs Orion; full Orion section (ARM64, 12-core, 64 GB LPDDR5, 4 MB SLC) added; Verdict table updated.
+- **README.md:** Section 10 AccuracyDrift summary added (3 behavioral classes, cache cliff at ~100 MB, Orion comparison); Section 11 "what's next" added; Orion added to hardware table.
+- **Numerical consistency (R7 agent):** Luna RAM corrected 504 → 503 GB and eskape_650mb size 150 → 142 MB across AccuracyDrift/RESULTS.md, OBSERVATIONS.md, README.md, docs/updates.md, docs/reports/summary.md.
+- **Minerva/profiling/:** "AccuracyDrift not started — disk was full as of 2026-05-28, verify before starting" notes added to both Kraken2 and Dorado result files.
