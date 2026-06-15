@@ -47,4 +47,52 @@ tar -xzf k2_pluspf_20260226.tar.gz -C ~/AccuracyDrift/databases/pluspf_103gb/
 
 ## Results
 
-*(to be filled in as runs complete)*
+### Classification Accuracy — Gold Standard (Luna, 32T, cold run)
+
+| Read model | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | IPC | Wall time (s) |
+|------------|-------------|---------------|-----------------|----------------|-----|---------------|
+| reads_fast | 96.79 | 3.21 | 93.79 | 90.11 | 0.90 | 57.75 |
+| reads_hac  | 98.86 | 1.14 | 94.18 | 91.07 | 0.97 | 57.17 |
+| reads_sup  | 99.24 | 0.76 | 94.16 | 91.21 | 1.00 | 57.00 |
+
+**Cold-run caveat:** sys time was ~56s ≈ wall time across all three runs. With 32 threads and ~57s wall, only ~100 CPU-seconds were active — the other ~1,700 CPU-seconds of available thread time were idle, waiting on I/O. The 103 GB DB was being paged from disk during each run (first access after extraction). Wall times here reflect I/O-dominated cold starts. Warm repeats needed for steady-state classification speed (expect ~10–15s wall at 32T once 103 GB is page-cached in Luna's 504 GB RAM).
+
+LLC miss rate 90–91% is the highest of any DB in the experiment, 9–10 pp above standard_16gb's 80–81%. IPC 0.90–1.00 is the lowest, confirming the most severe DRAM saturation observed.
+
+### Comparison to standard_16gb (AccuracyDrift largest DB)
+
+| Read model | standard_16gb | pluspf_103gb | Gain |
+|------------|---------------|--------------|------|
+| reads_fast | — (not collected) | 96.79% | — |
+| reads_hac  | 97.77% | 98.86% | +1.09 pp (+1,146 reads classified) |
+| reads_sup  | 98.48% | 99.24% | +0.76 pp (+797 reads classified) |
+
+The ~1 pp gain from adding protozoa and fungi confirms a fraction of the standard_16gb unclassified reads are genuinely fungal/protozoan. The remaining 0.76–1.14% unclassified in PlusPF is likely truly novel sequence not in any RefSeq reference — this is the hard floor.
+
+### Species Breakdown — PlusPF 103 GB (Luna, 32T)
+
+Extracted with:
+```bash
+awk '$4=="S"' reads_<model>_pluspf_103gb_32T_report.txt | \
+  grep -E "Pseudomonas aeruginosa$|Escherichia coli$|Klebsiella pneumoniae$|Acinetobacter baumannii$|Enterobacter cloacae$|Staphylococcus aureus$|Enterococcus faecium$"
+```
+
+| Species | reads_hac | reads_sup | reads_fast |
+|---------|-----------|-----------|------------|
+| *Pseudomonas aeruginosa* | 41.58% (43,630) | 40.73% (42,757) | 40.91% (42,890) |
+| *Escherichia coli* | 20.60% (21,609) | 19.80% (20,784) | 21.19% (22,214) |
+| *Klebsiella pneumoniae* | 9.22% (9,677) | 9.14% (9,599) | 7.95% (8,330) |
+| *Acinetobacter baumannii* | 0.33% (341) | 0.36% (382) | 0.16% (165) |
+| *Enterobacter cloacae* | 0.07% (76) | 0.09% (94) | 0.02% (26) |
+| *Staphylococcus aureus* | 0.00% (1) | 0.00% (1) | — |
+| *Enterococcus faecium* | — | — | — |
+
+Key findings:
+- **A. baumannii confirmed at 0.16–0.36%** — was in the standard DB long tail but never tabulated (below 1% threshold). Its presence here confirms a small but real A. baumannii component, which was invisible in sample_targeted because the NCBI genome was suppressed and could not be added to that DB.
+- **S. aureus essentially absent** — 1 read across 104,918 (hac) and 104,980 (sup), 0 for fast. Not a meaningful clinical signal.
+- **E. faecium absent** — 0 reads in all three models.
+- **Major species counts are higher than standard_16gb** — P. aeruginosa 43,630 (PlusPF) vs 37,373 (standard_16gb), E. coli 21,609 vs 17,350, K. pneumoniae 9,677 vs 5,774. The extra reads come from the "long tail" pool, which shrank from ~37% to ~27%. PlusPF's different reference set shifts some LCA calls from genus/family-level ambiguous assignments to specific species — a reshuffling within classified reads, not just new classifications from unclassified.
+
+### Next Steps
+- Re-run warm (103 GB should be page-cached after first run): same command, captures steady-state performance
+- Thread scaling for pluspf: 1T, 8T, 16T, 32T (already done), 64T, 96T — to characterize Amdahl+DRAM behavior at 103 GB
