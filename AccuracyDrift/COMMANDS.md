@@ -622,3 +622,51 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 | **avg** | **95.77** | **86.00** | **82.58** | **5.119** | **1.50** |
 
 96T slower than 64T on both wall time (5.119s vs 4.949s) and classification time (0.943s vs 0.802s). Speedup 3.28x, below 64T's 3.39x. hac × standard_8gb thread scaling complete.
+
+---
+
+## Missing from this log
+
+The following runs were completed but not individually logged here. All results (3-run averages per thread count) are in RESULTS.md.
+
+**Luna — not logged:**
+- reads_hac × standard_16gb × 1T–96T
+- reads_hac × sample_targeted × 1T
+- reads_sup × all 5 DBs × 1T–96T (all thread counts, 3 runs each)
+- reads_fast × pluspf_103gb × 32T (cold run)
+- reads_hac × pluspf_103gb × 32T (cold run)
+- reads_sup × pluspf_103gb × 32T (cold run)
+
+**Orion — not logged (see section below for command template):**
+- reads_hac × all 5 DBs × 1T–12T (all thread counts, 3 runs each)
+- reads_sup × all 5 DBs × 1T–12T (all thread counts, 3 runs each)
+
+---
+
+## Orion (Jetson AGX Orin 64GB, jetsonagx@10.154.233.173)
+
+SSH: `ssh jetsonagx@10.154.233.173` — campus network only (IITD WiFi, no external access).
+
+Key differences vs Luna:
+- ARM64 (aarch64), not x86_64 — perf event names are ARM-specific
+- Single NUMA node — no numactl needed or available
+- `sudo` required for perf stat on this kernel
+- perf binary: `sudo /usr/lib/linux-tools-5.4.0-26/perf` (system wrapper unreliable)
+- Thread counts: 1, 2, 4, 6, 8, 10, 12 (no hyperthreading, 12 physical cores max)
+- Kraken2 at `~/tools/kraken2/kraken2` (explicit path required — sudo strips PATH)
+- Databases at `~/AccuracyDrift/databases/`
+
+Standard perf command template:
+
+```bash
+sudo /usr/lib/linux-tools-5.4.0-26/perf stat \
+  -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  ~/tools/kraken2/kraken2 --db ~/AccuracyDrift/databases/<DB> \
+  --threads <T> \
+  --output /dev/null --report /dev/null \
+  ~/reads/reads_hac.fastq
+```
+
+Replace `<DB>` and `<T>`. For reads_sup use `~/reads/reads_sup.fastq`. Each run done 3 times and averaged. Note: `cache-references` on ARM maps to L2 accesses (not LLC), so Cache Miss Rate% on Orion is not comparable to Luna. LLC-load-misses / LLC-loads is the consistent metric across both machines.
+
+All per-thread results are in RESULTS.md section 1.4.

@@ -16,12 +16,14 @@ Test how Kraken2 classification accuracy and cache behavior change across differ
 
 | Name | Actual Size | Type | Status on Luna |
 |------|-------------|------|----------------|
+| sample_targeted | 50 MB | Custom build — 6 reference genomes matching this sample exactly (P. aeruginosa PAO1, E. coli K-12, K. pneumoniae HS11286, E. faecium 62415, S. aureus MRSA252, E. cloacae ATCC 13047) | done |
 | eskape_650mb | 142 MB | ESKAPE pathogens only, custom build | done |
 | eskape_human_4gb | 3.8 GB | ESKAPE + human, custom build | done |
 | standard_8gb | 8 GB | Pre-built standard | done |
 | standard_16gb | 16 GB | Pre-built standard | done |
+| pluspf_103gb | 103.4 GB | Pre-built PlusPF — Standard + protozoa + fungi; gold-standard accuracy ceiling. Cannot run on Orion (64 GB RAM insufficient). | done |
 
-All 4 databases are ready on Luna at `~/AccuracyDrift/databases/`.
+All 6 databases are ready on Luna at `~/AccuracyDrift/databases/`.
 
 ## Transferring to other machines
 

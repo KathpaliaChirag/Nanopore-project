@@ -408,3 +408,15 @@ Full experiment to understand how Kraken2 classification accuracy and cache beha
 - All other DBs up to PlusPFP (221.8 GB), core_nt (316.2 GB), GTDB v226 (644 GB) documented in `AccuracyDrift/AccuracyChase.md`
 - Luna (504 GB RAM) can load 103.4 GB comfortably; Orion (64 GB) cannot
 - Download: `wget https://genome-idx.s3.amazonaws.com/kraken/k2_pluspf_20260226.tar.gz` (run on Luna)
+
+---
+
+## 2026-06-15 — Project review and cleanup (multi-agent)
+
+- AccuracyDrift/README.md: added sample_targeted (50 MB) and pluspf_103gb (103.4 GB) to databases table; updated "4 databases" to "6 databases".
+- AccuracyDrift/RESULTS.md: split reads_hac × sample_targeted checklist item into 1T (done) + 2T–96T (pending); added pluspf_103gb cold-run items for all three models; added reads_fast thread scaling items for Luna; reorganized Orion checklist (added per-DB reads_fast items, updated species breakdown item).
+- AccuracyDrift/OBSERVATIONS.md: fixed duplicate observation number (second "6" renumbered to "10"); restored missing body of observation 135 (three behavioral classes taxonomy) which had been accidentally pasted onto end of observation 143; removed the orphaned text from end of obs 143.
+- AccuracyDrift/COMMANDS.md: added "Missing from this log" summary section and full Orion command template section.
+- docs/plan.md: updated IMMEDIATE ACTIONS STATUS to 2026-06-15; marked source-reading task done (docs/reports/kraken2_get_optimizations.md confirms source read 2026-05-29); marked overdue deadline; added AccuracyDrift completion note + Phase 1 delay note to STEP 5 timeline.
+- docs/reports/kraken2_optimisation_report.md: added status comment at top noting Section 6 (M1-M7 + patch benchmark tables) is unfilled and what to do to fill it.
+- docs/reports/ duplication check: kraken2_get_optimizations.md (v1) and v2 are additive not duplicate; final_report.md and kraken2_optimisation_report.md cover different phases; tables_and_graphs.md (Mermaid) and tables_and_graphs_basic.md (ASCII) serve different rendering contexts. No files deleted.

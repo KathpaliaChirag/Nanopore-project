@@ -395,6 +395,8 @@ Replace CompactHashTable with a small neural network (Kraska et al. 2017 SIGMOD)
 | **Phase 2** | June 8–21 | Proposal D (batch prefetch) → Proposal B (sequential ESKAPE, accuracy validation) → Proposal G (Bloom filter) |
 | **Phase 3+** | June 22+ | Proposal C (SIMD) → Proposal H (DB partitioning) → Proposal I (learned index) |
 
+**Status as of 2026-06-15:** Phase 0 profiling complete. AccuracyDrift experiment (2026-05-30 to 2026-06-13) characterized accuracy vs DB size vs thread count on Luna (96-core) and Orion (12-core ARM). Implementation phase (Phase 1+) not yet started — pending M1-M7 pre-implementation measurements in Luna/experiments/pending_measurements.md.
+
 ---
 
 ## STEP 6 — VALIDATION PROTOCOL
@@ -434,18 +436,18 @@ diff baseline.kraken optimized.kraken  # expect zero diff for Proposals A/D/E/F
 
 ---
 
-## IMMEDIATE ACTIONS STATUS (as of 2026-05-30)
+## IMMEDIATE ACTIONS STATUS (as of 2026-06-15)
 
-- [x] SSH to Luna, run Phase A (perf stat cold/warm) — ✅ done, all 3 models, all NUMA configs
-- [x] Run Phase B (TMA) — ✅ done, all 3 models + all 4 NUMA configs
-- [x] Run Phase C (cachegrind) — ✅ done, Step 11; CompactHashTable::Get = 96.24% of LL read misses
-- [x] Run Phase D (perf record + flamegraph) — ✅ done, Step 6; flamegraph_hac_32t.svg in repo
-- [x] Run Phase E (NUMA numactl comparison) — ✅ done, Steps 7-9; node0 = 4.405s (21.8% gain)
-- [ ] Run Phase F (DRAM bandwidth via uncore_imc) — 🔜 next priority
-- [ ] Run k-mer reuse script on reads_hac.fastq (k=35) — 🔜 needed to validate LRU cache ROI
-- [ ] Read compact_hash.h, compact_hash.cc, classify.cc — 🔜 before implementation phase
-- [ ] Fill result tables in `kraken2_optimisation_report.md` — 🔜 in progress
-- [ ] Push complete report to GitHub by 2026-05-31 — 🔜 deadline approaching
+- [x] SSH to Luna, run Phase A (perf stat cold/warm) — done, all 3 models, all NUMA configs
+- [x] Run Phase B (TMA) — done, all 3 models + all 4 NUMA configs
+- [x] Run Phase C (cachegrind) — done, Step 11; CompactHashTable::Get = 96.24% of LL read misses
+- [x] Run Phase D (perf record + flamegraph) — done, Step 6; flamegraph_hac_32t.svg in repo
+- [x] Run Phase E (NUMA numactl comparison) — done, Steps 7-9; node0 = 4.405s (21.8% gain)
+- [x] Read compact_hash.h, compact_hash.cc, classify.cc — done; full analysis in docs/reports/kraken2_get_optimizations.md (source read 2026-05-29, 3 corrections to inferred Get() algorithm)
+- [ ] Run Phase F (DRAM bandwidth via uncore_imc) — still pending (see Luna/experiments/pending_measurements.md M4)
+- [ ] Run k-mer reuse script on reads_hac.fastq (k=35) — still pending (see pending_measurements.md M5)
+- [ ] Fill result tables in `kraken2_optimisation_report.md` (Section 6, M1-M7 + per-patch) — still pending, waiting on Luna measurements
+- [ ] Push complete report to GitHub — OVERDUE (deadline was 2026-05-31; report skeleton exists but Section 6 is unfilled)
 
 ## REMAINING PROFILING (added 2026-05-30)
 

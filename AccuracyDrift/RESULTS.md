@@ -54,15 +54,14 @@ Both metrics tracked:
 
 ### Luna
 - [x] Fix reads_sup.fastq permissions
-- [x] reads_hac × sample_targeted × 1T (baseline done; 2T–96T pending)
-- [ ] reads_fast × eskape_650mb × all thread counts
-- [ ] reads_fast × eskape_human_4gb × all thread counts
-- [ ] reads_fast × standard_8gb × all thread counts
-- [ ] reads_fast × standard_16gb × all thread counts
+- [x] reads_hac × sample_targeted × 1T
+- [ ] reads_hac × sample_targeted × 2T–96T (thread scaling)
 - [x] reads_hac × eskape_650mb × all thread counts
 - [x] reads_hac × eskape_human_4gb × all thread counts
 - [x] reads_hac × standard_8gb × all thread counts
 - [x] reads_hac × standard_16gb × all thread counts
+- [x] reads_hac × pluspf_103gb × 32T (cold run done, 2026-06-13)
+- [ ] reads_hac × pluspf_103gb × warm run + thread scaling
 - [x] reads_sup × all DBs × 1T (species/report only, no perf stat — quick model comparison)
 - [x] reads_sup × all DBs × 1T perf stat — DONE 2026-06-13
 - [x] reads_sup × sample_targeted × all thread counts (perf stat) — DONE 2026-06-13
@@ -70,6 +69,15 @@ Both metrics tracked:
 - [x] reads_sup × eskape_human_4gb × all thread counts (perf stat) — DONE 2026-06-13
 - [x] reads_sup × standard_8gb × all thread counts (perf stat) — DONE 2026-06-13
 - [x] reads_sup × standard_16gb × all thread counts (perf stat) — DONE 2026-06-13
+- [x] reads_sup × pluspf_103gb × 32T (cold run done, 2026-06-13)
+- [ ] reads_sup × pluspf_103gb × warm run + thread scaling
+- [ ] reads_fast × sample_targeted × all thread counts
+- [ ] reads_fast × eskape_650mb × all thread counts
+- [ ] reads_fast × eskape_human_4gb × all thread counts
+- [ ] reads_fast × standard_8gb × all thread counts
+- [ ] reads_fast × standard_16gb × all thread counts
+- [x] reads_fast × pluspf_103gb × 32T (cold run done, 2026-06-13)
+- [ ] reads_fast × pluspf_103gb × warm run + thread scaling
 - [ ] Species breakdown for all Luna runs (full perf runs)
 
 ### Minerva
@@ -102,11 +110,15 @@ Both metrics tracked:
 - [x] Transfer remaining DBs (standard_8gb, standard_16gb)
 - [x] reads_hac × standard_8gb × all thread counts
 - [x] reads_hac × standard_16gb × all thread counts
-- [ ] reads_fast × all DBs × all thread counts
 - [x] reads_sup × all DBs × 1T and 2T (Orion, 2026-06-13)
 - [x] reads_sup × all DBs × 4T and 6T (Orion, 2026-06-13)
 - [x] reads_sup × all DBs × 8T,10T,12T (Orion, 2026-06-13)
-- [ ] Species breakdown
+- [ ] reads_fast × sample_targeted × all thread counts
+- [ ] reads_fast × eskape_650mb × all thread counts
+- [ ] reads_fast × eskape_human_4gb × all thread counts
+- [ ] reads_fast × standard_8gb × all thread counts
+- [ ] reads_fast × standard_16gb × all thread counts
+- [ ] Species breakdown (all DBs, reads_hac + reads_sup)
 
 ---
 

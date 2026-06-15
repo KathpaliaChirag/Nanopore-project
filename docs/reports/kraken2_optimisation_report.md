@@ -1,7 +1,15 @@
 # Kraken-2 Optimisation Report
 **Authors:** Chirag K (CK) + Chirag Suthar
-**Due:** 2026-05-31
+**Due:** 2026-05-31 (OVERDUE — see status note below)
 **Supervisor:** Kolin sir, Chayanika mam
+
+<!-- Status as of 2026-06-15:
+     Sections 1-5, 7, 8, 9 are complete and verified.
+     Section 6 is UNFILLED — waiting on Luna pre-implementation measurements:
+       - Section 6.1 (M1-M7 measurements table): all 10 rows are TBD. Run Luna/experiments/pending_measurements.md M1-M7 first.
+       - Section 6.2 (per-patch benchmark table): all patch rows are TBD. No patches applied and measured yet.
+     Fill section 6 after running pending_measurements.md then run_kraken2_opt_v1.sh.
+-->
 
 This report consolidates: (a) baseline profiling already completed on WSL2/Minerva/Luna,
 (b) source-derived correction of earlier inferred algorithms, (c) ten concrete
