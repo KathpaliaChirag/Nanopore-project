@@ -73,7 +73,7 @@ Update this every time a new major topic is pushed.
 - ~10-13× faster than Minerva at 1T (4.9 GHz boost + Rocket Lake IPC) — ⚠️ Minerva timing INVALID (loaded server); gap inflated by contention, re-run needed
 - Classified% identical to Minerva — accuracy is hardware-independent; standard_8gb remains the sweet spot
 - IPC governed by access pattern not miss rate: standard_8gb highest IPC (2.17) despite 63% miss; eskape_human_4gb worst (1.20); IPC drops 15-29% at 16T from HT
-- NEW: custom **eskape_51mb** DB (3 sample genomes: P. aeruginosa PAO1, E. coli MG1655, K. pneumoniae HS11286) classifies 84.80%/85.40% (hac/sup) — ~20 pp above general ESKAPE DBs at 51 MB; includes cross-DB detection table (§ "ESKAPE 51MB database", F7)
+- NEW: custom **eskape_51mb** DB (6-genome ESKAPE panel; sample contains mainly P. aeruginosa PAO1, E. coli MG1655, K. pneumoniae HS11286) classifies 84.80%/85.40% (hac/sup) — ~20 pp above general ESKAPE DBs at 51 MB; includes cross-DB detection table (§ "ESKAPE 51MB database", F7)
 
 **reports/phase1_dummytesting_dorado_kraken2.md** → Phase 1/2a complete run data (Phases 1a–2a)
 - Full tables and verdicts for Dorado fast/HAC GPU profiling + Kraken2 gprof

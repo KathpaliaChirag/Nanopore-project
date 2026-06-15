@@ -245,35 +245,35 @@ Key findings:
 
 > Full tables and per-read observations: **[reports/accuracydrift_dell_optiplex.md](reports/accuracydrift_dell_optiplex.md)** (§ "ESKAPE 51MB database")
 
-**Setup:** custom 51 MB Kraken2 DB built from exactly the three ESKAPE reference genomes in the sample — *P. aeruginosa* PAO1, *E. coli* K-12 MG1655, *K. pneumoniae* HS11286 (no host/off-target). Same reads + thread sweep as the other DBs on Dell; 3-run averages.
+**Setup:** custom 51 MB Kraken2 DB built from **six ESKAPE-panel reference genomes** (no *A. baumannii*, no host) — *P. aeruginosa* PAO1, *E. coli* K-12 MG1655, *K. pneumoniae* HS11286, *Enterobacter cloacae* ATCC 13047, *S. aureus* NCTC 8325, *E. faecium* DO. This sample contains mainly the first three; the others are trace hits. Same reads + thread sweep as the other DBs on Dell; 3-run averages.
 
 Key findings:
 
-- **84.80% (hac) / 85.40% (sup) classified from a 51 MB DB** — ~19–20 pp above the general eskape_650mb (~65%) and eskape_human_4gb (~66%), because it holds exactly the sample's organisms. *Sample-targeted result, not a general "small ESKAPE DB is better" claim.*
-- **Detection breakdown (hac):** *P. aeruginosa* 52.5% · *E. coli* 21.8% · *K. pneumoniae* 9.9% (= 84.8% total)
-- **Best detection-per-MB by far** — within ~11–12 pp of standard_8gb (95.77%) at 1/150th the DB size; the gap is reads from organisms not in the 3-genome DB
-- **Scales 7.6–7.7× at 16T** (best on Dell with eskape_650mb) — latency-bound small DB, HT helps; IPC 1.43–1.47 at 1T (highest of the ESKAPE DBs), drops to ~1.1 at 16T
+- **84.80% (hac) / 85.40% (sup) classified from a 51 MB DB** — ~19–20 pp above the general eskape_650mb (~65%) and eskape_human_4gb (~66%), because it carries dedicated references for the sample's dominant organisms. *Focused-panel result, not a general "small ESKAPE DB is better" claim.*
+- **Detection breakdown (hac):** *P. aeruginosa* 52.5% · *E. coli* 21.8% · *K. pneumoniae* 9.9% · *E. cloacae* 0.5% · *S. aureus*/*E. faecium* ~0.0% · higher-rank 0.1% (= 84.8% total)
+- **Best detection-per-MB by far** — within ~11–12 pp of standard_8gb (95.77%) at 1/150th the DB size; the gap is reads from organisms not in the 6-genome panel
+- **Scales 7.4–7.6× at 16T** (wall-clock, close behind eskape_650mb) — latency-bound small DB, HT helps; IPC 1.43–1.47 at 1T (highest of the ESKAPE DBs), drops to ~1.1 at 16T
 - ⚠️ classified% = DB↔sample k-mer match, **not** precision — no ground-truth or host-read filtering
 
 ### Detection (classified%) by database — all DBs used
 
 | Database | Size | fast | hac | sup |
 |----------|-----:|-----:|----:|----:|
-| eskape_51mb (custom, targeted) | 51 MB | 80.94 | 84.80 | 85.40 |
+| eskape_51mb (custom, 6-genome) | 51 MB | 80.94 | 84.80 | 85.40 |
 | eskape_650mb | 142 MB | 61.77 | 65.28 | 65.87 |
 | eskape_human_4gb | 3.8 GB | 62.27 | 66.13 | 66.68 |
 | standard_8gb | 7.6 GB | 82.66 | 95.77 | 97.09 |
 | standard_16gb | 15 GB | 90.44 | 97.77 | 98.48 |
 
-**Takeaway:** standard_16gb detects the most (97–98%) but at 15 GB; the 51 MB targeted DB out-detects both general ESKAPE DBs by ~19–20 pp and trails the standard DBs by only ~11–12 pp — when the expected organisms are known, a tiny targeted DB is the cheapest route to high detection.
+**Takeaway:** standard_16gb detects the most (97–98%) but at 15 GB; the 51 MB panel DB out-detects both general ESKAPE DBs by ~19–20 pp and trails the standard DBs by only ~11–12 pp — when the expected organisms are known, a tiny focused-panel DB is the cheapest route to high detection.
 
 ### Per-pathogen detection by database (hac, clade % of all reads)
 
-Sample = 3 ESKAPE pathogens. Species-level shown; *(G nn)* = genus-level where it exceeds species.
+Sample = 3 dominant ESKAPE pathogens. Species-level shown; *(G nn)* = genus-level where it exceeds species.
 
 | Database | *P. aeruginosa* | *E. coli* | *K. pneumoniae* | host (human) | classified |
 |----------|----------------:|----------:|----------------:|-------------:|-----------:|
-| eskape_51mb (targeted) | 52.50 | 21.79 | 9.92 | — | 84.80 |
+| eskape_51mb (6-genome) | 52.50 | 21.79 | 9.92 | — | 84.80 |
 | eskape_650mb | 65.28 | **0.00** | **0.00** | — | 65.28 |
 | eskape_human_4gb | 64.82 | **0.00** | **0.00** | 1.28 | 66.13 |
 | standard_8gb | 31.41 *(G 56.17)* | 14.45 | 4.52 *(G 9.13)* | 0.66 | 95.77 |
@@ -282,6 +282,6 @@ Sample = 3 ESKAPE pathogens. Species-level shown; *(G nn)* = genus-level where i
 - **eskape_650mb / eskape_human_4gb find ONLY P. aeruginosa** — zero E. coli, zero K. pneumoniae (those reads go unclassified); they act as Pseudomonas-only DBs and over-call P. aeruginosa (65% vs the targeted DB's 52.5%)
 - **Standard DBs detect all 3 but dilute species calls** — high classified% (95–98%) yet only ~50–58% pins to the 3 exact species; LCA ambiguity pushes ~25 pp of *Pseudomonas* up to genus level
 - **Host/human reads appear only in human-containing DBs** (eskape_human_4gb, standard_8/16gb); the two pure-ESKAPE DBs leave host reads unclassified
-- **Targeted 51 MB DB is the cleanest** — 84% pinned directly to the 3 species (species% = genus%), no spread
+- **51 MB panel DB is the cleanest** — ~84% pinned directly to the 3 dominant species (species% = genus%); only ~0.6% trace hits to the panel's other genomes + a little family/class-level
 
 ---

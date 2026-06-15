@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-12
 **Machine:** Dell OptiPlex 5090 — Intel Core i7-11700 @ 2.5 GHz (4.9 GHz boost), 16 threads (1-socket, 8c + HT), 16 MB L3 (shared)
-**Databases:** eskape_51mb (51 MB, custom sample-targeted), eskape_650mb (142 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB)
+**Databases:** eskape_51mb (51 MB, custom 6-genome ESKAPE panel), eskape_650mb (142 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB)
 **Reads:** reads_fast (104,832), reads_hac (104,918), reads_sup (104,980)
 **Thread sweep:** 1, 2, 4, 8, 16
 **Runs per combo:** 3 (values are averages)
@@ -227,17 +227,21 @@
 
 ---
 
-### ESKAPE 51MB database (custom, sample-targeted)
+### ESKAPE 51MB database (custom — 6-genome ESKAPE panel)
 
-Custom Kraken2 DB built from exactly the three ESKAPE reference genomes present in the sample — **Pseudomonas aeruginosa PAO1**, **Escherichia coli K-12 MG1655**, **Klebsiella pneumoniae HS11286** — 51 MB on disk. No host/human genome, no off-target species. Same reads and thread sweep as the other DBs (3 runs averaged).
+Custom 51 MB Kraken2 DB built from **six ESKAPE-panel reference genomes** (no *Acinetobacter baumannii*, no host/human genome): *Pseudomonas aeruginosa* PAO1, *Escherichia coli* K-12 MG1655, *Klebsiella pneumoniae* HS11286, *Enterobacter cloacae* ATCC 13047, *Staphylococcus aureus* NCTC 8325, and *Enterococcus faecium* DO. This sample contains mainly the first three; the other three appear only as trace hits. Same reads and thread sweep as the other DBs (3 runs averaged).
 
-**What it detected** (hac, 1T — fraction of all reads):
+**What it detected** (hac, 1T — clade % of all reads):
 
-| Organism | Detected% |
+| Organism (species) | Detected% |
 |----------|----------:|
 | *Pseudomonas aeruginosa* PAO1 | 52.50 |
 | *Escherichia coli* K-12 MG1655 | 21.79 |
 | *Klebsiella pneumoniae* HS11286 | 9.92 |
+| *Enterobacter cloacae* ATCC 13047 | 0.48 |
+| *Staphylococcus aureus* NCTC 8325 | 0.01 |
+| *Enterococcus faecium* DO | 0.00 |
+| Higher-rank only (genus/family/…) | 0.10 |
 | **Total classified** | **84.80** |
 | Unclassified | 15.20 |
 
@@ -245,37 +249,37 @@ Custom Kraken2 DB built from exactly the three ESKAPE reference genomes present 
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|-----|
-| 1  | 80.94 | 19.06 | 60.82 | 53.05 | 17.348 | 1.00x | 1.35 |
-| 2  | 80.94 | 19.06 | 61.10 | 53.13 |  9.204 | 1.88x | 1.33 |
-| 4  | 80.94 | 19.06 | 62.17 | 54.64 |  4.839 | 3.58x | 1.30 |
-| 8  | 80.94 | 19.06 | 63.40 | 56.11 |  3.116 | 5.57x | 1.33 |
-| 16 | 80.94 | 19.06 | 62.62 | 56.87 |  2.272 | 7.63x | 1.06 |
+| 1  | 80.94 | 19.06 | 60.82 | 53.05 | 17.411 | 1.00x | 1.35 |
+| 2  | 80.94 | 19.06 | 61.10 | 53.13 |  9.268 | 1.88x | 1.33 |
+| 4  | 80.94 | 19.06 | 62.17 | 54.64 |  4.917 | 3.54x | 1.30 |
+| 8  | 80.94 | 19.06 | 63.40 | 56.11 |  3.157 | 5.52x | 1.33 |
+| 16 | 80.94 | 19.06 | 62.62 | 56.87 |  2.320 | 7.50x | 1.06 |
 
 **reads_hac — eskape_51mb**
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|-----|
-| 1  | 84.80 | 15.20 | 59.74 | 52.56 | 17.750 | 1.00x | 1.43 |
-| 2  | 84.80 | 15.20 | 60.73 | 54.06 |  9.174 | 1.93x | 1.41 |
-| 4  | 84.80 | 15.20 | 61.60 | 55.16 |  5.018 | 3.54x | 1.40 |
-| 8  | 84.80 | 15.20 | 62.63 | 56.26 |  3.286 | 5.40x | 1.46 |
-| 16 | 84.80 | 15.20 | 61.71 | 57.32 |  2.301 | 7.72x | 1.11 |
+| 1  | 84.80 | 15.20 | 59.74 | 52.56 | 17.795 | 1.00x | 1.43 |
+| 2  | 84.80 | 15.20 | 60.73 | 54.06 |  9.207 | 1.93x | 1.41 |
+| 4  | 84.80 | 15.20 | 61.60 | 55.16 |  5.054 | 3.52x | 1.40 |
+| 8  | 84.80 | 15.20 | 62.63 | 56.26 |  3.326 | 5.35x | 1.46 |
+| 16 | 84.80 | 15.20 | 61.71 | 57.32 |  2.351 | 7.57x | 1.11 |
 
 **reads_sup — eskape_51mb**
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|-----|
-| 1  | 85.40 | 14.60 | 59.83 | 52.99 | 17.782 | 1.00x | 1.47 |
-| 2  | 85.40 | 14.60 | 60.56 | 54.30 |  9.223 | 1.93x | 1.45 |
-| 4  | 85.40 | 14.60 | 61.44 | 55.19 |  4.805 | 3.70x | 1.41 |
-| 8  | 85.40 | 14.60 | 62.40 | 56.28 |  3.251 | 5.47x | 1.50 |
-| 16 | 85.40 | 14.60 | 61.27 | 57.20 |  2.345 | 7.58x | 1.14 |
+| 1  | 85.40 | 14.60 | 59.83 | 52.99 | 17.813 | 1.00x | 1.47 |
+| 2  | 85.40 | 14.60 | 60.56 | 54.30 |  9.258 | 1.92x | 1.45 |
+| 4  | 85.40 | 14.60 | 61.44 | 55.19 |  4.843 | 3.68x | 1.41 |
+| 8  | 85.40 | 14.60 | 62.40 | 56.28 |  3.295 | 5.41x | 1.50 |
+| 16 | 85.40 | 14.60 | 61.27 | 57.20 |  2.397 | 7.43x | 1.14 |
 
 **Observations:**
-- **Classifies far better than the general eskape_650mb (~85% vs ~65%) despite being ~3× smaller** — because it holds exactly this sample's three organisms. This is a *sample-targeted* result, not a claim that small ESKAPE DBs generally win.
-- **Cheapest DB to reach standard-DB-level detection on this sample** — 84.80% (hac) / 85.40% (sup) for 51 MB vs standard_8gb's 95.77% / 97.09% for 7.6 GB; the ~11–12 pp gap is reads from organisms not in the 3-genome DB.
-- **Best Dell scaling alongside eskape_650mb** — 7.6–7.7× at 16T; latency-bound small DB, so hyperthreading helps (8T→16T ≈ 1.37×).
-- **Highest IPC of the ESKAPE DBs** (1.43–1.47 at 1T) — small, repetitive 3-genome k-mer space pipelines well; drops to ~1.1 at 16T from HT execution-unit sharing.
+- **Classifies far better than the general eskape_650mb (~85% vs ~65%) despite being ~3× smaller** — because it carries dedicated references for the sample's dominant organisms (*P. aeruginosa*, *E. coli*, *K. pneumoniae*). This is a focused-panel result, not a claim that small ESKAPE DBs generally win.
+- **Cheapest DB to reach standard-DB-level detection on this sample** — 84.80% (hac) / 85.40% (sup) for 51 MB vs standard_8gb's 95.77% / 97.09% for 7.6 GB; the ~11–12 pp gap is reads from organisms not in the 6-genome panel.
+- **Strong Dell scaling, close behind eskape_650mb** — 7.4–7.6× at 16T (wall-clock, same basis as the other DBs); latency-bound small DB, so hyperthreading helps (8T→16T ≈ 1.36–1.42×).
+- **Highest IPC of the ESKAPE DBs** (1.43–1.47 at 1T) — small, repetitive 6-genome k-mer space pipelines well; drops to ~1.1 at 16T from HT execution-unit sharing.
 - **LLC miss ~53→57% rises slightly with threads** — 16 MB L3 cannot hold even this DB's hash, so partitioning gives no cache benefit (same pattern as eskape_650mb on Dell).
 - ⚠️ **Caveat:** classified% measures DB↔sample k-mer match, not precision — with no ground truth / host-read filtering we cannot call this "more accurate" than standard, only far cheaper for detecting the sample's known organisms.
 
@@ -288,6 +292,7 @@ Custom Kraken2 DB built from exactly the three ESKAPE reference genomes present 
 | DB (hac) | Speedup 8T | Speedup 16T | HT gain (8T→16T) |
 |----------|-----------:|------------:|-----------------:|
 | eskape_650mb     | 5.55x | 8.11x | 1.46x |
+| eskape_51mb (custom) | 5.35x | 7.57x | 1.42x |
 | eskape_human_4gb | 4.76x | 6.42x | 1.35x |
 | standard_8gb     | 3.07x | 3.37x | 1.10x |
 | standard_16gb    | 2.42x | 2.51x | 1.04x |
@@ -335,6 +340,7 @@ Custom Kraken2 DB built from exactly the three ESKAPE reference genomes present 
 
 | DB | fast | hac | sup | Range |
 |----|-----:|----:|----:|------:|
+| eskape_51mb (custom) | 80.94 | 84.80 | 85.40 | 4.5 pp |
 | eskape_650mb     | 61.77 | 65.28 | 65.87 | 4.1 pp |
 | eskape_human_4gb | 62.27 | 66.13 | 66.68 | 4.4 pp |
 | standard_8gb     | 82.66 | 95.77 | 97.09 | 14.4 pp |
@@ -350,6 +356,7 @@ Custom Kraken2 DB built from exactly the three ESKAPE reference genomes present 
 
 | DB (hac, 1T) | Cache Miss% | LLC Miss% | IPC |
 |--------------|------------:|----------:|----:|
+| eskape_51mb (custom) | 59.74 | 52.56 | 1.43 |
 | eskape_650mb     | 66.14 | 56.50 | 1.30 |
 | eskape_human_4gb | 74.26 | 72.51 | 1.20 |
 | standard_8gb     | 63.13 | 63.29 | 2.17 |
@@ -366,6 +373,7 @@ Custom Kraken2 DB built from exactly the three ESKAPE reference genomes present 
 
 | DB (hac) | IPC 8T | IPC 16T | Drop |
 |----------|-------:|--------:|-----:|
+| eskape_51mb (custom) | 1.46 | 1.11 | -24% |
 | eskape_650mb     | 1.36 | 1.08 | -21% |
 | eskape_human_4gb | 1.22 | 1.04 | -15% |
 | standard_8gb     | 2.07 | 1.46 | -29% |
@@ -382,14 +390,14 @@ Custom Kraken2 DB built from exactly the three ESKAPE reference genomes present 
 
 | Database | Size on disk | fast | hac | sup |
 |----------|-------------:|-----:|----:|----:|
-| eskape_51mb (custom, sample-targeted) | 51 MB | 80.94 | 84.80 | 85.40 |
+| eskape_51mb (custom, 6-genome) | 51 MB | 80.94 | 84.80 | 85.40 |
 | eskape_650mb | 142 MB | 61.77 | 65.28 | 65.87 |
 | eskape_human_4gb | 3.8 GB | 62.27 | 66.13 | 66.68 |
 | standard_8gb | 7.6 GB | 82.66 | 95.77 | 97.09 |
 | standard_16gb | 15 GB | 90.44 | 97.77 | 98.48 |
 
 - **standard_16gb detects the most** (97–98% on hac/sup) but at 15 GB; standard_8gb is within ~1–2 pp at half the size
-- **The 51 MB custom DB punches far above its size** — it out-detects both general ESKAPE DBs (650 MB, 3.8 GB) by ~19–20 pp because it contains exactly the sample's three organisms; it trails the standard DBs by ~11–12 pp (the missing reads belong to organisms not in the 3-genome DB)
+- **The 51 MB custom DB punches far above its size** — it out-detects both general ESKAPE DBs (650 MB, 3.8 GB) by ~19–20 pp because it carries dedicated references for the sample's dominant organisms; it trails the standard DBs by ~11–12 pp (the missing reads belong to organisms not in the 6-genome panel)
 - **Detection rate is hardware-independent** — these values match Minerva exactly; only throughput differs by machine
 - ⚠️ classified% = fraction of reads that received any label (DB↔sample k-mer match), not a precision/accuracy measure — no ground-truth or host-read filtering was applied
 
@@ -397,11 +405,11 @@ Custom Kraken2 DB built from exactly the three ESKAPE reference genomes present 
 
 ### F8 — Per-pathogen detection: which organism each database actually found
 
-Clade % of all reads (hac, deterministic — identical across runs/threads/machines). The sample contains three ESKAPE pathogens; species-level = reads pinned to the exact species, genus-level given where the two diverge.
+Clade % of all reads (hac, deterministic — identical across runs/threads/machines). The sample contains three dominant ESKAPE pathogens; species-level = reads pinned to the exact species, genus-level given where the two diverge.
 
 | Database | *P. aeruginosa* | *E. coli* | *K. pneumoniae* | *H. sapiens* (host) | 3-pathogen sum (species) | Total classified |
 |----------|----------------:|----------:|----------------:|--------------------:|-------------------------:|-----------------:|
-| eskape_51mb (custom, targeted) | 52.50 | 21.79 | 9.92 | — | 84.21 | 84.80 |
+| eskape_51mb (custom, 6-genome) | 52.50 | 21.79 | 9.92 | — | 84.21 | 84.80 |
 | eskape_650mb | 65.28 | 0.00 | 0.00 | — | 65.28 | 65.28 |
 | eskape_human_4gb | 64.82 | 0.00 | 0.00 | 1.28 | 64.82 | 66.13 |
 | standard_8gb | 31.41 *(G 56.17)* | 14.45 *(G 15.49)* | 4.52 *(G 9.13)* | 0.66 | 50.38 | 95.77 |
@@ -413,5 +421,5 @@ Clade % of all reads (hac, deterministic — identical across runs/threads/machi
 - **eskape_650mb over-calls P. aeruginosa** — 65.28% vs the targeted DB's 52.50% on the same reads, while finding none of the other two species; with no competing references, E. coli / K. pneumoniae reads that share k-mers are likely lumped into P. aeruginosa.
 - **Standard DBs classify the most overall (95–98%) but dilute species-level calls** — standard_8gb pins only 31.41% to *P. aeruginosa* species although 56.17% reach genus *Pseudomonas*; LCA ambiguity across thousands of references pushes ~25 pp up to genus/group/sibling. The three target species sum to only ~50–58% of the 95–98% "classified"; the rest is genus/family/order-level spread.
 - **Host (human) reads surface only in DBs that include the human genome** — eskape_human_4gb 1.28%, standard_8gb 0.66%, standard_16gb 0.77%; eskape_51mb and eskape_650mb have no human reference, so host reads stay unclassified rather than being identified.
-- **The 51 MB targeted DB gives the cleanest species-level profile** — every classified read pins to species (species% = genus% for all three), 84% concentrated on exactly the three known pathogens, no taxonomic spread.
+- **The 51 MB DB gives the cleanest species-level profile** — for the three dominant pathogens species% = genus% (no LCA spread to genus), and ~84% of reads concentrate on those three; the remaining ~0.6% is trace hits to the panel's other three references (*Enterobacter cloacae* 0.48%, *S. aureus* / *E. faecium* ~0.01%) plus ~0.1% resolved only to family/class.
 - hac shown; the structure holds for fast/sup (the eskape DBs lack E. coli / K. pneumoniae references regardless of read model).
