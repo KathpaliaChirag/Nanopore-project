@@ -192,6 +192,8 @@ Alternative direction to Phase 3: instead of caching the 8 GB DB, **replace it**
 
 ## AccuracyDrift — Minerva (Intel Xeon Gold 6330, 112T, 251 GB RAM)
 
+> ⚠️ **RESULTS NOT VALID — needs re-run on idle server.** Runs were done while Minerva was fully loaded by other users' processes (heavy context switching). Timings, speedups, IPC, and cache/LLC miss rates are unreliable. Classified%/Unclassified% are unaffected (deterministic); all performance metrics below are suspect.
+
 > Full tables, per-combo observations, and final findings: **[reports/accuracydrift_minerva.md](reports/accuracydrift_minerva.md)**
 
 **Setup:** 3 reads (fast/hac/sup) × 4 DBs (eskape_650mb, eskape_human_4gb, standard_8gb, standard_16gb) × 5 thread counts (1,2,4,8,16) × 3 runs each = 180 runs. Values are 3-run averages.
@@ -199,7 +201,7 @@ Alternative direction to Phase 3: instead of caching the 8 GB DB, **replace it**
 Key findings:
 
 - **Scaling governed by LLC miss rate** — eskape_650mb scales 13–14× at 16T (LLC miss drops with threads); standard DBs plateau at 3–5× (fully DRAM-bound at 1T, no improvement with more threads)
-- **Minerva is ~10× slower than Luna at 1T on eskape_650mb** — root cause: Minerva L3 ~42 MB cannot hold the 142 MB DB; Luna L3 = 210 MB fits it almost entirely (Luna LLC miss 30.70% vs Minerva 68.58%)
+- **Minerva is ~10× slower than Luna at 1T on eskape_650mb** ⚠️ *gap inflated by Minerva contention — unreliable until re-run* — root cause: Minerva L3 ~42 MB cannot hold the 142 MB DB; Luna L3 = 210 MB fits it almost entirely (Luna LLC miss 30.70% vs Minerva 68.58%)
 - **eskape_human_4gb has the highest LLC miss rate (83%) despite not being the largest DB** — ESKAPE + human k-mer space is highly diverse and non-repetitive; standard DBs have lower miss rates (~51%) due to repetitive common-organism k-mers
 - **standard_8gb is the practical sweet spot** — 95.77% (hac) / 97.09% (sup) classified; standard_16gb adds only 2 pp for 38% longer runtime
 - **Read model matters more on standard DBs** — fast vs hac gap is 14.4 pp on standard_8gb but only 4.1 pp on eskape_650mb; DB coverage is the bottleneck for ESKAPE-targeted DBs, not read quality
@@ -224,7 +226,7 @@ Key findings:
 
 - **Scaling capped by 8 physical cores** — best case eskape_650mb 8.11× (hac, 16T) vs Minerva's 13.97×; 16T runs on hyperthreads (2/core)
 - **Hyperthreading is selective** — 8T→16T gains 1.35–1.46× on latency-bound small DBs (HT hides memory stalls) but only 1.04–1.10× on bandwidth-bound standard DBs (8 cores already saturate DRAM)
-- **~10–13× faster than Minerva at 1T** (18.2 s vs 233.3 s, hac/eskape_650mb) — 4.9 GHz boost + Rocket Lake IPC; part of the gap is Minerva being a loaded shared server
+- **~10–13× faster than Minerva at 1T** (18.2 s vs 233.3 s, hac/eskape_650mb) ⚠️ *Minerva timing INVALID (loaded server) — gap inflated, re-run needed* — 4.9 GHz boost + Rocket Lake IPC
 - **IPC set by access pattern, not miss rate** — standard_8gb posts the highest IPC (2.17) despite a 63% miss rate (well-pipelined, high MLP), while eskape_human_4gb is worst (1.20) on serialised misses
 - **HT cuts per-thread IPC 15–29% at 16T** — flat 1T→8T, then drops as two hyperthreads share each core's execution units
 
@@ -236,5 +238,50 @@ Key findings:
 | standard_16gb | 69.08 | 2.51× | 97.77 |
 
 **Observation:** the two machines tell complementary stories — Minerva is core-rich but per-thread slow (scales to 56 cores, IPC < 1.2), Dell is core-poor but per-thread fast (caps at 8 cores, IPC up to 2.2). Same DB + reads give identical accuracy on both; only throughput and the scaling ceiling change with hardware. On Dell's smaller 16 MB L3 every DB is fully DRAM-bound from 1T, so the practical recipe is unchanged: **standard_8gb at the 8-core sweet spot** — past 8 threads you pay an IPC penalty for little throughput.
+
+---
+
+## AccuracyDrift — ESKAPE 51 MB custom DB (Dell OptiPlex)
+
+> Full tables and per-read observations: **[reports/accuracydrift_dell_optiplex.md](reports/accuracydrift_dell_optiplex.md)** (§ "ESKAPE 51MB database")
+
+**Setup:** custom 51 MB Kraken2 DB built from exactly the three ESKAPE reference genomes in the sample — *P. aeruginosa* PAO1, *E. coli* K-12 MG1655, *K. pneumoniae* HS11286 (no host/off-target). Same reads + thread sweep as the other DBs on Dell; 3-run averages.
+
+Key findings:
+
+- **84.80% (hac) / 85.40% (sup) classified from a 51 MB DB** — ~19–20 pp above the general eskape_650mb (~65%) and eskape_human_4gb (~66%), because it holds exactly the sample's organisms. *Sample-targeted result, not a general "small ESKAPE DB is better" claim.*
+- **Detection breakdown (hac):** *P. aeruginosa* 52.5% · *E. coli* 21.8% · *K. pneumoniae* 9.9% (= 84.8% total)
+- **Best detection-per-MB by far** — within ~11–12 pp of standard_8gb (95.77%) at 1/150th the DB size; the gap is reads from organisms not in the 3-genome DB
+- **Scales 7.6–7.7× at 16T** (best on Dell with eskape_650mb) — latency-bound small DB, HT helps; IPC 1.43–1.47 at 1T (highest of the ESKAPE DBs), drops to ~1.1 at 16T
+- ⚠️ classified% = DB↔sample k-mer match, **not** precision — no ground-truth or host-read filtering
+
+### Detection (classified%) by database — all DBs used
+
+| Database | Size | fast | hac | sup |
+|----------|-----:|-----:|----:|----:|
+| eskape_51mb (custom, targeted) | 51 MB | 80.94 | 84.80 | 85.40 |
+| eskape_650mb | 142 MB | 61.77 | 65.28 | 65.87 |
+| eskape_human_4gb | 3.8 GB | 62.27 | 66.13 | 66.68 |
+| standard_8gb | 7.6 GB | 82.66 | 95.77 | 97.09 |
+| standard_16gb | 15 GB | 90.44 | 97.77 | 98.48 |
+
+**Takeaway:** standard_16gb detects the most (97–98%) but at 15 GB; the 51 MB targeted DB out-detects both general ESKAPE DBs by ~19–20 pp and trails the standard DBs by only ~11–12 pp — when the expected organisms are known, a tiny targeted DB is the cheapest route to high detection.
+
+### Per-pathogen detection by database (hac, clade % of all reads)
+
+Sample = 3 ESKAPE pathogens. Species-level shown; *(G nn)* = genus-level where it exceeds species.
+
+| Database | *P. aeruginosa* | *E. coli* | *K. pneumoniae* | host (human) | classified |
+|----------|----------------:|----------:|----------------:|-------------:|-----------:|
+| eskape_51mb (targeted) | 52.50 | 21.79 | 9.92 | — | 84.80 |
+| eskape_650mb | 65.28 | **0.00** | **0.00** | — | 65.28 |
+| eskape_human_4gb | 64.82 | **0.00** | **0.00** | 1.28 | 66.13 |
+| standard_8gb | 31.41 *(G 56.17)* | 14.45 | 4.52 *(G 9.13)* | 0.66 | 95.77 |
+| standard_16gb | 35.62 *(G 57.67)* | 16.54 | 5.50 *(G 9.56)* | 0.77 | 97.77 |
+
+- **eskape_650mb / eskape_human_4gb find ONLY P. aeruginosa** — zero E. coli, zero K. pneumoniae (those reads go unclassified); they act as Pseudomonas-only DBs and over-call P. aeruginosa (65% vs the targeted DB's 52.5%)
+- **Standard DBs detect all 3 but dilute species calls** — high classified% (95–98%) yet only ~50–58% pins to the 3 exact species; LCA ambiguity pushes ~25 pp of *Pseudomonas* up to genus level
+- **Host/human reads appear only in human-containing DBs** (eskape_human_4gb, standard_8/16gb); the two pure-ESKAPE DBs leave host reads unclassified
+- **Targeted 51 MB DB is the cleanest** — 84% pinned directly to the 3 species (species% = genus%), no spread
 
 ---

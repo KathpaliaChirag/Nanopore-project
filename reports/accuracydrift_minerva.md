@@ -1,5 +1,8 @@
 # AccuracyDrift — Minerva Results
 
+> ⚠️ **RESULTS NOT VALID — DO NOT USE FOR CONCLUSIONS.**
+> During these runs the Minerva server was already fully occupied by other users' processes, causing heavy CPU contention and a high rate of context switching. Timings, speedups, IPC, and cache/LLC miss rates are therefore unreliable and may not reflect AccuracyDrift's true behaviour. The whole sweep must be re-run on an idle (or properly isolated) Minerva before any of these numbers are trusted. Classified%/Unclassified% values are unaffected (deterministic), but all performance metrics below are suspect.
+
 **Date:** 2026-06-09
 **Machine:** Minerva — Intel Xeon Gold 6330 @ 2.0 GHz, 112 threads (2-socket, 56c each), 251 GB RAM, ~42 MB L3 per socket
 **Databases:** eskape_650mb (142 MB), eskape_human_4gb (3.8 GB), standard_8gb (7.6 GB), standard_16gb (15 GB)
@@ -231,6 +234,8 @@
 
 ### F1 — Thread scaling is governed entirely by LLC miss rate
 
+> ⚠️ **Suspect.** Speedup figures are timing-derived and were measured on a contended server; thread-scaling ratios may be distorted by competing processes. Re-run idle before trusting the scaling conclusions.
+
 | DB | LLC Miss% (1T, hac) | Speedup at 16T (hac) |
 |----|--------------------:|---------------------:|
 | eskape_650mb | 68.58 | 13.97x |
@@ -245,6 +250,8 @@
 ---
 
 ### F2 — Minerva is ~10x slower than Luna for cache-sensitive workloads
+
+> ⚠️ **Comparison unreliable.** The Minerva timings below were collected while the server was loaded by other users' processes (heavy context switching), so the Luna-vs-Minerva gap is inflated by contention, not just cache size. Do not quote the "~10x slower" figure until Minerva is re-run idle.
 
 | Machine | LLC Miss% (hac, eskape_650mb, 1T) | Time 1T (s) |
 |---------|----------------------------------:|------------:|

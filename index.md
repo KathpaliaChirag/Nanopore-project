@@ -60,7 +60,7 @@ Update this every time a new major topic is pushed.
 - 2026-05-28
 - 2026-05-29
 
-**reports/accuracydrift_minerva.md** → AccuracyDrift experiment on Minerva (2026-06-09)
+**reports/accuracydrift_minerva.md** → AccuracyDrift experiment on Minerva (2026-06-09) — ⚠️ INVALID: server was loaded by other processes (heavy context switching); performance metrics unreliable, needs re-run
 - 4 DBs × 3 read types × 5 thread counts × 3 runs = 180 runs; all values are 3-run averages
 - eskape_650mb scales near-linearly to 16T (13.56×); eskape_human_4gb degrades (8.39×) due to diverse k-mer LLC pressure
 - Classified% constant across threads — thread count has zero effect on classification accuracy
@@ -70,9 +70,10 @@ Update this every time a new major topic is pushed.
 **reports/accuracydrift_dell_optiplex.md** → AccuracyDrift experiment on Dell OptiPlex 5090 (2026-06-12)
 - Same 180-run matrix on i7-11700 (8c/16t, 16 MB L3); all values are 3-run averages
 - Scaling capped at 8 physical cores — best case eskape_650mb 8.11× (hac 16T); HT only helps latency-bound small DBs
-- ~10-13× faster than Minerva at 1T (4.9 GHz boost + Rocket Lake IPC; Minerva is a loaded shared server)
+- ~10-13× faster than Minerva at 1T (4.9 GHz boost + Rocket Lake IPC) — ⚠️ Minerva timing INVALID (loaded server); gap inflated by contention, re-run needed
 - Classified% identical to Minerva — accuracy is hardware-independent; standard_8gb remains the sweet spot
 - IPC governed by access pattern not miss rate: standard_8gb highest IPC (2.17) despite 63% miss; eskape_human_4gb worst (1.20); IPC drops 15-29% at 16T from HT
+- NEW: custom **eskape_51mb** DB (3 sample genomes: P. aeruginosa PAO1, E. coli MG1655, K. pneumoniae HS11286) classifies 84.80%/85.40% (hac/sup) — ~20 pp above general ESKAPE DBs at 51 MB; includes cross-DB detection table (§ "ESKAPE 51MB database", F7)
 
 **reports/phase1_dummytesting_dorado_kraken2.md** → Phase 1/2a complete run data (Phases 1a–2a)
 - Full tables and verdicts for Dorado fast/HAC GPU profiling + Kraken2 gprof
