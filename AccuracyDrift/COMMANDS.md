@@ -625,6 +625,103 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 
 ---
 
+## Per-Pod5 Kraken2 Runs — All 3 Models × 2 Databases (Luna, 2026-06-22)
+
+### Goal
+
+Previous AccuracyDrift runs used a single merged fastq (~104k reads from one pod5 file). This experiment runs Kraken2 on each of the 16 FBE pod5 files individually, for all 3 basecalling models (fast/hac/sup), against 2 databases (sample_targeted 50MB and pluspf_103gb 103GB). This gives:
+
+- Per-file classification results — can track how classification accuracy and cache behaviour change across the sequencing run (files 0→15 represent chronological order; file 15 has fewer reads as the run was ending)
+- A ground-truth pluspf classification per read for every file, which will be used to build an optimised sample-specific ESKAPE database
+- 96 independent perf stat measurements (cache-misses, cache-references, LLC-loads, LLC-load-misses, instructions, cycles) for single-threaded kraken2 behaviour analysis
+
+### Output structure
+
+```
+~/data/kraken_runs/
+├── fast/  hac/  sup/
+│   └── 0..15/
+│       ├── sample_targeted/
+│       │   ├── output.txt   — per-read: C/U, read_id, taxid, length, kmer_hits
+│       │   ├── report.txt   — species summary (classified %)
+│       │   └── perf.txt     — perf stat stderr output
+│       └── pluspf_103gb/
+│           ├── output.txt
+│           ├── report.txt
+│           └── perf.txt
+```
+
+Folder number (0–15) maps to the last digit(s) of the pod5 filename: `FBE01990_24778b97_03e50f91_<N>.pod5`.
+
+### Setup — create all 96 folders
+
+```bash
+for model in fast hac sup; do
+  for i in $(seq 0 15); do
+    mkdir -p ~/data/kraken_runs/$model/$i/sample_targeted
+    mkdir -p ~/data/kraken_runs/$model/$i/pluspf_103gb
+  done
+done
+```
+
+### Run command (inside tmux session)
+
+```bash
+tmux new -s kraken_runs
+
+for model in fast hac sup; do
+  for i in $(seq 0 15); do
+    fastq=~/data/basecalled/$model/FBE01990_24778b97_03e50f91_${i}.fastq
+
+    echo ">>> [$model/$i/sample_targeted] starting..."
+    start=$SECONDS
+    perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+      numactl --cpunodebind=0 --membind=0 \
+      kraken2 --db ~/AccuracyDrift/databases/sample_targeted \
+      --threads 1 \
+      --output ~/data/kraken_runs/$model/$i/sample_targeted/output.txt \
+      --report  ~/data/kraken_runs/$model/$i/sample_targeted/report.txt \
+      $fastq 2> ~/data/kraken_runs/$model/$i/sample_targeted/perf.txt
+    echo "<<< [$model/$i/sample_targeted] done in $(($SECONDS - start))s"
+
+    echo ">>> [$model/$i/pluspf_103gb] starting..."
+    start=$SECONDS
+    perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+      numactl --cpunodebind=0 --membind=0 \
+      kraken2 --db ~/AccuracyDrift/databases/pluspf_103gb \
+      --threads 1 \
+      --output ~/data/kraken_runs/$model/$i/pluspf_103gb/output.txt \
+      --report  ~/data/kraken_runs/$model/$i/pluspf_103gb/report.txt \
+      $fastq 2> ~/data/kraken_runs/$model/$i/pluspf_103gb/perf.txt
+    echo "<<< [$model/$i/pluspf_103gb] done in $(($SECONDS - start))s"
+
+  done
+done
+echo "=== ALL 96 RUNS COMPLETE ==="
+```
+
+**Key flags:**
+- `--threads 1` — single-threaded to get clean per-read perf data (multi-thread masks individual access patterns)
+- `numactl --cpunodebind=0 --membind=0` — pins to socket 0; Luna is dual-socket (Xeon Platinum 8468 × 2) so without this the OS can schedule across sockets, inflating memory latency via QPI interconnect
+- `2> perf.txt` — perf stat writes to stderr; redirecting captures it separately from kraken2's stdout
+
+**Progress check:**
+```bash
+find ~/data/kraken_runs -name "perf.txt" | wc -l   # X/96 complete
+
+for model in fast hac sup; do
+  count=$(find ~/data/kraken_runs/$model -name "perf.txt" | wc -l)
+  echo "$model: $count/32 done"
+done
+```
+
+**Timing (observed on Luna dual L40S, pluspf warm/page-cached):**
+- sample_targeted at 1T: ~23–28s per file (~120–155k reads)
+- pluspf_103gb at 1T: ~107–114s per file (~120–155k reads)
+- Total per file pair: ~135s → ~36 min per model → **~1h 48min total for all 96 runs**
+
+---
+
 ## Missing from this log
 
 The following runs were completed but not individually logged here. All results (3-run averages per thread count) are in RESULTS.md.

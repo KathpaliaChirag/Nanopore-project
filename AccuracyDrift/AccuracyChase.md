@@ -106,8 +106,10 @@ Key findings:
 - [x] Fresh basecalling — all 16 FBE pod5 files, FAST model (2026-06-22)
 - [x] Fresh basecalling — all 16 FBE pod5 files, HAC model (2026-06-22)
 - [x] Fresh basecalling — all 16 FBE pod5 files, SUP model (2026-06-22)
+- [ ] Per-pod5 Kraken2 runs — all 3 models × 16 files × 2 DBs (96 runs total, in progress 2026-06-22) — see COMMANDS.md for full command
 - [ ] Warm run for all three read models (103 GB should be page-cached in Luna's 503 GB RAM after cold runs; expect ~10–15s wall at 32T vs ~57s cold)
 - [ ] Thread scaling for pluspf_103gb: 1T, 8T, 16T, 32T (done), 64T, 96T — to characterize Amdahl+DRAM behavior at 103 GB scale
+- [ ] Build optimised sample-specific ESKAPE database using pluspf per-pod5 output as ground truth
 
 ---
 
