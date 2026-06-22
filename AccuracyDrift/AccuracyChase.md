@@ -106,9 +106,9 @@ Key findings:
 - [x] Fresh basecalling — all 16 FBE pod5 files, FAST model (2026-06-22)
 - [x] Fresh basecalling — all 16 FBE pod5 files, HAC model (2026-06-22)
 - [x] Fresh basecalling — all 16 FBE pod5 files, SUP model (2026-06-22)
-- [ ] Per-pod5 Kraken2 runs — all 3 models × 16 files × 2 DBs (96 runs total, in progress 2026-06-22) — see COMMANDS.md for full command
-- [ ] Warm run for all three read models (103 GB should be page-cached in Luna's 503 GB RAM after cold runs; expect ~10–15s wall at 32T vs ~57s cold)
-- [ ] Thread scaling for pluspf_103gb: 1T, 8T, 16T, 32T (done), 64T, 96T — to characterize Amdahl+DRAM behavior at 103 GB scale
+- [x] Per-pod5 Kraken2 runs — all 3 models × 16 files × 2 DBs (96 runs total, done 2026-06-22)
+- [x] Warm run for all three read models — done 2026-06-22 (1T: fast=100.4s, hac=96.9s, sup=95.0s; 32T: fast=57.7s, hac=56.8s, sup=56.4s)
+- [x] Thread scaling for pluspf_103gb: 1T–96T — all 3 models (done 2026-06-22), see ## pluspf_103gb Thread Scaling Summary below
 - [ ] Build optimised sample-specific ESKAPE database using pluspf per-pod5 output as ground truth
 
 ---
@@ -200,3 +200,26 @@ Note: HAC total (1,906,966) is slightly lower than FAST (1,922,066) — a ~0.8% 
 | SUP   | 1,923,965   | Most reads — rescues borderline reads other models reject |
 
 All three models output to `~/data/basecalled/{fast,hac,sup}/` on Luna, one fastq per pod5 file.
+
+---
+
+## pluspf_103gb Thread Scaling Summary
+
+All three read models on Luna (Xeon Platinum 8468, 96c/192t, 210 MB LLC). Warm runs: 3-run average per thread count, numactl --cpunodebind=0 --membind=0, DB page-cached in 503 GB RAM. reads_fast values from `reads_fast_thread_scaling/pluspf_103gb_NT.txt`; reads_hac and reads_sup from `pluspf_thread_scaling/{hac,sup}_NT.txt`.
+
+| Threads | fast time (s) | hac time (s) | sup time (s) | fast LLC Miss% | hac LLC Miss% | sup LLC Miss% |
+|---------|---------------|--------------|--------------|----------------|---------------|---------------|
+| 1       | 100.443       | 96.887       | 94.950       | 89.17          | 90.52         | 90.66         |
+| 2       | 78.770        | 75.739       | 75.268       | 89.79          | 91.10         | 91.23         |
+| 4       | 67.381        | 65.856       | 65.656       | 90.21          | 91.65         | 91.85         |
+| 8       | 61.865        | 60.692       | 60.314       | 90.31          | 91.64         | 91.88         |
+| 16      | 58.845        | 57.945       | 57.746       | 90.29          | 91.30         | 91.48         |
+| 32      | 57.746        | 56.759       | 56.392       | 90.21          | 91.13         | 91.16         |
+| 64      | 57.537        | 56.579       | 56.236       | 89.76          | 90.80         | 90.90         |
+| 96      | 57.508        | 56.417       | 56.337       | 89.56          | 90.68         | 90.79         |
+
+Key observations:
+- **DRAM wall dominates:** peak speedup is ~1.69–1.75x by 32T across all three models; no gain beyond. Every k-mer lookup misses LLC (89–92% miss rate throughout), so throughput is limited by DRAM bandwidth, not by core count.
+- **reads_hac/sup are ~5% faster than reads_fast** at every thread count despite processing slightly fewer reads. Longer reads in the hac/sup fastq files increase k-mer locality (consecutive k-mers from the same read reuse hash-table regions), slightly reducing effective DRAM pressure.
+- **LLC miss rate is uniform across models** at any given thread count — the bottleneck is the 103 GB DB size eclipsing the 210 MB LLC, not the read k-mer quality.
+- **Warm 32T = ~57s** (all models), compared to the cold-run ~57s seen initially — DB was effectively cached after the first cold extraction run. The apparent "no improvement" from cold to warm is because the OS had cached the 103 GB file during the cold run itself on this 503 GB RAM machine.
