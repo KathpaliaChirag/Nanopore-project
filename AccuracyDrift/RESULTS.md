@@ -262,18 +262,20 @@ Peak speedup ~1.72x at 96T. LLC miss rate >90% across all thread counts: 103 GB 
 
 #### reads_fast — sample_targeted
 
-Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB.
+Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB. Warm runs (3-run average, numactl --cpunodebind=0 --membind=0).
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 2  | - | - | - | - | - | - | - |
-| 4  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
-| 16 | - | - | - | - | - | - | - |
-| 32 | - | - | - | - | - | - | - |
-| 64 | - | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - | - |
+| 1  | 80.94 | 19.06 | 5.86  | 9.77  | 19.563 | 1.00x  | 1.68 |
+| 2  | 80.94 | 19.06 | 5.98  | 9.87  | 9.902  | 1.98x  | 1.67 |
+| 4  | 80.94 | 19.06 | 6.95  | 10.50 | 5.018  | 3.90x  | 1.67 |
+| 8  | 80.94 | 19.06 | 8.96  | 11.80 | 2.585  | 7.57x  | 1.65 |
+| 16 | 80.94 | 19.06 | 10.87 | 12.97 | 1.406  | 13.91x | 1.62 |
+| 32 | 80.94 | 19.06 | 12.47 | 13.82 | 0.904  | 21.64x | 1.56 |
+| 64 | 80.94 | 19.06 | 14.14 | 14.53 | 0.923  | 21.20x | 1.31 |
+| 96 | 80.94 | 19.06 | 14.98 | 14.96 | 1.107  | 17.67x | 1.27 |
+
+reads_fast classified% = 80.94% vs reads_hac 84.80% — lower-quality basecalling k-mers fail to match even this targeted 6-genome DB. Pre-cliff behaviour intact: LLC miss rate stays 9–15%, peak speedup 21.64x at 32T.
 
 #### reads_fast — eskape_650mb
 
@@ -303,29 +305,37 @@ Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB.
 
 #### reads_fast — standard_8gb
 
+Warm runs (3-run average, numactl --cpunodebind=0 --membind=0).
+
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 2  | - | - | - | - | - | - | - |
-| 4  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
-| 16 | - | - | - | - | - | - | - |
-| 32 | - | - | - | - | - | - | - |
-| 64 | - | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - | - |
+| 1  | 82.66 | 17.34 | 79.11 | 80.17 | 16.838 | 1.00x | 1.94 |
+| 2  | 82.66 | 17.34 | 79.40 | 80.77 | 10.669 | 1.58x | 1.93 |
+| 4  | 82.66 | 17.34 | 80.04 | 82.04 | 7.575  | 2.22x | 1.91 |
+| 8  | 82.66 | 17.34 | 83.30 | 83.86 | 6.074  | 2.77x | 1.88 |
+| 16 | 82.66 | 17.34 | 87.58 | 84.00 | 5.326  | 3.16x | 1.82 |
+| 32 | 82.66 | 17.34 | 88.77 | 83.62 | 5.080  | 3.31x | 1.69 |
+| 64 | 82.66 | 17.34 | 87.68 | 83.31 | 5.246  | 3.21x | 1.43 |
+| 96 | 82.66 | 17.34 | 87.17 | 83.86 | 5.335  | 3.16x | 1.40 |
+
+reads_fast classified% = 82.66% vs reads_hac 95.77% on standard_8gb — significant accuracy drop for fast model. Amdahl-limited: peak speedup 3.31x at 32T (matches hac/sup pattern). LLC miss rate 80–84% throughout.
 
 #### reads_fast — standard_16gb
 
+Warm runs (3-run average, numactl --cpunodebind=0 --membind=0). Note: 1T run 1 was a cold-start outlier (35.58s vs ~23.8s for runs 2–3; LLC miss rate 29% vs 83%+ for runs 2–3 due to DB loading filling cache during run 1). 3-run average includes the cold outlier; speedup column uses the 3-run average 1T time (27.719s).
+
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 2  | - | - | - | - | - | - | - |
-| 4  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
-| 16 | - | - | - | - | - | - | - |
-| 32 | - | - | - | - | - | - | - |
-| 64 | - | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - | - |
+| 1  | 90.44 | 9.56 | 76.16 | 65.11 | 27.719† | 1.00x | 1.69 |
+| 2  | 90.44 | 9.56 | 84.00 | 83.95 | 15.754  | 1.76x | 1.64 |
+| 4  | 90.44 | 9.56 | 84.80 | 85.78 | 11.754  | 2.36x | 1.61 |
+| 8  | 90.44 | 9.56 | 88.25 | 87.34 | 9.711   | 2.85x | 1.58 |
+| 16 | 90.44 | 9.56 | 90.92 | 86.86 | 8.715   | 3.18x | 1.56 |
+| 32 | 90.44 | 9.56 | 91.27 | 86.28 | 8.319   | 3.33x | 1.49 |
+| 64 | 90.44 | 9.56 | 90.45 | 86.36 | 8.421   | 3.29x | 1.27 |
+| 96 | 90.44 | 9.56 | 89.93 | 86.48 | 8.570   | 3.23x | 1.25 |
+
+†3-run avg skewed by cold run 1 (35.58s). Warm-only (runs 2+3) avg = 23.791s; warm-only speedup at 32T ≈ 2.86x. reads_fast classified% = 90.44% vs reads_hac 97.77% — meaningful accuracy gap at standard_16gb scale.
 
 #### reads_fast — pluspf_103gb
 
