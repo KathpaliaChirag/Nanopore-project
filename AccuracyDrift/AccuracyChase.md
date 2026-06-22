@@ -105,9 +105,7 @@ Key findings:
 - [x] reads_sup × pluspf_103gb × 32T cold run (Luna)
 - [x] Fresh basecalling — all 16 FBE pod5 files, FAST model (2026-06-22)
 - [x] Fresh basecalling — all 16 FBE pod5 files, HAC model (2026-06-22)
-
-**Pending:**
-- [ ] Fresh basecalling — SUP model on all 16 FBE pod5 files
+- [x] Fresh basecalling — all 16 FBE pod5 files, SUP model (2026-06-22)
 - [ ] Warm run for all three read models (103 GB should be page-cached in Luna's 503 GB RAM after cold runs; expect ~10–15s wall at 32T vs ~57s cold)
 - [ ] Thread scaling for pluspf_103gb: 1T, 8T, 16T, 32T (done), 64T, 96T — to characterize Amdahl+DRAM behavior at 103 GB scale
 
@@ -169,4 +167,34 @@ Note: `_15.pod5` has significantly fewer reads (31,190 vs ~100–155k for others
 
 Note: HAC total (1,906,966) is slightly lower than FAST (1,922,066) — a ~0.8% difference due to model-specific quality filtering behaviour in v5.2.0, not a data issue. Individual file sizes are within 1% of FAST equivalents.
 
-SUP model run pending.
+### Per-file read counts (SUP model)
+
+| Pod5 file | Reads |
+|-----------|-------|
+| FBE01990_24778b97_03e50f91_0.pod5  | 135,886 |
+| FBE01990_24778b97_03e50f91_1.pod5  | 145,195 |
+| FBE01990_24778b97_03e50f91_2.pod5  | 155,793 |
+| FBE01990_24778b97_03e50f91_3.pod5  | 145,246 |
+| FBE01990_24778b97_03e50f91_4.pod5  | 135,445 |
+| FBE01990_24778b97_03e50f91_5.pod5  | 133,923 |
+| FBE01990_24778b97_03e50f91_6.pod5  | 124,215 |
+| FBE01990_24778b97_03e50f91_7.pod5  | 122,515 |
+| FBE01990_24778b97_03e50f91_8.pod5  | 126,070 |
+| FBE01990_24778b97_03e50f91_9.pod5  | 112,753 |
+| FBE01990_24778b97_03e50f91_10.pod5 | 107,733 |
+| FBE01990_24778b97_03e50f91_11.pod5 | 126,607 |
+| FBE01990_24778b97_03e50f91_12.pod5 | 111,962 |
+| FBE01990_24778b97_03e50f91_13.pod5 | 109,741 |
+| FBE01990_24778b97_03e50f91_14.pod5 |  99,686 |
+| FBE01990_24778b97_03e50f91_15.pod5 |  31,195 |
+| **Total** | **1,923,965** |
+
+### Cross-model summary (all 16 FBE pod5 files, 2026-06-22)
+
+| Model | Total reads | Notes |
+|-------|-------------|-------|
+| FAST  | 1,922,066   | Highest throughput model |
+| HAC   | 1,906,966   | ~15k fewer than FAST — model-specific quality filtering in v5.2.0 |
+| SUP   | 1,923,965   | Most reads — rescues borderline reads other models reject |
+
+All three models output to `~/data/basecalled/{fast,hac,sup}/` on Luna, one fastq per pod5 file.
