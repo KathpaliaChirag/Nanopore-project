@@ -243,18 +243,20 @@ Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. p
 
 #### reads_hac — pluspf_103gb
 
-PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.k2d = 103.4 GB. All runs cold (first access post-extraction); sys time ≈ wall time — 103 GB paged from disk. Warm repeats pending.
+PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.k2d = 103.4 GB. Warm runs (3-run average per thread count, numactl --cpunodebind=0 --membind=0, DB page-cached).
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
-| 16 | - | - | - | - | - | - | - |
-| 32 | 98.86 | 1.14 | 94.18 | 91.07 | 57.17† | - | 0.97 |
-| 64 | - | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - | - |
+| 1  | 98.86 | 1.14 | 92.11 | 90.52 | 96.887 | 1.00x | 1.00 |
+| 2  | 98.86 | 1.14 | 92.39 | 91.10 | 75.739 | 1.28x | 1.00 |
+| 4  | 98.86 | 1.14 | 92.92 | 91.65 | 65.856 | 1.47x | 0.99 |
+| 8  | 98.86 | 1.14 | 93.89 | 91.64 | 60.692 | 1.60x | 0.99 |
+| 16 | 98.86 | 1.14 | 94.35 | 91.30 | 57.945 | 1.67x | 0.99 |
+| 32 | 98.86 | 1.14 | 94.31 | 91.13 | 56.759 | 1.71x | 0.97 |
+| 64 | 98.86 | 1.14 | 94.07 | 90.80 | 56.579 | 1.71x | 0.93 |
+| 96 | 98.86 | 1.14 | 93.89 | 90.68 | 56.417 | 1.72x | 0.90 |
 
-†Cold run. sys=55.95s ≈ wall=57.17s — nearly all time was disk I/O paging 103 GB. Wall time not comparable to warm runs of smaller DBs. Warm repeat will give true classification speed (~10–15s expected at 32T from page cache).
+Peak speedup ~1.72x at 96T. LLC miss rate >90% across all thread counts: 103 GB DB far exceeds LLC (210 MB), every k-mer lookup hits DRAM. Adding threads gains DRAM bandwidth but diminishing returns plateau beyond 32T.
 
 ---
 
@@ -327,17 +329,20 @@ Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB.
 
 #### reads_fast — pluspf_103gb
 
-PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.k2d = 103.4 GB. Cold run only (32T).
+PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.k2d = 103.4 GB. Warm runs (3-run average per thread count, numactl --cpunodebind=0 --membind=0, DB page-cached).
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
-| 32 | 96.79 | 3.21 | 93.79 | 90.11 | 57.75† | - | 0.90 |
-| 64 | - | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - | - |
+| 1  | 96.79 | 3.21 | 90.61 | 89.17 | 100.443 | 1.00x | 0.94 |
+| 2  | 96.79 | 3.21 | 91.01 | 89.79 | 78.770  | 1.28x | 0.93 |
+| 4  | 96.79 | 3.21 | 92.12 | 90.21 | 67.381  | 1.49x | 0.93 |
+| 8  | 96.79 | 3.21 | 93.51 | 90.31 | 61.865  | 1.62x | 0.92 |
+| 16 | 96.79 | 3.21 | 93.95 | 90.29 | 58.845  | 1.71x | 0.92 |
+| 32 | 96.79 | 3.21 | 93.96 | 90.21 | 57.746  | 1.74x | 0.90 |
+| 64 | 96.79 | 3.21 | 93.73 | 89.76 | 57.537  | 1.75x | 0.85 |
+| 96 | 96.79 | 3.21 | 93.44 | 89.56 | 57.508  | 1.75x | 0.81 |
 
-†Cold run. sys=56.04s ≈ wall=57.75s.
+Peak speedup ~1.75x at 64–96T. LLC miss rate ~90% throughout — same DRAM saturation pattern as reads_hac/sup. reads_fast classified% (96.79%) is ~2 pp lower than reads_sup (99.24%), consistent with lower basecalling quality.
 
 #### reads_sup — eskape_650mb
 
@@ -410,17 +415,20 @@ Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB.
 
 #### reads_sup — pluspf_103gb
 
-PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.k2d = 103.4 GB. Cold run only (32T).
+PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.k2d = 103.4 GB. Warm runs (3-run average per thread count, numactl --cpunodebind=0 --membind=0, DB page-cached).
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
-| 32 | 99.24 | 0.76 | 94.16 | 91.21 | 57.00† | - | 1.00 |
-| 64 | - | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - | - |
+| 1  | 99.24 | 0.76 | 92.30 | 90.66 | 94.950 | 1.00x | 1.03 |
+| 2  | 99.24 | 0.76 | 92.60 | 91.23 | 75.268 | 1.26x | 1.03 |
+| 4  | 99.24 | 0.76 | 93.10 | 91.85 | 65.656 | 1.45x | 1.01 |
+| 8  | 99.24 | 0.76 | 94.06 | 91.88 | 60.314 | 1.57x | 1.01 |
+| 16 | 99.24 | 0.76 | 94.49 | 91.48 | 57.746 | 1.64x | 1.01 |
+| 32 | 99.24 | 0.76 | 94.21 | 91.16 | 56.392 | 1.68x | 1.01 |
+| 64 | 99.24 | 0.76 | 94.19 | 90.90 | 56.236 | 1.69x | 0.96 |
+| 96 | 99.24 | 0.76 | 94.01 | 90.79 | 56.337 | 1.69x | 0.92 |
 
-†Cold run. sys=55.89s ≈ wall=57.00s.
+Peak speedup ~1.69x at 64T. Same DRAM saturation pattern as reads_hac. reads_sup classifies 99.24% vs 98.86% for reads_hac — marginal accuracy gain from superior basecalling.
 
 Note (eskape_human_4gb): run 2 = 34.471s vs runs 1+3 = 29.675s/29.736s — system load spike on shared Luna machine. LLC miss rates were identical across all 3 runs (55.83/55.85/55.88%), confirming no cache effect. Average of all 3 runs = 31.294s.
 
