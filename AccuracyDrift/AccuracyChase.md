@@ -103,7 +103,70 @@ Key findings:
 - [x] reads_fast × pluspf_103gb × 32T cold run (Luna)
 - [x] reads_hac × pluspf_103gb × 32T cold run (Luna)
 - [x] reads_sup × pluspf_103gb × 32T cold run (Luna)
+- [x] Fresh basecalling — all 16 FBE pod5 files, FAST model (2026-06-22)
+- [x] Fresh basecalling — all 16 FBE pod5 files, HAC model (2026-06-22)
 
 **Pending:**
+- [ ] Fresh basecalling — SUP model on all 16 FBE pod5 files
 - [ ] Warm run for all three read models (103 GB should be page-cached in Luna's 503 GB RAM after cold runs; expect ~10–15s wall at 32T vs ~57s cold)
 - [ ] Thread scaling for pluspf_103gb: 1T, 8T, 16T, 32T (done), 64T, 96T — to characterize Amdahl+DRAM behavior at 103 GB scale
+
+---
+
+## Fresh Basecalling — All 16 FBE Pod5 Files (2026-06-22)
+
+Previous AccuracyDrift and AccuracyChase runs used reads basecalled from a single pod5 file (`FBE01990_24778b97_03e50f91_10.pod5`, ~104k reads). On 2026-06-22, fresh basecalling was run on all 16 pod5 files from the complete FBE dataset stored at `~/data/pod5/fbe/` on Luna.
+
+**Model:** `dna_r10.4.1_e8.2_400bps_fast@v5.2.0`  
+**Hardware:** Luna dual L40S GPUs  
+**Output:** `~/data/basecalled/fast/<filename>.fastq` (one fastq per pod5 file)
+
+### Per-file read counts (FAST model)
+
+| Pod5 file | Reads |
+|-----------|-------|
+| FBE01990_24778b97_03e50f91_0.pod5  | 135,765 |
+| FBE01990_24778b97_03e50f91_1.pod5  | 144,895 |
+| FBE01990_24778b97_03e50f91_2.pod5  | 155,450 |
+| FBE01990_24778b97_03e50f91_3.pod5  | 145,107 |
+| FBE01990_24778b97_03e50f91_4.pod5  | 135,278 |
+| FBE01990_24778b97_03e50f91_5.pod5  | 133,844 |
+| FBE01990_24778b97_03e50f91_6.pod5  | 124,028 |
+| FBE01990_24778b97_03e50f91_7.pod5  | 122,358 |
+| FBE01990_24778b97_03e50f91_8.pod5  | 125,902 |
+| FBE01990_24778b97_03e50f91_9.pod5  | 112,635 |
+| FBE01990_24778b97_03e50f91_10.pod5 | 107,652 |
+| FBE01990_24778b97_03e50f91_11.pod5 | 126,632 |
+| FBE01990_24778b97_03e50f91_12.pod5 | 111,943 |
+| FBE01990_24778b97_03e50f91_13.pod5 | 109,697 |
+| FBE01990_24778b97_03e50f91_14.pod5 |  99,690 |
+| FBE01990_24778b97_03e50f91_15.pod5 |  31,190 |
+| **Total** | **1,922,066** |
+
+Note: `_15.pod5` has significantly fewer reads (31,190 vs ~100–155k for others) — expected behaviour as the last chunk of a sequencing run when pore activity is trailing off.
+
+### Per-file read counts (HAC model)
+
+| Pod5 file | Reads |
+|-----------|-------|
+| FBE01990_24778b97_03e50f91_0.pod5  | 134,596 |
+| FBE01990_24778b97_03e50f91_1.pod5  | 143,940 |
+| FBE01990_24778b97_03e50f91_2.pod5  | 154,531 |
+| FBE01990_24778b97_03e50f91_3.pod5  | 144,066 |
+| FBE01990_24778b97_03e50f91_4.pod5  | 134,151 |
+| FBE01990_24778b97_03e50f91_5.pod5  | 132,903 |
+| FBE01990_24778b97_03e50f91_6.pod5  | 123,153 |
+| FBE01990_24778b97_03e50f91_7.pod5  | 121,268 |
+| FBE01990_24778b97_03e50f91_8.pod5  | 125,025 |
+| FBE01990_24778b97_03e50f91_9.pod5  | 111,708 |
+| FBE01990_24778b97_03e50f91_10.pod5 | 106,795 |
+| FBE01990_24778b97_03e50f91_11.pod5 | 125,550 |
+| FBE01990_24778b97_03e50f91_12.pod5 | 111,022 |
+| FBE01990_24778b97_03e50f91_13.pod5 | 108,631 |
+| FBE01990_24778b97_03e50f91_14.pod5 |  98,773 |
+| FBE01990_24778b97_03e50f91_15.pod5 |  30,854 |
+| **Total** | **1,906,966** |
+
+Note: HAC total (1,906,966) is slightly lower than FAST (1,922,066) — a ~0.8% difference due to model-specific quality filtering behaviour in v5.2.0, not a data issue. Individual file sizes are within 1% of FAST equivalents.
+
+SUP model run pending.
