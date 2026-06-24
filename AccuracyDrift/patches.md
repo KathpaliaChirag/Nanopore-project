@@ -194,11 +194,66 @@ For pluspf_103gb, even with 2 MB pages the STLB still overflows (52K pages vs 2K
 
 ---
 
-## M3–M7 status
+## M3 — perf record LLC-load-misses (2026-06-24, Luna, standard_8gb)
+
+**Command:**
+```bash
+numactl --cpunodebind=0 --membind=0 \
+  perf record -e LLC-load-misses \
+  -o ~/results/profiling/pending/m3_perf.data \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb --threads 32 \
+  --output /dev/null --report /dev/null \
+  ~/results/basecalling/reads_hac.fastq 2>/dev/null
+
+perf report --stdio \
+  -i ~/results/profiling/pending/m3_perf.data \
+  2>/dev/null | head -40 | tee ~/results/profiling/pending/m3_report.txt
+```
+
+**Results (48K samples, ~101M LLC-load-misses total):**
+
+| % | Binary | Symbol | Type |
+|---|---|---|---|
+| 40.14% | [kernel] | 0xffffffffb3247ff8 (+ cluster) | Hardware page table walker |
+| 26.69% | [kernel] | 0xffffffffb3e00ba0 | copy_page_to_iter (FASTQ I/O) |
+| 6.27% | libc.so.6 | __memmove_avx512_unaligned_erms | FASTQ data copy |
+| **5.84%** | classify | **kraken2::CompactHashTable::Get()** | Hash table direct miss |
+| 5.64% | classify | std::unordered_map::operator[] | Taxonomy report map |
+| 5.14% | libc.so.6 | __memchr_evex | FASTQ scanning |
+| 0.09% | classify | kraken2::MinimizerScanner::NextMinimizer() | Zero LLC — pure compute |
+
+**Key finding: 66.83% of LLC misses are in kernel space, but the root cause is still CompactHashTable::Get().**
+
+cachegrind attributed 96.24% to `Get()` while perf shows only 5.84%. Both are correct — they measure different things:
+
+- cachegrind asks "which user-space instruction triggered the miss?" → `Get()` wins
+- perf samples "where is the CPU executing when the miss is detected?" → includes kernel page walk code that runs *because* `Get()` caused a TLB miss
+
+The causal chain: `CompactHashTable::Get()` → TLB miss → kernel page table walker → walker reads PTE from RAM → PTE read misses LLC → perf samples the kernel page walk code, not `Get()`.
+
+**LLC miss ownership by root cause:**
+
+| Source | % | Root cause | Addressed by |
+|---|---|---|---|
+| Kernel page walker cluster | 40.14% | TLB miss from hash table → 4-level page walk | Patch 2 (2 MB pages → 3-level walk, page table fits LLC) |
+| FASTQ kernel I/O path | 26.69% | copy_page_to_iter copying FASTQ into userspace | Not in patch (would need mmap FASTQ in Kraken2 source) |
+| FASTQ libc memmove + memchr | ~11% | Scanning FASTQ bytes | Not in patch |
+| CompactHashTable::Get() direct | 5.84% | Hash table data miss | Patch 3 (prefetch) |
+| std::unordered_map report map | 5.64% | Taxonomy counting per classified read | Not addressed — separate opportunity |
+| MinimizerScanner | 0.09% | Pure compute, no LLC misses | Nothing needed |
+
+**Implication for Patch 2:** the 40.14% kernel page walk LLC overhead is caused by TLB misses on the hash table. Switching to 2 MB huge pages collapses the page table from 2M entries to 4K entries → page table fits in LLC → page walk PTE reads hit LLC instead of DRAM → that 40.14% drops significantly. This makes Patch 2 potentially more impactful than the modest 1–2% dTLB-miss-rate calculation suggested.
+
+**Surprise finding — `std::unordered_map::operator[]` at 5.64%:** This is the per-taxon ReadCounts map used for report generation (`std::unordered_map<uint64_t, ReadCounts<HyperLogLogPlusMinus>>`). Updated for every classified read; with thousands of distinct taxa encountered, map nodes scatter in heap memory and miss LLC. Not targeted by any of the 4 patches — worth flagging to Kolin sir as a separate optimization opportunity.
+
+**Decision for P3 (prefetch): confirmed Apply.** `CompactHashTable::Get()` is the user-space source of both the 5.84% direct LLC misses and the 40.14% kernel page walk overhead.
+
+---
+
+## M4–M7 status
 
 | Measurement | Status | What it decides |
 |---|---|---|
-| M3 — perf annotate CompactHashTable | **Pending** | Confirms exact load line causing LLC misses; validates prefetch target |
 | M4 — DRAM bandwidth (uncore IMC) | **Pending** | Latency-bound vs bandwidth-bound → if >70% peak BW, DB compression needed instead |
 | M5 — k-mer reuse rate | **Pending** | Validates Kolin sir's LRU cache ROI (P4); reuse >30% → apply, <10% → skip |
 | M6 — perf c2c false sharing | Low priority | Only needed if revisiting thread counts beyond 32T |
