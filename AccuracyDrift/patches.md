@@ -64,7 +64,7 @@ Each probe is a random access into the hash table → LLC miss → ~100–200 ns
 
 **PF_STRIDE = 16 for all databases** (4-byte cell → 64/4 = 16 cells per cache line). The patch uses `constexpr size_t PF_STRIDE = 64 / sizeof(Cell)` which computes this automatically. M1 confirms the formula is calibrated correctly for every database on this system.
 
-**sample_targeted uses 26+6 bit split, not 16+16.** With only 6 species + a small LCA tree, taxon IDs fit in 6 bits (max 63 unique IDs). The remaining 26 bits go to the key (fewer hash collisions in a small table). Large pre-built databases need 16 value bits to cover thousands of taxa — leaving only 16 bits for the key, which means slightly higher collision rates.
+**sample_targeted uses 26+6 bit split, not 16+16 — this is automatic, not something we set.** When `kraken2-build` runs, it counts unique taxon IDs in the taxonomy and sets `value_bits = minimum bits needed to represent them all`. For our 6-species custom DB (P. aeruginosa, E. coli, K. pneumoniae, E. faecium, S. aureus, E. cloacae + their LCA ancestors), the full hierarchy fits in 6 bits (max 63 unique internal IDs). The remaining 32−6 = 26 bits go to the key. For pre-built standard databases with thousands of NCBI taxa, 16 value bits (max 65,536 unique IDs) are needed, leaving only 16 bits for the key. More key bits = fewer spurious hash collisions in the compact table — so our small custom DB actually has better lookup precision than the large ones.
 
 **Decision for P3 (prefetch): Apply.** PF_STRIDE=16 confirmed for all databases. Load factor 0.70 means ~70% of lookups need a 2nd probe that benefits from the prefetch.
 
@@ -156,11 +156,41 @@ for DB_NAME in sample_targeted standard_8gb standard_16gb pluspf_103gb; do
 done 2>&1 | tee ~/results/profiling/pending/m2_all_dbs.txt
 ```
 
-**Expected pattern:**
-- `sample_targeted` (50 MB → 12,800 4KB pages): lower raw miss count, but still ~60% per hash access
-- `standard_8gb` (8 GB → 2M 4KB pages): measured 16.2M misses at 65%
-- `standard_16gb` (16 GB → 4M 4KB pages): ~2× more misses than standard_8gb
-- `pluspf_103gb` (103 GB → 27M 4KB pages): highest miss count, but run is warm (~10–15s)
+**Results across all databases (2026-06-24, reads_hac, 32T, warm DB):**
+
+| DB | dTLB-loads | dTLB-load-misses | Miss% | Cycles | Wall time |
+|---|---|---|---|---|---|
+| sample_targeted | 30.8B | 98.9M | **0.32%** | 66.3B | 0.93s |
+| standard_8gb | 30.3B | 16.8M | 0.06% | 61.0B | 4.76s |
+| standard_16gb | 37.8B | 31.6M | 0.08% | 83.6B | 8.18s |
+| pluspf_103gb | 78.4B | 192.3M | 0.25% | 398.8B | 58.75s |
+
+**Counterintuitive finding: sample_targeted has the highest miss% (0.32%) despite being the smallest DB.**
+
+The raw miss count for sample_targeted (98.9M) is 6× higher than standard_8gb (16.8M), even though the DB is 160× smaller. The reason is that the miss% is measured against total dTLB-loads, but cycles/miss reveals the real picture:
+
+```
+cycles per TLB miss:
+  sample_targeted : 66.3B / 98.9M = 670 cycles/miss   ← CPU is busy
+  standard_8gb    : 61.0B / 16.8M = 3,631 cycles/miss ← CPU is stalled on DRAM
+  standard_16gb   : 83.6B / 31.6M = 2,646 cycles/miss
+  pluspf_103gb    : 398.8B / 192.3M = 2,074 cycles/miss
+```
+
+sample_targeted's DB (50 MB) fits in LLC — no DRAM stalls for hash lookups. The CPU runs at full speed and spends active time scanning the 703 MB FASTQ file (MinimizerScanner). That FASTQ scanning generates 175,750 unique 4 KB pages which compete with the hash table's 12,800 pages in the 2,048-entry STLB, causing many TLB misses from FASTQ access, not the hash table.
+
+For standard_8gb, the CPU stalls ~90% of the time waiting for DRAM on hash table misses. Very few cycles are spent on FASTQ scanning, so FASTQ-related TLB misses barely appear in the total.
+
+**Patch 2 impact per database:**
+
+| DB | 4 KB pages | 2 MB pages | STLB fits? | TLB miss source | P2 benefit |
+|---|---|---|---|---|---|
+| sample_targeted | 12,800 | 25 | Yes (25 < 2048) | Mostly FASTQ, not hash | Low |
+| standard_8gb | 2,097,152 | 4,096 | Yes (4096 ≈ 2048) | Hash table | ~1–2% |
+| standard_16gb | 4,194,304 | 8,192 | Partial | Hash table | ~1–2% |
+| pluspf_103gb | 27,262,976 | 52,736 | No (52K > 2048) | Hash table + FASTQ | Reduces walk cost per miss |
+
+For pluspf_103gb, even with 2 MB pages the STLB still overflows (52K pages vs 2K STLB). Patch 2 still helps because 2 MB pages reduce the hardware page walk from 4 levels to 3 (skipping the PTE level), saving ~20–30 cycles per walk. With 192M misses at ~25 cycles saved each = ~4.8B cycles ≈ 1.2% of its 398B total cycles.
 
 ---
 
