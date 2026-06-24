@@ -34,8 +34,9 @@ Luna account is **student** (shared). Orion account is **jetsonagx**. Our Minerv
 ~/results/basecalling/reads_fast.fastq      # 104,832 reads, 708 MB
 ~/AccuracyDrift/databases/                  # all 6 kraken2 databases (eskape_650mb etc.)
 ~/data/kraken2_db/                          # standard 8 GB DB (Steps 1-51 profiling)
-~/kraken2-src/                              # kraken2 source clone
-~/kraken2-build/                            # compiled binaries (classify, kraken2)
+~/tools/kraken2-src/                        # kraken2 source clone (NOT ~/kraken2-src/ — that doesn't exist)
+~/tools/kraken2/                            # compiled binaries: classify, kraken2 wrapper
+~/tools/kraken2-pg/                         # gprof-instrumented build (classify binary)
 ~/results/profiling/pending/                # M1-M7 measurement outputs
 ```
 
