@@ -339,6 +339,36 @@ Luna has 4 DDR5 DIMMs installed per socket (slots 0, 2, 4, 6 populated; 1, 3, 5,
 
 **Channels are perfectly load-balanced:** all 4 active channels carry identical traffic (~6,872 MiB reads, ~3,942 MiB writes each). This is expected — the hash function distributes k-mers uniformly across the hash table, which in turn distributes DRAM accesses uniformly across channels.
 
+### M4 across all databases (2026-06-24)
+
+Computed totals (all 4 active channels summed):
+
+| DB | Reads (GiB) | Writes (GiB) | Total BW (GiB/s) | % of 143 GiB/s peak | Wall time |
+|---|---|---|---|---|---|
+| sample_targeted | 8.37 | 6.43 | **15.27** | **10.7%** | 0.97s |
+| standard_8gb | 26.86 | 15.39 | 8.20 | 5.7% | 5.04s |
+| standard_16gb | 46.63 | 24.31 | 8.31 | 5.8% | 8.54s |
+| pluspf_103gb | 267.97 | 133.15 | 6.97 | 4.9% | 57.56s |
+
+**All four databases are latency-bound.** None exceeds 11% of available DDR5 bandwidth. The DRAM highway has 4 lanes running at ~7% capacity regardless of DB size.
+
+**Why sample_targeted has 2× higher bandwidth (10.7% vs 5-6%):**
+Matches M2 finding — sample_targeted is compute-bound (DB in LLC, no hash stalls). The CPU runs at full speed generating a higher DRAM request rate from FASTQ scanning. For large DBs, each thread is stalled on a DRAM hash lookup most of the time, issuing requests slowly.
+
+**Why standard_8gb and standard_16gb have nearly identical bandwidth (8.20 vs 8.31 GiB/s) despite 2× larger DB:**
+Because the bottleneck is latency, not volume. Both run with 32 threads × 1 DRAM request in flight = 32 in-flight requests. The number of requests per second is the same; the larger DB just means more of those requests are LLC misses. Same throughput, more pain per request.
+
+**pluspf_103gb slightly lower bandwidth (4.9%):** At 103 GB, even more wall time is spent on kernel page walks (page table for 103 GB = 26M 4KB pages). Page walk latency is extra overhead before each DRAM data request lands, further reducing effective request rate.
+
+**Total DRAM reads vs DB size (re-read factor):**
+```
+sample_targeted : 8.37 GiB reads for  50 MB DB → reads dominated by FASTQ (703 MB)
+standard_8gb    : 26.86 GiB reads for   8 GB DB → ~2.4× DB re-read (LLC eviction)
+standard_16gb   : 46.63 GiB reads for  16 GB DB → ~2.9× DB re-read
+pluspf_103gb    : 267.97 GiB reads for 103 GB DB → ~2.6× DB re-read
+```
+The ~2.5–3× re-read factor for large DBs comes from LLC eviction: with random access across 8–103 GB and only 210 MB LLC, the same hash table regions get repeatedly evicted and re-fetched.
+
 ---
 
 ## M5–M7 status
