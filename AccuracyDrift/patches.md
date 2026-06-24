@@ -279,11 +279,72 @@ Even sample_targeted shows 33% kernel page walker LLC misses despite the DB fitt
 
 ---
 
-## M4–M7 status
+## M4 — DRAM bandwidth via uncore IMC (2026-06-24, Luna, standard_8gb)
+
+**Command:**
+```bash
+numactl --cpunodebind=0 --membind=0 \
+  perf stat -a -e \
+uncore_imc_0/cas_count_read/,uncore_imc_0/cas_count_write/,\
+uncore_imc_1/cas_count_read/,uncore_imc_1/cas_count_write/,\
+uncore_imc_2/cas_count_read/,uncore_imc_2/cas_count_write/,\
+uncore_imc_3/cas_count_read/,uncore_imc_3/cas_count_write/,\
+uncore_imc_4/cas_count_read/,uncore_imc_4/cas_count_write/,\
+uncore_imc_5/cas_count_read/,uncore_imc_5/cas_count_write/,\
+uncore_imc_6/cas_count_read/,uncore_imc_6/cas_count_write/,\
+uncore_imc_7/cas_count_read/,uncore_imc_7/cas_count_write/ \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb --threads 32 \
+  --output /dev/null --report /dev/null \
+  ~/results/basecalling/reads_hac.fastq \
+  2>&1 | tee ~/results/profiling/pending/m4_imc.txt
+```
+
+**Results (standard_8gb, reads_hac, 32T, warm, wall time 5.008s):**
+
+Active channels: imc_0, imc_2, imc_4, imc_6 only (imc_1/3/5/7 = 0 — 4 DIMMs installed, not 8).
+
+| Channel | Reads (MiB) | Writes (MiB) |
+|---|---|---|
+| imc_0 | 6,870.68 | 3,940.81 |
+| imc_2 | 6,871.60 | 3,940.47 |
+| imc_4 | 6,873.39 | 3,943.09 |
+| imc_6 | 6,873.99 | 3,943.06 |
+| **Total** | **27,489.66 MiB (26.85 GiB)** | **15,767.43 MiB (15.40 GiB)** |
+
+**Derived metrics:**
+```
+Total DRAM traffic : 42.25 GiB in 5.008 s
+Read bandwidth     : 26.85 GiB / 5.008 s = 5.36 GiB/s
+Write bandwidth    : 15.40 GiB / 5.008 s = 3.08 GiB/s
+Total bandwidth    : 8.44 GiB/s ≈ 9.1 GB/s
+
+Peak (4 active DDR5-4800 channels × 35.76 GiB/s) = 143 GiB/s
+% of peak used     : 8.44 / 143 = 5.9%
+```
+
+**Decision: conclusively latency-bound, not bandwidth-bound.**
+
+Using only 5.9% of available DDR5 bandwidth. The problem is NOT that we are reading too much data — it is that we wait 100–300 ns for each individual random hash table access before issuing the next one (sequential probe chain dependency: slot N must return before we know to probe slot N+1). The DRAM highway has 4 lanes and we are using 1/17th of one lane.
+
+Contrast with a bandwidth-bound workload: all 4 channels fully loaded, 143 GiB/s of sustained traffic. That would require ~compression of the hash table cells (less data per lookup) or a different data structure.
+
+**Implication for patches:**
+- Patch 3 (prefetch): issues the next probe's DRAM request before the current one returns — doubles in-flight requests per thread → can approach 2× speedup on the hash lookup bottleneck with no bandwidth cost (we have 94% headroom)
+- Patch 4 (Kolin sir's k-mer cache): eliminates DRAM accesses entirely for repeated k-mers → saves both latency AND bandwidth
+- Patch 2 (huge pages): reduces page walk overhead — still valid
+- DB compression: **not needed** — bandwidth is not the constraint
+
+**Structural note — why only 4 of 8 IMCs are active:**
+Luna has 4 DDR5 DIMMs installed per socket (slots 0, 2, 4, 6 populated; 1, 3, 5, 7 empty). Populated slots map to even-numbered IMCs. Theoretical peak with 4 channels ≈ 143 GiB/s (half of the 8-channel maximum of 286 GiB/s).
+
+**Channels are perfectly load-balanced:** all 4 active channels carry identical traffic (~6,872 MiB reads, ~3,942 MiB writes each). This is expected — the hash function distributes k-mers uniformly across the hash table, which in turn distributes DRAM accesses uniformly across channels.
+
+---
+
+## M5–M7 status
 
 | Measurement | Status | What it decides |
 |---|---|---|
-| M4 — DRAM bandwidth (uncore IMC) | **Pending** | Latency-bound vs bandwidth-bound → if >70% peak BW, DB compression needed instead |
 | M5 — k-mer reuse rate | **Pending** | Validates Kolin sir's LRU cache ROI (P4); reuse >30% → apply, <10% → skip |
 | M6 — perf c2c false sharing | Low priority | Only needed if revisiting thread counts beyond 32T |
 | M7 — objdump AVX-512 status | **Pending** | Decides if `-march=sapphirerapids` enables SIMD in MinimizerScanner |
