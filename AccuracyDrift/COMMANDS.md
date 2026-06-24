@@ -740,6 +740,146 @@ The following runs were completed but not individually logged here. All results 
 
 ---
 
+## Pre-patch measurements M1–M7 (Luna, 2026-06-24)
+
+These gate the optimisation patch (`Luna/experiments/kraken2_opt_v1.patch`). Run in order. Full analysis in `AccuracyDrift/patches.md`.
+
+Variables used throughout:
+```bash
+DB=~/AccuracyDrift/databases/standard_8gb
+IN=~/results/basecalling/reads_hac.fastq
+# Note: ~/kraken2-build/classify does not exist — use kraken2 wrapper
+# kraken2 is at ~/tools/kraken2/kraken2 (in PATH)
+```
+
+### M1 — Hash table structure (completed 2026-06-24)
+
+Reads the 32-byte header of hash.k2d to determine cell size, load factor, and prefetch stride. Takes 1 second, no perf needed.
+
+```bash
+mkdir -p ~/results/profiling/pending
+
+# Single DB
+python3 - <<'PY' | tee ~/results/profiling/pending/m1_hash_header.txt
+import struct, os
+p = os.path.expanduser("~/AccuracyDrift/databases/standard_8gb/hash.k2d")
+with open(p, "rb") as f:
+    cap, sz, kb, vb = struct.unpack("<QQQQ", f.read(32))
+file_bytes = os.path.getsize(p)
+cell_b = (file_bytes - 32) / cap
+print(f"capacity      : {cap:,}")
+print(f"size          : {sz:,}")
+print(f"load_factor   : {sz/cap:.4f}")
+print(f"key_bits      : {kb}")
+print(f"value_bits    : {vb}")
+print(f"key+value     : {kb+vb}  ({'40-bit cell' if kb+vb==40 else '32-bit cell' if kb+vb==32 else 'other'})")
+print(f"file_bytes    : {file_bytes:,}")
+print(f"implied bytes/cell : {cell_b:.3f}")
+print(f"cells/cache_line   : {64/cell_b:.2f}")
+PY
+
+# All databases at once
+python3 - <<'PY' | tee ~/results/profiling/pending/m1_all_dbs.txt
+import struct, os
+dbs = ["sample_targeted", "standard_8gb", "standard_16gb", "pluspf_103gb"]
+base = os.path.expanduser("~/AccuracyDrift/databases")
+for db in dbs:
+    p = os.path.join(base, db, "hash.k2d")
+    if not os.path.exists(p):
+        print(f"=== {db} === MISSING\n"); continue
+    with open(p, "rb") as f:
+        cap, sz, kb, vb = struct.unpack("<QQQQ", f.read(32))
+    file_bytes = os.path.getsize(p)
+    cell_b = (file_bytes - 32) / cap
+    print(f"=== {db} ===")
+    print(f"  load_factor   : {sz/cap:.4f}  ({sz/cap*100:.1f}% full)")
+    print(f"  cell size     : {kb}+{vb} bits = {kb+vb} ({'32-bit/4B' if kb+vb==32 else '40-bit/5B' if kb+vb==40 else 'other'})")
+    print(f"  file size     : {file_bytes/1e9:.2f} GB")
+    print(f"  cells/64B line: {64/cell_b:.2f}  → PF_STRIDE = {int(64/cell_b)}")
+    print()
+PY
+```
+
+Results: all 4 DBs use 32-bit cells, load factor ~0.70 (hardcoded in Kraken2 builder), PF_STRIDE=16 for all. See `patches.md §M1` for full table and interpretation.
+
+### M2 — dTLB pressure / huge pages (completed 2026-06-24)
+
+Check THP status first:
+```bash
+cat /sys/kernel/mm/transparent_hugepage/enabled
+# Luna result: always [madvise] never  ← madvise mode, NOT always
+# Patch 2 (MADV_HUGEPAGE) IS needed — stock Kraken2 does not call madvise
+```
+
+Run dTLB measurement on standard_8gb:
+```bash
+numactl --cpunodebind=0 --membind=0 \
+  perf stat -e cycles,instructions,\
+dTLB-loads,dTLB-load-misses,\
+dTLB-stores,dTLB-store-misses \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb --threads 32 \
+  --output /dev/null --report /dev/null \
+  ~/results/basecalling/reads_hac.fastq \
+  2>&1 | tee ~/results/profiling/pending/m2_dtlb.txt
+```
+
+Run across all databases:
+```bash
+for DB_NAME in sample_targeted standard_8gb standard_16gb pluspf_103gb; do
+  echo "=== $DB_NAME ==="
+  numactl --cpunodebind=0 --membind=0 \
+    perf stat -e dTLB-loads,dTLB-load-misses,cycles \
+    kraken2 --db ~/AccuracyDrift/databases/$DB_NAME --threads 32 \
+    --output /dev/null --report /dev/null \
+    ~/results/basecalling/reads_hac.fastq 2>&1 \
+  | grep -E "dTLB|cycles|seconds time elapsed"
+  echo ""
+done 2>&1 | tee ~/results/profiling/pending/m2_all_dbs.txt
+```
+
+Result for standard_8gb: 16.2M dTLB-load-misses / 30.3B total dTLB-loads = 0.05% overall — but this is misleading. Hash table accesses are only ~25M of the 30B loads; normalised TLB miss rate for hash table ≈ 65%. Decision: apply Patch 2. See `patches.md §M2` for full analysis.
+
+### M3 — perf annotate (pending)
+
+```bash
+numactl --cpunodebind=0 --membind=0 \
+  perf record -e LLC-load-misses \
+  -o ~/results/profiling/pending/m3_perf.data \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb --threads 32 \
+  --output /dev/null --report /dev/null \
+  ~/results/basecalling/reads_hac.fastq 2>/dev/null
+
+perf report --stdio \
+  -i ~/results/profiling/pending/m3_perf.data \
+  2>/dev/null | head -40 | tee ~/results/profiling/pending/m3_report.txt
+```
+
+### M4 — DRAM bandwidth via uncore IMC (pending)
+
+```bash
+# Discover IMC PMU names first
+ls /sys/devices/ | grep uncore_imc
+
+# Then measure (replace uncore_imc_N with actual names found above)
+numactl --cpunodebind=0 --membind=0 \
+  perf stat -a -e \
+'uncore_imc_0/cas_count_read/','uncore_imc_0/cas_count_write/',\
+'uncore_imc_1/cas_count_read/','uncore_imc_1/cas_count_write/' \
+  kraken2 --db ~/AccuracyDrift/databases/standard_8gb --threads 32 \
+  --output /dev/null --report /dev/null \
+  ~/results/basecalling/reads_hac.fastq \
+  2>&1 | tee ~/results/profiling/pending/m4_imc.txt
+# Decision: observed_BW = total_cas × 64 / wall_s
+# <50% of 300 GB/s peak → latency-bound → prefetch + LRU cache are right fixes
+# >70% peak → bandwidth-bound → need DB compression instead
+```
+
+### M5 — k-mer reuse rate (pending)
+
+Requires a small edit to classify.cc to count minimizer repeats, then rebuild. Full instructions in `Luna/experiments/pending_measurements.md`. Decision gate: reuse >30% → Patch 4 (Kolin sir's LRU cache) lands big; <10% → skip.
+
+---
+
 ## Orion (Jetson AGX Orin 64GB, jetsonagx@10.154.233.173)
 
 SSH: `ssh jetsonagx@10.154.233.173` — campus network only (IITD WiFi, no external access).
