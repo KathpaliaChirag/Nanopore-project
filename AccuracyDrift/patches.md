@@ -248,6 +248,35 @@ The causal chain: `CompactHashTable::Get()` → TLB miss → kernel page table w
 
 **Decision for P3 (prefetch): confirmed Apply.** `CompactHashTable::Get()` is the user-space source of both the 5.84% direct LLC misses and the 40.14% kernel page walk overhead.
 
+### M3 across all databases (2026-06-24)
+
+| Source | sample_targeted | standard_8gb | standard_16gb | pluspf_103gb |
+|---|---|---|---|---|
+| Kernel page walker `[k]` | 33.06% | 40.52% | 39.53% | **42.52%** |
+| FASTQ I/O kernel `copy_page_to_iter` | 3.96% | 26.85% | 30.34% | **32.44%** |
+| libc memmove_avx512 + memchr (FASTQ scan) | **53.46%** | 11.63% | 7.87% | 1.29% |
+| `CompactHashTable::Get()` | 2.24% | 5.70% | 7.75% | **10.57%** |
+| `std::unordered_map::operator[]` (report map) | 0.29% | 5.50% | 6.58% | 6.47% |
+| `MinimizerScanner::NextMinimizer()` | 0.21% | ~0% | 0.13% | 0.23% |
+
+**Finding 1 — CompactHashTable::Get() scales monotonically with DB size:**
+```
+sample_targeted:  2.24%   (50 MB DB, fits in LLC)
+standard_8gb:     5.70%   (8 GB DB)
+standard_16gb:    7.75%   (16 GB DB)
+pluspf_103gb:    10.57%   (103 GB DB)
+```
+Larger DB → fewer hash table entries fit in LLC → higher miss rate per Get() call → higher % of total LLC misses. This is the cache cliff made visible at the instruction level.
+
+**Finding 2 — sample_targeted reveals the bottleneck shift:**
+When the DB fits in LLC, `Get()` drops to 2.24% and libc FASTQ functions (memmove + memchr) jump to 53%. The same 104,918 reads are processed with the same minimizer computation, but with no DRAM stalls for hash lookups, the CPU sprints through FASTQ scanning instead. This is the pre-cliff regime making itself visible in LLC miss composition — the bottleneck has moved from hash table to FASTQ I/O.
+
+**Finding 3 — Kernel page walker is a constant ~33–42% across all DBs:**
+Even sample_targeted shows 33% kernel page walker LLC misses despite the DB fitting in LLC. The FASTQ file (703 MB = 175,750 4 KB pages) alone keeps the page walker busy — sequential FASTQ access still causes TLB misses on each new 4 KB page, and PTE reads for 175K pages miss LLC. Patch 2 (huge pages) makes the page table smaller, which helps reduce this overhead across all databases.
+
+**Finding 4 — MinimizerScanner stays near 0% on every database:**
+0.21%, ~0%, 0.13%, 0.23% — pure compute confirmed across all four databases. The minimizer window (≤15 entries) stays permanently in L1 cache regardless of DB size.
+
 ---
 
 ## M4–M7 status
