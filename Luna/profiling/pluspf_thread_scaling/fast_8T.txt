@@ -1,0 +1,60 @@
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 5.954s (1056.4 Kseq/m, 3603.56 Mbp/m).
+  101471 sequences classified (96.79%)
+  3361 sequences unclassified (3.21%)
+
+ Performance counter stats for 'numactl --cpunodebind=0 --membind=0 kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 8 --output /dev/null --report /dev/null /home/student/results/basecalling/reads_fast.fastq':
+
+    4,49,39,94,021      cache-misses                     #   93.30% of all cache refs         
+    4,81,67,36,018      cache-references                                                      
+    1,28,98,83,143      LLC-loads                                                             
+    1,16,53,72,202      LLC-load-misses                  #   90.35% of all LL-cache accesses  
+ 2,93,63,10,57,474      instructions                     #    0.93  insn per cycle            
+ 3,17,31,81,54,993      cycles                                                                
+
+      61.871932444 seconds time elapsed
+
+      47.275428000 seconds user
+      55.369501000 seconds sys
+
+
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 5.957s (1055.9 Kseq/m, 3602.03 Mbp/m).
+  101471 sequences classified (96.79%)
+  3361 sequences unclassified (3.21%)
+
+ Performance counter stats for 'numactl --cpunodebind=0 --membind=0 kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 8 --output /dev/null --report /dev/null /home/student/results/basecalling/reads_fast.fastq':
+
+    4,49,07,69,096      cache-misses                     #   93.32% of all cache refs         
+    4,81,21,23,543      cache-references                                                      
+    1,28,99,45,879      LLC-loads                                                             
+    1,16,56,61,276      LLC-load-misses                  #   90.37% of all LL-cache accesses  
+ 2,92,31,40,77,862      instructions                     #    0.92  insn per cycle            
+ 3,17,34,14,25,982      cycles                                                                
+
+      61.790991457 seconds time elapsed
+
+      47.321860000 seconds user
+      55.312499000 seconds sys
+
+
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 5.998s (1048.8 Kseq/m, 3577.65 Mbp/m).
+  101471 sequences classified (96.79%)
+  3361 sequences unclassified (3.21%)
+
+ Performance counter stats for 'numactl --cpunodebind=0 --membind=0 kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 8 --output /dev/null --report /dev/null /home/student/results/basecalling/reads_fast.fastq':
+
+    4,50,03,64,563      cache-misses                     #   93.30% of all cache refs         
+    4,82,37,71,881      cache-references                                                      
+    1,29,03,97,590      LLC-loads                                                             
+    1,16,55,44,685      LLC-load-misses                  #   90.32% of all LL-cache accesses  
+ 2,92,34,05,88,071      instructions                     #    0.92  insn per cycle            
+ 3,18,99,51,84,183      cycles                                                                
+
+      62.034841458 seconds time elapsed
+
+      47.684796000 seconds user
+      55.499599000 seconds sys
+
+
