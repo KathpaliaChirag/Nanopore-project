@@ -1,0 +1,42 @@
+ 33.32	34983	34983	U	0	unclassified
+ 66.68	69997	0	R	1	root
+ 66.68	69997	22	R1	131567	  cellular organisms
+ 65.35	68603	0	R2	2	    Bacteria
+ 65.35	68603	0	K	3379134	      Pseudomonadati
+ 65.35	68603	0	P	1224	        Pseudomonadota
+ 65.35	68603	0	C	1236	          Gammaproteobacteria
+ 65.35	68603	0	O	72274	            Pseudomonadales
+ 65.35	68603	0	F	135621	              Pseudomonadaceae
+ 65.35	68603	0	G	286	                Pseudomonas
+ 65.35	68603	0	G1	136841	                  Pseudomonas aeruginosa group
+ 65.35	68603	68603	S	287	                    Pseudomonas aeruginosa
+  1.31	1372	0	R2	2759	    Eukaryota
+  1.31	1372	0	R3	33154	      Opisthokonta
+  1.31	1372	0	K	33208	        Metazoa
+  1.31	1372	0	K1	6072	          Eumetazoa
+  1.31	1372	0	K2	33213	            Bilateria
+  1.31	1372	0	K3	33511	              Deuterostomia
+  1.31	1372	0	P	7711	                Chordata
+  1.31	1372	0	P1	89593	                  Craniata
+  1.31	1372	0	P2	7742	                    Vertebrata
+  1.31	1372	0	P3	7776	                      Gnathostomata
+  1.31	1372	0	P4	117570	                        Teleostomi
+  1.31	1372	0	P5	117571	                          Euteleostomi
+  1.31	1372	0	P6	8287	                            Sarcopterygii
+  1.31	1372	0	P7	1338369	                              Dipnotetrapodomorpha
+  1.31	1372	0	P8	32523	                                Tetrapoda
+  1.31	1372	0	P9	32524	                                  Amniota
+  1.31	1372	0	C	40674	                                    Mammalia
+  1.31	1372	0	C1	32525	                                      Theria
+  1.31	1372	0	C2	9347	                                        Eutheria
+  1.31	1372	0	C3	1437010	                                          Boreoeutheria
+  1.31	1372	0	C4	314146	                                            Euarchontoglires
+  1.31	1372	0	O	9443	                                              Primates
+  1.31	1372	0	O1	376913	                                                Haplorrhini
+  1.31	1372	0	O2	314293	                                                  Simiiformes
+  1.31	1372	0	O3	9526	                                                    Catarrhini
+  1.31	1372	0	O4	314295	                                                      Hominoidea
+  1.31	1372	0	F	9604	                                                        Hominidae
+  1.31	1372	0	F1	207598	                                                          Homininae
+  1.31	1372	0	G	9605	                                                            Homo
+  1.31	1372	1372	S	9606	                                                              Homo sapiens

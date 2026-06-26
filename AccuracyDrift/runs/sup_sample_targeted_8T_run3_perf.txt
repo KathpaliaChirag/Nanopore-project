@@ -1,0 +1,20 @@
+Loading database information... done.
+104980 sequences (365.84 Mbp) processed in 2.590s (2431.5 Kseq/m, 8473.48 Mbp/m).
+  89658 sequences classified (85.40%)
+  15322 sequences unclassified (14.60%)
+
+ Performance counter stats for 'numactl --cpunodebind=0 --membind=0 kraken2 --db /home/student/AccuracyDrift/databases/sample_targeted --threads 8 --report /home/student/AccuracyDrift/runs/sup_sample_targeted_8T_run3_report.txt --output /home/student/AccuracyDrift/runs/sup_sample_targeted_8T_run3_output.txt /home/student/results/basecalling/reads_sup.fastq':
+
+      10,21,99,794      cache-misses                     #   12.15% of all cache refs         
+      84,11,86,563      cache-references                                                      
+      14,84,42,257      LLC-loads                                                             
+       1,93,16,516      LLC-load-misses                  #   13.01% of all LL-cache accesses  
+ 1,12,68,22,22,795      instructions                     #    1.79  insn per cycle            
+   63,00,58,89,346      cycles                                                                
+
+       2.641561021 seconds time elapsed
+
+      20.108615000 seconds user
+       0.282952000 seconds sys
+
+
