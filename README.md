@@ -721,7 +721,7 @@ xychart-beta
     bar [1.0, 1.51, 2.04, 2.49, 2.79, 2.93, 2.90, 2.85]
 ```
 
-Amdahl ceiling **~2.93× at 32T**. Serial DB load = ~7.5s floor. sys time grows at 64T+ (thread overhead), so 32T is optimal.
+Amdahl ceiling **~2.93× at 32T**. Serial DB load = ~7.5s floor. OS thread-spawn sys time grows monotonically: **7.86s (32T) → 8.38s (64T) → 9.05s (96T)** — the Amdahl floor is not static; it rises with thread count, making 32T doubly optimal (serial floor is smallest AND classification speedup has plateaued).
 
 ### 9h. PlusPF 103 GB — Gold-Standard Ceiling (reads_hac, Luna warm)
 
@@ -936,6 +936,8 @@ The standard_8gb/16gb runs establish the true composition: P. aeruginosa ~35%, E
 Absent from all five smaller databases. During sample_targeted construction, the target genome (GCF_000012085.1) was **suppressed on NCBI** and could not be downloaded. In standard_8gb/16gb the reads exist but are distributed across the "other classified" long tail below the 1% threshold.
 
 To restore *A. baumannii* detection in a custom database: use a non-suppressed strain accession with `ncbi-genome-download` (e.g., ATCC 17978, GCF_000015425.1). This is a 0.16–0.36% signal, but *A. baumannii* is a critical ESKAPE pathogen — missing it in a diagnostic report carries real treatment risk.
+
+> **Note:** For low-abundance species (&lt;0.4%), basecalling model choice materially affects detection. *A. baumannii* drops from 0.33% (hac) to **0.16% (fast)** — a 2× difference. Using the `fast` model risks missing this pathogen entirely in a noisy sample. *S. aureus* and *E. faecium* are conclusively absent (0–1 reads across all models with pluspf_103gb), suggesting these are not present in this particular AIIMS sample.
 
 ### 11d. PlusPF 103 GB — Gold-Standard Accuracy Ceiling
 
