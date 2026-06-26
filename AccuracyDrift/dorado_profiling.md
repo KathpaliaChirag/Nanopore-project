@@ -20,18 +20,19 @@
 
 ---
 
-## Baseline Wall Times (no profiler overhead)
+## Baseline Wall Times — GPU vs CPU
 
-| Model | Wall time | Dorado internal (ms) | Reads | Throughput (samples/s) | Batch size | Chunk size |
+| Model | GPU wall time | GPU throughput (samples/s) | CPU wall time | CPU throughput (samples/s) | GPU speedup | CPU RAM |
 |---|---|---|---|---|---|---|
-| fast | 33.9s | 21,612 | 104,478 | 2.35 × 10⁸ | 320 | 9,996 |
-| hac  | 55.0s | 24,945 | 104,476 | 2.03 × 10⁸ | 2,944 | 9,996 |
-| sup  | 4m 26s | 256,570 | 104,478 | 1.98 × 10⁷ | 96 | 12,288 |
+| fast | 33.9s | 2.35 × 10⁸ | 9m 40s (616,959 ms) | 8.23 × 10⁶ | **28.6×** | 47 GB |
+| hac  | 55.0s | 2.03 × 10⁸ | 43m 26s (2,694,842 ms) | 1.88 × 10⁶ | **107×** | |
+| sup  | 4m 26s | 1.98 × 10⁷ | running (~8h est.) | | | |
 
-**Key observations:**
-- fast → hac: 1.6× slower wall time, throughput barely drops (2.35 → 2.03 × 10⁸ samples/s)
-- hac → sup: **10× throughput drop** (2.03 × 10⁸ → 1.98 × 10⁷). Batch size collapses from 2,944 → 96 — sup model is far larger, VRAM-per-batch is the bottleneck.
-- Both GPUs used (cuda:0 + cuda:1) across all three models.
+> GPU runs: 2× L40S (cuda:0 + cuda:1). CPU runs: 650 threads, ~130 cores active.
+
+**GPU batch sizes:** fast=320, hac=2,944, sup=96 (VRAM-limited)
+
+> **Why SUP CPU is so slow:** The SUP model uses FP8 precision (`fp8_e4m3`) on GPU — a data type natively accelerated by Ada Lovelace tensor cores. No CPU architecture currently supports native FP8 arithmetic (Intel Xeon Platinum 8468 has AMX for BF16/INT8 but not FP8). On CPU, dorado falls back to FP32 for all FP8 ops, increasing both compute cost and memory bandwidth. The fused GPU kernels (e.g. `mm_swiglu<fp8>` = matmul + SwiGLU in one pass) also break into separate CPU ops, adding overhead. Result: the SUP GPU→CPU penalty is expected to be far worse than fast (28.6×) or hac (107×).
 
 ---
 
