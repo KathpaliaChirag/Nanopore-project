@@ -1,0 +1,306 @@
+=== threads=2 ===
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 7.386s (851.6 Kseq/m, 2905.10 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 7.390s (851.1 Kseq/m, 2903.45 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 7.528s (835.6 Kseq/m, 2850.39 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 7.535s (834.8 Kseq/m, 2847.65 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 7.446s (844.8 Kseq/m, 2881.83 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 2 --report /dev/null --output /dev/null /home/student/results/basecalling/reads_fast.fastq' (5 runs):
+
+   61,00,57,17,163      cycles                                                                  ( +-  0.51% )
+ 1,05,59,11,67,504      instructions                     #    1.73  insn per cycle              ( +-  0.15% )
+      11,93,20,616      LLC-load-misses                  #   81.45% of all LL-cache accesses    ( +-  0.68% )
+      14,64,89,515      LLC-loads                                                               ( +-  0.69% )
+   26,98,15,18,748      cycle_activity.stalls_total                                             ( +-  1.04% )
+   11,40,49,30,322      memory_activity.stalls_l3_miss                                          ( +-  1.49% )
+
+           12.2917 +- 0.0710 seconds time elapsed  ( +-  0.58% )
+
+
+=== threads=4 ===
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 3.354s (1875.6 Kseq/m, 6398.20 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 3.406s (1846.5 Kseq/m, 6299.05 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 3.420s (1839.2 Kseq/m, 6274.10 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 3.382s (1859.9 Kseq/m, 6344.70 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 3.332s (1887.5 Kseq/m, 6438.84 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 4 --report /dev/null --output /dev/null /home/student/results/basecalling/reads_fast.fastq' (5 runs):
+
+   56,44,91,46,489      cycles                                                                  ( +-  0.31% )
+ 1,02,36,05,99,178      instructions                     #    1.81  insn per cycle              ( +-  0.03% )
+      10,46,24,981      LLC-load-misses                  #   80.02% of all LL-cache accesses    ( +-  0.35% )
+      13,07,48,909      LLC-loads                                                               ( +-  0.17% )
+   23,80,35,08,265      cycle_activity.stalls_total                                             ( +-  0.65% )
+    9,81,76,22,775      memory_activity.stalls_l3_miss                                          ( +-  1.69% )
+
+            8.1794 +- 0.0133 seconds time elapsed  ( +-  0.16% )
+
+
+=== threads=8 ===
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.779s (3535.4 Kseq/m, 12060.52 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.756s (3582.1 Kseq/m, 12219.55 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.790s (3514.8 Kseq/m, 11990.22 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.755s (3584.6 Kseq/m, 12228.31 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.748s (3598.9 Kseq/m, 12276.86 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 8 --report /dev/null --output /dev/null /home/student/results/basecalling/reads_fast.fastq' (5 runs):
+
+   57,53,42,50,809      cycles                                                                  ( +-  0.32% )
+ 1,02,34,53,92,473      instructions                     #    1.78  insn per cycle              ( +-  0.10% )
+      10,48,13,231      LLC-load-misses                  #   80.67% of all LL-cache accesses    ( +-  0.35% )
+      12,99,26,669      LLC-loads                                                               ( +-  0.40% )
+   24,73,64,23,837      cycle_activity.stalls_total                                             ( +-  0.53% )
+   10,26,94,98,870      memory_activity.stalls_l3_miss                                          ( +-  0.65% )
+
+            6.5731 +- 0.0109 seconds time elapsed  ( +-  0.17% )
+
+
+=== threads=16 ===
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.976s (6445.4 Kseq/m, 21987.45 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.981s (6411.4 Kseq/m, 21871.32 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.983s (6399.5 Kseq/m, 21830.77 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.985s (6387.8 Kseq/m, 21790.87 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.976s (6442.4 Kseq/m, 21977.12 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 16 --report /dev/null --output /dev/null /home/student/results/basecalling/reads_fast.fastq' (5 runs):
+
+   59,23,27,19,243      cycles                                                                  ( +-  0.20% )
+ 1,02,48,13,51,504      instructions                     #    1.73  insn per cycle              ( +-  0.06% )
+      10,58,99,994      LLC-load-misses                  #   82.11% of all LL-cache accesses    ( +-  0.10% )
+      12,89,66,036      LLC-loads                                                               ( +-  0.19% )
+   26,31,98,92,125      cycle_activity.stalls_total                                             ( +-  0.36% )
+   10,75,77,94,834      memory_activity.stalls_l3_miss                                          ( +-  0.12% )
+
+            5.7381 +- 0.0118 seconds time elapsed  ( +-  0.21% )
+
+
+=== threads=32 ===
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.717s (8776.0 Kseq/m, 29937.64 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.726s (8661.2 Kseq/m, 29546.17 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.727s (8646.6 Kseq/m, 29496.46 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.727s (8656.9 Kseq/m, 29531.49 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.709s (8869.3 Kseq/m, 30255.93 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 32 --report /dev/null --output /dev/null /home/student/results/basecalling/reads_fast.fastq' (5 runs):
+
+   64,83,11,72,535      cycles                                                                  ( +-  0.08% )
+ 1,03,86,48,51,029      instructions                     #    1.60  insn per cycle              ( +-  0.04% )
+      10,66,82,916      LLC-load-misses                  #   82.15% of all LL-cache accesses    ( +-  0.19% )
+      12,98,65,405      LLC-loads                                                               ( +-  0.45% )
+   31,20,74,65,805      cycle_activity.stalls_total                                             ( +-  0.15% )
+   11,25,85,63,519      memory_activity.stalls_l3_miss                                          ( +-  0.25% )
+
+            5.5154 +- 0.0203 seconds time elapsed  ( +-  0.37% )
+
+
+=== threads=64 ===
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.881s (7135.6 Kseq/m, 24341.86 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.867s (7255.6 Kseq/m, 24751.06 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.876s (7181.8 Kseq/m, 24499.62 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.865s (7270.2 Kseq/m, 24801.01 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 0.883s (7120.7 Kseq/m, 24291.02 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 64 --report /dev/null --output /dev/null /home/student/results/basecalling/reads_fast.fastq' (5 runs):
+
+   71,74,43,61,828      cycles                                                                  ( +-  0.42% )
+ 1,06,00,06,33,431      instructions                     #    1.48  insn per cycle              ( +-  0.04% )
+      10,83,45,260      LLC-load-misses                  #   82.14% of all LL-cache accesses    ( +-  0.06% )
+      13,18,99,574      LLC-loads                                                               ( +-  0.26% )
+   36,94,14,88,112      cycle_activity.stalls_total                                             ( +-  0.76% )
+   11,22,22,94,380      memory_activity.stalls_l3_miss                                          ( +-  0.42% )
+
+            5.6775 +- 0.0156 seconds time elapsed  ( +-  0.27% )
+
+
+=== threads=96 ===
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.079s (5829.8 Kseq/m, 19887.48 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.086s (5791.5 Kseq/m, 19756.63 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.042s (6038.0 Kseq/m, 20597.51 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.009s (6234.1 Kseq/m, 21266.63 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.035s (6076.1 Kseq/m, 20727.48 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 96 --report /dev/null --output /dev/null /home/student/results/basecalling/reads_fast.fastq' (5 runs):
+
+   73,28,03,33,076      cycles                                                                  ( +-  0.52% )
+ 1,07,02,22,39,063      instructions                     #    1.46  insn per cycle              ( +-  0.10% )
+      10,94,40,006      LLC-load-misses                  #   82.15% of all LL-cache accesses    ( +-  0.08% )
+      13,32,18,737      LLC-loads                                                               ( +-  0.15% )
+   38,08,49,20,931      cycle_activity.stalls_total                                             ( +-  0.85% )
+   11,22,79,62,228      memory_activity.stalls_l3_miss                                          ( +-  0.51% )
+
+            5.8653 +- 0.0235 seconds time elapsed  ( +-  0.40% )
+
+
+=== threads=128 ===
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.200s (5239.8 Kseq/m, 17874.59 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.139s (5520.3 Kseq/m, 18831.50 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.112s (5657.6 Kseq/m, 19300.05 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.145s (5493.5 Kseq/m, 18740.13 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.122s (5604.6 Kseq/m, 19119.10 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 128 --report /dev/null --output /dev/null /home/student/results/basecalling/reads_fast.fastq' (5 runs):
+
+   76,30,21,86,588      cycles                                                                  ( +-  0.38% )
+ 1,07,65,45,52,634      instructions                     #    1.41  insn per cycle              ( +-  0.07% )
+      10,97,73,572      LLC-load-misses                  #   81.80% of all LL-cache accesses    ( +-  0.14% )
+      13,41,89,791      LLC-loads                                                               ( +-  0.16% )
+   40,31,04,56,588      cycle_activity.stalls_total                                             ( +-  0.52% )
+   11,15,23,27,576      memory_activity.stalls_l3_miss                                          ( +-  0.39% )
+
+            5.9716 +- 0.0249 seconds time elapsed  ( +-  0.42% )
+
+
+=== threads=192 ===
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.284s (4897.3 Kseq/m, 16706.22 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.283s (4901.1 Kseq/m, 16719.34 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.326s (4742.0 Kseq/m, 16176.61 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.289s (4878.2 Kseq/m, 16641.24 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 1.286s (4890.4 Kseq/m, 16682.62 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 192 --report /dev/null --output /dev/null /home/student/results/basecalling/reads_fast.fastq' (5 runs):
+
+   85,68,76,18,287      cycles                                                                  ( +-  0.96% )
+ 1,09,27,70,62,031      instructions                     #    1.28  insn per cycle              ( +-  0.12% )
+      11,03,77,223      LLC-load-misses                  #   80.90% of all LL-cache accesses    ( +-  0.13% )
+      13,64,42,234      LLC-loads                                                               ( +-  0.23% )
+   48,00,97,21,138      cycle_activity.stalls_total                                             ( +-  1.53% )
+   11,53,82,55,474      memory_activity.stalls_l3_miss                                          ( +-  1.20% )
+
+            6.1208 +- 0.0176 seconds time elapsed  ( +-  0.29% )
+
+

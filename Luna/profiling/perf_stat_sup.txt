@@ -1,0 +1,29 @@
+Loading database information... done.
+104980 sequences (365.84 Mbp) processed in 1.093s (5762.9 Kseq/m, 20082.71 Mbp/m).
+  101922 sequences classified (97.09%)
+  3058 sequences unclassified (2.91%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 96 --report /home/student/results/profiling/report_sup.txt --output /dev/null /home/student/results/basecalling/reads_sup.fastq':
+
+   72,32,49,78,285      cycles                                                                  (53.80%)
+ 1,19,21,39,20,836      instructions                     #    1.65  insn per cycle              (60.56%)
+      47,46,84,014      cache-misses                     #   84.70% of all cache refs           (60.63%)
+      56,04,49,403      cache-references                                                        (60.76%)
+      10,11,90,277      LLC-load-misses                  #   81.95% of all LL-cache accesses    (60.78%)
+      12,34,75,097      LLC-loads                                                               (60.57%)
+      21,10,48,316      L1-dcache-load-misses            #    0.65% of all L1-dcache accesses   (60.31%)
+   32,50,35,29,882      L1-dcache-loads                                                         (53.21%)
+      29,34,77,209      branch-misses                    #    1.41% of all branches             (59.90%)
+   20,77,16,91,213      branch-instructions                                                     (59.58%)
+   35,04,44,35,299      cycle_activity.stalls_total                                             (52.80%)
+    4,75,19,67,681      cycle_activity.stalls_l1d_miss                                          (52.95%)
+    4,32,27,40,764      cycle_activity.stalls_l2_miss                                           (53.15%)
+                 0      cycle_activity.stalls_l3_miss                                           (53.37%)
+    9,26,29,45,570      memory_activity.stalls_l3_miss                                          (53.63%)
+
+       5.628373447 seconds time elapsed
+
+      19.155000000 seconds user
+       6.434182000 seconds sys
+
+

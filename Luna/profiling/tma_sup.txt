@@ -1,0 +1,21 @@
+Loading database information... done.
+104980 sequences (365.84 Mbp) processed in 1.090s (5779.0 Kseq/m, 20138.83 Mbp/m).
+  101922 sequences classified (97.09%)
+  3058 sequences unclassified (2.91%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads 96 --report /dev/null --output /dev/null /home/student/results/basecalling/reads_sup.fastq':
+
+ 4,37,64,20,43,750      TOPDOWN.SLOTS                    #     26.2 %  tma_memory_bound       
+                                                  #     20.8 %  tma_core_bound         
+ 1,20,09,07,42,470      topdown-retiring                                                      
+   41,78,35,01,858      topdown-fe-bound                                                      
+ 1,15,69,61,86,701      topdown-mem-bound                                                     
+ 2,07,46,67,04,080      topdown-be-bound                                                      
+   71,53,69,48,599      topdown-bad-spec                                                      
+
+       5.621139952 seconds time elapsed
+
+      19.167132000 seconds user
+       6.287355000 seconds sys
+
+

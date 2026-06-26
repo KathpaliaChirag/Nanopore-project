@@ -1,0 +1,37 @@
+ 19.69	23799	23799	U	0	unclassified
+ 80.31	97053	0	R	1	root
+ 80.31	97053	0	R1	131567	  cellular organisms
+ 80.31	97053	15	R2	2	    Bacteria
+ 80.29	97034	0	K	3379134	      Pseudomonadati
+ 80.29	97034	0	P	1224	        Pseudomonadota
+ 80.29	97034	16	C	1236	          Gammaproteobacteria
+ 49.90	60308	0	O	72274	            Pseudomonadales
+ 49.90	60308	0	F	135621	              Pseudomonadaceae
+ 49.90	60308	0	G	286	                Pseudomonas
+ 49.90	60308	0	G1	136841	                  Pseudomonas aeruginosa group
+ 49.90	60308	0	S	287	                    Pseudomonas aeruginosa
+ 49.90	60308	60308	S1	208964	                      Pseudomonas aeruginosa PAO1
+ 30.38	36710	0	O	91347	            Enterobacterales
+ 30.38	36710	148	F	543	              Enterobacteriaceae
+ 20.63	24929	0	G	561	                Escherichia
+ 20.63	24929	0	S	562	                  Escherichia coli
+ 20.63	24929	0	S1	83333	                    Escherichia coli K-12
+ 20.63	24929	24929	S2	511145	                      Escherichia coli str. K-12 substr. MG1655
+  9.23	11156	0	G	570	                Klebsiella
+  9.23	11156	0	G1	3390273	                  Klebsiella pneumoniae complex
+  9.23	11156	0	S	573	                    Klebsiella pneumoniae
+  9.23	11156	0	S1	72407	                      Klebsiella pneumoniae subsp. pneumoniae
+  9.23	11156	11156	S2	1125630	                        Klebsiella pneumoniae subsp. pneumoniae HS11286
+  0.39	477	0	G	547	                Enterobacter
+  0.39	477	0	G1	354276	                  Enterobacter cloacae complex
+  0.39	477	0	S	550	                    Enterobacter cloacae
+  0.39	477	0	S1	336306	                      Enterobacter cloacae subsp. cloacae
+  0.39	477	477	S2	716541	                        Enterobacter cloacae subsp. cloacae ATCC 13047
+  0.00	4	0	K	1783272	      Bacillati
+  0.00	4	0	P	1239	        Bacillota
+  0.00	4	0	C	91061	          Bacilli
+  0.00	4	0	O	1385	            Caryophanales
+  0.00	4	0	F	90964	              Staphylococcaceae
+  0.00	4	0	G	1279	                Staphylococcus
+  0.00	4	0	S	1280	                  Staphylococcus aureus
+  0.00	4	4	S1	93061	                    Staphylococcus aureus subsp. aureus NCTC 8325

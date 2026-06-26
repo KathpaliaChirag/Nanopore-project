@@ -1,0 +1,72 @@
+=== threads=2 ===
+  run 1: 11.488s
+  run 2: 11.301s
+  run 3: 12.268s
+  run 4: 12.561s
+  run 5: 11.077s
+  avg: 11.739s
+
+=== threads=4 ===
+  run 1: 7.443s
+  run 2: 7.499s
+  run 3: 7.458s
+  run 4: 8.099s
+  run 5: 8.237s
+  avg: 7.747s
+
+=== threads=8 ===
+  run 1: 6.623s
+  run 2: 6.525s
+  run 3: 6.603s
+  run 4: 6.490s
+  run 5: 6.479s
+  avg: 6.544s
+
+=== threads=16 ===
+  run 1: 5.817s
+  run 2: 5.721s
+  run 3: 5.686s
+  run 4: 5.731s
+  run 5: 5.697s
+  avg: 5.730s
+
+=== threads=32 ===
+  run 1: 5.509s
+  run 2: 5.554s
+  run 3: 5.504s
+  run 4: 5.488s
+  run 5: 5.481s
+  avg: 5.507s
+
+=== threads=64 ===
+  run 1: 5.741s
+  run 2: 5.747s
+  run 3: 5.733s
+  run 4: 5.709s
+  run 5: 5.618s
+  avg: 5.709s
+
+=== threads=96 ===
+  run 1: 5.985s
+  run 2: 5.950s
+  run 3: 5.461s
+  run 4: 5.951s
+  run 5: 5.873s
+  avg: 5.844s
+
+=== threads=128 ===
+  run 1: 5.969s
+  run 2: 6.002s
+  run 3: 6.076s
+  run 4: 5.946s
+  run 5: 5.969s
+  avg: 5.992s
+
+=== threads=192 ===
+  run 1: 6.143s
+  run 2: 6.229s
+  run 3: 6.104s
+  run 4: 6.183s
+  run 5: 6.140s
+  avg: 6.159s
+

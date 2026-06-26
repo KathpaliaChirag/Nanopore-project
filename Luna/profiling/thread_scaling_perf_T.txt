@@ -1,0 +1,37 @@
+Value "--report" invalid for option threads (number expected)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 12.795s (491.6 Kseq/m, 1677.02 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Value "--report" invalid for option threads (number expected)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 12.792s (491.7 Kseq/m, 1677.34 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Value "--report" invalid for option threads (number expected)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 12.848s (489.6 Kseq/m, 1670.08 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Value "--report" invalid for option threads (number expected)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 12.837s (490.0 Kseq/m, 1671.46 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+Value "--report" invalid for option threads (number expected)
+Loading database information... done.
+104832 sequences (357.62 Mbp) processed in 12.873s (488.6 Kseq/m, 1666.87 Mbp/m).
+  86656 sequences classified (82.66%)
+  18176 sequences unclassified (17.34%)
+
+ Performance counter stats for 'kraken2 --db /home/student/data/kraken2_db --threads --report /dev/null --output /dev/null /home/student/results/basecalling/reads_fast.fastq' (5 runs):
+
+   52,93,02,83,284      cycles                                                                  ( +-  0.18% )
+ 1,00,93,51,23,908      instructions                     #    1.91  insn per cycle              ( +-  0.01% )
+      10,20,64,505      LLC-load-misses                  #   80.17% of all LL-cache accesses    ( +-  0.12% )
+      12,73,14,490      LLC-loads                                                               ( +-  0.14% )
+   20,97,42,41,009      cycle_activity.stalls_total                                             ( +-  0.45% )
+    8,31,75,53,008      memory_activity.stalls_l3_miss                                          ( +-  0.22% )
+
+           17.1168 +- 0.0305 seconds time elapsed  ( +-  0.18% )
+

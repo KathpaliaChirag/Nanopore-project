@@ -38,3 +38,6 @@ AMDuProf-*/
 
 # gprof output
 gmon.out
+Luna/profiling/perf_output_hac_full.txt
+Luna/profiling/perf_output_sup.txt
+Luna/profiling/perf_record_hac_32t_out.txt

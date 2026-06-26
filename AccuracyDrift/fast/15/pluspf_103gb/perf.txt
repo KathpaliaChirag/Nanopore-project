@@ -1,0 +1,20 @@
+Loading database information... done.
+30362 sequences (90.75 Mbp) processed in 11.727s (155.3 Kseq/m, 464.29 Mbp/m).
+  29367 sequences classified (96.72%)
+  995 sequences unclassified (3.28%)
+
+ Performance counter stats for 'numactl --cpunodebind=0 --membind=0 kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 1 --output /home/student/data/kraken_runs/fast/15/pluspf_103gb/output.txt --report /home/student/data/kraken_runs/fast/15/pluspf_103gb/report.txt /home/student/data/basecalled/fast/FBE01990_24778b97_03e50f91_15.fastq':
+
+    3,84,10,00,505      cache-misses                     #   95.25% of all cache refs         
+    4,03,26,77,361      cache-references                                                      
+    1,00,99,49,260      LLC-loads                                                             
+      96,49,64,437      LLC-load-misses                  #   95.55% of all LL-cache accesses  
+ 2,01,02,92,48,040      instructions                     #    0.96  insn per cycle            
+ 2,09,42,10,38,614      cycles                                                                
+
+      67.723192937 seconds time elapsed
+
+      11.847775000 seconds user
+      55.861226000 seconds sys
+
+
