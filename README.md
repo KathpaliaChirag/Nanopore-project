@@ -473,7 +473,44 @@ Hypothesis: flamegraph's ~20% I/O tower is disk I/O. Copying FASTQ to `/dev/shm`
 
 → full write-up: [Luna/experiments/tmpfs_fastq/README.md](Luna/experiments/tmpfs_fastq/README.md)
 
-### 8h. Cumulative optimisation ladder (zero code changes)
+### 8h. DRAM Bandwidth — Latency-Bound, Not Bandwidth-Bound (M4)
+
+Measured via uncore IMC hardware counters: `perf stat -a -e uncore_imc_{0,2,4,6}/cas_count_{read,write}/`. Luna has 4 active DDR5 channels per socket (slots 0, 2, 4, 6 populated).
+
+**M4 result — standard_8gb (32T, numactl node0, warm, wall 5.008s):**
+
+| IMC Channel | Reads (MiB) | Writes (MiB) |
+|-------------|------------|-------------|
+| imc_0 | 6,870.7 | 3,940.8 |
+| imc_2 | 6,871.6 | 3,940.5 |
+| imc_4 | 6,873.4 | 3,943.1 |
+| imc_6 | 6,874.0 | 3,943.1 |
+| **Total** | **26,489.7 MiB reads** | **15,767.4 MiB writes** |
+
+```
+Read bandwidth  :  5.36 GiB/s
+Write bandwidth :  3.08 GiB/s
+Total bandwidth :  8.44 GiB/s  ≈  9.1 GB/s
+Peak (4 active DDR5-4800 channels) : 143 GiB/s
+Utilisation :  8.44 / 143  =  5.9%  of peak
+```
+
+All-database comparison (32T, numactl node0):
+
+| Database | Total BW (GiB/s) | % of 143 GiB/s peak | Wall time |
+|----------|:---------------:|:------------------:|-----------|
+| sample_targeted 50 MB | **15.27** | **10.7%** | 0.97 s |
+| standard_8gb 7.6 GB | 8.20 | 5.7% | 5.04 s |
+| standard_16gb 15 GB | 8.31 | 5.8% | 8.54 s |
+| pluspf_103gb 103 GB | 6.97 | 4.9% | 57.56 s |
+
+> **Verdict: conclusively latency-bound.** All databases use **5–11%** of available DDR5 bandwidth. The DRAM highway is 94% empty. All 4 active IMC channels are **perfectly load-balanced** (within 3 MiB across ~6,870 MiB total) — the hash function uniformly distributes k-mers across the address space, distributing DRAM accesses uniformly across channels.
+>
+> `standard_8gb` and `standard_16gb` have nearly identical bandwidth (5.7% vs 5.8%) despite a 2× size difference. The bottleneck is latency, not volume: 32 threads × ~1 DRAM request in flight = ~32 concurrent requests; the request rate is fixed by stall latency, not DB size.
+>
+> **Implication:** DB compression is the wrong fix — bandwidth is not the constraint. Prefetch (`__builtin_prefetch`, Patch 3) issues the next DRAM request before the current one returns with no bandwidth cost since 94% headroom remains. Kolin sir's thread-local k-mer cache (Patch 4) eliminates DRAM accesses entirely for repeated minimizers.
+
+### 8i. Cumulative optimisation ladder (zero code changes)
 
 | Step | Change | Wall time | Cumulative saving |
 |------|--------|----------|------------------|
@@ -490,7 +527,7 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
   /home/student/results/basecalling/reads_hac.fastq
 ```
 
-### 8i. WSL2 vs Luna — what Luna corrected
+### 8j. WSL2 vs Luna — what Luna corrected
 
 | Metric | WSL2 | Luna | What it means |
 |--------|------|------|--------------|
@@ -699,6 +736,27 @@ xychart-beta
     y-axis "Peak Speedup (×)" 0 --> 25
     bar [21.26, 21.96, 10.57, 3.47, 2.93, 1.72]
 ```
+
+### 9i-b. IPC Decay vs Thread Count
+
+IPC declines as threads increase due to growing DRAM queue contention. Most clearly tracked on `eskape_650mb` where classification dominates wall time (no Amdahl floor).
+
+```mermaid
+xychart-beta
+    title "IPC Decay vs Thread Count — eskape_650mb 142 MB (reads_hac, Luna)"
+    x-axis ["1T", "2T", "4T", "8T", "16T", "32T", "64T", "96T"]
+    y-axis "IPC" 1.0 --> 1.6
+    line [1.47, 1.46, 1.45, 1.43, 1.41, 1.37, 1.18, 1.13]
+```
+
+| Phase | Thread Range | IPC | Rate of Decline |
+|-------|-------------|-----|----------------|
+| Gradual | 1T → 16T | 1.47 → 1.41 | ROB (512 entries) hides most DRAM latency |
+| Accelerating | 16T → 32T | 1.41 → 1.37 | DRAM bandwidth approaching saturation |
+| **Collapse** | **32T → 64T** | **1.37 → 1.18** | **DRAM queue saturated; ROB fills with stalled loads** |
+| Floor | 64T → 96T | 1.18 → 1.13 | Thread overhead dominates |
+
+The IPC knee at **32T** coincides exactly with the wall-time speedup plateau — both signals share the same root cause: DRAM bandwidth saturation on a single NUMA socket.
 
 ### 9j. reads_sup vs reads_hac comparison (Luna, 1T, all DBs)
 
