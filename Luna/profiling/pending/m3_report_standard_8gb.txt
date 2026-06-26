@@ -1,0 +1,20 @@
+    40.52%  classify  [unknown]             [k] 0xffffffffb3247ff8
+    26.85%  classify  [unknown]             [k] 0xffffffffb3e00ba0
+     6.34%  classify  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     5.70%  classify  classify              [.] kraken2::CompactHashTable::Get(unsigned long) const
+     5.50%  classify  classify              [.] std::__detail::_Map_base<unsigned long, std::pair<unsigned long const, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> > >, std::allocator<std::pair<unsigned long const, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> > > >, std::__detail::_Select1st, std::equal_to<unsigned long>, std::hash<unsigned long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true>, true>::operator[](unsigned long const&)
+     5.29%  classify  libc.so.6             [.] __memchr_evex
+     1.37%  classify  [unknown]             [k] 0xffffffffb3247ffa
+     1.37%  classify  [unknown]             [k] 0xffffffffb3248000
+     0.71%  classify  [unknown]             [k] 0xffffffffb2e41973
+     0.54%  classify  classify              [.] std::pair<std::__detail::_Node_iterator<unsigned int, true, false>, bool> std::_Hashtable<unsigned int, unsigned int, std::allocator<unsigned int>, std::__detail::_Identity, std::equal_to<unsigned int>, std::hash<unsigned int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert<unsigned int const&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<unsigned int, false> > > >(unsigned int const&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<unsigned int, false> > > const&, std::integral_constant<bool, true>) [clone .isra.0]
+     0.53%  classify  [unknown]             [k] 0xffffffffb3248005
+     0.26%  classify  [unknown]             [k] 0xffffffffb2e52868
+     0.24%  classify  [unknown]             [k] 0xffffffffb2e4fb48
+     0.24%  classify  [unknown]             [k] 0xffffffffb2e52912
+     0.23%  classify  libc.so.6             [.] malloc
+     0.22%  classify  [unknown]             [k] 0xffffffffb2e4fb6a
+     0.22%  classify  [unknown]             [k] 0xffffffffb2e5276f
+     0.18%  classify  [unknown]             [k] 0xffffffffb2e70de9
+     0.15%  classify  libc.so.6             [.] _int_free
+     0.14%  classify  [unknown]             [k] 0xffffffffb2e5279f

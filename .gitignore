@@ -41,3 +41,7 @@ gmon.out
 Luna/profiling/perf_output_hac_full.txt
 Luna/profiling/perf_output_sup.txt
 Luna/profiling/perf_record_hac_32t_out.txt
+
+# M1-M7 large binary/data files (keep only txt summaries)
+Luna/profiling/pending/m5_histogram.txt
+Luna/profiling/pending/*.data

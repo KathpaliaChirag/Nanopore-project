@@ -1,0 +1,9 @@
+capacity      : 2,000,000,000
+size          : 1,401,205,130
+load_factor   : 0.7006
+key_bits      : 16
+value_bits    : 16
+key+value     : 32  (32-bit cell)
+file_bytes    : 8,000,000,032
+implied bytes/cell : 4.000
+cells/cache_line   : 16.00

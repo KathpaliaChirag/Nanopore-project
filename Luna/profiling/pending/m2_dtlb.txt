@@ -1,0 +1,20 @@
+Loading database information... done.
+104918 sequences (355.36 Mbp) processed in 0.681s (9239.4 Kseq/m, 31293.56 Mbp/m).
+  100481 sequences classified (95.77%)
+  4437 sequences unclassified (4.23%)
+
+ Performance counter stats for 'kraken2 --db /home/student/AccuracyDrift/databases/standard_8gb --threads 32 --output /dev/null --report /dev/null /home/student/results/basecalling/reads_hac.fastq':
+
+   60,26,38,74,041      cycles                                                                
+ 1,11,73,36,02,783      instructions                     #    1.85  insn per cycle            
+   30,29,66,27,002      dTLB-loads                                                            
+       1,62,28,544      dTLB-load-misses                 #    0.05% of all dTLB cache accesses
+   14,20,61,52,013      dTLB-stores                                                           
+       1,97,42,893      dTLB-store-misses                                                     
+
+       4.779997735 seconds time elapsed
+
+      15.282032000 seconds user
+       4.643009000 seconds sys
+
+

@@ -1,0 +1,3 @@
+unique_minimizers : 32782212
+total_lookups    : 351788683
+reuse_rate       : 0.9068 (90.7%)

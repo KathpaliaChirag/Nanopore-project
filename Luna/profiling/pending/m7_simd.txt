@@ -1,0 +1,7 @@
+=== M7: SIMD instruction count ===
+AVX-512 zmm:
+0
+AVX2 ymm:
+0
+SSE xmm:
+1308

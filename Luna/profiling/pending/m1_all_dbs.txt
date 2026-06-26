@@ -1,0 +1,24 @@
+=== sample_targeted ===
+  load_factor   : 0.6899  (69.0% full)
+  cell size     : 26+6 bits = 32 (32-bit/4B)
+  file size     : 0.05 GB
+  cells/64B line: 16.00  → PF_STRIDE = 16
+
+=== standard_8gb ===
+  load_factor   : 0.7006  (70.1% full)
+  cell size     : 16+16 bits = 32 (32-bit/4B)
+  file size     : 8.00 GB
+  cells/64B line: 16.00  → PF_STRIDE = 16
+
+=== standard_16gb ===
+  load_factor   : 0.7001  (70.0% full)
+  cell size     : 16+16 bits = 32 (32-bit/4B)
+  file size     : 16.00 GB
+  cells/64B line: 16.00  → PF_STRIDE = 16
+
+=== pluspf_103gb ===
+  load_factor   : 0.7007  (70.1% full)
+  cell size     : 16+16 bits = 32 (32-bit/4B)
+  file size     : 111.00 GB
+  cells/64B line: 16.00  → PF_STRIDE = 16
+

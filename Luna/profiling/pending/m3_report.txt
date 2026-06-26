@@ -1,0 +1,40 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 48K of event 'LLC-load-misses'
+# Event count (approx.): 100936361
+#
+# Overhead  Command   Shared Object         Symbol                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+# ........  ........  ....................  ......................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    40.14%  classify  [unknown]             [k] 0xffffffffb3247ff8
+    26.69%  classify  [unknown]             [k] 0xffffffffb3e00ba0
+     6.27%  classify  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     5.84%  classify  classify              [.] kraken2::CompactHashTable::Get(unsigned long) const
+     5.64%  classify  classify              [.] std::__detail::_Map_base<unsigned long, std::pair<unsigned long const, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> > >, std::allocator<std::pair<unsigned long const, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> > > >, std::__detail::_Select1st, std::equal_to<unsigned long>, std::hash<unsigned long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true>, true>::operator[](unsigned long const&)
+     5.14%  classify  libc.so.6             [.] __memchr_evex
+     1.59%  classify  [unknown]             [k] 0xffffffffb3247ffa
+     1.45%  classify  [unknown]             [k] 0xffffffffb3248000
+     0.70%  classify  [unknown]             [k] 0xffffffffb2e41973
+     0.68%  classify  classify              [.] std::pair<std::__detail::_Node_iterator<unsigned int, true, false>, bool> std::_Hashtable<unsigned int, unsigned int, std::allocator<unsigned int>, std::__detail::_Identity, std::equal_to<unsigned int>, std::hash<unsigned int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert<unsigned int const&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<unsigned int, false> > > >(unsigned int const&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<unsigned int, false> > > const&, std::integral_constant<bool, true>) [clone .isra.0]
+     0.50%  classify  [unknown]             [k] 0xffffffffb3248005
+     0.27%  classify  [unknown]             [k] 0xffffffffb2e52868
+     0.25%  classify  [unknown]             [k] 0xffffffffb2e52912
+     0.25%  classify  [unknown]             [k] 0xffffffffb2e4fb48
+     0.19%  classify  [unknown]             [k] 0xffffffffb2e5276f
+     0.19%  classify  libc.so.6             [.] malloc
+     0.19%  classify  [unknown]             [k] 0xffffffffb2e4fb6a
+     0.18%  classify  [unknown]             [k] 0xffffffffb2e70de9
+     0.15%  classify  [unknown]             [k] 0xffffffffb2e5279f
+     0.15%  classify  libc.so.6             [.] _int_free
+     0.14%  classify  [unknown]             [k] 0xffffffffb2e5279b
+     0.13%  classify  classify              [.] HyperLogLogPlusMinus<unsigned long>::addToRegisters(std::unordered_set<unsigned int, std::hash<unsigned int>, std::equal_to<unsigned int>, std::allocator<unsigned int> > const&)
+     0.11%  classify  [unknown]             [k] 0xffffffffb2e4fe74
+     0.09%  classify  [unknown]             [k] 0xffffffffb2e4ff51
+     0.09%  classify  classify              [.] kraken2::MinimizerScanner::NextMinimizer()
+     0.08%  classify  [unknown]             [k] 0xffffffffb2e50174
+     0.08%  classify  classify              [.] kraken2::BatchSequenceReader::ReadNextSequence(std::istream&, kraken2::Sequence&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, kraken2::SequenceFormat)
+     0.07%  classify  classify              [.] ClassifySequence(kraken2::Sequence&, kraken2::Sequence&, std::__cxx11::basic_ostringstream<char, std::char_traits<char>, std::allocator<char> >&, kraken2::KeyValueStore*, kraken2::Taxonomy&, kraken2::IndexOptions&, Options&, ClassificationStats&, kraken2::MinimizerScanner&, std::vector<unsigned long, std::allocator<unsigned long> >&, std::unordered_map<unsigned long, unsigned long, std::hash<unsigned long>, std::equal_to<unsigned long>, std::allocator<std::pair<unsigned long const, unsigned long> > >&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >&, std::unordered_map<unsigned long, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> >, std::hash<unsigned long>, std::equal_to<unsigned long>, std::allocator<std::pair<unsigned long const, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> > > > >&)
+     0.07%  classify  [unknown]             [k] 0xffffffffb2e4fb30

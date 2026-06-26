@@ -1,0 +1,20 @@
+    33.06%  classify  [unknown]             [k] 0xffffffffb3247ff8
+    32.15%  classify  libc.so.6             [.] __memmove_avx512_unaligned_erms
+    21.31%  classify  libc.so.6             [.] __memchr_evex
+     3.96%  classify  [unknown]             [k] 0xffffffffb3e00ba0
+     2.24%  classify  classify              [.] kraken2::CompactHashTable::Get(unsigned long) const
+     0.56%  classify  [unknown]             [k] 0xffffffffb3247ffa
+     0.46%  classify  [unknown]             [k] 0xffffffffb2e41973
+     0.41%  classify  classify              [.] std::pair<std::__detail::_Node_iterator<unsigned int, true, false>, bool> std::_Hashtable<unsigned int, unsigned int, std::allocator<unsigned int>, std::__detail::_Identity, std::equal_to<unsigned int>, std::hash<unsigned int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert<unsigned int const&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<unsigned int, false> > > >(unsigned int const&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<unsigned int, false> > > const&, std::integral_constant<bool, true>) [clone .isra.0]
+     0.34%  classify  libc.so.6             [.] malloc
+     0.29%  classify  classify              [.] std::__detail::_Map_base<unsigned long, std::pair<unsigned long const, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> > >, std::allocator<std::pair<unsigned long const, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> > > >, std::__detail::_Select1st, std::equal_to<unsigned long>, std::hash<unsigned long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true>, true>::operator[](unsigned long const&)
+     0.27%  classify  classify              [.] kraken2::BatchSequenceReader::ReadNextSequence(std::istream&, kraken2::Sequence&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, kraken2::SequenceFormat)
+     0.26%  classify  [unknown]             [k] 0xffffffffb2e5279f
+     0.23%  classify  libc.so.6             [.] _int_malloc
+     0.23%  classify  libc.so.6             [.] _int_free
+     0.23%  classify  [unknown]             [k] 0xffffffffb2d977b5
+     0.21%  classify  classify              [.] kraken2::MinimizerScanner::NextMinimizer()
+     0.21%  classify  libstdc++.so.6.0.30   [.] std::basic_istream<char, std::char_traits<char> >& std::getline<char, std::char_traits<char>, std::allocator<char> >(std::basic_istream<char, std::char_traits<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, char)
+     0.20%  classify  [unknown]             [k] 0xffffffffb3ba2be7
+     0.19%  classify  classify              [.] ClassifySequence(kraken2::Sequence&, kraken2::Sequence&, std::__cxx11::basic_ostringstream<char, std::char_traits<char>, std::allocator<char> >&, kraken2::KeyValueStore*, kraken2::Taxonomy&, kraken2::IndexOptions&, Options&, ClassificationStats&, kraken2::MinimizerScanner&, std::vector<unsigned long, std::allocator<unsigned long> >&, std::unordered_map<unsigned long, unsigned long, std::hash<unsigned long>, std::equal_to<unsigned long>, std::allocator<std::pair<unsigned long const, unsigned long> > >&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >&, std::unordered_map<unsigned long, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> >, std::hash<unsigned long>, std::equal_to<unsigned long>, std::allocator<std::pair<unsigned long const, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> > > > >&)
+     0.19%  classify  [unknown]             [k] 0xffffffffb2e5279b

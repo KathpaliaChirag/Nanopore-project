@@ -1,0 +1,12 @@
+ 34.13	35831	35831	U	0	unclassified
+ 65.87	69149	0	R	1	root
+ 65.87	69149	0	R1	131567	  cellular organisms
+ 65.87	69149	0	R2	2	    Bacteria
+ 65.87	69149	0	K	3379134	      Pseudomonadati
+ 65.87	69149	0	P	1224	        Pseudomonadota
+ 65.87	69149	0	C	1236	          Gammaproteobacteria
+ 65.87	69149	0	O	72274	            Pseudomonadales
+ 65.87	69149	0	F	135621	              Pseudomonadaceae
+ 65.87	69149	0	G	286	                Pseudomonas
+ 65.87	69149	0	G1	136841	                  Pseudomonas aeruginosa group
+ 65.87	69149	69149	S	287	                    Pseudomonas aeruginosa

@@ -1,0 +1,44 @@
+=== M4: sample_targeted ===
+          2,143.22 MiB  uncore_imc_0/cas_count_read/                                          
+          1,645.00 MiB  uncore_imc_0/cas_count_write/                                         
+          2,141.76 MiB  uncore_imc_2/cas_count_read/                                          
+          1,644.65 MiB  uncore_imc_2/cas_count_write/                                         
+          2,146.41 MiB  uncore_imc_4/cas_count_read/                                          
+          1,650.17 MiB  uncore_imc_4/cas_count_write/                                         
+          2,146.79 MiB  uncore_imc_6/cas_count_read/                                          
+          1,647.97 MiB  uncore_imc_6/cas_count_write/                                         
+       0.970467111 seconds time elapsed
+
+=== M4: standard_8gb ===
+          6,872.42 MiB  uncore_imc_0/cas_count_read/                                          
+          3,937.74 MiB  uncore_imc_0/cas_count_write/                                         
+          6,872.69 MiB  uncore_imc_2/cas_count_read/                                          
+          3,938.25 MiB  uncore_imc_2/cas_count_write/                                         
+          6,879.64 MiB  uncore_imc_4/cas_count_read/                                          
+          3,944.53 MiB  uncore_imc_4/cas_count_write/                                         
+          6,876.64 MiB  uncore_imc_6/cas_count_read/                                          
+          3,942.12 MiB  uncore_imc_6/cas_count_write/                                         
+       5.035736688 seconds time elapsed
+
+=== M4: standard_16gb ===
+         11,935.63 MiB  uncore_imc_0/cas_count_read/                                          
+          6,220.30 MiB  uncore_imc_0/cas_count_write/                                         
+         11,932.88 MiB  uncore_imc_2/cas_count_read/                                          
+          6,219.91 MiB  uncore_imc_2/cas_count_write/                                         
+         11,942.96 MiB  uncore_imc_4/cas_count_read/                                          
+          6,228.80 MiB  uncore_imc_4/cas_count_write/                                         
+         11,939.95 MiB  uncore_imc_6/cas_count_read/                                          
+          6,225.15 MiB  uncore_imc_6/cas_count_write/                                         
+       8.536673489 seconds time elapsed
+
+=== M4: pluspf_103gb ===
+         68,585.69 MiB  uncore_imc_0/cas_count_read/                                          
+         34,076.53 MiB  uncore_imc_0/cas_count_write/                                         
+         68,610.73 MiB  uncore_imc_2/cas_count_read/                                          
+         34,098.85 MiB  uncore_imc_2/cas_count_write/                                         
+         68,593.51 MiB  uncore_imc_4/cas_count_read/                                          
+         34,076.97 MiB  uncore_imc_4/cas_count_write/                                         
+         68,609.38 MiB  uncore_imc_6/cas_count_read/                                          
+         34,092.83 MiB  uncore_imc_6/cas_count_write/                                         
+      57.562930037 seconds time elapsed
+

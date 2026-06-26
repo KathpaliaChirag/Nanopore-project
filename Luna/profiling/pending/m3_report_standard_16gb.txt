@@ -1,0 +1,20 @@
+    39.53%  classify  [unknown]             [k] 0xffffffffb3247ff8
+    30.34%  classify  [unknown]             [k] 0xffffffffb3e00ba0
+     7.75%  classify  classify              [.] kraken2::CompactHashTable::Get(unsigned long) const
+     6.58%  classify  classify              [.] std::__detail::_Map_base<unsigned long, std::pair<unsigned long const, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> > >, std::allocator<std::pair<unsigned long const, kraken2::ReadCounts<HyperLogLogPlusMinus<unsigned long> > > >, std::__detail::_Select1st, std::equal_to<unsigned long>, std::hash<unsigned long>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, false, true>, true>::operator[](unsigned long const&)
+     4.88%  classify  libc.so.6             [.] __memmove_avx512_unaligned_erms
+     2.99%  classify  libc.so.6             [.] __memchr_evex
+     1.37%  classify  [unknown]             [k] 0xffffffffb3248000
+     1.12%  classify  [unknown]             [k] 0xffffffffb3247ffa
+     0.57%  classify  [unknown]             [k] 0xffffffffb2e41973
+     0.42%  classify  [unknown]             [k] 0xffffffffb2e52868
+     0.32%  classify  [unknown]             [k] 0xffffffffb3248005
+     0.23%  classify  classify              [.] std::pair<std::__detail::_Node_iterator<unsigned int, true, false>, bool> std::_Hashtable<unsigned int, unsigned int, std::allocator<unsigned int>, std::__detail::_Identity, std::equal_to<unsigned int>, std::hash<unsigned int>, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<false, true, true> >::_M_insert<unsigned int const&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<unsigned int, false> > > >(unsigned int const&, std::__detail::_AllocNode<std::allocator<std::__detail::_Hash_node<unsigned int, false> > > const&, std::integral_constant<bool, true>) [clone .isra.0]
+     0.23%  classify  [unknown]             [k] 0xffffffffb2e70de9
+     0.20%  classify  [unknown]             [k] 0xffffffffb2e4fb6a
+     0.20%  classify  [unknown]             [k] 0xffffffffb2e4fb48
+     0.19%  classify  [unknown]             [k] 0xffffffffb2e5276f
+     0.15%  classify  [unknown]             [k] 0xffffffffb2e52912
+     0.13%  classify  classify              [.] kraken2::MinimizerScanner::NextMinimizer()
+     0.13%  classify  libc.so.6             [.] malloc
+     0.12%  classify  libc.so.6             [.] _int_free

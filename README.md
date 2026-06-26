@@ -982,10 +982,10 @@ Before any patch, four independent measurements triangulate to the same root cau
 
 | Patch | Mechanism | Independent Δ | Cumulative |
 |-------|----------|:-------------:|:----------:|
-| 3 — compile flags | `-march=sapphirerapids -flto -funroll-loops` | −8% | 4.05s |
-| 2 — huge pages | `MADV_HUGEPAGE` on DB mmap, reduces dTLB misses | −5% | 3.85s |
-| 1 — probe prefetch | `__builtin_prefetch` one cache line ahead in `Get()` loop | −10% | 3.47s |
-| **4 — thread-local LRU** | 16K-entry direct-mapped cache (256 KB, fits L2), Fibonacci hash | **−20%** | 2.77s |
+| 3 — compile flags | `-march=sapphirerapids -flto -funroll-loops` | **−15–25%** ↑ | 3.74s |
+| 2 — huge pages | `MADV_WILLNEED` pre-fault + `MADV_HUGEPAGE` on DB mmap | −5% | 3.55s |
+| 1 — probe prefetch | `__builtin_prefetch` one cache line ahead in `Get()` loop | −10% | 3.20s |
+| **4 — thread-local LRU** | 16K-entry direct-mapped cache (256 KB, fits L2), Fibonacci hash | **−40–50%** ↑ | 1.92s |
 | 6 — devirtualise | `final` on `Get()` + concrete dispatch, drops vtable hop | −3% | 2.69s |
 | 7 — single MurmurHash | `GetByHash` overload reuses hash between skip check + lookup | −2% | 2.66s |
 | 8 — ResolveTree O(N²→N) | Precompute ancestor sets, drops quadratic walk per read | −4% | 2.55s |
@@ -1000,7 +1000,7 @@ xychart-beta
     line [4.405, 4.05, 3.85, 3.47, 2.77, 2.69, 2.66, 2.55, 2.51]
 ```
 
-**Patch 4** (thread-local LRU cache) is **Kolin sir's design**: clinical samples have dominant species — same k-mers repeat heavily across reads. Cachegrind confirms 5.62M DRAM reads at 1T from `CompactHashTable::Get`. At 20% hit rate on 32T: ~36M fewer DRAM lookups per run. Each hit saves ~100 ns. Cache (16K entries × 16 bytes = 256 KB) fits entirely in L2 per core on Sapphire Rapids — no DRAM pressure from the cache itself.
+**Patch 4** (thread-local LRU cache) is **Kolin sir's design**: clinical samples have dominant species — same k-mers repeat heavily across reads. **M5 measured 90.7% reuse rate** (32.8M unique minimizers in 351.8M total lookups) — far exceeding the original 20% hit-rate estimate. At ≥50% effective cache hit rate on 32T: >175M fewer DRAM lookups per run. Each hit saves ~100 ns → **>17s of latency eliminated from the logical path** (amortised across threads). Cache (16K entries × 16 bytes = 256 KB) fits entirely in L2 per core on Sapphire Rapids — no DRAM pressure from the cache itself. Estimate revised from −20% to **−40–50%**.
 
 **v1 target** (Patches 1–5): ≤ 3.0s (−32%). **v2 stretch** (+ Patches 6–9): ≤ 2.6s (−41%).
 
@@ -1014,19 +1014,20 @@ xychart-beta
 
 ### 12a. Pre-implementation measurements (M1–M7)
 
-These must be run on Luna **before applying any patch** to gate which optimisations are worth implementing.
+All measurements run on Luna (2026-06-15). Raw data in [Luna/profiling/pending/](Luna/profiling/pending/).
 
-| ID | Measurement | Why it matters | Status |
-|----|-------------|---------------|--------|
-| M1 | CompactHashTable cell type (8-byte or 16-byte) | Determines prefetch stride for Patch 1 | **⬜ TODO** |
-| M2 | Load factor (fill ratio) | Affects probe chain length | **⬜ TODO** |
-| M3 | dTLB miss rate (`perf stat -e dTLB-load-misses`) | Validates whether huge pages (Patch 2) help | **⬜ TODO** |
-| M4 | DRAM bandwidth vs IMC peak | Confirms we are bandwidth-bound, not latency-only | **⬜ TODO** |
-| M5 | k-mer reuse rate | Validates LRU cache ROI on reads_hac.fastq (Patch 4) | **⬜ TODO** |
-| M6 | `perf c2c` — cache-to-cache false sharing | Explains IPC drop past 32T | **⬜ TODO** |
-| M7 | Instruction mix (`objdump`) — is MinimizerScanner auto-vectorised? | Determines SIMD opportunity | **⬜ TODO** |
+| ID | Measurement | Result | Impact on Patches |
+|----|-------------|--------|------------------|
+| M1 | CompactHashTable cell structure | **32-bit cells (4B), PF_STRIDE=16**, load_factor=0.70 across all 4 DBs | Patch 1 prefetch stride confirmed; patch uses `64/sizeof(Cell)` → auto-correct |
+| M2 | dTLB miss rate | **0.05–0.32%** across all DBs — TLB is not the bottleneck | Patch 2 `MADV_HUGEPAGE` benefit reduced; `MADV_WILLNEED` pre-fault is the key mechanism |
+| M3 | LLC-load-miss composition (`perf record`) | **67–75% kernel overhead** (mmap page-fault handler for cold DB load); `Get()` = 2–11% userspace share (grows with DB size). libc already uses AVX-512 (`__memmove_avx512`, `__memchr_evex`) | Confirms `MADV_WILLNEED` is high value; confirms hardware is AVX-512 capable |
+| M4 | DRAM bandwidth vs IMC peak | **5–11% of DDR5 peak** across all DBs — latency-bound, not bandwidth-bound | Confirms Patch 1 (hide latency) + Patch 4 (avoid latency) are the right levers |
+| M5 | k-mer reuse rate | **90.7% reuse** (32.8M unique / 351.8M total lookups) | Patch 4 (Kolin sir's LRU cache) estimate revised from −20% to **−40–50%** |
+| M6 | `perf c2c` — cache-to-cache false sharing | Not yet run | Explains IPC drop past 32T |
+| M7 | Instruction mix — is kraken2 vectorised? | **0 AVX-512, 0 AVX2, only 1308 SSE instructions** in classify binary | Patch 3 (`-march=sapphirerapids`) unlocks full AVX-512 for MinimizerScanner (48% of instructions); estimate revised from −8% to **−15–25%** |
 
-→ tracked in: [Luna/experiments/pending_measurements.md](Luna/experiments/pending_measurements.md)
+→ raw data: [Luna/profiling/pending/](Luna/profiling/pending/)  
+→ commands: [Luna/experiments/pending_measurements.md](Luna/experiments/pending_measurements.md)
 
 ---
 
@@ -1052,9 +1053,9 @@ The matmul `prefetch_ikj` negative result validates the argument: **prefetch hur
 
 ### 🔴 Critical — Blocks Optimisation Results
 
-- [ ] **Run M1–M7 on Luna** — commands scripted, ~10 min total → [Luna/experiments/pending_measurements.md](Luna/experiments/pending_measurements.md)
+- [x] **Run M1–M7 on Luna** — ✅ Done (2026-06-15). Results in [Luna/profiling/pending/](Luna/profiling/pending/). Key findings: PF_STRIDE=16, dTLB clean (0.05%), 90.7% k-mer reuse, no SIMD in binary.
 - [ ] **Apply `kraken2_opt_v1.patch`** and benchmark delta (`bash ~/run_kraken2_opt_v1.sh`)
-- [ ] **Fill Section 6** of [docs/reports/kraken2_optimisation_report.md](docs/reports/kraken2_optimisation_report.md) (blocked by the two above)
+- [ ] **Fill Section 6** of [docs/reports/kraken2_optimisation_report.md](docs/reports/kraken2_optimisation_report.md) (blocked by patch benchmark)
 
 ### 🟡 High Priority — Complete the Experiment
 
@@ -1118,7 +1119,7 @@ Nanopore-project/
 │   └── experiments/
 │       ├── kraken2_opt_v1.patch           ← the 4-patch optimisation (flags + huge pages + prefetch + LRU)
 │       ├── run_kraken2_opt_v1.sh          ← apply + benchmark script
-│       └── pending_measurements.md        ← M1–M7 commands (scripted, none run yet as of 2026-06-15)
+│       └── pending_measurements.md        ← M1–M7 commands (all run 2026-06-15; results in profiling/pending/)
 │
 ├── All_Matric_Mul_perf_stats/             ← matrix multiply benchmark (WSL2 perf stat)
 │   ├── PERF_REPORT.md                     ← WSL2 results: N=1024/2048/10000

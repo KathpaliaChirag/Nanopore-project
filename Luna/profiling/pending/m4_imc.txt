@@ -1,0 +1,26 @@
+Loading database information... done.
+104918 sequences (355.36 Mbp) processed in 0.681s (9242.3 Kseq/m, 31303.62 Mbp/m).
+  100481 sequences classified (95.77%)
+  4437 sequences unclassified (4.23%)
+
+ Performance counter stats for 'system wide':
+
+          6,870.68 MiB  uncore_imc_0/cas_count_read/                                          
+          3,940.81 MiB  uncore_imc_0/cas_count_write/                                         
+              0.00 MiB  uncore_imc_1/cas_count_read/                                          
+              0.00 MiB  uncore_imc_1/cas_count_write/                                         
+          6,871.60 MiB  uncore_imc_2/cas_count_read/                                          
+          3,940.47 MiB  uncore_imc_2/cas_count_write/                                         
+              0.00 MiB  uncore_imc_3/cas_count_read/                                          
+              0.00 MiB  uncore_imc_3/cas_count_write/                                         
+          6,873.39 MiB  uncore_imc_4/cas_count_read/                                          
+          3,943.09 MiB  uncore_imc_4/cas_count_write/                                         
+              0.00 MiB  uncore_imc_5/cas_count_read/                                          
+              0.00 MiB  uncore_imc_5/cas_count_write/                                         
+          6,873.99 MiB  uncore_imc_6/cas_count_read/                                          
+          3,943.06 MiB  uncore_imc_6/cas_count_write/                                         
+              0.00 MiB  uncore_imc_7/cas_count_read/                                          
+              0.00 MiB  uncore_imc_7/cas_count_write/                                         
+
+       5.008768499 seconds time elapsed
+

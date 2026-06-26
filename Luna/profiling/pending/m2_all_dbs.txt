@@ -1,0 +1,24 @@
+=== sample_targeted ===
+   30,77,59,60,111      dTLB-loads                                                            
+       9,84,84,810      dTLB-load-misses                 #    0.32% of all dTLB cache accesses
+   67,76,09,14,684      cycles                                                                
+       0.934343324 seconds time elapsed
+
+=== standard_8gb ===
+   30,32,88,59,913      dTLB-loads                                                            
+       1,69,97,317      dTLB-load-misses                 #    0.06% of all dTLB cache accesses
+   63,06,20,64,473      cycles                                                                
+       5.050656078 seconds time elapsed
+
+=== standard_16gb ===
+   37,74,54,03,690      dTLB-loads                                                            
+       3,21,82,341      dTLB-load-misses                 #    0.09% of all dTLB cache accesses
+   85,20,60,14,938      cycles                                                                
+       8.581794284 seconds time elapsed
+
+=== pluspf_103gb ===
+   78,17,30,79,889      dTLB-loads                                                            
+      15,73,69,247      dTLB-load-misses                 #    0.20% of all dTLB cache accesses
+ 3,10,27,16,05,244      cycles                                                                
+      56.945336798 seconds time elapsed
+
