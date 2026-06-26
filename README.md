@@ -50,6 +50,21 @@ species report → "patient has Pseudomonas aeruginosa"
 | **dorado** | 82% of GPU time is GEMM (Tensor Cores, FP16) | Transformer NN forward pass dominates | S2B signal cache (GPU-side, ~25% savings at 30% hit rate) |
 | **kraken2** | 96.24% of LLC misses in `CompactHashTable::Get()` | 8 GB DB >> 210 MB L3; every lookup is DRAM | Prefetch + thread-local LRU cache (Kolin sir's design) |
 
+### Key Numbers at a Glance
+
+| Metric | Value | Source |
+|--------|-------|--------|
+| `CompactHashTable::Get` — instructions% | **0.65%** | cachegrind, 1T |
+| `CompactHashTable::Get` — LLC miss% | **96.24%** | cachegrind, 1T |
+| NUMA free win (96T default → 32T node0) | **−21.8%** wall time | perf stat, Steps 7–9 |
+| DRAM bandwidth utilisation | **5.9–10.7%** of DDR5 peak | uncore IMC, M4 |
+| Retiring% of pipeline slots at baseline | **26.9%** | TMA, 96T |
+| Peak thread scaling (pre-cliff 50 MB DB) | **21.26×** at 32T | AccuracyDrift |
+| Peak thread scaling (Amdahl 8 GB DB) | **3.47×** at 32T | AccuracyDrift |
+| Classification accuracy — pluspf ceiling | **98.86%** (hac) / **99.24%** (sup) | AccuracyChase |
+| Dorado GEMM% of GPU time | **82%** | Nsight Systems |
+| Luna LLC vs Orion SLC | **210 MB vs 4 MB** (52×) | hardware |
+
 ---
 
 ## 2. The 6 ESKAPE Pathogens
