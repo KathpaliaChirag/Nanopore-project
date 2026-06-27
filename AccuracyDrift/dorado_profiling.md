@@ -22,15 +22,19 @@
 
 ## Baseline Wall Times — GPU vs CPU
 
-| Model | GPU wall time | GPU throughput (samples/s) | CPU wall time | CPU throughput (samples/s) | GPU speedup | CPU RAM |
-|---|---|---|---|---|---|---|
-| fast | 33.9s | 2.35 × 10⁸ | 9m 40s (616,959 ms) | 8.23 × 10⁶ | **28.6×** | 47 GB |
-| hac  | 55.0s | 2.03 × 10⁸ | 43m 26s (2,694,842 ms) | 1.88 × 10⁶ | **107×** | |
-| sup  | 4m 26s | 1.98 × 10⁷ | running (~8h est.) | | | |
+| Model | Luna L40S GPU | Luna CPU | Orion Ampere GPU | Luna GPU speedup vs CPU |
+|---|---|---|---|---|
+| fast | 33.9s / 2.35×10⁸ sp/s | 9m 40s / 8.23×10⁶ sp/s | 6m 44s / 1.31×10⁷ sp/s | **28.6×** |
+| hac  | 55.0s / 2.03×10⁸ sp/s | 43m 26s / 1.88×10⁶ sp/s | ~24 min (est., disconnected) | **107×** |
+| sup  | 4m 26s / 1.98×10⁷ sp/s | **~9 days (est.)** | not run | **~3,000× (est.)** |
 
-> GPU runs: 2× L40S (cuda:0 + cuda:1). CPU runs: 650 threads, ~130 cores active.
+> Luna GPU: 2× L40S (cuda:0 + cuda:1), dorado v1.4.0. CPU: 650 threads, ~130 cores active, 96 GB RAM.
+> Orion GPU: 2048-core Ampere iGPU, 64 GB unified memory, dorado v0.5.3, batch size capped at 64.
+> SUP CPU: progress bar showed `9d:01h:14m:10s` remaining after 12 min elapsed — cancelled, estimate used.
+> Orion HAC: ~24 min ETA shown at 0% before SSH disconnect — estimate only.
 
-**GPU batch sizes:** fast=320, hac=2,944, sup=96 (VRAM-limited)
+**Luna GPU batch sizes:** fast=320, hac=2,944, sup=96 (VRAM-limited)
+**Orion GPU batch sizes:** fast=64, hac=64 (unified memory constraint)
 
 > **Why SUP CPU is so slow:** The SUP model uses FP8 precision (`fp8_e4m3`) on GPU — a data type natively accelerated by Ada Lovelace tensor cores. No CPU architecture currently supports native FP8 arithmetic (Intel Xeon Platinum 8468 has AMX for BF16/INT8 but not FP8). On CPU, dorado falls back to FP32 for all FP8 ops, increasing both compute cost and memory bandwidth. The fused GPU kernels (e.g. `mm_swiglu<fp8>` = matmul + SwiGLU in one pass) also break into separate CPU ops, adding overhead. Result: the SUP GPU→CPU penalty is expected to be far worse than fast (28.6×) or hac (107×).
 
@@ -153,6 +157,20 @@
 | **Total GEMM (FP8 + FP16)** | **~43.6%** | incl. attention QKV projections |
 | **Total Transformer ops** | **~71%** | GEMM + attention + RMSNorm |
 | **Total LSTM** | **0%** | no LSTM kernels at all |
+
+---
+
+## Orion GPU Runs (Jetson AGX Orin, dorado v0.5.3)
+
+> Machine: Orion | GPU: 2048-core Ampere iGPU, 64 GB unified memory
+> dorado v0.5.3, model v4.3.0, batch size capped at 64 (OOM at default)
+> Same pod5 input: FBE01990_24778b97_03e50f91_10.pod5 (104,478 reads)
+
+| Model | Wall time | Throughput (samples/s) |
+|---|---|---|
+| fast | 6m 44s | 1.31 × 10⁷ |
+| hac | running | |
+| sup | | |
 
 ---
 
