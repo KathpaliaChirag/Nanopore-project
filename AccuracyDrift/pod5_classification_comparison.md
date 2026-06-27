@@ -8,13 +8,13 @@ ESKAPE pathogen species breakdown per pod5 file. HAC model. 96 Kraken2 runs done
 
 **Row order:** ESKAPE acronym sequence. E. coli is not an ESKAPE pathogen — counted in "Other classified".  
 **Percentages** = % of all reads for that pod5 file (classified + unclassified denominator).  
-**Note on pod5 9:** report totals match the old single-FASTQ reference run (104,918 reads). Likely run with reads_hac.fastq instead of the per-pod5 FASTQ — data included as-is.
+**Note on pod5 10:** report totals (104,918) match the old reads_hac.fastq reference run — likely mis-run with the single-FASTQ instead of per-pod5 file. Data included as-is.
 
 ---
 
 ## Aggregate — All 16 Pod5 Files Combined (HAC Model, 2026-06-22)
 
-Total reads processed: **1,872,777** across both DBs.
+Total reads processed: **1,872,777**
 
 | Species | 50 MB DB | 103 GB DB |
 |---------|----------|-----------|
@@ -116,54 +116,6 @@ Total reads: 131,822
 ---
 
 ### Pod5 5 — FBE01990_24778b97_03e50f91_5.pod5
-Total reads: 120,965
-
-| Species | 50 MB DB | 103 GB DB |
-|---------|----------|-----------|
-| *Enterococcus faecium* | 0.00% (0) | 0.00% (0) |
-| *Staphylococcus aureus* | 0.01% (7) | 0.00% (0) |
-| *Klebsiella pneumoniae* | 9.85% (11,918) | 9.06% (10,955) |
-| *Acinetobacter baumannii* | 0.00% (0) — absent from DB | 0.30% (363) |
-| *Pseudomonas aeruginosa* | 52.41% (63,395) | 42.10% (50,931) |
-| *Enterobacter cloacae* | 0.48% (585) | 0.07% (85) |
-| Other classified | 21.78% (26,348) | 47.19% (57,089) |
-| **Unclassified** | **15.47% (18,712)** | **1.27% (1,542)** |
-
----
-
-### Pod5 6 — FBE01990_24778b97_03e50f91_6.pod5
-Total reads: 119,216
-
-| Species | 50 MB DB | 103 GB DB |
-|---------|----------|-----------|
-| *Enterococcus faecium* | 0.00% (1) | 0.00% (0) |
-| *Staphylococcus aureus* | 0.01% (7) | 0.00% (1) |
-| *Klebsiella pneumoniae* | 9.96% (11,878) | 9.22% (10,989) |
-| *Acinetobacter baumannii* | 0.00% (0) — absent from DB | 0.30% (357) |
-| *Pseudomonas aeruginosa* | 52.53% (62,621) | 41.88% (49,924) |
-| *Enterobacter cloacae* | 0.52% (621) | 0.07% (84) |
-| Other classified | 21.87% (26,071) | 47.34% (56,432) |
-| **Unclassified** | **15.11% (18,017)** | **1.20% (1,429)** |
-
----
-
-### Pod5 7 — FBE01990_24778b97_03e50f91_7.pod5
-Total reads: 122,764
-
-| Species | 50 MB DB | 103 GB DB |
-|---------|----------|-----------|
-| *Enterococcus faecium* | 0.01% (7) | 0.00% (0) |
-| *Staphylococcus aureus* | 0.00% (2) | 0.00% (0) |
-| *Klebsiella pneumoniae* | 9.84% (12,085) | 9.14% (11,216) |
-| *Acinetobacter baumannii* | 0.00% (0) — absent from DB | 0.29% (360) |
-| *Pseudomonas aeruginosa* | 52.58% (64,544) | 41.86% (51,391) |
-| *Enterobacter cloacae* | 0.49% (607) | 0.09% (109) |
-| Other classified | 22.14% (27,182) | 47.37% (58,152) |
-| **Unclassified** | **14.94% (18,337)** | **1.25% (1,536)** |
-
----
-
-### Pod5 8 — FBE01990_24778b97_03e50f91_8.pod5
 Total reads: 130,448
 
 | Species | 50 MB DB | 103 GB DB |
@@ -179,8 +131,72 @@ Total reads: 130,448
 
 ---
 
+### Pod5 6 — FBE01990_24778b97_03e50f91_6.pod5
+Total reads: 120,965
+
+| Species | 50 MB DB | 103 GB DB |
+|---------|----------|-----------|
+| *Enterococcus faecium* | 0.00% (0) | 0.00% (0) |
+| *Staphylococcus aureus* | 0.01% (7) | 0.00% (0) |
+| *Klebsiella pneumoniae* | 9.85% (11,918) | 9.06% (10,955) |
+| *Acinetobacter baumannii* | 0.00% (0) — absent from DB | 0.30% (363) |
+| *Pseudomonas aeruginosa* | 52.41% (63,395) | 42.10% (50,931) |
+| *Enterobacter cloacae* | 0.48% (585) | 0.07% (85) |
+| Other classified | 21.78% (26,348) | 47.19% (57,089) |
+| **Unclassified** | **15.47% (18,712)** | **1.27% (1,542)** |
+
+---
+
+### Pod5 7 — FBE01990_24778b97_03e50f91_7.pod5
+Total reads: 119,216
+
+| Species | 50 MB DB | 103 GB DB |
+|---------|----------|-----------|
+| *Enterococcus faecium* | 0.00% (1) | 0.00% (0) |
+| *Staphylococcus aureus* | 0.01% (7) | 0.00% (1) |
+| *Klebsiella pneumoniae* | 9.96% (11,878) | 9.22% (10,989) |
+| *Acinetobacter baumannii* | 0.00% (0) — absent from DB | 0.30% (357) |
+| *Pseudomonas aeruginosa* | 52.53% (62,621) | 41.88% (49,924) |
+| *Enterobacter cloacae* | 0.52% (621) | 0.07% (84) |
+| Other classified | 21.87% (26,071) | 47.34% (56,432) |
+| **Unclassified** | **15.11% (18,017)** | **1.20% (1,429)** |
+
+---
+
+### Pod5 8 — FBE01990_24778b97_03e50f91_8.pod5
+Total reads: 122,764
+
+| Species | 50 MB DB | 103 GB DB |
+|---------|----------|-----------|
+| *Enterococcus faecium* | 0.01% (7) | 0.00% (0) |
+| *Staphylococcus aureus* | 0.00% (2) | 0.00% (0) |
+| *Klebsiella pneumoniae* | 9.84% (12,085) | 9.14% (11,216) |
+| *Acinetobacter baumannii* | 0.00% (0) — absent from DB | 0.29% (360) |
+| *Pseudomonas aeruginosa* | 52.58% (64,544) | 41.86% (51,391) |
+| *Enterobacter cloacae* | 0.49% (607) | 0.09% (109) |
+| Other classified | 22.14% (27,182) | 47.37% (58,152) |
+| **Unclassified** | **14.94% (18,337)** | **1.25% (1,536)** |
+
+---
+
 ### Pod5 9 — FBE01990_24778b97_03e50f91_9.pod5
-Total reads: 104,918 ⚠️ matches old reads_hac.fastq reference — likely mis-run with single-FASTQ instead of per-pod5 file
+Total reads: 109,728
+
+| Species | 50 MB DB | 103 GB DB |
+|---------|----------|-----------|
+| *Enterococcus faecium* | 0.00% (2) | 0.00% (0) |
+| *Staphylococcus aureus* | 0.00% (4) | 0.00% (1) |
+| *Klebsiella pneumoniae* | 9.79% (10,738) | 9.06% (9,943) |
+| *Acinetobacter baumannii* | 0.00% (0) — absent from DB | 0.29% (323) |
+| *Pseudomonas aeruginosa* | 52.85% (57,988) | 41.51% (45,545) |
+| *Enterobacter cloacae* | 0.46% (505) | 0.09% (96) |
+| Other classified | 21.84% (23,961) | 47.87% (52,525) |
+| **Unclassified** | **15.06% (16,530)** | **1.18% (1,295)** |
+
+---
+
+### Pod5 10 — FBE01990_24778b97_03e50f91_10.pod5
+Total reads: 104,918 ⚠️ totals match old reads_hac.fastq reference run — likely mis-run with single-FASTQ instead of per-pod5 file
 
 | Species | 50 MB DB | 103 GB DB |
 |---------|----------|-----------|
@@ -195,7 +211,7 @@ Total reads: 104,918 ⚠️ matches old reads_hac.fastq reference — likely mis
 
 ---
 
-### Pod5 10 — FBE01990_24778b97_03e50f91_10.pod5
+### Pod5 11 — FBE01990_24778b97_03e50f91_11.pod5
 Total reads: 123,458
 
 | Species | 50 MB DB | 103 GB DB |
@@ -211,7 +227,7 @@ Total reads: 123,458
 
 ---
 
-### Pod5 11 — FBE01990_24778b97_03e50f91_11.pod5
+### Pod5 12 — FBE01990_24778b97_03e50f91_12.pod5
 Total reads: 109,020
 
 | Species | 50 MB DB | 103 GB DB |
@@ -227,7 +243,7 @@ Total reads: 109,020
 
 ---
 
-### Pod5 12 — FBE01990_24778b97_03e50f91_12.pod5
+### Pod5 13 — FBE01990_24778b97_03e50f91_13.pod5
 Total reads: 106,781
 
 | Species | 50 MB DB | 103 GB DB |
@@ -243,7 +259,7 @@ Total reads: 106,781
 
 ---
 
-### Pod5 13 — FBE01990_24778b97_03e50f91_13.pod5
+### Pod5 14 — FBE01990_24778b97_03e50f91_14.pod5
 Total reads: 97,054
 
 | Species | 50 MB DB | 103 GB DB |
@@ -256,22 +272,6 @@ Total reads: 97,054
 | *Enterobacter cloacae* | 0.50% (487) | 0.08% (79) |
 | Other classified | 21.63% (20,992) | 48.74% (47,309) |
 | **Unclassified** | **15.87% (15,406)** | **1.24% (1,203)** |
-
----
-
-### Pod5 14 — FBE01990_24778b97_03e50f91_14.pod5
-Total reads: 109,728
-
-| Species | 50 MB DB | 103 GB DB |
-|---------|----------|-----------|
-| *Enterococcus faecium* | 0.00% (2) | 0.00% (0) |
-| *Staphylococcus aureus* | 0.00% (4) | 0.00% (1) |
-| *Klebsiella pneumoniae* | 9.79% (10,738) | 9.06% (9,943) |
-| *Acinetobacter baumannii* | 0.00% (0) — absent from DB | 0.29% (323) |
-| *Pseudomonas aeruginosa* | 52.85% (57,988) | 41.51% (45,545) |
-| *Enterobacter cloacae* | 0.46% (505) | 0.09% (96) |
-| Other classified | 21.84% (23,961) | 47.87% (52,525) |
-| **Unclassified** | **15.06% (16,530)** | **1.18% (1,295)** |
 
 ---
 
@@ -297,5 +297,6 @@ Total reads: 30,378 (last chunk — pore activity trailing off, expected low cou
 - **E. faecium / S. aureus** are effectively absent from this AIIMS ICU sample — single-digit read counts per pod5 in both DBs. The infection is dominated by P. aeruginosa, K. pneumoniae, and E. coli (non-ESKAPE).
 - **E. coli** (~22% of reads) is the main driver of "Other classified" in the 50 MB DB — it is included in the sample_targeted reference set but is not an ESKAPE pathogen.
 - **"Other classified" in 103 GB DB** (~48%) is E. coli (~20%) + human reads + environmental bacteria that the 50 MB DB cannot see — these reads go to Unclassified in the small DB instead.
-- **Species proportions are highly stable** across all 16 pod5 files: P. aeruginosa holds at 52–53% (50 MB) / 41–42% (103 GB), K. pneumoniae at 9.4–10.0% / 8.6–9.4%, Unclassified at 14.8–15.9% / 0.87–1.42%. No temporal drift in sample composition.
-- **Pod5 9** totals match the old reads_hac.fastq reference run (104,918 reads) — flag for re-run if per-pod5 breakdown of file _9 is needed.
+- **Species proportions are highly stable** across all 16 pod5 files: P. aeruginosa holds at 52–53% (50 MB) / 40–42% (103 GB), K. pneumoniae at 9.4–10.0% / 8.6–9.4%, Unclassified at 14.8–15.9% / 0.87–1.42%. No temporal drift in sample composition.
+- **Pod5 10** totals (104,918) match the old reads_hac.fastq reference run — likely mis-run with single-FASTQ instead of per-pod5 file. Flag for re-run if per-pod5 breakdown of file _10 is needed.
+- **Verification method:** totals checked for sample_targeted/pluspf consistency in each directory (all 16 matched); P. aeruginosa counts spot-checked against raw report files for dirs 0, 7, 15.
