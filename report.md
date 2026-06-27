@@ -285,3 +285,28 @@ Sample = 3 dominant ESKAPE pathogens. Species-level shown; *(G nn)* = genus-leve
 - **51 MB panel DB is the cleanest** — ~84% pinned directly to the 3 dominant species (species% = genus%); only ~0.6% trace hits to the panel's other genomes + a little family/class-level
 
 ---
+
+## Phase 5 — ESKAPE Compact-Hash Cell-Size Reduction (16 / 24-bit)
+
+**Date:** 2026-06-27 — implemented + built + verified (not design-only).
+
+> Full report (implementation, size proof, FP model, accuracy, commands, artifacts): **[reports/eskape_cellsize.md](reports/eskape_cellsize.md)**
+> GitHub: [reports/eskape_cellsize.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/eskape_cellsize.md)
+
+Narrowed the Kraken2 compact-hash **cell** (CHT — Compact Hash Table) below the stock 32 bits, exploiting that an ESKAPE-only DB needs only `value_bits = 6` (35 taxonomy nodes) — the other 26 bits are wasted collision-check (FP — false positive — ~1 in 30 M). Added `CompactHashCell16` (2 B) + `CompactHashCell24` (3 B) to the templated `CompactHashTable<Cell>` (same pattern as the existing 40-bit cell); selected by `-C {16|24|32|40}`, width self-described in the DB header and auto-detected on load. Built all 3 DBs from identical inputs with **no download** (taxonomy reconstructed from the on-disk 47k-node `standard_8gb/taxo.k2d`; seqid2taxid generated from the genome headers).
+
+Key findings:
+
+- **Size scales exactly with cell width** (size = 32 B header + capacity × cell_bytes; verified to the byte): 32→**48.80 MB**, 24→**36.60 MB** (−25%), 16→**24.40 MB** (−50%). `value_bits=6` auto-derived in all.
+- **Correctness:** self-classifying the 6 reference genomes → each calls its own species, **identical across all cell widths**; `dump_table` round-trips all 3 DBs; reported taxon sets identical (35 taxa, none missing/extra).
+- **16-bit needs a confidence threshold; 24-bit does not.** On long reads (`reads_fast/hac/sup`), 16-bit at `-T 0` over-classifies by **+16–21%** — hash-collision FP, proven by cross-phylum hits (E. coli/host reads inflating Gram-positive *S. aureus* ×48, *E. faecium* ×1476, which share no 31-mers with Gram-negatives). A `-T ≥ 0.05` confidence threshold collapses this to <0.6% of 32-bit. **24-bit at `-T 0` is already within +0.3–0.45%** of 32-bit.
+
+| DB | size | FP @ `-T 0` | runtime requirement |
+|----|-----:|------------:|---------------------|
+| 32-bit | 48.80 MB | baseline | — |
+| 24-bit | 36.60 MB (−25%) | +0.3–0.45% | none |
+| 16-bit | 24.40 MB (−50%) | +16–21% | `-T ≥ 0.05` mandatory |
+
+**Recommendation:** `eskape_24bit` for a drop-in −25% (no threshold); `eskape_16bit` + `-T 0.05` for −50% (species-equivalent to 32-bit). DBs in `data/database/eskape_{16,24,32}bit/`; reports + `findings.md` in `results/eskape_16bit/`.
+
+---
