@@ -25,13 +25,13 @@
 | Model | Luna L40S GPU | Luna CPU | Orion Ampere GPU | Luna GPU speedup vs CPU |
 |---|---|---|---|---|
 | fast | 33.9s / 2.35×10⁸ sp/s | 9m 40s / 8.23×10⁶ sp/s | 6m 44s / 1.31×10⁷ sp/s | **28.6×** |
-| hac  | 55.0s / 2.03×10⁸ sp/s | 43m 26s / 1.88×10⁶ sp/s | ~24 min (est., disconnected) | **107×** |
+| hac  | 55.0s / 2.03×10⁸ sp/s | 43m 26s / 1.88×10⁶ sp/s | ~1 day (est., disconnected) | **107×** |
 | sup  | 4m 26s / 1.98×10⁷ sp/s | **~9 days (est.)** | not run | **~3,000× (est.)** |
 
 > Luna GPU: 2× L40S (cuda:0 + cuda:1), dorado v1.4.0. CPU: 650 threads, ~130 cores active, 96 GB RAM.
 > Orion GPU: 2048-core Ampere iGPU, 64 GB unified memory, dorado v0.5.3, batch size capped at 64.
 > SUP CPU: progress bar showed `9d:01h:14m:10s` remaining after 12 min elapsed — cancelled, estimate used.
-> Orion HAC: ~24 min ETA shown at 0% before SSH disconnect — estimate only.
+> Orion HAC: ~1 day ETA from progress bar at 0% before SSH disconnect — estimate only.
 
 **Luna GPU batch sizes:** fast=320, hac=2,944, sup=96 (VRAM-limited)
 **Orion GPU batch sizes:** fast=64, hac=64 (unified memory constraint)
