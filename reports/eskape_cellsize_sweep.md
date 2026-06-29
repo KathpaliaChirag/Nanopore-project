@@ -160,7 +160,7 @@ This is the FP signature — counts that **cannot be biology**, only hash collis
 - **Cross-phylum proof:** *S. aureus* (×48) and *E. faecium* (×1476) are Gram-positive Bacillota
   that share **no 31-mers** with the Gram-negative Proteobacteria that dominate this sample.
   Their inflation can only be collision FP. **24-bit barely moves them** (1→60, 33→66) and the
-  threshold (§4) erases them.
+  threshold (§5) erases them.
 
 ---
 
