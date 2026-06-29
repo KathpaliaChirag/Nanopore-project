@@ -292,6 +292,9 @@ Sample = 3 dominant ESKAPE pathogens. Species-level shown; *(G nn)* = genus-leve
 
 > Full report (implementation, size proof, FP model, accuracy, commands, artifacts): **[reports/eskape_cellsize.md](reports/eskape_cellsize.md)**
 > GitHub: [reports/eskape_cellsize.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/eskape_cellsize.md)
+>
+> Deviation sweep (3 basecallers × 3 widths × 2 thresholds + table-fill audit): **[reports/eskape_cellsize_sweep.md](reports/eskape_cellsize_sweep.md)**
+> GitHub: [reports/eskape_cellsize_sweep.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/eskape_cellsize_sweep.md)
 
 Narrowed the Kraken2 compact-hash **cell** (CHT — Compact Hash Table) below the stock 32 bits, exploiting that an ESKAPE-only DB needs only `value_bits = 6` (35 taxonomy nodes) — the other 26 bits are wasted collision-check (FP — false positive — ~1 in 30 M). Added `CompactHashCell16` (2 B) + `CompactHashCell24` (3 B) to the templated `CompactHashTable<Cell>` (same pattern as the existing 40-bit cell); selected by `-C {16|24|32|40}`, width self-described in the DB header and auto-detected on load. Built all 3 DBs from identical inputs with **no download** (taxonomy reconstructed from the on-disk 47k-node `standard_8gb/taxo.k2d`; seqid2taxid generated from the genome headers).
 
@@ -307,6 +310,9 @@ Key findings:
 | 24-bit | 36.60 MB (−25%) | +0.3–0.45% | none |
 | 16-bit | 24.40 MB (−50%) | +16–21% | `-T ≥ 0.05` mandatory |
 
-**Recommendation:** `eskape_24bit` for a drop-in −25% (no threshold); `eskape_16bit` + `-T 0.05` for −50% (species-equivalent to 32-bit). DBs in `data/database/eskape_{16,24,32}bit/`; reports + `findings.md` in `results/eskape_16bit/`.
+- **Table fill (load factor):** all 3 DBs are **~70% full / ~30% empty** (built at the same `-c 12200000` capacity; emptiness costs the same bytes at any width, so only the cell shrinks the file). 16-bit holds **9,626 fewer** occupied cells than 32-bit (8,525,857 vs 8,535,483) — distinct minimizers merging under 10-bit key collisions, the measurable root of its FP.
+- **Deviation sweep (vs 32-bit, all 3 basecallers):** 24-bit deviates **+0.3–0.45%** at `-T 0` and **0–4 reads / ~105 k** at `-T 0.05` (a true drop-in); 16-bit deviates **+16–21%** at `-T 0` (unusable) but converges to **+0.3–0.6%** at `-T 0.05`.
+
+**Recommendation:** `eskape_24bit` for a drop-in −25% (no threshold); `eskape_16bit` + `-T 0.05` for −50% (species-equivalent to 32-bit). DBs in `data/database/eskape_{16,24,32}bit/`; reports + `findings.md` in `results/eskape_16bit/`; full deviation + fill data in [reports/eskape_cellsize_sweep.md](reports/eskape_cellsize_sweep.md).
 
 ---
