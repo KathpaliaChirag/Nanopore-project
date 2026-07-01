@@ -44,11 +44,9 @@
 | Dorado sup wall time | 4m 26s (266s) | 67m 50.8s (4070.8s) | 15.3× |
 | Dorado sup throughput (sp/s) | 1.98×10⁷ | 1.979×10⁷ | **~1.0× (identical)** |
 | Kraken2 50 MB wall time (hac) | 4.405s (reads_hac, 32T) | 11.10s | 2.52× |
-| Kraken2 103 GB wall time (hac) | — (not measured) | 79.97s† | — |
+| Kraken2 103 GB wall time (hac) | — (not measured) | 79.97s (warm) | — |
 | Kraken2 LLC miss rate 50 MB (hac) | 14.64% | 13.11% | — |
 | Kraken2 LLC miss rate 103 GB (hac) | — | 73.73% | — |
-
-† hac/sup ran with 103 GB DB warm in OS page cache (~78-80s). fast × 103 GB ran cold (168s).
 
 ---
 
@@ -64,13 +62,13 @@
 
 ### 103 GB DB (pluspf_103gb)
 
-| Model | Sequences | Wall time | LLC-loads | LLC-load-misses | LLC miss rate | IPC | Classified |
+| Model | Sequences | Wall time (warm) | LLC-loads | LLC-load-misses | LLC miss rate | IPC | Classified |
 |---|---|---|---|---|---|---|---|
-| fast | 1,871,478 | 168.08s* | 7,799,295,375 | 4,832,168,278 | **61.96%** | 0.78 | 96.53% |
-| hac  | 1,872,777 | 79.97s   | 6,440,697,444 | 4,748,802,452 | **73.73%** | 0.94 | 98.83% |
-| sup  | 1,873,441 | 77.31s   | 6,159,444,719 | 4,512,937,225 | **73.27%** | 0.98 | 99.32% |
+| fast | 1,871,478 | **89.24s** | 7,529,346,628 | 5,680,289,238 | **75.44%** | 0.79 | 96.53% |
+| hac  | 1,872,777 | 79.97s    | 6,440,697,444 | 4,748,802,452 | **73.73%** | 0.94 | 98.83% |
+| sup  | 1,873,441 | 77.31s    | 6,159,444,719 | 4,512,937,225 | **73.27%** | 0.98 | 99.32% |
 
-*fast × 103 GB ran with DB cold (first 103 GB run, loaded from disk). hac and sup found DB warm in OS page cache. Warm steady-state time ≈ 78–80s.
+fast × 103 GB run twice: cold (168.08s, 61.96% LLC miss rate — reflects sequential disk prefetch during page fault loading, not representative) and warm (89.24s, 75.44% — authoritative random-access number). hac/sup ran warm because fast had already loaded the DB into OS page cache.
 
 **Key observations:**
 - **50 MB DB:** LLC miss rate stable at 12–13% across all models — DB fits in effective LLC, classification rate increases with model accuracy (80.67% → 85.46%).
