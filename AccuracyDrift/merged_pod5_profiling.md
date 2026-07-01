@@ -43,10 +43,39 @@
 | Dorado hac throughput (sp/s) | 2.03×10⁸ | 2.114×10⁸ | **~1.04× (identical)** |
 | Dorado sup wall time | 4m 26s (266s) | 67m 50.8s (4070.8s) | 15.3× |
 | Dorado sup throughput (sp/s) | 1.98×10⁷ | 1.979×10⁷ | **~1.0× (identical)** |
-| Kraken2 50 MB wall time | 4.405s (reads_hac, 32T) | ??? | ??? |
-| Kraken2 103 GB wall time | ??? (not measured for single) | ??? | ??? |
-| Kraken2 LLC miss rate (50 MB) | 14.64% | ??? | — |
-| Kraken2 LLC miss rate (103 GB) | ??? | ??? | — |
+| Kraken2 50 MB wall time (hac) | 4.405s (reads_hac, 32T) | 11.10s | 2.52× |
+| Kraken2 103 GB wall time (hac) | — (not measured) | 79.97s† | — |
+| Kraken2 LLC miss rate 50 MB (hac) | 14.64% | 13.11% | — |
+| Kraken2 LLC miss rate 103 GB (hac) | — | 73.73% | — |
+
+† hac/sup ran with 103 GB DB warm in OS page cache (~78-80s). fast × 103 GB ran cold (168s).
+
+---
+
+## Kraken2 Results — Merged Dataset (summary tables)
+
+### 50 MB DB (sample_targeted)
+
+| Model | Sequences | Wall time | LLC-loads | LLC-load-misses | LLC miss rate | IPC | Classified |
+|---|---|---|---|---|---|---|---|
+| fast | 1,871,478 | 11.11s | 2,712,407,985 | 341,782,868 | **12.60%** | 1.64 | 80.67% |
+| hac  | 1,872,777 | 11.10s | 2,578,452,436 | 338,128,361 | **13.11%** | 1.74 | 84.73% |
+| sup  | 1,873,441 | 12.18s | 2,546,667,455 | 312,169,296 | **12.26%** | 1.72 | 85.46% |
+
+### 103 GB DB (pluspf_103gb)
+
+| Model | Sequences | Wall time | LLC-loads | LLC-load-misses | LLC miss rate | IPC | Classified |
+|---|---|---|---|---|---|---|---|
+| fast | 1,871,478 | 168.08s* | 7,799,295,375 | 4,832,168,278 | **61.96%** | 0.78 | 96.53% |
+| hac  | 1,872,777 | 79.97s   | 6,440,697,444 | 4,748,802,452 | **73.73%** | 0.94 | 98.83% |
+| sup  | 1,873,441 | 77.31s   | 6,159,444,719 | 4,512,937,225 | **73.27%** | 0.98 | 99.32% |
+
+*fast × 103 GB ran with DB cold (first 103 GB run, loaded from disk). hac and sup found DB warm in OS page cache. Warm steady-state time ≈ 78–80s.
+
+**Key observations:**
+- **50 MB DB:** LLC miss rate stable at 12–13% across all models — DB fits in effective LLC, classification rate increases with model accuracy (80.67% → 85.46%).
+- **103 GB DB:** LLC miss rate jumps to 62–74%, IPC drops from ~1.7 to 0.78–0.98 — memory bandwidth wall. Classification near-complete (96.5–99.3%).
+- **Wall time scaling (50 MB):** single-file hac was 4.405s for 104,918 reads; merged hac is 11.10s for 1,872,777 reads (17.85× more reads, only 2.52× more time) — 32-thread parallelism + warm DB cache.
 
 ---
 
@@ -106,94 +135,10 @@
 
 ---
 
-## Kraken2 Results — Merged Dataset
-
-### Fast Model
-
-**50 MB DB (sample_targeted):**
-
-| Metric | Value |
-|---|---|
-| Wall time | ??? |
-| LLC-loads | ??? |
-| LLC-load-misses | ??? |
-| LLC miss rate | ??? |
-| Instructions | ??? |
-| Cycles | ??? |
-| IPC | ??? |
-
-**8 GB DB (standard_8gb):**
-
-| Metric | Value |
-|---|---|
-| Wall time | ??? |
-| LLC-loads | ??? |
-| LLC-load-misses | ??? |
-| LLC miss rate | ??? |
-| Instructions | ??? |
-| Cycles | ??? |
-| IPC | ??? |
-
----
-
-### HAC Model
-
-**50 MB DB (sample_targeted):**
-
-| Metric | Value |
-|---|---|
-| Wall time | ??? |
-| LLC-loads | ??? |
-| LLC-load-misses | ??? |
-| LLC miss rate | ??? |
-| Instructions | ??? |
-| Cycles | ??? |
-| IPC | ??? |
-
-**8 GB DB (standard_8gb):**
-
-| Metric | Value |
-|---|---|
-| Wall time | ??? |
-| LLC-loads | ??? |
-| LLC-load-misses | ??? |
-| LLC miss rate | ??? |
-| Instructions | ??? |
-| Cycles | ??? |
-| IPC | ??? |
-
----
-
-### SUP Model
-
-**50 MB DB (sample_targeted):**
-
-| Metric | Value |
-|---|---|
-| Wall time | ??? |
-| LLC-loads | ??? |
-| LLC-load-misses | ??? |
-| LLC miss rate | ??? |
-| Instructions | ??? |
-| Cycles | ??? |
-| IPC | ??? |
-
-**8 GB DB (standard_8gb):**
-
-| Metric | Value |
-|---|---|
-| Wall time | ??? |
-| LLC-loads | ??? |
-| LLC-load-misses | ??? |
-| LLC miss rate | ??? |
-| Instructions | ??? |
-| Cycles | ??? |
-| IPC | ??? |
-
----
-
 ## Notes
 
-- Space rule enforced: only one FASTQ on disk at a time; each deleted before next model basecalls.
-- nsys .nsys-rep binaries not transferred (large); only *_stats.txt extracted.
-- SUP basecalling expected ~80 min for 1.87M reads.
+- All three FASTQs kept on disk simultaneously (~12 GB each, ~36 GB total) — space not a concern.
+- pod5 merge (v0.3.39) corrupted zstd signal blocks; switched to dorado directory input instead.
+- SUP basecalling took 67m 50s for 1.87M reads (vs ~80 min estimate for merged file).
+- nsys profiles not run on merged dataset (single-file profiles already captured in dorado_profiling.md).
+- 103 GB DB cold-load penalty: first run took 168s; subsequent runs ~78-80s (DB warm in OS page cache).
