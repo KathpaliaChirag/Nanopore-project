@@ -296,6 +296,9 @@ Sample = 3 dominant ESKAPE pathogens. Species-level shown; *(G nn)* = genus-leve
 > Deviation sweep (3 basecallers × 3 widths × 2 thresholds + table-fill audit): **[reports/eskape_cellsize_sweep.md](reports/eskape_cellsize_sweep.md)**
 > GitHub: [reports/eskape_cellsize_sweep.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/eskape_cellsize_sweep.md)
 >
+> Why 16-bit fails / 24-bit ≈ 32-bit (false-positive mechanism, key_bits math): **[reports/eskape_cellsize_fp_analysis.md](reports/eskape_cellsize_fp_analysis.md)**
+> GitHub: [reports/eskape_cellsize_fp_analysis.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/eskape_cellsize_fp_analysis.md)
+>
 > Per-pod5 fast dataset (1.87 M reads — per-pathogen detection % across 3 widths): **[results/eskape_16bit/sweep/fastq_fast/findings.md](results/eskape_16bit/sweep/fastq_fast/findings.md)**
 > GitHub: [results/eskape_16bit/sweep/fastq_fast/findings.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/results/eskape_16bit/sweep/fastq_fast/findings.md)
 >
