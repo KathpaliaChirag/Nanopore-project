@@ -45,3 +45,12 @@ Luna/profiling/perf_record_hac_32t_out.txt
 # M1-M7 large binary/data files (keep only txt summaries)
 Luna/profiling/pending/m5_histogram.txt
 Luna/profiling/pending/*.data
+
+# Raw per-read kraken2 output dumps — often exceed GitHub's 100MB limit,
+# only report.txt/perf.txt summaries are needed
+**/output.txt
+
+# Office temp lock files
+~$*.pptx
+~$*.docx
+~$*.xlsx

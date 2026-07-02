@@ -1,0 +1,42 @@
+ 15.87	15406	15406	U	0	unclassified
+ 84.13	81648	0	R	1	root
+ 84.13	81648	0	R1	131567	  cellular organisms
+ 84.13	81648	5	R2	2	    Bacteria
+ 84.12	81638	0	K	3379134	      Pseudomonadati
+ 84.12	81638	0	P	1224	        Pseudomonadota
+ 84.12	81638	18	C	1236	          Gammaproteobacteria
+ 52.41	50863	0	O	72274	            Pseudomonadales
+ 52.41	50863	0	F	135621	              Pseudomonadaceae
+ 52.41	50863	0	G	286	                Pseudomonas
+ 52.41	50863	0	G1	136841	                  Pseudomonas aeruginosa group
+ 52.41	50863	0	S	287	                    Pseudomonas aeruginosa
+ 52.41	50863	50863	S1	208964	                      Pseudomonas aeruginosa PAO1
+ 31.69	30757	0	O	91347	            Enterobacterales
+ 31.69	30757	100	F	543	              Enterobacteriaceae
+ 21.50	20869	0	G	561	                Escherichia
+ 21.50	20869	0	S	562	                  Escherichia coli
+ 21.50	20869	0	S1	83333	                    Escherichia coli K-12
+ 21.50	20869	20869	S2	511145	                      Escherichia coli str. K-12 substr. MG1655
+  9.58	9301	0	G	570	                Klebsiella
+  9.58	9301	0	G1	3390273	                  Klebsiella pneumoniae complex
+  9.58	9301	0	S	573	                    Klebsiella pneumoniae
+  9.58	9301	0	S1	72407	                      Klebsiella pneumoniae subsp. pneumoniae
+  9.58	9301	9301	S2	1125630	                        Klebsiella pneumoniae subsp. pneumoniae HS11286
+  0.50	487	0	G	547	                Enterobacter
+  0.50	487	0	G1	354276	                  Enterobacter cloacae complex
+  0.50	487	0	S	550	                    Enterobacter cloacae
+  0.50	487	0	S1	336306	                      Enterobacter cloacae subsp. cloacae
+  0.50	487	487	S2	716541	                        Enterobacter cloacae subsp. cloacae ATCC 13047
+  0.01	5	0	K	1783272	      Bacillati
+  0.01	5	0	P	1239	        Bacillota
+  0.01	5	0	C	91061	          Bacilli
+  0.00	3	0	O	186826	            Lactobacillales
+  0.00	3	0	F	81852	              Enterococcaceae
+  0.00	3	0	G	1350	                Enterococcus
+  0.00	3	0	S	1352	                  Enterococcus faecium
+  0.00	3	3	S1	333849	                    Enterococcus faecium DO
+  0.00	2	0	O	1385	            Caryophanales
+  0.00	2	0	F	90964	              Staphylococcaceae
+  0.00	2	0	G	1279	                Staphylococcus
+  0.00	2	0	S	1280	                  Staphylococcus aureus
+  0.00	2	2	S1	93061	                    Staphylococcus aureus subsp. aureus NCTC 8325
