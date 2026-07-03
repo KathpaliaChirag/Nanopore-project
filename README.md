@@ -114,18 +114,18 @@ AIIMS sample is a **polymicrobial ICU infection**: *P. aeruginosa* (35%) + *E. c
 
 | Tool | Version / Path | Status | Purpose |
 |------|---------------|--------|---------|
-| **perf** | `/usr/bin/perf` v6.8.12 | ✅ Installed | Hardware counters, TMA, PEBS, uncore IMC events |
-| **gprof** | `/usr/bin/gprof` (binutils) | ✅ Installed | Function-level CPU time (compile with `-pg -g`) |
-| **cachegrind** | valgrind v3.18.1 | ✅ Installed | Per-function LLC miss rates - fills WSL2 LLC gap |
-| **FlameGraph** | `~/tools/FlameGraph/flamegraph.pl` | ✅ Installed | Stack-collapse + SVG flame graphs from `perf record` |
-| **numactl** | `/usr/bin/numactl` | ✅ Installed | NUMA pinning - `--cpunodebind=0 --membind=0` |
-| **btop** | installed 2026-05-28 | ✅ Installed | Live CPU/GPU/RAM monitor - `btop --utf-force` |
-| **kraken2** | `~/tools/kraken2/kraken2` v2.1.3 | ✅ Installed | Target binary under profile |
-| **dorado** | `~/tools/dorado/bin/dorado` v1.4.0 | ✅ Installed | GPU basecaller under profile |
-| **nsys** (Nsight Systems) | 2024.2.3 | ⚠️ Not in PATH | GPU timeline + CUDA API trace |
-| **ncu** (Nsight Compute) | - | ⚠️ Not in PATH | Per-kernel roofline + SM utilisation |
-| **nvcc** | - (CUDA 12.9) | ⚠️ Not in PATH | CUDA compiler |
-| **LIKWID** | - | ❌ Not installed | Hardware performance groups |
+| **perf** | `/usr/bin/perf` v6.8.12 | Installed | Hardware counters, TMA, PEBS, uncore IMC events |
+| **gprof** | `/usr/bin/gprof` (binutils) | Installed | Function-level CPU time (compile with `-pg -g`) |
+| **cachegrind** | valgrind v3.18.1 | Installed | Per-function LLC miss rates - fills WSL2 LLC gap |
+| **FlameGraph** | `~/tools/FlameGraph/flamegraph.pl` | Installed | Stack-collapse + SVG flame graphs from `perf record` |
+| **numactl** | `/usr/bin/numactl` | Installed | NUMA pinning - `--cpunodebind=0 --membind=0` |
+| **btop** | installed 2026-05-28 | Installed | Live CPU/GPU/RAM monitor - `btop --utf-force` |
+| **kraken2** | `~/tools/kraken2/kraken2` v2.1.3 | Installed | Target binary under profile |
+| **dorado** | `~/tools/dorado/bin/dorado` v1.4.0 | Installed | GPU basecaller under profile |
+| **nsys** (Nsight Systems) | 2025.1.3 (`cuda-nsight-systems-12-9`) | Installed 2026-06-26 | GPU timeline + CUDA API trace; default apt package (2021.3.3.2) is broken on L40S sm_89, had to install separately |
+| **ncu** (Nsight Compute) | 2021.3.1 | Installed | Per-kernel roofline + SM utilisation |
+| **nvcc** | CUDA 12.9 | Not in PATH | CUDA compiler |
+| **LIKWID** | - | Not installed | Hardware performance groups |
 
 → full hardware comparison: [docs/Luna_vs_Minerva.md](docs/Luna_vs_Minerva.md) | Orion notes: [AccuracyDrift/machines/Orion.md](AccuracyDrift/machines/Orion.md) | Luna inventory: [Luna/luna_stats.md](Luna/luna_stats.md)
 
@@ -904,7 +904,7 @@ xychart-beta
     bar [80.67, 84.73, 85.46, 96.53, 98.83, 99.32]
 ```
 
-**Key finding:** GPU basecalling throughput is identical whether Dorado processes the merged 16-file dataset or a single pod5 file. The GPU is already saturated at single-file scale, so batching more input does not change per-sample throughput. Fast model: 2.35x10⁸ samples/s single-file vs 2.345x10⁸ merged (about 1.0x). HAC: 2.03x10⁸ vs 2.114x10⁸ (about 1.04x). SUP: 1.98x10⁷ vs 1.979x10⁷ (about 1.0x). This is a useful confirming result: L40S throughput is a hardware ceiling, not an artifact of small test inputs, and wall time scales almost exactly with read count (SUP took 67m 50.8s for 1.87M merged reads vs 4m 26s for the single 104,918-read pod5, a 15.3x time increase for a proportional 15.9x increase in read count).
+**Key finding:** GPU basecalling throughput is identical whether Dorado processes the merged 16-file dataset or a single pod5 file. The GPU is already saturated at single-file scale, so batching more input does not change per-sample throughput. Fast model: 2.35x10⁸ samples/s single-file vs 2.345x10⁸ merged (about 1.0x). HAC: 2.03x10⁸ vs 2.114x10⁸ (about 1.04x). SUP: 1.98x10⁷ vs 1.979x10⁷ (about 1.0x). This is a useful confirming result: L40S throughput is a hardware ceiling, not an artifact of small test inputs. Wall time scales roughly with read count but not quite linearly: SUP took 67m 50.8s for the merged dataset vs 4m 26s for the single 104,918-read pod5, a 15.3x time increase against a 17.85x increase in read count (1,872,777 vs 104,918), so the merged run is somewhat more efficient per read, consistent with fixed per-run startup overhead being amortised across more reads.
 
 The nsys/CUDA profiling subsection of the source file (fast/hac/sup CUDA API and GPU kernel breakdowns) is still an unfilled placeholder ("???" throughout) as of this writing; nsys was not re-run on the merged dataset since single-file profiles were already captured separately. No numbers are given here for that subsection pending that run.
 
@@ -1188,7 +1188,7 @@ The matmul `prefetch_ikj` negative result validates the argument: **prefetch hur
 ### Proposed Experiments
 
 - [ ] **16-bit hash table cells**: halve the table size on-disk; may move post-cliff DBs (142 MB, 3.8 GB) into pre-cliff regime
-- [ ] **Dorado CPU vs GPU baseline**: run `dorado --device cpu` for comparison against the completed GPU profiling (see [AccuracyDrift/dorado_profiling.md](AccuracyDrift/dorado_profiling.md))
+- [ ] **Dorado sup CPU baseline, let it run to completion**: fast and hac CPU baselines are measured (Section 6c); sup CPU is currently only a roughly 9-day estimate read off a cancelled progress bar, an actual completed run would confirm it
 - [ ] **Large pod5 merge vs per-barcode**: test whether batching all barcodes into one run is faster
 - [ ] **Neural prefetcher for kraken2**: no progress yet, listed for completeness
 - [ ] AMX matmul on Luna (Xeon Platinum 8468 has Intel AMX tile hardware)
@@ -1258,14 +1258,21 @@ Nanopore-project/
 │   ├── fix_seqid_map.py
 │   └── fix_prelim_maps.py
 │
+├── Minerva/                                <- Minerva hardware inventory, install notes, access docs (runs blocked, disk full)
+├── WSL2/
+│   └── kraken2/                            <- WSL2-side kraken2 build artifacts
+│
+├── reports/
+│   └── matrix_multiplication/              <- matmul benchmark report + graphs (parallel to Luna/profiling/matmul/)
+│
 ├── presentation/                          <- singular directory, distinct from presentations/ below
 │   └── flamegraph_hac_32t.svg             <- slide asset copy of the Luna/profiling/ flamegraph
 │
-├── presentations/                         <- presentation materials
-│   └── june.pptx                          <- 26-slide deck
-│
-└── results/                               <- pipeline output data (BAM, FASTQ, nsight profiles)
+└── presentations/                         <- presentation materials
+    └── june.pptx                          <- 26-slide deck
 ```
+
+Pipeline output data (BAM, FASTQ, nsight profiles) is gitignored and lives locally, not committed.
 
 ---
 
