@@ -1,6 +1,6 @@
-# Luna — Pending Measurements (run before applying patches)
+# Luna - Pending Measurements (run before applying patches)
 
-**Status as of 2026-06-15: none of M1-M7 have been run yet. Run these before applying kraken2_opt_v1.patch.**
+**Status as of 2026-06-26: M1, M2, M3, M4, M5, M7 are done - results in `Luna/profiling/pending/*.txt`, decisions in `AccuracyDrift/patches.md`. M6 was not run (low priority). The patch itself (`kraken2_opt_v1.patch`) has NOT yet been applied or benchmarked - `run_kraken2_opt_v1.sh` has never been executed. That run is the next step.**
 
 These five measurements answer questions that **decide which patches matter and which
 parameters to tune**. Run all five on Luna in the order shown. Results paste back to chat
@@ -18,7 +18,7 @@ IN=~/results/basecalling/reads_hac.fastq
 
 ---
 
-## M1. Hash table header — cell type, capacity, load factor
+## M1. Hash table header - cell type, capacity, load factor
 
 **Why:** decides prefetch stride (12 vs 16 cells), confirms 40-bit vs 32-bit cells.
 Load factor near 1.0 → long clusters → prefetch is high-value.
@@ -48,7 +48,7 @@ high-leverage. If 40-bit cell → Patch 1's PF_STRIDE = 12.
 
 ---
 
-## M2. DTLB pressure — does huge pages help?
+## M2. DTLB pressure - does huge pages help?
 
 **Why:** decides whether Patch 2 (MADV_HUGEPAGE) is worthwhile.
 
@@ -76,7 +76,7 @@ cat /proc/$(pgrep classify | head -1)/smaps_rollup 2>/dev/null | grep -i huge
 
 ---
 
-## M3. perf annotate — exact line in Get() causing the LL misses
+## M3. perf annotate - exact line in Get() causing the LL misses
 
 **Why:** confirms whether the probe-load (`table_[idx].value(...)`) is the dominant miss
 line, or whether `hashed_key()` and `value()` are reading the cell separately and we should
@@ -100,11 +100,11 @@ to find the exact mangled name first.
 
 **Decision:** the line accounting for > 80 % of LLC misses inside Get() should be the
 `table_[idx].value(value_bits_)` read. If it isn't, the inferred algorithm is still wrong
-somewhere — re-investigate.
+somewhere - re-investigate.
 
 ---
 
-## M4. DRAM bandwidth — latency-bound vs bandwidth-bound
+## M4. DRAM bandwidth - latency-bound vs bandwidth-bound
 
 **Why:** if uncore IMC counters show DRAM well under saturation (≤ 50 % of peak), we are
 **latency-bound** → LRU + prefetch are the right fix. If close to peak → we are
@@ -133,14 +133,14 @@ numactl --cpunodebind=0 --membind=0 \
 
 ---
 
-## M5. K-mer reuse rate — validate LRU cache hit-rate before implementing
+## M5. K-mer reuse rate - validate LRU cache hit-rate before implementing
 
 **Why:** Patch 4 (thread-local LRU) only pays if reuse rate is > 20 %. Measuring it
 beforehand prevents wasted patching.
 
 There are two ways:
 
-### M5a (quick, approximate) — minimizer histogram via instrumented build
+### M5a (quick, approximate) - minimizer histogram via instrumented build
 
 Add a one-line emit to `classify.cc::ClassifySequence`:
 ```cpp
@@ -167,7 +167,7 @@ head -n 1024 m5_minimizer_histogram.txt | awk '{s+=$1} END {print "top1024_count
 
 Revert the fprintf and rebuild.
 
-### M5b (precise, slow) — perf record on Get() call sites
+### M5b (precise, slow) - perf record on Get() call sites
 
 If M5a fprintf is too noisy, count Get() calls precisely:
 ```bash
@@ -184,7 +184,7 @@ perf stat -e \
 
 ---
 
-## M6. perf c2c — false sharing (only matters if scaling beyond 32T)
+## M6. perf c2c - false sharing (only matters if scaling beyond 32T)
 
 **Why:** thread sweet spot is 32T; not strictly needed yet. Run if we want to revisit
 NUMA Patch 5.
@@ -198,7 +198,7 @@ perf c2c report -i m6_c2c.data --stdio | head -150 | tee m6_c2c.txt
 ```
 
 **Decision:** "HITM" events > 5 % of cache traffic → cross-thread sharing on the hash
-table is a real issue. With a read-only mmap table, HITM should be ~0 — confirms.
+table is a real issue. With a read-only mmap table, HITM should be ~0 - confirms.
 
 ---
 
