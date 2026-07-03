@@ -299,6 +299,9 @@ Sample = 3 dominant ESKAPE pathogens. Species-level shown; *(G nn)* = genus-leve
 > Why 16-bit fails / 24-bit ≈ 32-bit (false-positive mechanism, key_bits math): **[reports/eskape_cellsize_fp_analysis.md](reports/eskape_cellsize_fp_analysis.md)**
 > GitHub: [reports/eskape_cellsize_fp_analysis.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/eskape_cellsize_fp_analysis.md)
 >
+> Port guide — add 16/24-bit cells to a fresh `DerrickWood/kraken2` clone (stock already has 32/40+templating; 5 files, additive + one guard): **[reports/kraken2_cellsize_port.md](reports/kraken2_cellsize_port.md)**
+> GitHub: [reports/kraken2_cellsize_port.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/kraken2_cellsize_port.md)
+>
 > Per-pod5 fast dataset (1.87 M reads — per-pathogen detection % across 3 widths): **[results/eskape_16bit/sweep/fastq_fast/findings.md](results/eskape_16bit/sweep/fastq_fast/findings.md)**
 > GitHub: [results/eskape_16bit/sweep/fastq_fast/findings.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/results/eskape_16bit/sweep/fastq_fast/findings.md)
 >
