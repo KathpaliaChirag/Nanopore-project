@@ -38,13 +38,16 @@ AMDuProf-*/
 
 # gprof output
 gmon.out
-Luna/profiling/perf_output_hac_full.txt
-Luna/profiling/perf_output_sup.txt
-Luna/profiling/perf_record_hac_32t_out.txt
+# NOTE: **/ prefix so these still match after the 2026-07-04 restructure into
+# dorado-kraken-research/ (the old bare Luna/ paths went stale). Several of these
+# files exceed GitHub's 100 MB limit and must never be committed.
+**/Luna/profiling/perf_output_hac_full.txt
+**/Luna/profiling/perf_output_sup.txt
+**/Luna/profiling/perf_record_hac_32t_out.txt
 
 # M1-M7 large binary/data files (keep only txt summaries)
-Luna/profiling/pending/m5_histogram.txt
-Luna/profiling/pending/*.data
+**/Luna/profiling/pending/m5_histogram.txt
+**/Luna/profiling/pending/*.data
 
 # Raw per-read kraken2 output dumps — often exceed GitHub's 100MB limit,
 # only report.txt/perf.txt summaries are needed
