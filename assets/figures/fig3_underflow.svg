@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+<rect x="0" y="0" width="760" height="420" rx="14" fill="#fcfcfb" stroke="#e1e0d9"/>
+<text x="28" y="38" font-size="20" font-weight="700" fill="#0b0b0b">The odometer P_t dives toward zero, then off a cliff</text>
+<text x="28" y="62" font-size="13" fill="#52514e">P_t = 0.8^t is a product of numbers below 1. Past the float floor the machine rounds it to exactly 0, and b*x/P explodes.</text>
+<line x1="80" y1="105.4" x2="700" y2="105.4" stroke="#e8e7e0"/>
+<text x="74" y="108.4" font-size="10" fill="#898781" text-anchor="end">10^0</text>
+<line x1="80" y1="159.8" x2="700" y2="159.8" stroke="#e8e7e0"/>
+<text x="74" y="162.8" font-size="10" fill="#898781" text-anchor="end">10^-10</text>
+<line x1="80" y1="214.1" x2="700" y2="214.1" stroke="#e8e7e0"/>
+<text x="74" y="217.1" font-size="10" fill="#898781" text-anchor="end">10^-20</text>
+<line x1="80" y1="268.5" x2="700" y2="268.5" stroke="#e8e7e0"/>
+<text x="74" y="271.5" font-size="10" fill="#898781" text-anchor="end">10^-30</text>
+<line x1="80" y1="322.8" x2="700" y2="322.8" stroke="#e8e7e0"/>
+<text x="74" y="325.8" font-size="10" fill="#898781" text-anchor="end">10^-40</text>
+<path d="M80.0,105.4L85.9,107.5L91.8,109.6L97.7,111.8L103.6,113.9L109.5,116.0L115.4,118.1L121.3,120.2L127.2,122.3L133.1,124.4L139.0,126.5L145.0,128.6L150.9,130.7L156.8,132.8L162.7,134.9L168.6,137.0L174.5,139.1L180.4,141.2L186.3,143.4L192.2,145.5L198.1,147.6L204.0,149.7L209.9,151.8L215.8,153.9L221.7,156.0L227.6,158.1L233.5,160.2L239.4,162.3L245.3,164.4L251.2,166.5L257.1,168.6L263.0,170.7L269.0,172.9L274.9,175.0L280.8,177.1L286.7,179.2L292.6,181.3L298.5,183.4L304.4,185.5L310.3,187.6L316.2,189.7L322.1,191.8L328.0,193.9L333.9,196.0L339.8,198.1L345.7,200.2L351.6,202.3L357.5,204.5L363.4,206.6L369.3,208.7L375.2,210.8L381.1,212.9L387.0,215.0L393.0,217.1L398.9,219.2L404.8,221.3L410.7,223.4L416.6,225.5L422.5,227.6L428.4,229.7L434.3,231.8L440.2,233.9L446.1,236.1L452.0,238.2L457.9,240.3L463.8,242.4L469.7,244.5L475.6,246.6L481.5,248.7L487.4,250.8L493.3,252.9L499.2,255.0L505.1,257.1L511.0,259.2L517.0,261.3L522.9,263.4L528.8,265.5L534.7,267.7L540.6,269.8L546.5,271.9L552.4,274.0L558.3,276.1L564.2,278.2L570.1,280.3L576.0,282.4L581.9,284.5L587.8,286.6L593.7,288.7L599.6,290.8L605.5,292.9L611.4,295.0L617.3,297.1L623.2,299.3L629.1,301.4L635.0,303.5L641.0,305.6L646.9,307.7L652.8,309.8L658.7,311.9L664.6,314.0L670.5,316.1L676.4,318.2L682.3,320.3L688.2,322.4L694.1,324.5L700.0,326.6" fill="none" stroke="#2a78d6" stroke-width="3"/>
+<line x1="80" y1="311.6" x2="700" y2="311.6" stroke="#d03b3b" stroke-width="2" stroke-dasharray="6 4"/>
+<text x="88" y="305.6" font-size="11" fill="#d03b3b" font-weight="600">float32 underflow floor (1.18e-38)</text>
+<line x1="657.2" y1="100" x2="657.2" y2="350" stroke="#d03b3b" stroke-width="1.5" stroke-dasharray="3 3"/>
+<text x="653.2" y="384" font-size="11" fill="#d03b3b" text-anchor="middle">t=391: P is 0 in the machine</text>
+<line x1="174.5" y1="342" x2="174.5" y2="350" stroke="#898781" stroke-width="1"/>
+<line x1="269.0" y1="342" x2="269.0" y2="350" stroke="#898781" stroke-width="1"/>
+<line x1="363.4" y1="342" x2="363.4" y2="350" stroke="#898781" stroke-width="1"/>
+<line x1="457.9" y1="342" x2="457.9" y2="350" stroke="#898781" stroke-width="1"/>
+<line x1="552.4" y1="342" x2="552.4" y2="350" stroke="#898781" stroke-width="1"/>
+<line x1="646.9" y1="342" x2="646.9" y2="350" stroke="#898781" stroke-width="1"/>
+<text x="140" y="366" font-size="11" fill="#898781">ticks = chunk boundaries (every 64): resetting P here keeps it far above the cliff</text>
+<text x="390" y="402" font-size="11" fill="#898781" text-anchor="middle">step t</text>
+<text x="28" y="400" font-size="12.5" fill="#52514e">The real fix isn't chunking, it's working in log-space (add log a's, subtract) so you never divide tiny numbers. Chunking is extra safety.</text>
+</svg>

@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mamba as MHA — Interactive Companion</title>
+<style>
+  :root{
+    --blue:#2a78d6; --orange:#eb6834; --ink:#0b0b0b; --mut:#52514e; --faint:#898781;
+    --surface:#fcfcfb; --card:#ffffff; --grid:#e1e0d9; --red:#d03b3b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --ink:#f3f2ee; --mut:#c3c2b7; --faint:#8f8e86; --surface:#161615; --card:#1f1f1d; --grid:#33332f; }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--ink);
+    background:var(--surface); line-height:1.55; }
+  header{ padding:34px 22px 10px; max-width:900px; margin:0 auto; }
+  h1{ font-size:1.7rem; margin:0 0 6px; }
+  .sub{ color:var(--mut); font-size:1rem; margin:0 0 4px; }
+  main{ max-width:900px; margin:0 auto; padding:10px 22px 80px; }
+  section{ background:var(--card); border:1px solid var(--grid); border-radius:14px;
+    padding:20px 22px; margin:22px 0; }
+  h2{ font-size:1.18rem; margin:0 0 4px; }
+  .lead{ color:var(--mut); font-size:0.95rem; margin:0 0 16px; }
+  .row{ display:flex; flex-wrap:wrap; gap:22px; align-items:center; }
+  .controls{ display:flex; flex-wrap:wrap; gap:16px 26px; align-items:center; margin-bottom:14px; }
+  label{ font-size:0.9rem; color:var(--mut); display:flex; flex-direction:column; gap:4px; }
+  input[type=range]{ width:220px; accent-color:var(--blue); }
+  button{ font:inherit; padding:8px 16px; border-radius:9px; border:1px solid var(--blue);
+    background:var(--blue); color:#fff; cursor:pointer; }
+  button.ghost{ background:transparent; color:var(--blue); }
+  button:disabled{ opacity:.4; cursor:default; }
+  .readout{ font-variant-numeric:tabular-nums; }
+  .big{ font-size:1.5rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .blue{ color:var(--blue); } .orange{ color:var(--orange); } .red{ color:var(--red); }
+  canvas{ max-width:100%; height:auto; }
+  .barwrap{ margin:10px 0; }
+  .barlabel{ font-size:.85rem; color:var(--mut); margin-bottom:3px; }
+  .bar{ height:26px; border-radius:6px; transition:width .12s ease; }
+  code{ background:rgba(128,128,128,.15); padding:1px 5px; border-radius:4px; font-size:.85em; }
+  .algebra{ font-family:ui-monospace,"Cascadia Code",Consolas,monospace; font-size:.9rem;
+    background:rgba(128,128,128,.08); border-radius:8px; padding:12px 14px; margin-top:12px;
+    white-space:pre-wrap; min-height:3.4em; }
+  .foot{ color:var(--faint); font-size:.82rem; text-align:center; margin-top:30px; }
+  .pill{ display:inline-block; padding:2px 9px; border-radius:20px; font-size:.8rem; font-weight:600; }
+  a{ color:var(--blue); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Mamba as MHA — Interactive Companion</h1>
+  <p class="sub">Play with the ideas from <code>MAMBA_MHA_EXPLAINER.md</code>. Nothing to install — this is one self-contained file your browser runs.</p>
+  <p class="sub" style="font-size:.86rem">Blue = recurrent / sequential / slow-on-chip · Orange = attention / parallel / fast-on-chip. The colors mean the same thing everywhere.</p>
+</header>
+<main>
+
+  <!-- ===== 1. O(T) vs O(T^2) ===== -->
+  <section id="s1">
+    <h2>1 · Watch O(T) and O(T²) diverge</h2>
+    <p class="lead">Drag the sequence length. The RNN does <em>less</em> total arithmetic, but its <em>depth</em> (steps that must wait) explodes while attention's stays pinned at 1. The chip runs depth, not work.</p>
+    <div class="controls">
+      <label>sequence length T = <span id="t1val" class="readout big">64</span>
+        <input id="t1" type="range" min="1" max="4096" value="64">
+      </label>
+    </div>
+    <div class="barwrap"><div class="barlabel">total arithmetic — RNN ∝ T = <span id="workR" class="readout blue"></span></div>
+      <div class="bar" id="barWorkR" style="background:var(--blue)"></div></div>
+    <div class="barwrap"><div class="barlabel">total arithmetic — attention ∝ T² = <span id="workA" class="readout orange"></span></div>
+      <div class="bar" id="barWorkA" style="background:var(--orange)"></div></div>
+    <div style="height:12px"></div>
+    <div class="barwrap"><div class="barlabel">sequential depth — RNN = T = <span id="depR" class="readout blue"></span></div>
+      <div class="bar" id="barDepR" style="background:var(--blue)"></div></div>
+    <div class="barwrap"><div class="barlabel">sequential depth — attention = 1 (whatever T is) = <span id="depA" class="readout orange">1</span></div>
+      <div class="bar" id="barDepA" style="background:var(--orange); width:2px"></div></div>
+    <p class="lead" style="margin-top:14px">At a nanopore-sized <code>T ≈ 150,000</code>, attention's work bar is off the planet — but its depth bar is still a sliver. That sliver is why parallel hardware loves it.</p>
+  </section>
+
+  <!-- ===== 2. Build L by unrolling ===== -->
+  <section id="s2">
+    <h2>2 · Unroll the recurrence and watch <span class="orange">L</span> build itself</h2>
+    <p class="lead">Press <strong>Next step</strong> to advance <code>t</code>. Each press writes the algebra for <code>h_t</code> and fills row <code>t</code> of the matrix <code>L</code>, one cell at a time: <code>L[t,s] = c_t · b_s · (P_t / P_s)</code>. Same fixed dataset as the figures in the doc.</p>
+    <div class="controls">
+      <button id="stepBtn">Next step ▶</button>
+      <button id="resetBtn" class="ghost">Reset</button>
+      <span class="readout">t = <strong id="tcur">–</strong> / 7</span>
+    </div>
+    <canvas id="lcanvas" width="560" height="470"></canvas>
+    <div class="algebra" id="algebra">Press “Next step” to begin. h_0 = b_0·x_0 …</div>
+  </section>
+
+  <!-- ===== 3. Softmax toggle ===== -->
+  <section id="s3">
+    <h2>3 · Flip softmax on and off</h2>
+    <p class="lead">The whole caveat in one switch. Raw <code>L</code> (Mamba): weights can be negative, rows sum to anything. After causal softmax (real attention): every weight positive, every row sums to exactly <strong>1.00</strong>. Same numbers underneath.</p>
+    <div class="controls">
+      <button id="sfBtn">Show: <span id="sfState">raw L (Mamba)</span></button>
+      <span class="pill" id="sfPill" style="background:rgba(235,104,52,.15); color:var(--orange)">diverging · signed · arbitrary row sums</span>
+    </div>
+    <canvas id="sfcanvas" width="560" height="470"></canvas>
+  </section>
+
+  <!-- ===== 4. Chunk size vs underflow ===== -->
+  <section id="s4">
+    <h2>4 · Chunk size meets the underflow cliff</h2>
+    <p class="lead">Bigger chunks = more of the work is one fast matmul, but a longer cumulative product <code>P</code> that can dive under the floating-point floor. Drag and watch the smallest <code>P</code> inside a chunk approach the cliff.</p>
+    <div class="controls">
+      <label>chunk size = <span id="ckval" class="readout big">64</span>
+        <input id="ck" type="range" min="8" max="1024" value="64" step="8">
+      </label>
+      <label>precision
+        <select id="prec" style="font:inherit;padding:6px;border-radius:8px">
+          <option value="1.18e-38">float32 (1.18e-38)</option>
+          <option value="6.1e-5">float16 (6.1e-5)</option>
+        </select>
+      </label>
+    </div>
+    <p class="readout">smallest P inside a chunk (using a = 0.8): <span id="minP" class="big"></span>
+      <span id="ckVerdict" class="pill"></span></p>
+    <p class="lead" style="margin-top:6px">This is why the shipped code works in <strong>log-space</strong> (add logs, subtract) instead of dividing tiny numbers — and chunks stay short as a second safety net.</p>
+  </section>
+
+  <p class="foot">Companion to MAMBA_MHA_EXPLAINER.md · all figures use the same fixed dataset · generated values, nothing faked.</p>
+</main>
+
+<script>
+// ---------- shared dataset (matches the SVG figures) ----------
+const A=[0.90,0.85,0.80,0.88,0.75,0.82,0.90,0.78];
+const B=[1.0,-0.5,0.8,0.3,-0.9,0.6,-0.4,0.7];
+const C=[0.5,0.9,-0.3,0.7,0.4,-0.6,0.8,0.2];
+const N=8;
+const P=[]; P[0]=A[0]; for(let t=1;t<N;t++) P[t]=P[t-1]*A[t];
+const L=[]; let M=0;
+for(let t=0;t<N;t++){ L[t]=[]; for(let s=0;s<N;s++){ if(s<=t){ L[t][s]=C[t]*B[s]*(P[t]/P[s]); M=Math.max(M,Math.abs(L[t][s])); } else L[t][s]=null; } }
+// softmax per row over s<=t
+const W=[]; for(let t=0;t<N;t++){ W[t]=[]; let sum=0; for(let s=0;s<=t;s++){ sum+=Math.exp(L[t][s]); } for(let s=0;s<=t;s++){ W[t][s]=Math.exp(L[t][s])/sum; } }
+
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function lerp(a,b,t){ return Math.round(a+(b-a)*t); }
+function divColor(v){ const t=Math.min(1,Math.abs(v)/M);
+  if(v>=0) return `rgb(${lerp(243,235,t)},${lerp(241,104,t)},${lerp(238,52,t)})`;
+  return `rgb(${lerp(243,42,t)},${lerp(241,120,t)},${lerp(238,214,t)})`; }
+function seqColor(u){ u=Math.min(1,Math.max(0,u)); return `rgb(${lerp(233,13,u)},${lerp(240,54,u)},${lerp(251,107,u)})`; }
+
+// fmt helper for big integers
+function fmt(n){ if(n<1e6) return n.toLocaleString(); return n.toExponential(2); }
+
+// ---------- 1. O(T) vs O(T^2) ----------
+const t1=document.getElementById('t1');
+function upd1(){
+  const T=+t1.value; document.getElementById('t1val').textContent=T;
+  const wR=T, wA=T*T;
+  document.getElementById('workR').textContent=fmt(wR);
+  document.getElementById('workA').textContent=fmt(wA);
+  document.getElementById('depR').textContent=fmt(T);
+  // log-scaled bar widths against T^2 max
+  const maxLog=Math.log10(4096*4096);
+  document.getElementById('barWorkR').style.width=(100*Math.log10(Math.max(1,wR))/maxLog)+'%';
+  document.getElementById('barWorkA').style.width=(100*Math.log10(Math.max(1,wA))/maxLog)+'%';
+  document.getElementById('barDepR').style.width=(100*T/4096)+'%';
+}
+t1.addEventListener('input',upd1); upd1();
+
+// ---------- 2. build L ----------
+const lc=document.getElementById('lcanvas'), lctx=lc.getContext('2d');
+let curT=-1;
+function drawL(uptoT){
+  const cs=52, ox=70, oy=30;
+  lctx.clearRect(0,0,lc.width,lc.height);
+  lctx.font='11px system-ui'; lctx.textAlign='center';
+  for(let t=0;t<N;t++) for(let s=0;s<N;s++){
+    const x=ox+s*cs, y=oy+t*cs;
+    if(s<=t && t<=uptoT){
+      lctx.fillStyle=divColor(L[t][s]); lctx.fillRect(x,y,cs-2,cs-2);
+      lctx.fillStyle=Math.abs(L[t][s])/M>0.58?'#fff':'#0A2540';
+      lctx.fillText(L[t][s].toFixed(2), x+cs/2, y+cs/2+4);
+    } else if(s<=t){ lctx.fillStyle=css('--grid'); lctx.fillRect(x,y,cs-2,cs-2); }
+    else { lctx.fillStyle=css('--surface'); lctx.fillRect(x,y,cs-2,cs-2); lctx.strokeStyle=css('--grid'); lctx.strokeRect(x,y,cs-2,cs-2); }
+  }
+  lctx.fillStyle=css('--mut'); lctx.font='10px system-ui';
+  for(let s=0;s<N;s++) lctx.fillText('s='+s, ox+s*cs+cs/2, oy-6);
+  lctx.textAlign='end';
+  for(let t=0;t<N;t++) lctx.fillText('t='+t, ox-8, oy+t*cs+cs/2+4);
+  lctx.textAlign='start';
+}
+const algebraLines=[];
+function buildAlgebra(t){
+  // human-readable expansion of h_t = sum_{s<=t} (prod a) b_s x_s, then y_t=c_t h_t
+  let terms=[];
+  for(let s=0;s<=t;s++){
+    let chain=''; for(let k=s+1;k<=t;k++) chain+=`a${k}·`;
+    terms.push(`${chain}b${s}·x${s}`);
+  }
+  return `h_${t} = ${terms.join('  +  ')}\ny_${t} = c_${t} · h_${t}   →   fills row ${t} of L`;
+}
+document.getElementById('stepBtn').addEventListener('click',()=>{
+  if(curT<N-1){ curT++; document.getElementById('tcur').textContent=curT;
+    drawL(curT); document.getElementById('algebra').textContent=buildAlgebra(curT);
+    if(curT===N-1) document.getElementById('stepBtn').disabled=true; }
+});
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  curT=-1; document.getElementById('tcur').textContent='–'; drawL(-1);
+  document.getElementById('stepBtn').disabled=false;
+  document.getElementById('algebra').textContent='Press “Next step” to begin. h_0 = b_0·x_0 …';
+});
+drawL(-1);
+
+// ---------- 3. softmax toggle ----------
+const sc=document.getElementById('sfcanvas'), sctx=sc.getContext('2d');
+let showSoftmax=false;
+function drawSF(){
+  const cs=52, ox=70, oy=30;
+  sctx.clearRect(0,0,sc.width,sc.height);
+  sctx.font='10px system-ui'; sctx.textAlign='center';
+  for(let t=0;t<N;t++){
+    let rowsum=0;
+    for(let s=0;s<N;s++){
+      const x=ox+s*cs, y=oy+t*cs;
+      if(s<=t){
+        if(showSoftmax){ sctx.fillStyle=seqColor(W[t][s]); rowsum+=W[t][s]; }
+        else { sctx.fillStyle=divColor(L[t][s]); rowsum+=L[t][s]; }
+        sctx.fillRect(x,y,cs-2,cs-2);
+        const val=showSoftmax?W[t][s]:L[t][s];
+        sctx.fillStyle=(showSoftmax?W[t][s]>0.5:Math.abs(L[t][s])/M>0.58)?'#fff':'#0A2540';
+        sctx.fillText(val.toFixed(2), x+cs/2, y+cs/2+3);
+      } else { sctx.fillStyle=css('--surface'); sctx.fillRect(x,y,cs-2,cs-2); sctx.strokeStyle=css('--grid'); sctx.strokeRect(x,y,cs-2,cs-2); }
+    }
+    // row sum in margin
+    sctx.fillStyle=showSoftmax?css('--blue'):css('--ink');
+    sctx.font='bold 11px system-ui';
+    sctx.fillText(rowsum.toFixed(2), ox+N*cs+22, oy+t*cs+cs/2+4);
+    sctx.font='10px system-ui';
+  }
+  sctx.fillStyle=css('--mut'); sctx.fillText('row Σ', ox+N*cs+22, oy-6);
+}
+document.getElementById('sfBtn').addEventListener('click',()=>{
+  showSoftmax=!showSoftmax;
+  document.getElementById('sfState').textContent=showSoftmax?'softmax (real attention)':'raw L (Mamba)';
+  const pill=document.getElementById('sfPill');
+  if(showSoftmax){ pill.textContent='sequential · all positive · every row = 1.00';
+    pill.style.background='rgba(42,120,214,.15)'; pill.style.color=css('--blue'); }
+  else { pill.textContent='diverging · signed · arbitrary row sums';
+    pill.style.background='rgba(235,104,52,.15)'; pill.style.color=css('--orange'); }
+  drawSF();
+});
+drawSF();
+
+// ---------- 4. chunk vs underflow ----------
+const ck=document.getElementById('ck'), prec=document.getElementById('prec');
+function upd4(){
+  const cz=+ck.value; document.getElementById('ckval').textContent=cz;
+  const minP=Math.pow(0.8, cz-1);           // smallest P within a chunk of this size (a=0.8)
+  document.getElementById('minP').textContent=minP.toExponential(2);
+  const floor=+prec.value;
+  const v=document.getElementById('ckVerdict');
+  if(minP<floor){ v.textContent='UNDERFLOWS — divides by ~0'; v.style.background='rgba(208,59,59,.15)'; v.style.color=css('--red'); }
+  else if(minP<floor*1e6){ v.textContent='getting dangerous'; v.style.background='rgba(235,104,52,.15)'; v.style.color=css('--orange'); }
+  else { v.textContent='safe'; v.style.background='rgba(42,120,214,.15)'; v.style.color=css('--blue'); }
+}
+ck.addEventListener('input',upd4); prec.addEventListener('change',upd4); upd4();
+
+// redraw canvases on theme change (colors read from CSS vars)
+if(window.matchMedia){ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ drawL(curT); drawSF(); }); }
+</script>
+</body>
+</html>

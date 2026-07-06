@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 662 638" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+<rect x="0" y="0" width="662" height="638" rx="14" fill="#fcfcfb" stroke="#e1e0d9"/>
+<text x="28" y="40" font-size="21" font-weight="700" fill="#0b0b0b">The matrix L  —  y = L @ x in one picture</text>
+<text x="28" y="66" font-size="13.5" fill="#52514e">Each cell L[t,s] = c_t · b_s · (P_t / P_s). Blank = causal mask (no peeking at the future). Orange +, blue −.</text>
+<text x="122" y="94" font-size="12" fill="#898781" text-anchor="middle">s=0</text>
+<text x="174" y="94" font-size="12" fill="#898781" text-anchor="middle">s=1</text>
+<text x="226" y="94" font-size="12" fill="#898781" text-anchor="middle">s=2</text>
+<text x="278" y="94" font-size="12" fill="#898781" text-anchor="middle">s=3</text>
+<text x="330" y="94" font-size="12" fill="#898781" text-anchor="middle">s=4</text>
+<text x="382" y="94" font-size="12" fill="#898781" text-anchor="middle">s=5</text>
+<text x="434" y="94" font-size="12" fill="#898781" text-anchor="middle">s=6</text>
+<text x="486" y="94" font-size="12" fill="#898781" text-anchor="middle">s=7</text>
+<text x="304" y="74" font-size="12" fill="#52514e" text-anchor="middle" font-weight="600">input position s  →</text>
+<text x="84" y="134" font-size="12" fill="#898781" text-anchor="end">t=0</text>
+<text x="84" y="186" font-size="12" fill="#898781" text-anchor="end">t=1</text>
+<text x="84" y="238" font-size="12" fill="#898781" text-anchor="end">t=2</text>
+<text x="84" y="290" font-size="12" fill="#898781" text-anchor="end">t=3</text>
+<text x="84" y="342" font-size="12" fill="#898781" text-anchor="end">t=4</text>
+<text x="84" y="394" font-size="12" fill="#898781" text-anchor="end">t=5</text>
+<text x="84" y="446" font-size="12" fill="#898781" text-anchor="end">t=6</text>
+<text x="84" y="498" font-size="12" fill="#898781" text-anchor="end">t=7</text>
+<text transform="translate(30,312) rotate(-90)" font-size="12" fill="#52514e" text-anchor="middle" font-weight="600">output position t  ↓</text>
+<rect x="96" y="104" width="52" height="52" fill="rgb(238,151,116)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="122" y="134" font-size="11.5" fill="#ffffff" text-anchor="middle">0.50</text>
+<rect x="148" y="104" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="200" y="104" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="252" y="104" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="304" y="104" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="356" y="104" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="408" y="104" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="460" y="104" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="96" y="156" width="52" height="52" fill="rgb(235,104,52)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="122" y="186" font-size="11.5" fill="#ffffff" text-anchor="middle">0.77</text>
+<rect x="148" y="156" width="52" height="52" fill="rgb(125,170,224)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="174" y="186" font-size="11.5" fill="#ffffff" text-anchor="middle">-0.45</text>
+<rect x="200" y="156" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="252" y="156" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="304" y="156" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="356" y="156" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="408" y="156" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="460" y="156" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="96" y="208" width="52" height="52" fill="rgb(189,209,232)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="122" y="238" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.20</text>
+<rect x="148" y="208" width="52" height="52" fill="rgb(242,220,209)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="174" y="238" font-size="11.5" fill="#0A2540" text-anchor="middle">0.12</text>
+<rect x="200" y="208" width="52" height="52" fill="rgb(180,203,230)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="226" y="238" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.24</text>
+<rect x="252" y="208" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="304" y="208" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="356" y="208" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="408" y="208" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="460" y="208" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="96" y="260" width="52" height="52" fill="rgb(239,166,136)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="122" y="290" font-size="11.5" fill="#0A2540" text-anchor="middle">0.42</text>
+<rect x="148" y="260" width="52" height="52" fill="rgb(178,202,230)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="174" y="290" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.25</text>
+<rect x="200" y="260" width="52" height="52" fill="rgb(238,153,118)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="226" y="290" font-size="11.5" fill="#ffffff" text-anchor="middle">0.49</text>
+<rect x="252" y="260" width="52" height="52" fill="rgb(241,203,187)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="278" y="290" font-size="11.5" fill="#0A2540" text-anchor="middle">0.21</text>
+<rect x="304" y="260" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="356" y="260" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="408" y="260" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="460" y="260" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="96" y="312" width="52" height="52" fill="rgb(241,209,194)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="122" y="342" font-size="11.5" fill="#0A2540" text-anchor="middle">0.18</text>
+<rect x="148" y="312" width="52" height="52" fill="rgb(215,224,235)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="174" y="342" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.11</text>
+<rect x="200" y="312" width="52" height="52" fill="rgb(241,203,187)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="226" y="342" font-size="11.5" fill="#0A2540" text-anchor="middle">0.21</text>
+<rect x="252" y="312" width="52" height="52" fill="rgb(242,225,216)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="278" y="342" font-size="11.5" fill="#0A2540" text-anchor="middle">0.09</text>
+<rect x="304" y="312" width="52" height="52" fill="rgb(148,184,227)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="330" y="342" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.36</text>
+<rect x="356" y="312" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="408" y="312" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="460" y="312" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="96" y="364" width="52" height="52" fill="rgb(185,206,231)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="122" y="394" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.22</text>
+<rect x="148" y="364" width="52" height="52" fill="rgb(242,218,206)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="174" y="394" font-size="11.5" fill="#0A2540" text-anchor="middle">0.13</text>
+<rect x="200" y="364" width="52" height="52" fill="rgb(175,200,230)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="226" y="394" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.26</text>
+<rect x="252" y="364" width="52" height="52" fill="rgb(214,223,235)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="278" y="394" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.11</text>
+<rect x="304" y="364" width="52" height="52" fill="rgb(238,162,130)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="330" y="394" font-size="11.5" fill="#0A2540" text-anchor="middle">0.44</text>
+<rect x="356" y="364" width="52" height="52" fill="rgb(148,184,227)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="382" y="394" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.36</text>
+<rect x="408" y="364" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="460" y="364" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="96" y="416" width="52" height="52" fill="rgb(240,194,174)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="122" y="446" font-size="11.5" fill="#0A2540" text-anchor="middle">0.26</text>
+<rect x="148" y="416" width="52" height="52" fill="rgb(202,216,233)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="174" y="446" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.16</text>
+<rect x="200" y="416" width="52" height="52" fill="rgb(240,185,162)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="226" y="446" font-size="11.5" fill="#0A2540" text-anchor="middle">0.31</text>
+<rect x="252" y="416" width="52" height="52" fill="rgb(242,217,206)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="278" y="446" font-size="11.5" fill="#0A2540" text-anchor="middle">0.13</text>
+<rect x="304" y="416" width="52" height="52" fill="rgb(103,157,221)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="330" y="446" font-size="11.5" fill="#ffffff" text-anchor="middle">-0.53</text>
+<rect x="356" y="416" width="52" height="52" fill="rgb(238,164,133)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="382" y="446" font-size="11.5" fill="#0A2540" text-anchor="middle">0.43</text>
+<rect x="408" y="416" width="52" height="52" fill="rgb(159,190,228)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="434" y="446" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.32</text>
+<rect x="460" y="416" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
+<rect x="96" y="468" width="52" height="52" fill="rgb(242,232,225)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="122" y="498" font-size="11.5" fill="#0A2540" text-anchor="middle">0.05</text>
+<rect x="148" y="468" width="52" height="52" fill="rgb(235,236,237)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="174" y="498" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.03</text>
+<rect x="200" y="468" width="52" height="52" fill="rgb(242,230,223)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="226" y="498" font-size="11.5" fill="#0A2540" text-anchor="middle">0.06</text>
+<rect x="252" y="468" width="52" height="52" fill="rgb(243,236,232)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="278" y="498" font-size="11.5" fill="#0A2540" text-anchor="middle">0.03</text>
+<rect x="304" y="468" width="52" height="52" fill="rgb(216,225,235)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="330" y="498" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.10</text>
+<rect x="356" y="468" width="52" height="52" fill="rgb(242,226,218)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="382" y="498" font-size="11.5" fill="#0A2540" text-anchor="middle">0.08</text>
+<rect x="408" y="468" width="52" height="52" fill="rgb(227,231,236)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="434" y="498" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.06</text>
+<rect x="460" y="468" width="52" height="52" fill="rgb(242,216,204)" stroke="#fcfcfb" stroke-width="2"/>
+<text x="486" y="498" font-size="11.5" fill="#0A2540" text-anchor="middle">0.14</text>
+<path d="M96,104 L512,520" stroke="#0A2540" stroke-width="2.5" fill="none" opacity="0.5"/>
+<text x="552" y="110" font-size="12" fill="#52514e" font-weight="600">weight</text>
+<rect x="552" y="120" width="22" height="13" fill="rgb(235,104,52)"/>
+<rect x="552" y="133" width="22" height="13" fill="rgb(236,118,71)"/>
+<rect x="552" y="146" width="22" height="13" fill="rgb(237,131,89)"/>
+<rect x="552" y="159" width="22" height="13" fill="rgb(237,145,108)"/>
+<rect x="552" y="172" width="22" height="13" fill="rgb(238,159,126)"/>
+<rect x="552" y="185" width="22" height="13" fill="rgb(239,173,145)"/>
+<rect x="552" y="198" width="22" height="13" fill="rgb(240,186,164)"/>
+<rect x="552" y="211" width="22" height="13" fill="rgb(241,200,182)"/>
+<rect x="552" y="224" width="22" height="13" fill="rgb(241,214,201)"/>
+<rect x="552" y="237" width="22" height="13" fill="rgb(242,227,219)"/>
+<rect x="552" y="250" width="22" height="13" fill="rgb(243,241,238)"/>
+<rect x="552" y="263" width="22" height="13" fill="rgb(223,229,236)"/>
+<rect x="552" y="276" width="22" height="13" fill="rgb(203,217,233)"/>
+<rect x="552" y="289" width="22" height="13" fill="rgb(183,205,231)"/>
+<rect x="552" y="302" width="22" height="13" fill="rgb(163,193,228)"/>
+<rect x="552" y="315" width="22" height="13" fill="rgb(143,181,226)"/>
+<rect x="552" y="328" width="22" height="13" fill="rgb(122,168,224)"/>
+<rect x="552" y="341" width="22" height="13" fill="rgb(102,156,221)"/>
+<rect x="552" y="354" width="22" height="13" fill="rgb(82,144,219)"/>
+<rect x="552" y="367" width="22" height="13" fill="rgb(62,132,216)"/>
+<rect x="552" y="380" width="22" height="13" fill="rgb(42,120,214)"/>
+<text x="580" y="128" font-size="11" fill="#52514e">+0.77</text>
+<text x="580" y="258" font-size="11" fill="#52514e">0</text>
+<text x="580" y="388" font-size="11" fill="#52514e">−0.77</text>
+<text x="28" y="586" font-size="12.5" fill="#52514e">Diagonal (s=t): input just written, weight c·b, no decay yet. Fading up-left = older inputs, decayed by a longer chain of a's.</text>
+<text x="28" y="608" font-size="12" fill="#898781">Illustrative fixed dataset; values computed exactly by awk and shared with the interactive companion.</text>
+</svg>

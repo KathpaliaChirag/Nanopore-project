@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+<rect x="0" y="0" width="760" height="430" rx="14" fill="#fcfcfb" stroke="#e1e0d9"/>
+<text x="28" y="38" font-size="20" font-weight="700" fill="#0b0b0b">The paradox: fewer operations can still lose</text>
+<text x="28" y="62" font-size="13" fill="#52514e">A chip runs DEPTH (steps that must wait), not total work.</text>
+<text x="70" y="86" font-size="13" font-weight="700" fill="#0A2540">Total arithmetic (log scale)</text>
+<rect x="70" y="100" width="280" height="250" fill="none" stroke="#e8e7e0"/>
+<line x1="70" y1="350.0" x2="350" y2="350.0" stroke="#e8e7e0"/>
+<text x="64" y="353.0" font-size="10" fill="#898781" text-anchor="end">10^0</text>
+<line x1="70" y1="278.6" x2="350" y2="278.6" stroke="#e8e7e0"/>
+<text x="64" y="281.6" font-size="10" fill="#898781" text-anchor="end">10^2</text>
+<line x1="70" y1="207.1" x2="350" y2="207.1" stroke="#e8e7e0"/>
+<text x="64" y="210.1" font-size="10" fill="#898781" text-anchor="end">10^4</text>
+<line x1="70" y1="135.7" x2="350" y2="135.7" stroke="#e8e7e0"/>
+<text x="64" y="138.7" font-size="10" fill="#898781" text-anchor="end">10^6</text>
+<path d="M70.0,350.0L95.5,328.5L120.9,307.0L146.4,285.5L171.8,264.0L197.3,242.5L222.7,221.0L248.2,199.5L273.6,178.0L299.1,156.5L324.5,135.0L350.0,113.5" fill="none" stroke="#eb6834" stroke-width="3"/>
+<path d="M70.0,350.0L95.5,339.2L120.9,328.5L146.4,317.7L171.8,307.0L197.3,296.2L222.7,285.5L248.2,274.7L273.6,264.0L299.1,253.2L324.5,242.5L350.0,231.7" fill="none" stroke="#2a78d6" stroke-width="3"/>
+<text x="254" y="118" font-size="12" fill="#eb6834" font-weight="700">attention  T²</text>
+<text x="280" y="310" font-size="12" fill="#2a78d6" font-weight="700">RNN  T</text>
+<text x="210" y="372" font-size="11" fill="#898781" text-anchor="middle">sequence length T (1 to 2048)</text>
+<text x="460" y="86" font-size="13" font-weight="700" fill="#0A2540">Steps that must happen in order</text>
+<rect x="460" y="100" width="280" height="250" fill="none" stroke="#e8e7e0"/>
+<line x1="460" y1="350" x2="740" y2="100" stroke="#2a78d6" stroke-width="3"/>
+<line x1="460" y1="348.0" x2="740" y2="348.0" stroke="#eb6834" stroke-width="3"/>
+<text x="500" y="130" font-size="12" fill="#2a78d6" font-weight="700">RNN depth = T</text>
+<text x="530" y="340" font-size="12" fill="#eb6834" font-weight="700">attention depth = 1 (flat)</text>
+<text x="600" y="372" font-size="11" fill="#898781" text-anchor="middle">sequence length T</text>
+<text x="28" y="392" font-size="12.5" fill="#52514e">Left: the RNN does LESS total arithmetic. Right: but every step waits for the last, so its depth grows with T while attention's stays 1.</text>
+<text x="28" y="412" font-size="12.5" fill="#0A2540" font-weight="600">On a chip full of parallel workers, flat depth wins — even while doing far more arithmetic.</text>
+</svg>

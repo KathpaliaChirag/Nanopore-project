@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+<rect x="0" y="0" width="760" height="340" rx="14" fill="#fcfcfb" stroke="#e1e0d9"/>
+<text x="28" y="38" font-size="20" font-weight="700" fill="#0b0b0b">What x @ W actually does: a stack of recipes</text>
+<text x="28" y="62" font-size="13" fill="#52514e">One output number is a custom weighted blend of ALL the inputs. One column of the matrix = one recipe.</text>
+<text x="70" y="128" font-size="12" fill="#0A2540" font-weight="600">input x</text>
+<rect x="70" y="140" width="46" height="46" rx="6" fill="#eaf1fb" stroke="#2a78d6"/>
+<text x="93" y="169" font-size="16" fill="#0A2540" text-anchor="middle" font-weight="700">2</text>
+<rect x="70" y="186" width="46" height="46" rx="6" fill="#eaf1fb" stroke="#2a78d6"/>
+<text x="93" y="215" font-size="16" fill="#0A2540" text-anchor="middle" font-weight="700">4</text>
+<rect x="70" y="232" width="46" height="46" rx="6" fill="#eaf1fb" stroke="#2a78d6"/>
+<text x="93" y="261" font-size="16" fill="#0A2540" text-anchor="middle" font-weight="700">1</text>
+<text x="260" y="128" font-size="12" fill="#0A2540" font-weight="600">matrix W (each column is a recipe)</text>
+<rect x="260" y="140" width="46" height="46" fill="#fcece3" stroke="#eb6834"/>
+<text x="283" y="168" font-size="13" fill="#eb6834" text-anchor="middle" font-weight="700">0.5</text>
+<rect x="306" y="140" width="46" height="46" fill="#ffffff" stroke="#e8e7e0"/>
+<text x="329" y="168" font-size="12" fill="#898781" text-anchor="middle">.</text>
+<rect x="352" y="140" width="46" height="46" fill="#ffffff" stroke="#e8e7e0"/>
+<text x="375" y="168" font-size="12" fill="#898781" text-anchor="middle">.</text>
+<rect x="260" y="186" width="46" height="46" fill="#fcece3" stroke="#eb6834"/>
+<text x="283" y="214" font-size="13" fill="#eb6834" text-anchor="middle" font-weight="700">0.2</text>
+<rect x="306" y="186" width="46" height="46" fill="#ffffff" stroke="#e8e7e0"/>
+<text x="329" y="214" font-size="12" fill="#898781" text-anchor="middle">.</text>
+<rect x="352" y="186" width="46" height="46" fill="#ffffff" stroke="#e8e7e0"/>
+<text x="375" y="214" font-size="12" fill="#898781" text-anchor="middle">.</text>
+<rect x="260" y="232" width="46" height="46" fill="#fcece3" stroke="#eb6834"/>
+<text x="283" y="260" font-size="13" fill="#eb6834" text-anchor="middle" font-weight="700">-0.1</text>
+<rect x="306" y="232" width="46" height="46" fill="#ffffff" stroke="#e8e7e0"/>
+<text x="329" y="260" font-size="12" fill="#898781" text-anchor="middle">.</text>
+<rect x="352" y="232" width="46" height="46" fill="#ffffff" stroke="#e8e7e0"/>
+<text x="375" y="260" font-size="12" fill="#898781" text-anchor="middle">.</text>
+<line x1="116" y1="163" x2="560" y2="163" stroke="#eb6834" stroke-width="1.5" opacity="0.7"/>
+<line x1="116" y1="209" x2="560" y2="163" stroke="#eb6834" stroke-width="1.5" opacity="0.7"/>
+<line x1="116" y1="255" x2="560" y2="163" stroke="#eb6834" stroke-width="1.5" opacity="0.7"/>
+<rect x="560" y="140" width="54" height="46" rx="6" fill="#fcece3" stroke="#eb6834" stroke-width="2"/>
+<text x="587" y="169" font-size="16" fill="#eb6834" text-anchor="middle" font-weight="700">1.7</text>
+<text x="560" y="128" font-size="12" fill="#0A2540" font-weight="600">output y1</text>
+<rect x="560" y="196" width="54" height="46" rx="6" fill="#f7f6f3" stroke="#e8e7e0"/>
+<rect x="560" y="252" width="54" height="46" rx="6" fill="#f7f6f3" stroke="#e8e7e0"/>
+<text x="380" y="282" font-size="15" fill="#0A2540" text-anchor="middle">y1 = 0.5*2 + 0.2*4 - 0.1*1 = 1.7</text>
+<text x="28" y="316" font-size="12.5" fill="#52514e">Stack the recipes, get the whole output. This one operation is the thing chips run fastest, and the whole document rides on it.</text>
+</svg>

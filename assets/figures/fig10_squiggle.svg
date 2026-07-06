@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 420" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
+<rect x="0" y="0" width="760" height="420" rx="14" fill="#fcfcfb" stroke="#e1e0d9"/>
+<text x="28" y="38" font-size="20" font-weight="700" fill="#0b0b0b">What the nanopore signal actually is</text>
+<text x="28" y="62" font-size="13" fill="#52514e">The current is a fingerprint of a WINDOW of bases in the pore at once, and the signal is ~10x longer than the DNA it encodes.</text>
+<text x="70" y="106" font-size="11" fill="#898781">current (pA)</text>
+<path d="M70.0,170.0 L147.5,170.0 L147.5,200.0 M147.5,200.0 L225.0,200.0 L225.0,146.0 M225.0,146.0 L302.5,146.0 L302.5,146.0 M302.5,146.0 L380.0,146.0 L380.0,146.0 M380.0,146.0 L457.5,146.0 L457.5,214.0 M457.5,214.0 L535.0,214.0 L535.0,180.0 M535.0,180.0 L612.5,180.0 L612.5,158.0 M612.5,158.0 L690.0,158.0" fill="none" stroke="#2a78d6" stroke-width="2.5"/>
+<rect x="225.0" y="104" width="232.5" height="132" fill="#eb6834" opacity="0.18" stroke="#eb6834" stroke-dasharray="5 3"/>
+<text x="341.2" y="96" font-size="11" fill="#eb6834" text-anchor="middle" font-weight="600">sensing region: ~5-9 bases in the pore at once</text>
+<text x="70" y="264" font-size="11" fill="#898781">DNA strand threading the pore</text>
+<rect x="70.0" y="280" width="56.0" height="26" rx="4" fill="#eef1f5" stroke="#e8e7e0"/>
+<text x="98.0" y="298" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">G</text>
+<rect x="132.0" y="280" width="56.0" height="26" rx="4" fill="#eef1f5" stroke="#e8e7e0"/>
+<text x="160.0" y="298" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">A</text>
+<rect x="194.0" y="280" width="56.0" height="26" rx="4" fill="#eef1f5" stroke="#e8e7e0"/>
+<text x="222.0" y="298" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">C</text>
+<rect x="256.0" y="280" width="56.0" height="26" rx="4" fill="#fcece3" stroke="#eb6834"/>
+<text x="284.0" y="298" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">T</text>
+<rect x="318.0" y="280" width="56.0" height="26" rx="4" fill="#fcece3" stroke="#eb6834"/>
+<text x="346.0" y="298" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">G</text>
+<rect x="380.0" y="280" width="56.0" height="26" rx="4" fill="#fcece3" stroke="#eb6834"/>
+<text x="408.0" y="298" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">C</text>
+<rect x="442.0" y="280" width="56.0" height="26" rx="4" fill="#fcece3" stroke="#eb6834"/>
+<text x="470.0" y="298" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">A</text>
+<rect x="504.0" y="280" width="56.0" height="26" rx="4" fill="#fcece3" stroke="#eb6834"/>
+<text x="532.0" y="298" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">A</text>
+<rect x="566.0" y="280" width="56.0" height="26" rx="4" fill="#eef1f5" stroke="#e8e7e0"/>
+<text x="594.0" y="298" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">G</text>
+<rect x="628.0" y="280" width="56.0" height="26" rx="4" fill="#eef1f5" stroke="#e8e7e0"/>
+<text x="656.0" y="298" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">T</text>
+<text x="70" y="342" font-size="11" fill="#898781">basecaller output (shorter than the signal)</text>
+<rect x="70" y="350" width="34" height="26" rx="4" fill="#eafaf0" stroke="#3a9d6a"/>
+<text x="87" y="368" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">T</text>
+<rect x="110" y="350" width="34" height="26" rx="4" fill="#eafaf0" stroke="#3a9d6a"/>
+<text x="127" y="368" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">G</text>
+<rect x="150" y="350" width="34" height="26" rx="4" fill="#eafaf0" stroke="#3a9d6a"/>
+<text x="167" y="368" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">C</text>
+<rect x="190" y="350" width="34" height="26" rx="4" fill="#eafaf0" stroke="#3a9d6a"/>
+<text x="207" y="368" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">A</text>
+<rect x="230" y="350" width="34" height="26" rx="4" fill="#eafaf0" stroke="#3a9d6a"/>
+<text x="247" y="368" font-size="14" fill="#0A2540" text-anchor="middle" font-family="monospace" font-weight="700">A</text>
+<text x="300" y="368" font-size="12" fill="#0A2540">~10 signal samples per base, so input T is ~10x longer than output. One read = hundreds of thousands of samples.</text>
+</svg>
