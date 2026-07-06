@@ -21,7 +21,7 @@
 <text x="84" y="498" font-size="12" fill="#898781" text-anchor="end">t=7</text>
 <text transform="translate(30,312) rotate(-90)" font-size="12" fill="#52514e" text-anchor="middle" font-weight="600">output position t  ↓</text>
 <rect x="96" y="104" width="52" height="52" fill="rgb(238,151,116)" stroke="#fcfcfb" stroke-width="2"/>
-<text x="122" y="134" font-size="11.5" fill="#ffffff" text-anchor="middle">0.50</text>
+<text x="122" y="134" font-size="11.5" fill="#0A2540" text-anchor="middle">0.50</text>
 <rect x="148" y="104" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
 <rect x="200" y="104" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
 <rect x="252" y="104" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
@@ -32,7 +32,7 @@
 <rect x="96" y="156" width="52" height="52" fill="rgb(235,104,52)" stroke="#fcfcfb" stroke-width="2"/>
 <text x="122" y="186" font-size="11.5" fill="#ffffff" text-anchor="middle">0.77</text>
 <rect x="148" y="156" width="52" height="52" fill="rgb(125,170,224)" stroke="#fcfcfb" stroke-width="2"/>
-<text x="174" y="186" font-size="11.5" fill="#ffffff" text-anchor="middle">-0.45</text>
+<text x="174" y="186" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.45</text>
 <rect x="200" y="156" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
 <rect x="252" y="156" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
 <rect x="304" y="156" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
@@ -55,7 +55,7 @@
 <rect x="148" y="260" width="52" height="52" fill="rgb(178,202,230)" stroke="#fcfcfb" stroke-width="2"/>
 <text x="174" y="290" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.25</text>
 <rect x="200" y="260" width="52" height="52" fill="rgb(238,153,118)" stroke="#fcfcfb" stroke-width="2"/>
-<text x="226" y="290" font-size="11.5" fill="#ffffff" text-anchor="middle">0.49</text>
+<text x="226" y="290" font-size="11.5" fill="#0A2540" text-anchor="middle">0.49</text>
 <rect x="252" y="260" width="52" height="52" fill="rgb(241,203,187)" stroke="#fcfcfb" stroke-width="2"/>
 <text x="278" y="290" font-size="11.5" fill="#0A2540" text-anchor="middle">0.21</text>
 <rect x="304" y="260" width="52" height="52" fill="#f7f6f3" stroke="#fcfcfb" stroke-width="2"/>
@@ -98,7 +98,7 @@
 <rect x="252" y="416" width="52" height="52" fill="rgb(242,217,206)" stroke="#fcfcfb" stroke-width="2"/>
 <text x="278" y="446" font-size="11.5" fill="#0A2540" text-anchor="middle">0.13</text>
 <rect x="304" y="416" width="52" height="52" fill="rgb(103,157,221)" stroke="#fcfcfb" stroke-width="2"/>
-<text x="330" y="446" font-size="11.5" fill="#ffffff" text-anchor="middle">-0.53</text>
+<text x="330" y="446" font-size="11.5" fill="#0A2540" text-anchor="middle">-0.53</text>
 <rect x="356" y="416" width="52" height="52" fill="rgb(238,164,133)" stroke="#fcfcfb" stroke-width="2"/>
 <text x="382" y="446" font-size="11.5" fill="#0A2540" text-anchor="middle">0.43</text>
 <rect x="408" y="416" width="52" height="52" fill="rgb(159,190,228)" stroke="#fcfcfb" stroke-width="2"/>

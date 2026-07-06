@@ -63,19 +63,19 @@ BEGIN{
 
   # ===== FIG 9: compute vs bandwidth gap =====
   f="assets/figures/fig9_compute_bandwidth.svg"; W=760; H=320
-  card(f,W,H,"Why a chip is almost never limited by 'how much math'","On Luna's L40S: it does far more arithmetic per second than it can fetch numbers per second. That gap decides everything.")
-  bx=70; by=120; bw=560; bh=44
-  lo=11; hi=13.0
+  card(f,W,H,"Why a chip is almost never limited by 'how much math'","On Luna's L40S: it does far more arithmetic per second than it can fetch bytes per second. That gap decides everything.")
+  bx=70; by=120; bw=650; bh=44
+  lo=11.4; hi=14.7
   v1=362e12; v2=0.864e12
   fr1=(log10(v1)-lo)/(hi-lo); fr2=(log10(v2)-lo)/(hi-lo)
   printf("<text x=\"%d\" y=\"%d\" font-size=\"13\" fill=\"%s\" font-weight=\"600\">math the cores can do</text>\n",bx,by-8,INK) > f
   printf("<rect x=\"%d\" y=\"%d\" width=\"%.1f\" height=\"%d\" rx=\"5\" fill=\"%s\"/>\n",bx,by,bw*fr1,bh,ORANGE) > f
-  printf("<text x=\"%d\" y=\"%d\" font-size=\"13\" fill=\"#ffffff\" font-weight=\"700\">= 362 trillion multiply-adds / sec</text>\n",bx+10,by+27) > f
+  printf("<text x=\"%d\" y=\"%d\" font-size=\"13\" fill=\"#ffffff\" font-weight=\"700\">= 362 trillion FLOPs / sec</text>\n",bx+10,by+27) > f
   by2=by+90
-  printf("<text x=\"%d\" y=\"%d\" font-size=\"13\" fill=\"%s\" font-weight=\"600\">numbers it can fetch from memory</text>\n",bx,by2-8,INK) > f
+  printf("<text x=\"%d\" y=\"%d\" font-size=\"13\" fill=\"%s\" font-weight=\"600\">bytes it can fetch from memory</text>\n",bx,by2-8,INK) > f
   printf("<rect x=\"%d\" y=\"%d\" width=\"%.1f\" height=\"%d\" rx=\"5\" fill=\"%s\"/>\n",bx,by2,bw*fr2,bh,BLUE) > f
   printf("<text x=\"%.1f\" y=\"%d\" font-size=\"13\" fill=\"%s\" font-weight=\"700\">= 0.86 trillion bytes / sec</text>\n",bx+bw*fr2+10,by2+27,BLUE) > f
-  printf("<text x=\"%d\" y=\"%d\" font-size=\"15\" fill=\"%s\" font-weight=\"700\" text-anchor=\"middle\">about 400 arithmetic ops in the time it takes to fetch ONE number</text>\n",bx+bw/2,by2+95,INK) > f
+  printf("<text x=\"%d\" y=\"%d\" font-size=\"15\" fill=\"%s\" font-weight=\"700\" text-anchor=\"middle\">about 400 FLOPs for every single byte it fetches</text>\n",bx+bw/2,by2+95,INK) > f
   printf("<text x=\"28\" y=\"%d\" font-size=\"12.5\" fill=\"#52514e\">So the winner is whoever keeps the cores FED (high arithmetic intensity), not whoever does the least math. Log scale; L40S FP16 tensor + bandwidth.</text>\n",H-18) > f
   print "</svg>" > f; close(f)
   print "charts OK"

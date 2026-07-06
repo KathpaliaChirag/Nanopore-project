@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" font-family="system-ui,-apple-system,Segoe UI,sans-serif">
 <rect x="0" y="0" width="760" height="320" rx="14" fill="#fcfcfb" stroke="#e1e0d9"/>
 <text x="28" y="38" font-size="20" font-weight="700" fill="#0b0b0b">Why a chip is almost never limited by 'how much math'</text>
-<text x="28" y="62" font-size="13" fill="#52514e">On Luna's L40S: it does far more arithmetic per second than it can fetch numbers per second. That gap decides everything.</text>
+<text x="28" y="62" font-size="13" fill="#52514e">On Luna's L40S: it does far more arithmetic per second than it can fetch bytes per second. That gap decides everything.</text>
 <text x="70" y="112" font-size="13" fill="#0A2540" font-weight="600">math the cores can do</text>
-<rect x="70" y="120" width="996.4" height="44" rx="5" fill="#eb6834"/>
-<text x="80" y="147" font-size="13" fill="#ffffff" font-weight="700">= 362 trillion multiply-adds / sec</text>
-<text x="70" y="202" font-size="13" fill="#0A2540" font-weight="600">numbers it can fetch from memory</text>
-<rect x="70" y="210" width="262.2" height="44" rx="5" fill="#2a78d6"/>
-<text x="342.2" y="237" font-size="13" fill="#2a78d6" font-weight="700">= 0.86 trillion bytes / sec</text>
-<text x="350" y="305" font-size="15" fill="#0A2540" font-weight="700" text-anchor="middle">about 400 arithmetic ops in the time it takes to fetch ONE number</text>
+<rect x="70" y="120" width="622.2" height="44" rx="5" fill="#eb6834"/>
+<text x="80" y="147" font-size="13" fill="#ffffff" font-weight="700">= 362 trillion FLOPs / sec</text>
+<text x="70" y="202" font-size="13" fill="#0A2540" font-weight="600">bytes it can fetch from memory</text>
+<rect x="70" y="210" width="105.7" height="44" rx="5" fill="#2a78d6"/>
+<text x="185.7" y="237" font-size="13" fill="#2a78d6" font-weight="700">= 0.86 trillion bytes / sec</text>
+<text x="395" y="305" font-size="15" fill="#0A2540" font-weight="700" text-anchor="middle">about 400 FLOPs for every single byte it fetches</text>
 <text x="28" y="302" font-size="12.5" fill="#52514e">So the winner is whoever keeps the cores FED (high arithmetic intensity), not whoever does the least math. Log scale; L40S FP16 tensor + bandwidth.</text>
 </svg>

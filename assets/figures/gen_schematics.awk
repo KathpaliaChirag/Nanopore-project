@@ -54,7 +54,7 @@ BEGIN{
   print "</svg>" > f; close(f)
 
   # ===== FIG 5: chunking as tiling of L =====
-  f="assets/figures/fig5_chunking.svg"; W=680; H=560
+  f="assets/figures/fig5_chunking.svg"; W=680; H=620
   card(f,W,H,"Chunking is just tiling the matrix L","Fill each orange diagonal block with a fast parallel matmul; stitch blocks with one cheap blue thread of carried state.")
   n=8; cs=52; gx=90; gy=110
   # base grid (lower triangle faint)
@@ -74,7 +74,7 @@ BEGIN{
   printf("<defs><marker id=\"ar\" markerWidth=\"8\" markerHeight=\"8\" refX=\"6\" refY=\"3\" orient=\"auto\"><path d=\"M0,0 L6,3 L0,6 Z\" fill=\"%s\"/></marker></defs>\n",BLUE) > f
   printf("<text x=\"%d\" y=\"%d\" font-size=\"12\" fill=\"%s\"><tspan fill=\"%s\" font-weight=\"700\">orange blocks</tspan> = parallel matmul (GEMM, tensor cores)</text>\n",gx,gy+n*cs+30,INK,ORANGE) > f
   printf("<text x=\"%d\" y=\"%d\" font-size=\"12\" fill=\"%s\"><tspan fill=\"%s\" font-weight=\"700\">blue region + arrow</tspan> = small summary state carried chunk to chunk (cheap recurrence)</text>\n",gx,gy+n*cs+52,INK,BLUE) > f
-  printf("<text x=\"28\" y=\"%d\" font-size=\"12.5\" fill=\"#52514e\">Attention inside each chunk, a thin recurrence between: reading the novel chapter by chapter.</text>\n",H-22) > f
+  printf("<text x=\"28\" y=\"%d\" font-size=\"12.5\" fill=\"#52514e\">Attention inside each chunk, a thin recurrence between: reading the novel chapter by chapter.</text>\n",gy+n*cs+80) > f
   print "</svg>" > f; close(f)
 
   # ===== FIG 10: nanopore squiggle -> k-mer -> base =====

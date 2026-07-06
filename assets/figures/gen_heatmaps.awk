@@ -6,7 +6,7 @@ function irgb(bR,bG,bB, pR,pG,pB, t,  r,g,b){
 function divcolor(v,  t){ t=(v<0?-v:v)/M; if(t>1)t=1
   if(v>=0) return irgb(243,241,238,235,104,52,t); else return irgb(243,241,238,42,120,214,t) }
 function seqcolor(u){ if(u<0)u=0; if(u>1)u=1; return irgb(233,240,251,13,54,107,u) }
-function ink(t){ return (t>0.58?"#ffffff":"#0A2540") }
+function ink(t){ return (t>0.72?"#ffffff":"#0A2540") }
 function header(f,title,subt){
   printf("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 %d %d\" font-family=\"system-ui,-apple-system,Segoe UI,sans-serif\">\n",CW,CH) > f
   printf("<rect x=\"0\" y=\"0\" width=\"%d\" height=\"%d\" rx=\"14\" fill=\"#fcfcfb\" stroke=\"#e1e0d9\"/>\n",CW,CH) > f

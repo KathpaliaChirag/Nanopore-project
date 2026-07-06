@@ -172,7 +172,7 @@ function drawL(uptoT){
     const x=ox+s*cs, y=oy+t*cs;
     if(s<=t && t<=uptoT){
       lctx.fillStyle=divColor(L[t][s]); lctx.fillRect(x,y,cs-2,cs-2);
-      lctx.fillStyle=Math.abs(L[t][s])/M>0.58?'#fff':'#0A2540';
+      lctx.fillStyle=Math.abs(L[t][s])/M>0.72?'#fff':'#0A2540';
       lctx.fillText(L[t][s].toFixed(2), x+cs/2, y+cs/2+4);
     } else if(s<=t){ lctx.fillStyle=css('--grid'); lctx.fillRect(x,y,cs-2,cs-2); }
     else { lctx.fillStyle=css('--surface'); lctx.fillRect(x,y,cs-2,cs-2); lctx.strokeStyle=css('--grid'); lctx.strokeRect(x,y,cs-2,cs-2); }
@@ -221,7 +221,7 @@ function drawSF(){
         else { sctx.fillStyle=divColor(L[t][s]); rowsum+=L[t][s]; }
         sctx.fillRect(x,y,cs-2,cs-2);
         const val=showSoftmax?W[t][s]:L[t][s];
-        sctx.fillStyle=(showSoftmax?W[t][s]>0.5:Math.abs(L[t][s])/M>0.58)?'#fff':'#0A2540';
+        sctx.fillStyle=(showSoftmax?W[t][s]>0.5:Math.abs(L[t][s])/M>0.72)?'#fff':'#0A2540';
         sctx.fillText(val.toFixed(2), x+cs/2, y+cs/2+3);
       } else { sctx.fillStyle=css('--surface'); sctx.fillRect(x,y,cs-2,cs-2); sctx.strokeStyle=css('--grid'); sctx.strokeRect(x,y,cs-2,cs-2); }
     }
