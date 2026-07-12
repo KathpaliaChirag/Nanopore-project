@@ -7,9 +7,9 @@
 # Allow markdown files
 !*.md
 
-# Allow generated chart images under matrix_mul/
-!matrix_mul/*.png
-!matrix_mul/*.svg
+# Allow generated chart images under matrix_mul/ (now nested under kraken2opti/)
+!kraken2opti/matrix_mul/*.png
+!kraken2opti/matrix_mul/*.svg
 
 # Allow .gitignore itself
 !.gitignore

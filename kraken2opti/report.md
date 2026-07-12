@@ -140,7 +140,7 @@ See per-N reports for full tables (CH3-A wall/IPC (Instructions Per Cycle)/GFlop
 
 > Full per-thread breakdown (all 27 combinations, exact raw values, per-table observations):
 > **[kraken2_thread_scaling_full.md](reports/kraken2_thread_scaling_full.md)**
-> GitHub: [reports/kraken2_thread_scaling_full.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/kraken2_thread_scaling_full.md)
+> GitHub: [reports/kraken2_thread_scaling_full.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/kraken2opti/reports/kraken2_thread_scaling_full.md)
 
 Key findings extracted from the full report:
 
@@ -291,28 +291,28 @@ Sample = 3 dominant ESKAPE pathogens. Species-level shown; *(G nn)* = genus-leve
 **Date:** 2026-06-27 — implemented + built + verified (not design-only).
 
 > Full report (implementation, size proof, FP model, accuracy, commands, artifacts): **[reports/eskape_cellsize.md](reports/eskape_cellsize.md)**
-> GitHub: [reports/eskape_cellsize.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/eskape_cellsize.md)
+> GitHub: [reports/eskape_cellsize.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/kraken2opti/reports/eskape_cellsize.md)
 >
 > Deviation sweep (3 basecallers × 3 widths × 2 thresholds + table-fill audit): **[reports/eskape_cellsize_sweep.md](reports/eskape_cellsize_sweep.md)**
-> GitHub: [reports/eskape_cellsize_sweep.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/eskape_cellsize_sweep.md)
+> GitHub: [reports/eskape_cellsize_sweep.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/kraken2opti/reports/eskape_cellsize_sweep.md)
 >
 > Why 16-bit fails / 24-bit ≈ 32-bit (false-positive mechanism, key_bits math): **[reports/eskape_cellsize_fp_analysis.md](reports/eskape_cellsize_fp_analysis.md)**
-> GitHub: [reports/eskape_cellsize_fp_analysis.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/eskape_cellsize_fp_analysis.md)
+> GitHub: [reports/eskape_cellsize_fp_analysis.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/kraken2opti/reports/eskape_cellsize_fp_analysis.md)
 >
 > Port guide — add 16/24-bit cells to a fresh `DerrickWood/kraken2` clone (stock already has 32/40+templating; 5 files, additive + one guard): **[reports/kraken2_cellsize_port.md](reports/kraken2_cellsize_port.md)**
-> GitHub: [reports/kraken2_cellsize_port.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/reports/kraken2_cellsize_port.md)
+> GitHub: [reports/kraken2_cellsize_port.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/kraken2opti/reports/kraken2_cellsize_port.md)
 >
 > Per-pod5 fast dataset (1.87 M reads — per-pathogen detection % across 3 widths): **[results/eskape_16bit/sweep/fastq_fast/findings.md](results/eskape_16bit/sweep/fastq_fast/findings.md)**
-> GitHub: [results/eskape_16bit/sweep/fastq_fast/findings.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/results/eskape_16bit/sweep/fastq_fast/findings.md)
+> GitHub: [results/eskape_16bit/sweep/fastq_fast/findings.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/kraken2opti/results/eskape_16bit/sweep/fastq_fast/findings.md)
 >
 > Per-pod breakdown (pod5_0…15 individually, 96 runs — verdict holds in every pod): **[results/eskape_16bit/sweep/fastq_fast/per_pod/findings_per_pod.md](results/eskape_16bit/sweep/fastq_fast/per_pod/findings_per_pod.md)**
-> GitHub: [results/eskape_16bit/sweep/fastq_fast/per_pod/findings_per_pod.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/results/eskape_16bit/sweep/fastq_fast/per_pod/findings_per_pod.md)
+> GitHub: [results/eskape_16bit/sweep/fastq_fast/per_pod/findings_per_pod.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/kraken2opti/results/eskape_16bit/sweep/fastq_fast/per_pod/findings_per_pod.md)
 >
 > Per-pod pathogen comparison (reads/pathogen × all 6 runs, per pod): **[results/eskape_16bit/sweep/fastq_fast/per_pod/per_pod_pathogen_comparison.md](results/eskape_16bit/sweep/fastq_fast/per_pod/per_pod_pathogen_comparison.md)**
-> GitHub: [results/eskape_16bit/sweep/fastq_fast/per_pod/per_pod_pathogen_comparison.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/results/eskape_16bit/sweep/fastq_fast/per_pod/per_pod_pathogen_comparison.md)
+> GitHub: [results/eskape_16bit/sweep/fastq_fast/per_pod/per_pod_pathogen_comparison.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/kraken2opti/results/eskape_16bit/sweep/fastq_fast/per_pod/per_pod_pathogen_comparison.md)
 >
 > Thread + cache/LLC-miss sweep — **generated on Dell OptiPlex 5090 lab desktop** (16/20/24/32-bit × 16 pod5 × 9 thread-counts × 3 runs = 1,728 perf runs; memory-latency-bound, HT knee at 8 cores, 24-bit ≈ 32-bit): **[results/perf_threadsweep/perf_threadsweep_report.md](results/perf_threadsweep/perf_threadsweep_report.md)**
-> GitHub: [results/perf_threadsweep/perf_threadsweep_report.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/results/perf_threadsweep/perf_threadsweep_report.md)
+> GitHub: [results/perf_threadsweep/perf_threadsweep_report.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/kraken2opti/results/perf_threadsweep/perf_threadsweep_report.md)
 
 Narrowed the Kraken2 compact-hash **cell** (CHT — Compact Hash Table) below the stock 32 bits, exploiting that an ESKAPE-only DB needs only `value_bits = 6` (35 taxonomy nodes) — the other 26 bits are wasted collision-check (FP — false positive — ~1 in 30 M). Added `CompactHashCell16` (2 B) + `CompactHashCell24` (3 B) to the templated `CompactHashTable<Cell>` (same pattern as the existing 40-bit cell); selected by `-C {16|24|32|40}`, width self-described in the DB header and auto-detected on load. Built all 3 DBs from identical inputs with **no download** (taxonomy reconstructed from the on-disk 47k-node `standard_8gb/taxo.k2d`; seqid2taxid generated from the genome headers).
 
