@@ -310,6 +310,9 @@ Sample = 3 dominant ESKAPE pathogens. Species-level shown; *(G nn)* = genus-leve
 >
 > Per-pod pathogen comparison (reads/pathogen × all 6 runs, per pod): **[results/eskape_16bit/sweep/fastq_fast/per_pod/per_pod_pathogen_comparison.md](results/eskape_16bit/sweep/fastq_fast/per_pod/per_pod_pathogen_comparison.md)**
 > GitHub: [results/eskape_16bit/sweep/fastq_fast/per_pod/per_pod_pathogen_comparison.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/results/eskape_16bit/sweep/fastq_fast/per_pod/per_pod_pathogen_comparison.md)
+>
+> Thread + cache/LLC-miss sweep — **generated on Dell OptiPlex 5090 lab desktop** (16/20/24/32-bit × 16 pod5 × 9 thread-counts × 3 runs = 1,728 perf runs; memory-latency-bound, HT knee at 8 cores, 24-bit ≈ 32-bit): **[results/perf_threadsweep/perf_threadsweep_report.md](results/perf_threadsweep/perf_threadsweep_report.md)**
+> GitHub: [results/perf_threadsweep/perf_threadsweep_report.md](https://github.com/KathpaliaChirag/Nanopore-project/blob/hobbbit/results/perf_threadsweep/perf_threadsweep_report.md)
 
 Narrowed the Kraken2 compact-hash **cell** (CHT — Compact Hash Table) below the stock 32 bits, exploiting that an ESKAPE-only DB needs only `value_bits = 6` (35 taxonomy nodes) — the other 26 bits are wasted collision-check (FP — false positive — ~1 in 30 M). Added `CompactHashCell16` (2 B) + `CompactHashCell24` (3 B) to the templated `CompactHashTable<Cell>` (same pattern as the existing 40-bit cell); selected by `-C {16|24|32|40}`, width self-described in the DB header and auto-detected on load. Built all 3 DBs from identical inputs with **no download** (taxonomy reconstructed from the on-disk 47k-node `standard_8gb/taxo.k2d`; seqid2taxid generated from the genome headers).
 
