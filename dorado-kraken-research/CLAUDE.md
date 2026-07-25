@@ -218,7 +218,16 @@ Cache cliff on Luna is between 50 MB and 142 MB (LLC is 210 MB but random hash a
 
 ## What Is Not Done Yet
 
-- **Applying `kraken2_opt_v1.patch` and measuring the real delta** (M1–M7 are done and all say "apply" - this is now the top-priority remaining task)
+**New direction (2026-07-25):** Kolin sir emailed asking to continue this work toward two thesis pieces, both benchmarked against **Centrifuge** (not evaluated anywhere in this repo yet). See root `CLAUDE.md` and `README.md` for the full context, and `docs/reports/kraken2opti_report.tex` §5 for the "three items of future work" sir referenced. Neither thesis has started:
+
+- **Thesis 1 - Hardware-Aware Adaptive K-mer Cache**: extends Patch 4 (below) into a 4-way set-associative baseline, LLC-topology-aware cache sizing, and a biology-dependent adaptive eviction policy.
+- **Thesis 2 - Cell-Width Reduction + Double Hashing**: extends the completed cell-width experiment (`docs/reports/kraken2opti_report.tex`) with its three unimplemented future-work items - (1) a merged latency-hiding lookup cache combining this thesis's design with Thesis 1's, (2) switching Kraken2's default linear probing to double hashing to shrink the false-positive cliff, (3) a 6-bit-per-organism bitmask cell.
+- Setting up Centrifuge as the comparison baseline for both.
+- Asking LLMs for more ideas on both pieces, per sir's suggestion.
+
+**Still outstanding underneath the above:**
+
+- **Applying `kraken2_opt_v1.patch` and measuring the real delta** (M1–M7 are done and all say "apply" - this was the top-priority remaining task before the new thesis work and still is, since Thesis 1 builds directly on Patch 4)
 - `docs/reports/kraken2_optimisation_report.md` Section 6 - still a TBD stub, waiting on the patch run above
 - M6 (perf c2c false sharing) - not run; low priority, only matters if revisiting NUMA beyond 32T
 - AccuracyDrift: Orion `reads_fast` × all 5 DBs × all thread counts - not started

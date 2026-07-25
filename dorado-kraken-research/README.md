@@ -1125,6 +1125,27 @@ xychart-beta
 → v2 patches: [docs/reports/kraken2_get_optimizations_v2.md](docs/reports/kraken2_get_optimizations_v2.md)  
 → patch file: [Luna/experiments/kraken2_opt_v1.patch](Luna/experiments/kraken2_opt_v1.patch)
 
+### 12b. Cell-Width Reduction - the kraken2opti Report (joint with Chirag Suthar)
+
+A second, separately-written report formalises the 24-bit/16-bit hash-cell experiment mentioned in `SUMMER_REPORT.md` "two side results" and extends it with a cross-hardware validation sweep. → [docs/reports/kraken2opti_report.tex](docs/reports/kraken2opti_report.tex)
+
+The core result is an exponential false-positive law for Kraken2's compact-hash lookup: `FP_read ≈ N·p·2⁻ᵇ`, where `b` is the number of check bits left in the cell after narrowing it. Solving for where `FP_read ≈ 1` predicts a sharp accuracy cliff at **b* ≈ 13 check bits**. That prediction is then confirmed two ways:
+
+| Cell width | Check bits (`b`) | Size vs. 32-bit | Deviation from 32-bit | Verdict |
+|---|---|---|---|---|
+| 32-bit (stock) | 26 | baseline | - | above the cliff |
+| 24-bit | 18 | −25% | +0.3-0.45% | above the cliff - **lossless drop-in** |
+| 16-bit | 10 | −50% | +16-21% (uncorrected) | below the cliff - needs `-T 0.05` |
+
+A 1,728-run desktop sweep (4 cell widths × 16 pod5 files × 9 thread counts × 3 runs) reproduces the same cliff on data the model was never fit to - 24-bit and 20-bit sit on the true classification rate, 16-bit jumps +7.2pp.
+
+**Three items of future work** come out of this report's §5, and they're the concrete next steps for both of Kolin sir's proposed thesis pieces (see `CLAUDE.md` "What Is Not Done Yet" for how they map):
+1. **Latency-hiding lookup cache** - merge this report's 4-way set-associative LRU design with the summer track's thread-local cache (Patch 4 above) into one implementation instead of two.
+2. **Switch probing scheme** - Kraken2 defaults to linear probing (§2.2 of `kraken2_optimisation_report.md`), not double hashing. Double hashing cuts the expected probe length `p` from ≈6 to ≈2.5 at the same load factor, which lowers the cliff by ≈1.3 bits - enough to make 16-bit safe without a threshold.
+3. **Bitmask cell** - a 6-bit-per-organism value packed into the cell, so one `Get()` answers "which of the six ESKAPE organisms does this k-mer belong to" at once, instead of one taxon ID.
+
+None of the three have been implemented yet.
+
 ### 12a. Pre-implementation measurements (M1–M7)
 
 All measurements run on Luna (2026-06-15). Raw data in [Luna/profiling/pending/](Luna/profiling/pending/).
@@ -1163,6 +1184,15 @@ The matmul `prefetch_ikj` negative result validates the argument: **prefetch hur
 ---
 
 ## 14. Pending Work & TODO
+
+### New Direction (2026-07-25): Two Thesis Pieces
+
+Kolin sir emailed asking to continue this work toward two thesis pieces, both benchmarked against **Centrifuge** (not evaluated anywhere in this repo yet - only mentioned as background in `docs/knowledge_base.md`). Neither has started:
+
+- [ ] **Thesis 1 - Hardware-Aware Adaptive K-mer Cache**: extend Patch 4 into a 4-way set-associative baseline, add LLC-topology-aware cache sizing (Luna's 210 MB L3 vs. Orion's 4 MB SLC want different cache sizes), add a biology-dependent adaptive eviction policy
+- [ ] **Thesis 2 - Cell-Width Reduction + Double Hashing**: complete the three future-work items from §12b above (merged lookup cache, double hashing, bitmask cell)
+- [ ] Set up Centrifuge as a comparison baseline for both
+- [ ] Ask LLMs for additional ideas on both pieces, per sir's suggestion
 
 ### Critical: Blocks Optimisation Results
 
@@ -1216,7 +1246,8 @@ Nanopore-project/
 │       ├── kraken2_optimisation_report.md <- consolidated report (Section 6 pending patch benchmark)
 │       ├── kraken2_get_optimizations.md   <- v1 patches 1-5 (source-verified)
 │       ├── kraken2_get_optimizations_v2.md <- v2 patches 6-10
-│       └── kraken2_execution_checklist.md
+│       ├── kraken2_execution_checklist.md
+│       └── kraken2opti_report.tex         <- cell-width reduction report, joint w/ Chirag Suthar (see §12b)
 │
 ├── AccuracyDrift/
 │   ├── README.md                          <- database setup commands + machine list
