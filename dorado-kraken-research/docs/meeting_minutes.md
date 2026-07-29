@@ -273,4 +273,156 @@ Dorado / GPU work is deprioritised for now. The memory-bound nature of Kraken-2 
 | Lab Linux desktop | TBD | TBD |
 
 ### Next meeting
-TBD
+2026-07-04 (became the Mamba-as-MHA pivot meeting, below)
+
+---
+
+> **Note on Meetings 6–8 below:** no live minutes were taken for this stretch — `meeting_minutes.md` went unmaintained from 2026-06-02 to 2026-07-29 while the project pivoted to Mamba-as-MHA (2026-07-04) and then back to the kraken2 thesis work (2026-07-25). These three entries are **reconstructed** from commit history, doc content, and two whiteboard photos supplied by CK on 2026-07-29 — not from a contemporaneous note-taker. Dates are best-effort from git timestamps; attendee lists assume Kolin sir + Chirag K unless evidence says otherwise. **Confirm/correct exact dates, attendees, and any discussion not reflected in committed files.**
+
+## Meeting 6 — 2026-07-04 *(date inferred from commit `cda8aee`/`10a98fc`; confirm)*
+
+**Attendees:** Kolin sir, Chirag K *(confirm if Chirag S / Rishabh / Rohit were present)*
+**Format:** Direction pivot + curriculum assignment
+
+### Topics covered
+
+1. **Pivot: Dorado/Kraken2 profiling → Mamba-as-MHA**
+   - Direction changed from the summer's Dorado (GPU basecaller) / Kraken2 (CPU classifier) profiling work to a new research question: can **Mamba** (a state-space sequence model) be reformulated to run as an **MHA (multi-head attention)**-shaped computation, so it can ride the hardware/kernel paths (GEMM, tensor cores, FlashAttention-style kernels) chips already optimise for attention?
+   - Motivation: newer chips have increasingly dedicated hardware/software paths for MHA (tensor cores, transformer engines, FP8 attention support) — a decade of vendor tuning Mamba's bespoke selective-scan kernel doesn't get.
+   - Theoretical basis: the Mamba-2 **State Space Duality (SSD)** result (Dao & Gu, 2024, *"Transformers are SSMs"*) — a structured SSM and masked attention are the same computation viewed two ways.
+   - Open question raised, left unresolved: does this connect to **NanoMambaNet** (an edge-inference pipeline sir mentioned previously re: an LSH neural-cache idea), or is it a standalone exercise?
+   - Target hardware **not decided** — Luna (L40S GPU) vs Orion (Jetson edge) vs both — explicitly left open for exploration.
+   - Noted: Chirag K has zero ML background going in — everything downstream (explainer doc, this curriculum) had to be built for that.
+
+2. **ML fundamentals curriculum assigned** (whiteboard)
+
+   | # | Topic |
+   |---|---|
+   | 1 | Linear Algebra |
+   | 2 | Matrix / Vector operations |
+   | 3 | O.D.E. — Differential equations |
+   | 4 | Single-layer perceptron |
+   | 5 | MLP (multi-layer perceptron) — gradient, loss function, activation function, feedforward, backprop, dense layers |
+
+   Then, building toward Transformers — a sequence-model chain:
+   **vanilla RNN → problems of vanilla RNN → BiRNN → LSTM → BiLSTM → problems of LSTM → vanilla attention → Transformer encoder → Transformer encoder+decoder**
+
+   Items 1–5 bracketed on the board under **ANN / NN** — i.e. these are general neural-network foundations, not Mamba-specific, meant to be covered before the sequence-model chain.
+
+3. **Roadmap set: 5 phases** (per `MAMBA_MHA_EXPLAINER.md` §6 / project memory)
+   1. Explainer doc, written for zero-ML-background reader (Phase 0)
+   2. Toy numerical proof (recurrence = attention-shaped matmul)
+   3. Real-scale implementation
+   4. Benchmark on target chip
+   5. Write-up
+
+### Action items
+- Write the zero-background explainer doc — **done same day**, `MAMBA_MHA_EXPLAINER.md` (later restyled to CK's writing-style guide, then rewritten professor-voice, same session)
+- Work through ML curriculum topics 1–5 and the RNN→Transformer sequence-model chain
+- Decide target chip (Luna vs Orion vs both) — left open
+- Resolve whether this connects to NanoMambaNet — left open
+
+### Next meeting
+2026-07-06 *(became Meeting 7, below — confirm)*
+
+---
+
+## Meeting 7 — 2026-07-06 *(date inferred from commit `c14b7b4`; confirm)*
+
+**Attendees:** Kolin sir, Chirag K *(confirm if others present)*
+**Format:** SSM deep-dive / reading list
+
+### Topics covered
+
+Whiteboard titled **"Update Rules"** — the different ways a state-space model's update step can be derived/viewed, assigned as the next study block:
+
+| Topic | Status (cross-checked against `MAMBA_MHA_EXPLAINER.md` on 2026-07-29) |
+|---|---|
+| Convolution (SSM as one big convolution) | **not yet written up** |
+| Continuous (control-theory A/B/C formulation) | covered — explainer Ch. 4 |
+| HiPPO (long-range-memory init. theory behind S4/Mamba) | **not yet written up** |
+| Discretization (continuous ODE → discrete recurrence) | covered — explainer Ch. 4 |
+| Mamba (selective scan, input-dependent A/B/C) | covered — explainer Ch. 4 |
+| Mamba-2 (State Space Duality — SSM = masked attention) | covered — explainer Ch. 5 |
+| Transformer + Mamba variation (hybrid attention/SSM architectures) | **not yet written up** |
+| Zamba (specific hybrid Mamba+attention architecture) | **not yet written up** |
+
+Same-day commit `c14b7b4` overhauled the explainer with a 5-expert multi-agent review (ML/DL, biology/nanopore, systems, visualization, pedagogy) and added 9 awk-generated SVG figures — consistent with this being the session that pushed Chapters 4–5 (control theory → discretization → selective scan → SSD proof) into their current form. The **convolution view, HiPPO, and hybrid architectures (Transformer+Mamba, Zamba) are the items from this list that never got written up** before the 2026-07-25 pivot back — they're the concrete gap if Mamba work resumes.
+
+### Action items
+- Write up the convolution view of SSMs
+- Write up HiPPO and why it enables long-range memory
+- Research hybrid Transformer+Mamba architectures, incl. Zamba specifically
+- (carried from Meeting 6) decide target chip — still open
+
+### Next meeting
+Not recorded — next entry in this file is the 2026-07-25 pivot back (Meeting 8)
+
+---
+
+## Meeting 8 — 2026-07-25
+
+**Attendees:** Kolin sir (via email), Chirag K
+**Format:** Email — direction reversal *(not a live meeting; recorded here to keep the timeline complete — confirm if a call/meeting also happened around this)*
+
+### Topics covered
+
+1. **Pivot back: Mamba-as-MHA (paused, not abandoned) → Kraken2/Dorado thesis work**
+   - Kolin sir emailed asking to continue the summer kraken2 work toward **two thesis pieces**, both benchmarked against **Centrifuge** — not evaluated anywhere in this repo before this point.
+   - Mamba-as-MHA is paused where Meetings 6–7 left it (explainer through Ch. 5/6; convolution view, HiPPO, and hybrid architectures still unwritten) — the same "paused, not abandoned" status the kraken2 work held from 2026-07-04 to 2026-07-25.
+
+2. **Thesis 1 — Hardware-Aware Adaptive K-mer Cache**
+   - Extends Patch 4 (sir's own thread-local k-mer cache design; 90.7% measured reuse rate, M5)
+   - Baseline it as 4-way set-associative
+   - Add LLC-topology-aware cache sizing
+   - Add a biology-dependent (access-pattern-driven) adaptive eviction policy
+
+3. **Thesis 2 — Cell-Width Reduction + Double Hashing**
+   - Extends the completed cell-width experiment (32/24/16-bit cells, exponential false-positive law, 1,728-run cross-hardware sweep — joint work with Chirag Suthar, written up in `kraken2opti_report.tex`)
+   - Resolves the report's §5 "three items of future work":
+     1. Latency-hiding lookup cache — merge Patch 4's thread-local design with the report's 4-way set-associative LRU design (feeds Thesis 1)
+     2. Switch Kraken2's default linear probing → double hashing (cuts expected probe length ≈6 → ≈2.5, shifts the false-positive cliff down ≈1.3 bits)
+     3. A 6-bit-per-organism bitmask cell — one `Get()` answers all six ESKAPE panel members at once
+
+4. **Centrifuge baseline** — not set up yet; needed as the comparison point for both theses
+
+5. **Ask LLMs for more ideas** — sir suggested asking LLMs for additional ideas on both thesis pieces
+
+### Action items
+- Set up Centrifuge as the comparison baseline for both theses — not started
+- Apply `kraken2_opt_v1.patch` and measure the real delta — still the top-priority item carried over from before the Mamba pivot (M1–M7 all say "go", patch itself never run)
+- Ask LLMs for more ideas on both thesis pieces — **in progress**, `plan_2026-07-25.md` idea catalog started same day, syncmers/strobemers/PGO/GPU ideas added over the following two days (through `14a77fc`, 2026-07-27)
+- Begin Thesis 1 (4-way set-associative baseline) and Thesis 2 (double hashing) implementation
+
+### Next meeting
+2026-07-29, 4–5 pm (see Meeting 9 — a standing weekly slot was set here)
+
+---
+
+## Meeting 9 — 2026-07-29 (Wednesday, 4–5 pm)
+
+**Attendees:** Kolin sir, Chirag K
+**Format:** Weekly check-in (first of a new recurring slot)
+
+> **Standing meeting going forward: every Wednesday, 4–5 pm.** Add each week's entry below in the same format so this file stays current in real time instead of drifting again like it did between Meetings 5 and 8.
+
+### Topics covered
+
+1. **Execution planning for both thesis pieces**
+   - Discussed how to actually sequence the work on Thesis 1 (adaptive k-mer cache) and Thesis 2 (cell-width + double hashing) — turning `plan_2026-07-25.md` from an idea catalog into an execution order.
+
+2. **Fibonacci hashing — reading item**
+   - Read up a little on Fibonacci hashing (multiply-and-shift hashing using a fixed constant derived from the golden ratio to spread values evenly across slots).
+   - Already in use in Patch 4's thread-local cache design (`plan_2026-07-25.md` line 29 — slot lookup is "multiply the k-mer's 64-bit value by a fixed constant... take the top bits"); this reading connects directly to Thesis 1's cache work, and possibly to the Thesis 2 hashing scheme too.
+
+3. **Centrifuge — start running in parallel**
+   - Begin running Centrifuge on the side (alongside thesis implementation work), so the comparison baseline is being built up concurrently instead of as a separate blocking step later.
+
+### Action items
+- Write a concrete execution plan/order for Thesis 1 and Thesis 2 (turn `plan_2026-07-25.md` into sequenced steps)
+- Read further on Fibonacci hashing and note how/where it applies to Thesis 1 (cache) and Thesis 2 (hashing scheme)
+- Get Centrifuge running (setup + first data) in parallel with thesis implementation work
+- Continue applying `kraken2_opt_v1.patch` and measuring the real delta — still outstanding
+
+### Next meeting
+2026-08-05, 4–5 pm (standing Wednesday slot)
