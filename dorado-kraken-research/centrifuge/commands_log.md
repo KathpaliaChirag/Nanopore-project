@@ -357,4 +357,22 @@ cd ~/AccuracyDrift/databases && nohup ~/.local/bin/ncbi-genome-download --taxids
 ```
 **Result:** Job ran and exited on its own (15,847-line log, reached near the end of the catalog). **Zero `Checksum mismatch` errors** (`grep -c` confirms) — the proxy fix genuinely resolved the garbage-content bug. But `.fna`/`.fna.gz` count is still exactly 200, only 41 files were touched during this run, and 8221 total files exist in the folder (mostly metadata/stub files, not real genomes). The log shows `ERROR: No entry for file ending in '_genomic.fna.gz'` far more often than expected for "complete genome" RefSeq records. **New theory: `ncbi-genome-download`'s directory-listing step likely uses FTP-protocol requests separately from the HTTPS file downloads** — the HTTP-only proxy may not tunnel FTP listings correctly, causing the tool to see "no file" for assemblies that actually have one, even though direct HTTPS fetches of known filenames (our earlier `curl` test) work fine through the same proxy.
 
+### [3.15] Checked --help, found a better explanation than the FTP theory
+**Why:** verify the FTP-listing theory before acting on it.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+~/.local/bin/ncbi-genome-download --help 2>&1 | head -60
+~/.local/bin/ncbi-genome-download --help 2>&1 | sed -n '60,110p'
+```
+**Result:** FTP theory disproven — `-u/--uri` defaults to `https://ftp.ncbi.nih.gov/genomes` (already HTTPS, not FTP). Two better findings instead: **`-r/--retries` defaults to `0`** (zero automatic retries on any transient failure), and the log's first line (`INFO: Using cached summary`) means it reused a cached copy of NCBI's genome catalog — likely cached during an earlier flaky-network attempt, before the proxy fix. A corrupted/incomplete cached catalog would explain "no entry" errors on records that actually do have files.
+
+### [3.16] Clear stale cache, add retries, run again
+**Why:** force a fresh catalog fetch now that the proxy actually works, and add resilience against any remaining transient blips.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+rm -rf ~/.cache/ncbi-genome-download && \
+cd ~/AccuracyDrift/databases && nohup ~/.local/bin/ncbi-genome-download --taxids 1352,1280,573,470,287,547 --formats fasta --assembly-levels complete bacteria -o eskape_genomes --verbose -p 8 -r 3 > eskape_download4.log 2>&1 & disown
+```
+**Result:** `[1] 290158` — running. Without the cache, it re-fetches NCBI's full bacterial genome catalog first (large file), so expect a quiet stretch before real downloads resume — checked again after a few minutes, not immediately.
+
 ---
