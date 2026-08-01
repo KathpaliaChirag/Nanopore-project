@@ -270,4 +270,29 @@ diff ~/headers.txt ~/mapped.txt && echo "CLEAN: all headers mapped"
 ```
 **Result (fast path):** `CLEAN: all headers mapped` — no diff output, every sequence header matches a taxid entry. `sample_targeted_combined.fasta` ready for `centrifuge-build`. (Retry download result pending, checked separately.)
 
+### [FastPath.4] First centrifuge-build attempt — failed, missing `python`
+**Why:** actually build the index.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+~/tools/centrifuge/centrifuge-build --conversion-table ~/AccuracyDrift/databases/sample_targeted/seqid2taxid.map \
+  --taxonomy-tree ~/AccuracyDrift/databases/sample_targeted/taxonomy/nodes.dmp \
+  --name-table ~/AccuracyDrift/databases/sample_targeted/taxonomy/names.dmp \
+  ~/AccuracyDrift/databases/sample_targeted_combined.fasta \
+  ~/AccuracyDrift/databases/centrifuge_sample_targeted/cf_base
+```
+**Result:** `/usr/bin/env: 'python': No such file or directory`. Checked the wrapper's shebang (`head -5 ~/tools/centrifuge/centrifuge-build`): `#!/usr/bin/env python` — Luna only has `python3`, no plain `python` symlink (common on newer Debian/Ubuntu).
+
+### [FastPath.5] Fix: symlink python -> python3, retry build
+**Why:** `centrifuge-build` is a Python wrapper script; `env` needs `python` resolvable on PATH. User-local fix, no root needed.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+mkdir -p ~/.local/bin && ln -sf /usr/bin/python3 ~/.local/bin/python && echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && export PATH="$HOME/.local/bin:$PATH" && which python && \
+~/tools/centrifuge/centrifuge-build --conversion-table ~/AccuracyDrift/databases/sample_targeted/seqid2taxid.map \
+  --taxonomy-tree ~/AccuracyDrift/databases/sample_targeted/taxonomy/nodes.dmp \
+  --name-table ~/AccuracyDrift/databases/sample_targeted/taxonomy/names.dmp \
+  ~/AccuracyDrift/databases/sample_targeted_combined.fasta \
+  ~/AccuracyDrift/databases/centrifuge_sample_targeted/cf_base
+```
+**Result:** SUCCESS. `which python` → `/home/student/.local/bin/python`. Build completed in **12 seconds** (`Total time for call to driver() for forward index: 00:00:12`). Wrote `cf_base.1.cf` (17,744,597 bytes) and `cf_base.2.cf` (3,507,644 bytes) to `~/AccuracyDrift/databases/centrifuge_sample_targeted/`. **First Centrifuge index ever built in this project.**
+
 ---
