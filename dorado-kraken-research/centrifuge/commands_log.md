@@ -446,4 +446,26 @@ ls -la ~/AccuracyDrift/databases/centrifuge_eskape_200/
 ```
 **Result:** SUCCESS, very fast. 105,259 classification lines (~104,918 reads). 7-line report (6 organisms + header) — species list matches `sample_targeted`'s known 6-taxid set exactly (same taxids tracked all session: 511145, 208964, 93061, 716541, 1125630, 333849). *P. aeruginosa* PAO1 dominant (55,338 reads), then *E. coli* K-12 (22,946), down to smaller counts for the rest. Confirms both the index and the classification pipeline work correctly. **First real Centrifuge classification result in this project.** Report is in Centrifuge's 7-column format (`name, taxID, taxRank, genomeSize, numReads, numUniqueReads, abundance`) — differs from Kraken2's report format, as the Week 1 plan flagged; accuracy-script adaptation is separate follow-up work.
 
+### [4.2] Profiled run — perf stat + numactl, same config as Kraken2's 32T baseline
+**Why:** measure Centrifuge with the exact same counters/thread count/NUMA pinning Kraken2's 0.928s/15.44%/14.64%/1.65 baseline was measured with, so the numbers are actually comparable.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  ~/tools/centrifuge/centrifuge -p 32 \
+  -x ~/AccuracyDrift/databases/centrifuge_sample_targeted/cf_base \
+  -U ~/results/basecalling/reads_hac.fastq \
+  -S /dev/null --report-file /dev/null
+```
+**Result:**
+
+| Metric | Kraken2 (32T) | Centrifuge (32T) |
+|---|---|---|
+| Wall time | 0.928s | **5.115s** (~5.5x slower) |
+| LLC Miss Rate% | 14.64% | **1.21%** (~12x lower) |
+| Cache Miss Rate% | 15.44% | 0.88% |
+| IPC | 1.65 | 1.03 |
+
+**Surprising result — opposite of the Week 1 plan's own hypothesis.** The plan expected Centrifuge's FM-index/BWT walk to have *worse* cache locality than Kraken2 (citing papers on FM-index's poor spatial locality). Instead: Centrifuge's cache/LLC miss rate is dramatically lower, but it's much slower overall with lower IPC — meaning its bottleneck isn't cache misses, it's likely the serial dependency chain itself (each BWT backward-search step needs the previous step's result, limiting instruction-level parallelism regardless of cache behavior).
+
 ---
