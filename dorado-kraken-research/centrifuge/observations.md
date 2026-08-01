@@ -75,4 +75,21 @@ Two separate things are going on, one expected and one not:
 
 This time, the `eskape_genomes/` folder should be **kept**, not deleted afterward — Centrifuge's index build (Step 3 of the Week 1 plan) needs it, unlike the Kraken2-only script this README documents.
 
+## Fast-path option: sample_targeted already has everything intact (2026-08-01)
+
+Unlike `eskape_650mb`/`eskape_human_4gb`, `sample_targeted/` (the 50 MB demo DB) survived completely — `hash.k2d`/`taxo.k2d`/`opts.k2d`, `seqid2taxid.map`, and a full `taxonomy/` folder (`nodes.dmp`, `names.dmp`) are all still there. This lets us build a first, small Centrifuge comparison index **without waiting on the big eskape_genomes re-download**.
+
+One wrinkle resolved: `library/added/` has 12 `.fna` files, not 6. `seqid2taxid.map` (17 sequences, 6 distinct taxids) plus file-size pairing confirms the **6 `GCF_`-named files are the real reference genomes** actually used to build this DB; the 6 randomly-named files (`0GY9zJXjkl.fna` etc., each near-identical in size to a `GCF_` file) are duplicate leftovers from something unrelated, not part of the real build.
+
+| Taxid | Species | Sequences | File |
+|---|---|---|---|
+| 511145 | *E. coli* K-12 | NC_000913.3 | `GCF_000005845.2_ASM584v2_genomic.fna` |
+| 208964 | *P. aeruginosa* PAO1 | NC_002516.2 | `GCF_000006765.1_ASM676v1_genomic.fna` |
+| 93061 | *S. aureus* | NC_007795.1 | `GCF_000013425.1_ASM1342v1_genomic.fna` |
+| 716541 | *A. baumannii* | NC_014107/108/121.1 | `GCF_000025565.1_ASM2556v1_genomic.fna` |
+| 1125630 | *K. pneumoniae* HS11286 | NC_016838-847.1 (7 seqs) | `GCF_000240185.1_ASM24018v2_genomic.fna` |
+| 333849 | *E. faecium* | NC_017960-963.1 | `GCF_000174395.2_ASM17439v2_genomic.fna` |
+
+**Plan:** concatenate only these 6 `GCF_` files, reuse the existing `seqid2taxid.map` and `taxonomy/` (`nodes.dmp`/`names.dmp`) as-is — no `centrifuge-download` needed for this fast path — and run `centrifuge-build` straight away. Output goes to a new `centrifuge_sample_targeted/` folder, separate from the eventual full-scale `centrifuge_eskape/` build once the big download finishes.
+
 ---
