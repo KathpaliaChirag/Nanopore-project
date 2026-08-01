@@ -148,4 +148,25 @@ find ~ -maxdepth 3 -iname "eskape_genomes*" -o -iname "taxonomy" 2>/dev/null
 ```
 **Result:** Empty — neither found within 3 levels of home. Need to search deeper / check actual `AccuracyDrift/databases/` layout directly.
 
+### [3.2] Check actual AccuracyDrift/databases/ layout + count .fna files machine-wide
+**Why:** confirm what's actually on disk vs what the plan assumes is there.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+ls -la ~/AccuracyDrift/databases/ && find ~ -name "*.fna" 2>/dev/null | wc -l && find ~ -name "*.fna" 2>/dev/null | head -5
+```
+**Result:**
+```
+~/AccuracyDrift/databases/ contains:
+  eskape_650mb_build.log   (log only, no eskape_650mb/ folder)
+  eskape_human_4gb_build.log (log only, no eskape_human_4gb/ folder)
+  human_download.log
+  pluspf_103gb/
+  sample_targeted/
+  standard_16gb/
+  standard_8gb/
+```
+Machine-wide `.fna` count: **12 total**, all under `sample_targeted/library/added/`.
+
+**FLAG — real blocker, not a dead end:** the `eskape_650mb` and `eskape_human_4gb` database folders (genome library + built `.k2d` files) are gone from `AccuracyDrift/databases/` — only their build logs remain. Only 12 `.fna` files exist machine-wide, all belonging to the small 50MB `sample_targeted` demo DB, not the ~1149-file ESKAPE set the Week 1 plan assumes is still on disk. Needs investigation before Step 3 can proceed as written.
+
 ---

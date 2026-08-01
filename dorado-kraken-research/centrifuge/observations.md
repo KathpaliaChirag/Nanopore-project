@@ -44,3 +44,24 @@ Combined with the 4 `.tmp_pod5_v3_v4_migration_*` folders already found directly
 **Decision (2026-08-01):** leave the ~810 MB of temp-folder junk in place for now — 149 GB free is enough headroom to proceed with Centrifuge. Revisit deletion only if space actually gets tight later. `AccuracyDrift/` breakdown and the two loose tarballs were not investigated further — storage audit paused here, resuming the actual Step 1 build.
 
 ---
+
+## ⚠️ eskape_650mb genome library is missing (found 2026-08-01, Step 3.1/3.2)
+
+The Week 1 plan's Step 3 assumes the ~1149 `.fna` ESKAPE genome files used to build Kraken2's `eskape_650mb` database are still sitting on disk, ready to concatenate for Centrifuge. **They aren't.**
+
+```mermaid
+flowchart LR
+    Expected["Plan expects:<br/>~1149 .fna files<br/>+ eskape_650mb/ DB folder"] -.->|reality| Actual["Found:<br/>only build .log files remain<br/>eskape_650mb/ folder: GONE<br/>eskape_human_4gb/ folder: GONE<br/>Only 12 .fna files exist machine-wide<br/>(all sample_targeted, a different/smaller DB)"]
+```
+
+What's confirmed:
+- `~/AccuracyDrift/databases/eskape_650mb/` and `.../eskape_human_4gb/` don't exist — only `eskape_650mb_build.log` and `eskape_human_4gb_build.log` remain as evidence they once did.
+- The 4 databases that *do* still exist: `pluspf_103gb`, `sample_targeted`, `standard_16gb`, `standard_8gb`.
+- No `eskape_genomes/` directory anywhere within 3 levels of home.
+- Total `.fna` files on the entire machine: 12, all under `sample_targeted/library/added/` — not the ESKAPE set.
+
+**Why this matters:** this isn't just a missing-taxonomy-folder situation the plan already anticipated (Step 3's known caveat about Kraken2's cleanup deleting `taxonomy/`) — the genome *library itself* is gone, not just its derived taxonomy scratch folder. Either it was cleaned up at some point after the original Kraken2 build (disk pressure was flagged as a recurring theme in this project — Orion's own docs mention it — plausible something similar happened here), or it lives somewhere not yet checked (a backup tarball, a different mount, Minerva, a colleague's account).
+
+**Not yet decided:** whether to (a) search further for a backup/archive of the original genome download, or (b) re-run `ncbi-genome-download` from scratch per `AccuracyDrift/README.md`'s documented build procedure to regenerate the same ESKAPE genome set. Re-downloading is the documented, known-good path if no backup turns up — but it means Centrifuge's index won't be built from literally the same files Kraken2's `eskape_650mb` was built from, only the same *species selection*, unless the original accession list is recoverable too.
+
+---
