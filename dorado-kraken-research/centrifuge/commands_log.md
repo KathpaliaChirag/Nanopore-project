@@ -311,4 +311,12 @@ du -sh ~/AccuracyDrift/databases/eskape_genomes 2>/dev/null && ps aux | grep -i 
 ```
 **Result:** 357M (up from 64M — real progress). `ps` found no process again (chain short-circuited before the `tail`, so log wasn't seen yet) — needs a follow-up check.
 
+### [3.11] Check second attempt's log directly
+**Why:** find out if -p 8 actually did better, or hit the same wall.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+tail -30 ~/AccuracyDrift/databases/eskape_download2.log && find ~/AccuracyDrift/databases/eskape_genomes -name "*.fna.gz" -o -name "*.fna" | wc -l
+```
+**Result:** Same two error types as before — benign `No entry for file ending in '_genomic.fna.gz'` (some records genuinely lack this file) mixed with the same **identical-MD5 checksum mismatches** (`got '14aa54cecceebc1536a4d1ee4a5c08ec'`, unchanged from the first attempt). **`.fna` count is still exactly 200** — no growth at all despite folder size growing to 357M and a much lower parallelism. This weakens the pure-concurrency theory: a request-count-based rate limit (or network-level block) that the first attempt already tripped, inherited by the retry, fits better than "too many simultaneous connections."
+
 ---
