@@ -93,3 +93,19 @@ One wrinkle resolved: `library/added/` has 12 `.fna` files, not 6. `seqid2taxid.
 **Plan:** concatenate only these 6 `GCF_` files, reuse the existing `seqid2taxid.map` and `taxonomy/` (`nodes.dmp`/`names.dmp`) as-is — no `centrifuge-download` needed for this fast path — and run `centrifuge-build` straight away. Output goes to a new `centrifuge_sample_targeted/` folder, separate from the eventual full-scale `centrifuge_eskape/` build once the big download finishes.
 
 ---
+
+## ⚠️ -p 25 triggered NCBI throttling — big download only got ~200/1149 genomes (2026-08-01)
+
+The parallel restart (Step 3.6, `-p 25`) ran for a while, then silently exited on its own. Log analysis (Step 3.9) shows the real cause: every `Checksum mismatch` error reports the exact same received MD5 (`14aa54cecceebc1536a4d1ee4a5c08ec`) no matter which assembly was being fetched. Identical bytes across unrelated files means the same thing every time — NCBI stopped serving real file content and started returning a generic error/rate-limit response instead, and `-p 25` downloaded that error response 900+ times over, each one correctly flagged and rejected by the tool's own checksum check.
+
+```mermaid
+flowchart LR
+    A["-p 25: 25 concurrent<br/>connections to NCBI"] --> B{"NCBI rate limit<br/>threshold crossed?"}
+    B -->|"first ~200 assemblies:<br/>no"| C["Real genome data,<br/>checksums pass"]
+    B -->|"remaining ~950:<br/>yes, at some point"| D["Generic error response<br/>served for every request,<br/>same bytes every time"]
+    D --> E["Every checksum fails,<br/>but all report the SAME<br/>wrong MD5 - the tell"]
+```
+
+This validates the throttling risk flagged before picking `-p 25` over the suggested safer `10` — it didn't fail immediately, but it did fail partway through a long run. **Only ~200 of ~1149 target genomes actually downloaded successfully.** Not yet decided: whether to retry the remaining ~950 at a lower parallelism (e.g. `-p 8-10`) after giving NCBI's rate limiter time to reset, or accept the 200 as a smaller-but-real ESKAPE set for now. This doesn't block the `sample_targeted` fast-path build, which is independent and already has everything it needs.
+
+---

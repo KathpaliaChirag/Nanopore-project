@@ -217,6 +217,22 @@ du -sh ~/AccuracyDrift/databases/eskape_genomes 2>/dev/null && ps aux | grep -i 
 ```
 **Result:** 34M so far. Confirmed **25 active worker processes** (PIDs 284883-284908, each ~13% CPU) — real parallelism this time, not serial. Log shows repeated `ERROR: No entry for file ending in '_genomic.fna.gz'` for some records — expected/benign, some NCBI assembly entries don't ship a genomic FASTA; tool skips and continues. Final assembly count may land a bit under 1149 because of this, not a failure.
 
+### [3.8] Second health check — download had already stopped
+**Why:** routine re-check, same command as 3.7.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+du -sh ~/AccuracyDrift/databases/eskape_genomes 2>/dev/null && ps aux | grep -i genome-download | grep -v grep && tail -20 ~/AccuracyDrift/databases/eskape_download.log
+```
+**Result:** 64M, but `ps` returned **no processes at all** — the job had already exited on its own between checks. Needed the log tail to find out why.
+
+### [3.9] Diagnose why the download stopped
+**Why:** 64 MB is far short of the ~7 GB target; needed to know if it finished or crashed.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+tail -60 ~/AccuracyDrift/databases/eskape_download.log && find ~/AccuracyDrift/databases/eskape_genomes -name "*.fna.gz" -o -name "*.fna" | wc -l
+```
+**Result:** Dozens of `ERROR: Checksum mismatch` lines, every single one reporting the **identical** `got` MD5 (`14aa54cecceebc1536a4d1ee4a5c08ec`) regardless of which assembly/expected checksum. That means every failed download received byte-for-byte identical content — almost certainly a generic NCBI rate-limit/error response, not real genome data. **`-p 25` triggered exactly the throttling risk flagged before choosing it**, just partway through the run rather than immediately. Only **200 `.fna`/`.fna.gz` files** landed successfully out of the ~1149 target. `ncbi-genome-download`'s own checksum verification correctly caught and rejected the bad downloads — no corrupt data got kept, but a large fraction of the run failed as a result.
+
 ---
 
 ## Fast path — Centrifuge index from sample_targeted (while big download runs in background)
