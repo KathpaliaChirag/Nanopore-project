@@ -468,4 +468,26 @@ time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instru
 
 **Surprising result — opposite of the Week 1 plan's own hypothesis.** The plan expected Centrifuge's FM-index/BWT walk to have *worse* cache locality than Kraken2 (citing papers on FM-index's poor spatial locality). Instead: Centrifuge's cache/LLC miss rate is dramatically lower, but it's much slower overall with lower IPC — meaning its bottleneck isn't cache misses, it's likely the serial dependency chain itself (each BWT backward-search step needs the previous step's result, limiting instruction-level parallelism regardless of cache behavior).
 
+### [4.3] Profiled run at 1 thread — matches Kraken2's 1T baseline row
+**Why:** CK asked whether 1T gives cleaner/more accurate cache stats. Answer: not "more accurate," but a genuinely useful second data point — Kraken2's own table has a 1T row too (7.23%/10.19% cache/LLC miss), so this lets us compare thread-scaling behavior between the two tools, not just single-point numbers.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  ~/tools/centrifuge/centrifuge -p 1 \
+  -x ~/AccuracyDrift/databases/centrifuge_sample_targeted/cf_base \
+  -U ~/results/basecalling/reads_hac.fastq \
+  -S /dev/null --report-file /dev/null
+```
+**Result:**
+
+| Metric | Kraken2 (1T) | Centrifuge (1T) | Kraken2 (32T) | Centrifuge (32T) |
+|---|---|---|---|---|
+| Wall time | 19.729s | 48.461s | 0.928s | 5.115s |
+| LLC Miss Rate% | 10.19% | 0.71% | 14.64% | 1.21% |
+| Cache Miss Rate% | 7.23% | 0.58% | 15.44% | 0.88% |
+| IPC | 1.78 | 2.63 | 1.65 | 1.03 |
+| Speedup (1T→32T) | 21.26x | 9.47x | — | — |
+
+**Real finding, not a fluke:** Centrifuge's lower cache-miss rate holds at both thread counts, ruling out a one-off measurement. But Centrifuge scales far worse with threads — at 1T it's actually *more* IPC-efficient than Kraken2 (2.63 vs 1.78), yet scaling to 32T collapses its IPC to 1.03 while Kraken2 barely drops (1.78→1.65). Kraken2 gets near-ideal 32x speedup (21.26x); Centrifuge only gets 9.47x. **Conclusion: Centrifuge's bottleneck isn't cache misses at all — it's thread contention/synchronization overhead on its FM-index structure that worsens with more threads, unlike Kraken2's classic memory-latency-bound behavior.** This is new, substantive data for the project (first-ever Centrifuge profiling here), not previously published anywhere per the Week 1 plan's own literature review.
+
 ---
