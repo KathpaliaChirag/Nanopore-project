@@ -491,3 +491,31 @@ time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instru
 **Real finding, not a fluke:** Centrifuge's lower cache-miss rate holds at both thread counts, ruling out a one-off measurement. But Centrifuge scales far worse with threads — at 1T it's actually *more* IPC-efficient than Kraken2 (2.63 vs 1.78), yet scaling to 32T collapses its IPC to 1.03 while Kraken2 barely drops (1.78→1.65). Kraken2 gets near-ideal 32x speedup (21.26x); Centrifuge only gets 9.47x. **Conclusion: Centrifuge's bottleneck isn't cache misses at all — it's thread contention/synchronization overhead on its FM-index structure that worsens with more threads, unlike Kraken2's classic memory-latency-bound behavior.** This is new, substantive data for the project (first-ever Centrifuge profiling here), not previously published anywhere per the Week 1 plan's own literature review.
 
 ---
+
+## Mid-scale (200-genome) classification run
+
+### [4.4] Plain classification run on centrifuge_eskape_200
+```bash
+~/tools/centrifuge/centrifuge -p 32 \
+  -x ~/AccuracyDrift/databases/centrifuge_eskape_200/cf_base \
+  -U ~/results/basecalling/reads_hac.fastq \
+  -S ~/AccuracyDrift/databases/centrifuge_eskape_200_classification.txt \
+  --report-file ~/AccuracyDrift/databases/centrifuge_eskape_200_report.txt
+```
+**Result:** Ran successfully. Naive line-count gave a misleading 90.00% classified — total lines (157,078) were inflated by multi-mapping (a read hitting several near-identical strains among 200 genomes produces multiple lines). Corrected using unique read IDs: **104,918 unique reads confirmed** (matches known dataset size exactly), **14,717 unique unclassified → 85.97% classified, 14.03% unclassified.** Also re-verified `sample_targeted`'s number the same rigorous way: **85.29% classified, 14.71% unclassified** (multi-mapping barely mattered there, only 6 genomes).
+
+Report only shows 4 of the 6 ESKAPE taxids with nonzero reads (*P. aeruginosa*, *K. pneumoniae*, *A. baumannii*, *S. aureus* — zero for *E. faecium* and *Enterobacter*). Explained by a genome-set composition difference, not a bug: this 200-genome index covers the **strict 6 ESKAPE taxids** (no *E. coli*), while `sample_targeted`'s curated 6-genome set includes *E. coli* as an extra (not part of the classic ESKAPE acronym).
+
+**Real finding — reference composition matters more than reference size:**
+
+| Metric | sample_targeted (6 genomes, incl. *E. coli*) | eskape_200 (200 genomes, strict ESKAPE) |
+|---|---|---|
+| Classified% | 85.29% | 85.97% |
+| *P. aeruginosa* reads | 55,338 | 101,459 (~1.8x) |
+| *K. pneumoniae* reads | 10,796 | 40,085 (~3.7x) |
+| *E. coli* reads | 22,946 | — (not in reference) |
+| *E. faecium* / *Enterobacter* reads | 5 / 723 | 0 / 0 |
+
+Removing *E. coli* didn't push those ~23K reads to unclassified — most got reassigned to *P. aeruginosa*/*K. pneumoniae* instead, since with 200 strain-diverse genomes available, Centrifuge finds a "good enough" alternative match rather than leaving the read unclassified. **These classification numbers are highly sensitive to reference composition, not just reference size** — worth remembering before treating any single accuracy number as definitive.
+
+---
