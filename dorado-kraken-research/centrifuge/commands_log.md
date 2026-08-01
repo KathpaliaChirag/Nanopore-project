@@ -295,4 +295,20 @@ mkdir -p ~/.local/bin && ln -sf /usr/bin/python3 ~/.local/bin/python && echo 'ex
 ```
 **Result:** SUCCESS. `which python` → `/home/student/.local/bin/python`. Build completed in **12 seconds** (`Total time for call to driver() for forward index: 00:00:12`). Wrote `cf_base.1.cf` (17,744,597 bytes) and `cf_base.2.cf` (3,507,644 bytes) to `~/AccuracyDrift/databases/centrifuge_sample_targeted/`. **First Centrifuge index ever built in this project.**
 
+### [FastPath.6] Verify all 4 index files exist
+**Why:** confirm the build produced everything Centrifuge needs to classify with (not just the 2 files mentioned in the driver's forward-index summary).
+**Machine:** Luna (`student@dell-R760`)
+```bash
+ls -la ~/AccuracyDrift/databases/centrifuge_sample_targeted/
+```
+**Result:** All 4 present: `cf_base.1.cf` (17.7M), `cf_base.2.cf` (3.5M), `cf_base.3.cf` (2.4K), `cf_base.4.cf` (216B) — ~20.3 MB total. **Step 3 (fast path) complete.**
+
+### [3.10] Second download attempt (-p 8) also stopped — checked size only, log check pending
+**Why:** routine check while confirming the index build.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+du -sh ~/AccuracyDrift/databases/eskape_genomes 2>/dev/null && ps aux | grep -i genome-download | grep -v grep && tail -10 ~/AccuracyDrift/databases/eskape_download2.log
+```
+**Result:** 357M (up from 64M — real progress). `ps` found no process again (chain short-circuited before the `tail`, so log wasn't seen yet) — needs a follow-up check.
+
 ---
