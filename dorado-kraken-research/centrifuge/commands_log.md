@@ -189,4 +189,24 @@ tar -tzf ~/runs_txt_only.tar.gz 2>/dev/null | head -20
 ```
 **Result:** `0.3.3` — already installed, no action needed.
 
+### [3.5] First download attempt — too slow, killed
+**Why:** started the documented re-download command (no parallelism flag, default serial).
+**Machine:** Luna (`student@dell-R760`)
+```bash
+mkdir -p ~/AccuracyDrift/databases/eskape_genomes && cd ~/AccuracyDrift/databases && ~/.local/bin/ncbi-genome-download --taxids 1352,1280,573,470,287,547 --formats fasta --assembly-levels complete bacteria -o eskape_genomes --verbose
+```
+**Result:** After ~1 hour, only ~25 MB downloaded (target ~7 GB). Process alive (PID 281594, 5:52 CPU time) but effectively crawling — `ncbi-genome-download` defaults to serial (1 assembly at a time), and with ~1149 assemblies each needing multiple round-trips to NCBI, that's untenably slow. Killed:
+```bash
+kill 281594 && sleep 2 && ps aux | grep -i genome-download | grep -v grep
+```
+Confirmed dead (no process listed).
+
+### [3.6] Restart with parallel downloads, detached
+**Why:** `-p 25` runs 25 assemblies concurrently instead of 1 (CK chose 25 over the suggested 10/20 — more aggressive, still below where NCBI is likely to start throttling). `nohup ... & disown` detaches it from the shell so it survives even without tmux — closing the terminal won't kill it.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+rm -rf ~/AccuracyDrift/databases/eskape_genomes && mkdir -p ~/AccuracyDrift/databases/eskape_genomes && cd ~/AccuracyDrift/databases && nohup ~/.local/bin/ncbi-genome-download --taxids 1352,1280,573,470,287,547 --formats fasta --assembly-levels complete bacteria -o eskape_genomes --verbose -p 25 > eskape_download.log 2>&1 & disown
+```
+**Result:** `[1] 284880` — job started, detached, running in background. Output going to `~/AccuracyDrift/databases/eskape_download.log`.
+
 ---
