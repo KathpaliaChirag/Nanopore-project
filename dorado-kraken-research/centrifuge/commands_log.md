@@ -375,4 +375,29 @@ cd ~/AccuracyDrift/databases && nohup ~/.local/bin/ncbi-genome-download --taxids
 ```
 **Result:** `[1] 290158` — running. Without the cache, it re-fetches NCBI's full bacterial genome catalog first (large file), so expect a quiet stretch before real downloads resume — checked again after a few minutes, not immediately.
 
+### [3.17] Fresh cache + retries gave identical result — accepted as a real ceiling
+**Result:** Same 373M, same exactly-200 `.fna`/`.fna.gz` count as before this run. Three independent fixes (lower parallelism, proxy configured, fresh cache + retries) all land on the identical 200-genome result — rules out flakiness, this is deterministic. Likely cause: `ncbi-genome-download` v0.3.3 too old for how NCBI's 2026 catalog structures newer (high-accession-number) assemblies. **Decision: build a mid-scale Centrifuge index from these 200 real genomes instead of continuing to chase the full 1149.**
+
+## Mid-scale Centrifuge index from the 200 downloaded genomes
+
+### [Mid.1] Gunzip all 200 genome files
+```bash
+find ~/AccuracyDrift/databases/eskape_genomes -name "*.fna.gz" -exec gunzip {} \;
+```
+**Result:** 200 `.fna` files, 0 remaining `.fna.gz`.
+
+### [Mid.2] Build seqid2taxid.map from the cached NCBI catalog + actual FASTA headers
+**Why:** `centrifuge-download` re-downloads everything itself (can't point it at local files), and ncbi-genome-download's `-m` metadata flag only logs freshly-downloaded assemblies, not already-valid skipped ones. Built the map manually instead: single-pass lookup of taxid per accession from the cached 515K-line NCBI catalog (`~/.cache/ncbi-genome-download/refseq_bacteria_assembly_summary.txt`, col 1 = accession, col 6 = taxid), then paired each genome's actual FASTA headers with its taxid — same technique `centrifuge-download`'s own script uses internally.
+```bash
+cd ~/AccuracyDrift/databases
+find eskape_genomes -name "*.fna" | sed -E 's#.*/(GCF_[0-9]+\.[0-9]+)_.*#\1#' | sort -u > eskape_accessions.txt
+awk -F'\t' 'NR==FNR{acc[$1]=1; next} ($1 in acc){print $1"\t"$6}' eskape_accessions.txt ~/.cache/ncbi-genome-download/refseq_bacteria_assembly_summary.txt > eskape_acc_taxid.tsv
+> eskape_genomes_seqid2taxid.map
+while IFS=$'\t' read -r acc taxid; do
+  f=$(find eskape_genomes -name "${acc}_*.fna")
+  grep '^>' "$f" | sed 's/^>//; s/ .*//' | awk -v t="$taxid" '{print $1"\t"t}' >> eskape_genomes_seqid2taxid.map
+done < eskape_acc_taxid.tsv
+```
+**Result:** 200/200 accessions matched a taxid. Map has **693 total sequences** (chromosome + plasmids across 200 genomes, ~3.5 sequences/genome average). Sample confirms taxid 287 (*P. aeruginosa*, matches the ESKAPE taxid table).
+
 ---
