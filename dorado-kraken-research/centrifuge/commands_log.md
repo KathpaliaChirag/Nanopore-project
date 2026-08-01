@@ -400,4 +400,25 @@ done < eskape_acc_taxid.tsv
 ```
 **Result:** 200/200 accessions matched a taxid. Map has **693 total sequences** (chromosome + plasmids across 200 genomes, ~3.5 sequences/genome average). Sample confirms taxid 287 (*P. aeruginosa*, matches the ESKAPE taxid table).
 
+### [Mid.3] Concatenate 200 genomes + verify header coverage
+```bash
+find eskape_genomes -name "*.fna" -exec cat {} + > eskape_genomes_combined.fasta
+grep ">" eskape_genomes_combined.fasta | cut -d' ' -f1 | tr -d '>' | sort -u > eskape_headers.txt
+cut -f1 eskape_genomes_seqid2taxid.map | sort -u > eskape_mapped.txt
+diff eskape_headers.txt eskape_mapped.txt && echo "CLEAN: all headers mapped"
+```
+**Result:** `eskape_genomes_combined.fasta` = **1,119,262,452 bytes (~1.04 GiB)**. `CLEAN: all headers mapped` — 693/693 headers match, nothing will get silently dropped.
+
+### [Mid.4] Build the mid-scale Centrifuge index (detached, ~1.1 GB input)
+**Why:** reuses `sample_targeted/taxonomy/` (generic NCBI taxonomy tree, works for any taxid) — no need to regenerate taxonomy.
+```bash
+mkdir -p ~/AccuracyDrift/databases/centrifuge_eskape_200 && \
+cd ~/AccuracyDrift/databases && nohup ~/tools/centrifuge/centrifuge-build --conversion-table eskape_genomes_seqid2taxid.map \
+  --taxonomy-tree sample_targeted/taxonomy/nodes.dmp \
+  --name-table sample_targeted/taxonomy/names.dmp \
+  eskape_genomes_combined.fasta \
+  centrifuge_eskape_200/cf_base > centrifuge_build_200.log 2>&1 & disown
+```
+**Result:** Running normally (PID 294142, 100% CPU). Standard build stages progressing (V-Sorting took ~1:54, proportional to the ~40x larger input vs. the 12-second `sample_targeted` build). Checking periodically, not continuously.
+
 ---
