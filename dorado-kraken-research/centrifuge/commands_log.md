@@ -179,4 +179,14 @@ tar -tzf ~/runs_txt_only.tar.gz 2>/dev/null | head -20
 ```
 **Result:** Every "eskape" hit machine-wide is a run-result text file (`.../AccuracyDrift/runs/*.txt`, `.../AccuracyDrift/reports/*.txt` — perf/report/output logs from prior benchmark runs) or the two build logs already known about. Both tarballs contain only similar perf/report/output logs (`sup/`, `pluspf_103gb`, `sample_targeted`, etc. — pre-existing benchmark data), not genome files or database files. **Confirmed: no backup of the eskape_650mb/eskape_human_4gb genome library or built databases exists anywhere on this machine.**
 
+**Root cause (read locally from `AccuracyDrift/README.md`, not a Luna command):** documented build script unconditionally `rm -rf eskape_genomes` after both DBs build (expected) — but the actual top-level `eskape_650mb/`/`eskape_human_4gb/` DB folders (with `hash.k2d`/`taxo.k2d`/`opts.k2d`) are ALSO gone, which that script never does. Full analysis in `observations.md`. Decision: re-download genomes via `ncbi-genome-download`, keep `eskape_genomes/` this time (Centrifuge needs it, unlike the Kraken2-only script).
+
+### [3.4] Confirm ncbi-genome-download is already installed
+**Why:** avoid reinstalling if it survived from the original build.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+~/.local/bin/ncbi-genome-download --version 2>&1 || echo "NOT INSTALLED"
+```
+**Result:** `0.3.3` — already installed, no action needed.
+
 ---
