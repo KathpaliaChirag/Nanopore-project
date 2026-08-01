@@ -107,4 +107,17 @@ cd centrifuge && make
 ```
 **Result:** Success, no errors. g++ (`-O3 -m64 -msse2 -funroll-loops -g3 -std=c++11`) compiled `centrifuge-build-bin`, `centrifuge-class`, `centrifuge-inspect-bin`. Only warnings surfaced: deprecated `std::auto_ptr` usage and signed/unsigned comparison warnings — both harmless, pre-existing code style issues flagged by a newer GCC, not build blockers. Confirms Luna's GCC version builds this cleanly (the open risk flagged in the Week 1 plan).
 
+### [Version check] Confirm we're on the latest Centrifuge code
+**Why:** CK asked to confirm we're not building an outdated version.
+**How:** checked GitHub's public API directly (no Luna command needed) — not logged as a Luna step, done from the local machine.
+**Result:** Latest tagged release is `v1.0.4.2`. Our `git clone` grabbed the tip of `master` (default branch, last pushed 2026-04-15), which defines `CENTRIFUGE_VERSION="1.0.5"` — a version bump ahead of the last official tag. We're on the most current code available, not behind.
+
+### [1.3] Verify all binaries built
+**Why:** confirm all 5 expected executables exist before moving to PATH setup.
+**Machine:** Luna (`student@dell-R760`, run from `~/centrifuge`)
+```bash
+ls -la ~/centrifuge/centrifuge*
+```
+**Result:** All 5 present and executable: `centrifuge`, `centrifuge-build` (wrapper script → `centrifuge-build-bin`), `centrifuge-class`, `centrifuge-inspect` (wrapper script → `centrifuge-inspect-bin`), `centrifuge-download`. Build fully succeeded.
+
 ---
