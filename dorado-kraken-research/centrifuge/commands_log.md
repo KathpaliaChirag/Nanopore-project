@@ -253,4 +253,21 @@ cat ~/AccuracyDrift/databases/sample_targeted/library/added/prelim_map.txt && ca
 ```
 **Result:** 17 sequences across exactly 6 taxids (511145, 208964, 93061, 716541, 1125630, 333849 — matching the 6 ESKAPE species). File-size pairing confirms the 6 `GCF_`-named files are the real reference genomes; the 6 randomly-named files are unrelated duplicates to exclude. Full breakdown in `observations.md`. **Decision: reuse `seqid2taxid.map` + `taxonomy/` as-is, concatenate only the 6 `GCF_` files, skip `centrifuge-download` entirely for this fast path.**
 
+### [FastPath.3] Retry big download at -p 8 (detached), concatenate + verify sample_targeted headers
+**Why (retry):** give NCBI a safer parallelism after the -p 25 throttling; re-running is safe since ncbi-genome-download skips already-good files by checksum.
+**Why (fast path):** concatenate the 6 real genomes into one FASTA, then confirm every header actually has a taxid match before trusting it (plan's own warning — Centrifuge silently drops unmapped sequences).
+**Machine:** Luna (`student@dell-R760`)
+```bash
+# Retry (separate terminal/background)
+cd ~/AccuracyDrift/databases && nohup ~/.local/bin/ncbi-genome-download --taxids 1352,1280,573,470,287,547 --formats fasta --assembly-levels complete bacteria -o eskape_genomes --verbose -p 8 > eskape_download2.log 2>&1 & disown
+
+# Fast path
+cd ~/AccuracyDrift/databases/sample_targeted/library/added && \
+cat GCF_000005845.2_ASM584v2_genomic.fna GCF_000006765.1_ASM676v1_genomic.fna GCF_000013425.1_ASM1342v1_genomic.fna GCF_000025565.1_ASM2556v1_genomic.fna GCF_000174395.2_ASM17439v2_genomic.fna GCF_000240185.1_ASM24018v2_genomic.fna > ~/AccuracyDrift/databases/sample_targeted_combined.fasta && \
+grep ">" ~/AccuracyDrift/databases/sample_targeted_combined.fasta | cut -d' ' -f1 | tr -d '>' | sort -u > ~/headers.txt && \
+cut -f1 ~/AccuracyDrift/databases/sample_targeted/seqid2taxid.map | sort -u > ~/mapped.txt && \
+diff ~/headers.txt ~/mapped.txt && echo "CLEAN: all headers mapped"
+```
+**Result (fast path):** `CLEAN: all headers mapped` — no diff output, every sequence header matches a taxid entry. `sample_targeted_combined.fasta` ready for `centrifuge-build`. (Retry download result pending, checked separately.)
+
 ---
