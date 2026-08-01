@@ -169,4 +169,14 @@ Machine-wide `.fna` count: **12 total**, all under `sample_targeted/library/adde
 
 **FLAG — real blocker, not a dead end:** the `eskape_650mb` and `eskape_human_4gb` database folders (genome library + built `.k2d` files) are gone from `AccuracyDrift/databases/` — only their build logs remain. Only 12 `.fna` files exist machine-wide, all belonging to the small 50MB `sample_targeted` demo DB, not the ~1149-file ESKAPE set the Week 1 plan assumes is still on disk. Needs investigation before Step 3 can proceed as written.
 
+### [3.3] Machine-wide search for any eskape backup + inspect the two loose tarballs
+**Why:** rule out a backup/archive existing somewhere before concluding the genome data must be re-downloaded from scratch.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+find / -iname "*eskape*" 2>/dev/null | grep -v "Permission denied"
+tar -tzf ~/kraken_runs_small.tar.gz 2>/dev/null | head -20
+tar -tzf ~/runs_txt_only.tar.gz 2>/dev/null | head -20
+```
+**Result:** Every "eskape" hit machine-wide is a run-result text file (`.../AccuracyDrift/runs/*.txt`, `.../AccuracyDrift/reports/*.txt` — perf/report/output logs from prior benchmark runs) or the two build logs already known about. Both tarballs contain only similar perf/report/output logs (`sup/`, `pluspf_103gb`, `sample_targeted`, etc. — pre-existing benchmark data), not genome files or database files. **Confirmed: no backup of the eskape_650mb/eskape_human_4gb genome library or built databases exists anywhere on this machine.**
+
 ---
