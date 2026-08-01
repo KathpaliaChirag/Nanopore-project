@@ -349,4 +349,12 @@ time curl -sI "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/045/690/395/GCF_0456
 ```
 **Result:** **Confirmed fixed.** Same URL that hung for 3.5 minutes now returns real headers (`HTTP/1.1 200 OK`, correct `Content-Length: 1614736`) in **1.137 seconds**.
 
+### [3.14] Third download attempt, proxy now active
+**Why:** retry with the actual root cause fixed.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+cd ~/AccuracyDrift/databases && nohup ~/.local/bin/ncbi-genome-download --taxids 1352,1280,573,470,287,547 --formats fasta --assembly-levels complete bacteria -o eskape_genomes --verbose -p 8 > eskape_download3.log 2>&1 & disown
+```
+**Result:** Job ran and exited on its own (15,847-line log, reached near the end of the catalog). **Zero `Checksum mismatch` errors** (`grep -c` confirms) — the proxy fix genuinely resolved the garbage-content bug. But `.fna`/`.fna.gz` count is still exactly 200, only 41 files were touched during this run, and 8221 total files exist in the folder (mostly metadata/stub files, not real genomes). The log shows `ERROR: No entry for file ending in '_genomic.fna.gz'` far more often than expected for "complete genome" RefSeq records. **New theory: `ncbi-genome-download`'s directory-listing step likely uses FTP-protocol requests separately from the HTTPS file downloads** — the HTTP-only proxy may not tunnel FTP listings correctly, causing the tool to see "no file" for assemblies that actually have one, even though direct HTTPS fetches of known filenames (our earlier `curl` test) work fine through the same proxy.
+
 ---
