@@ -128,4 +128,12 @@ mkdir -p ~/tools && mv ~/centrifuge ~/tools/centrifuge && export PATH=$PATH:~/to
 ```
 **Result:** Success, no output (expected — none of these three commands print on success). Note: shell was sitting inside `~/centrifuge` when it got moved; prompt still displays the old path but the directory now only exists at `~/tools/centrifuge`. Harmless, but use the new path going forward. PATH change is session-only so far — not yet persisted to `.bashrc`.
 
+### [1.5] Persist PATH in .bashrc + verify
+**Why:** make the PATH change permanent across logins, and confirm the shell can actually resolve `centrifuge` by name.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+echo 'export PATH=$PATH:~/tools/centrifuge' >> ~/.bashrc && source ~/.bashrc && which centrifuge
+```
+**Result:** `/home/student/tools/centrifuge/centrifuge` — exactly as expected. **Step 1 complete: Centrifuge is built, in `~/tools/centrifuge/`, and permanently on PATH.**
+
 ---
