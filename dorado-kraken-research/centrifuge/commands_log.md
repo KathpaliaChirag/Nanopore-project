@@ -209,4 +209,12 @@ rm -rf ~/AccuracyDrift/databases/eskape_genomes && mkdir -p ~/AccuracyDrift/data
 ```
 **Result:** `[1] 284880` — job started, detached, running in background. Output going to `~/AccuracyDrift/databases/eskape_download.log`.
 
+### [3.7] First health check on the parallel download
+**Why:** confirm -p 25 actually spawned parallel workers and isn't silently still serial.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+du -sh ~/AccuracyDrift/databases/eskape_genomes 2>/dev/null && ps aux | grep -i genome-download | grep -v grep && tail -20 ~/AccuracyDrift/databases/eskape_download.log
+```
+**Result:** 34M so far. Confirmed **25 active worker processes** (PIDs 284883-284908, each ~13% CPU) — real parallelism this time, not serial. Log shows repeated `ERROR: No entry for file ending in '_genomic.fna.gz'` for some records — expected/benign, some NCBI assembly entries don't ship a genomic FASTA; tool skips and continues. Final assembly count may land a bit under 1149 because of this, not a failure.
+
 ---
