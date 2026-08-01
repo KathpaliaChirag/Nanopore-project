@@ -120,4 +120,12 @@ ls -la ~/centrifuge/centrifuge*
 ```
 **Result:** All 5 present and executable: `centrifuge`, `centrifuge-build` (wrapper script → `centrifuge-build-bin`), `centrifuge-class`, `centrifuge-inspect` (wrapper script → `centrifuge-inspect-bin`), `centrifuge-download`. Build fully succeeded.
 
+### [1.4] Move to ~/tools/ and add to PATH (session-only)
+**Why:** match how Kraken2 is already organized (`~/tools/kraken2/`), and let `centrifuge` be callable by name instead of full path.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+mkdir -p ~/tools && mv ~/centrifuge ~/tools/centrifuge && export PATH=$PATH:~/tools/centrifuge
+```
+**Result:** Success, no output (expected — none of these three commands print on success). Note: shell was sitting inside `~/centrifuge` when it got moved; prompt still displays the old path but the directory now only exists at `~/tools/centrifuge`. Harmless, but use the new path going forward. PATH change is session-only so far — not yet persisted to `.bashrc`.
+
 ---
