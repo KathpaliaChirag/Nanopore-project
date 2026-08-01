@@ -421,4 +421,13 @@ cd ~/AccuracyDrift/databases && nohup ~/tools/centrifuge/centrifuge-build --conv
 ```
 **Result:** Running normally (PID 294142, 100% CPU). Standard build stages progressing (V-Sorting took ~1:54, proportional to the ~40x larger input vs. the 12-second `sample_targeted` build). Checking periodically, not continuously.
 
+### [Mid.5] Build completed — verified
+**Total build time:** 1:08:06 (`Total time for call to driver() for forward index`). Looked "stuck" on repeated checks because the log had simply stopped changing once finished — the process had already exited, easy to miss since the tail output looked identical across several checks.
+```bash
+ls -la ~/AccuracyDrift/databases/centrifuge_eskape_200/
+```
+**Result:** All 4 files present — `cf_base.1.cf` (359.4 MB), `cf_base.2.cf` (131.8 MB), `cf_base.3.cf` (16.5 KB), `cf_base.4.cf` (8.1 KB), ~515 MB total. **Mid-scale Centrifuge index (200 real ESKAPE genomes) is complete.**
+
+**Step 3 status: DONE at two scales** — `centrifuge_sample_targeted/` (6 genomes, fast path) and `centrifuge_eskape_200/` (200 genomes, real reference data). The originally-planned full 1149-genome rebuild remains blocked by the documented tool-version gap (see Observations), not required for this week's definition of done.
+
 ---
