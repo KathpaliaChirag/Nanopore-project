@@ -319,4 +319,34 @@ tail -30 ~/AccuracyDrift/databases/eskape_download2.log && find ~/AccuracyDrift/
 ```
 **Result:** Same two error types as before — benign `No entry for file ending in '_genomic.fna.gz'` (some records genuinely lack this file) mixed with the same **identical-MD5 checksum mismatches** (`got '14aa54cecceebc1536a4d1ee4a5c08ec'`, unchanged from the first attempt). **`.fna` count is still exactly 200** — no growth at all despite folder size growing to 357M and a much lower parallelism. This weakens the pure-concurrency theory: a request-count-based rate limit (or network-level block) that the first attempt already tripped, inherited by the retry, fits better than "too many simultaneous connections."
 
+### [3.12] Diagnostic curl tests + root cause found: missing proxy config
+**Why:** determine whether this is NCBI-side throttling or a Luna-side network issue.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+# test 1 (URL built wrong - missing a path segment)
+curl -sI "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/045/690/395/GCF_045690395.1_ASM4569039v1_genomic.fna.gz"
+# -> proxy CONNECT tunnel shown, then real 404 from NCBI (fast)
+
+# test 2 (corrected URL, verbose)
+curl -v "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/045/690/395/GCF_045690395.1_ASM4569039v1/GCF_045690395.1_ASM4569039v1_genomic.fna.gz" -o ~/test_dl.gz
+# -> IPv6 "Network unreachable", IPv4 hung 3.5 min then timed out. No proxy tunnel line this time.
+
+# checked for proxy env vars - none set anywhere
+echo "http_proxy=$http_proxy"; cat /etc/environment
+```
+**Result:** No proxy configured anywhere in the shell, yet behavior was proxy-tunnel-shaped on one test and direct-connection-hung on another. **CK identified the actual root cause: IIT Delhi's institutional proxy (`proxy62.iitd.ac.in:3128`) was never set.** Luna needs BOTH an authenticated network login (`tmux` + `~/iitd-login.py`) AND these proxy env vars for reliable outbound internet — documented in `dorado-kraken-research/CLAUDE.md` ("Luna internet access" section) and in persistent memory, since this is exactly the kind of gotcha that looks like a rate-limit/flaky-tool problem instead of a proxy problem.
+
+### [3.13] Set proxy, verify the fix
+**Why:** confirm the proxy actually resolves the hanging-connection symptom before retrying the big download.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+export HTTP_proxy=http://proxy62.iitd.ac.in:3128
+export HTTPS_proxy=http://proxy62.iitd.ac.in:3128
+export https_proxy=http://proxy62.iitd.ac.in:3128
+export http_proxy=http://proxy62.iitd.ac.in:3128
+# persisted to ~/.bashrc too
+time curl -sI "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/045/690/395/GCF_045690395.1_ASM4569039v1/GCF_045690395.1_ASM4569039v1_genomic.fna.gz"
+```
+**Result:** **Confirmed fixed.** Same URL that hung for 3.5 minutes now returns real headers (`HTTP/1.1 200 OK`, correct `Content-Length: 1614736`) in **1.137 seconds**.
+
 ---

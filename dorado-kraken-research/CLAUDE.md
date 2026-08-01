@@ -24,6 +24,24 @@ Luna account is **student** (shared). Orion account is **jetsonagx**. Our Minerv
 
 `perf_event_paranoid` on Luna is currently 0 - all hardware events available without root.
 
+### Luna internet access (do this BEFORE any download/install that needs external internet)
+
+Luna needs **two separate things** for outbound internet - missing either one causes intermittent/hanging connections (some requests connect fine, others hang for minutes then time out) that look like a rate-limit or flaky-tool problem but aren't. Discovered 2026-07-01 after a long detour debugging `ncbi-genome-download` failures that were actually this.
+
+```bash
+tmux                                                              # persistent session - login daemon must keep running
+env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY python3 ~/iitd-login.py -d   # unset proxy first, login needs direct access
+# enter IIT Delhi kerberos ID (kid) and password when prompted
+# detach WITHOUT killing it: Ctrl+B, then D
+
+export HTTP_proxy=http://proxy62.iitd.ac.in:3128
+export HTTPS_proxy=http://proxy62.iitd.ac.in:3128
+export https_proxy=http://proxy62.iitd.ac.in:3128
+export http_proxy=http://proxy62.iitd.ac.in:3128
+```
+
+Add the four `export` lines to `~/.bashrc` so they persist across logins. If external connections (wget/curl/pip/ncbi-genome-download/etc.) are hanging or intermittently failing on Luna, check this first before assuming the remote server or the tool is broken.
+
 ---
 
 ## Key Paths on Luna
