@@ -108,4 +108,10 @@ flowchart LR
 
 This validates the throttling risk flagged before picking `-p 25` over the suggested safer `10` — it didn't fail immediately, but it did fail partway through a long run. **Only ~200 of ~1149 target genomes actually downloaded successfully.** Not yet decided: whether to retry the remaining ~950 at a lower parallelism (e.g. `-p 8-10`) after giving NCBI's rate limiter time to reset, or accept the 200 as a smaller-but-real ESKAPE set for now. This doesn't block the `sample_targeted` fast-path build, which is independent and already has everything it needs.
 
+### Update — theory revised, three attempts now, same accessions fail every time
+
+Ran the retry twice more (`-p 8` twice). Both times: `.fna` count stuck at exactly 200, and — the key new detail — **the exact same accessions fail on every attempt** (`GCF_045690395.1`, `GCF_046531215.1`, `GCF_046531345.1`, etc. recur identically across all three independent runs), not a shifting random subset. That doesn't fit pure "too many concurrent/total requests" rate-limiting as cleanly as first thought — a request-budget limit would more likely affect whichever records happen to be in flight when the budget runs out, which should vary run to run. Consistently the same ~950 records failing suggests something specific to those particular records or their CDN path (a blocked edge node, a stale/regenerated file NCBI's catalog hasn't caught up to, or similar) rather than a simple global throttle.
+
+**Diagnostic in progress:** fetching one consistently-failing accession (`GCF_045690395.1`) directly with `curl`, bypassing `ncbi-genome-download` entirely, to see what's actually being served. Result pending.
+
 ---
