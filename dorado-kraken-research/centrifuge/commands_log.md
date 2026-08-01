@@ -137,3 +137,15 @@ echo 'export PATH=$PATH:~/tools/centrifuge' >> ~/.bashrc && source ~/.bashrc && 
 **Result:** `/home/student/tools/centrifuge/centrifuge` — exactly as expected. **Step 1 complete: Centrifuge is built, in `~/tools/centrifuge/`, and permanently on PATH.**
 
 ---
+
+## Step 3 — Build a Centrifuge index from the ESKAPE genomes
+
+### [3.1] Locate ESKAPE genome files and taxonomy folder
+**Why:** need to know where the ~1149 `.fna` files live before concatenating them, and whether the taxonomy folder (`nodes.dmp`/`names.dmp`) survived Kraken2's build cleanup or needs re-fetching.
+**Machine:** Luna (`student@dell-R760`)
+```bash
+find ~ -maxdepth 3 -iname "eskape_genomes*" -o -iname "taxonomy" 2>/dev/null
+```
+**Result:** Empty — neither found within 3 levels of home. Need to search deeper / check actual `AccuracyDrift/databases/` layout directly.
+
+---
