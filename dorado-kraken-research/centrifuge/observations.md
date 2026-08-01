@@ -118,6 +118,27 @@ Ran the retry twice more (`-p 8` twice). Both times: `.fna` count stuck at exact
 
 **Decision (2026-08-01):** one more retry, fully serial (`-p 1`) with a long per-request timeout — the most conservative possible attempt, least likely to trip whatever's flaky, before accepting the ~200-genome partial set as this week's result if it still doesn't improve.
 
+## First real Kraken2 vs Centrifuge comparison (2026-08-01)
+
+Ran Centrifuge on `sample_targeted`'s index against `reads_hac.fastq` (the same reads Kraken2 was already benchmarked against — see `AccuracyDrift/RESULTS.md` line 229 and `AccuracyDrift/reports/hac_sample_targeted.txt`). First-ever head-to-head numbers for this project:
+
+| Species | taxid | Kraken2 reads | Centrifuge reads | Kraken2 % | Centrifuge % |
+|---|---|---|---|---|---|
+| *P. aeruginosa* PAO1 | 208964 | 55,077 | 55,338 | 52.50% | 52.75% |
+| *E. coli* K-12 MG1655 | 511145 | 22,860 | 22,946 | 21.79% | 21.87% |
+| *K. pneumoniae* HS11286 | 1125630 | 10,411 | 10,796 | 9.92% | 10.29% |
+| *E. cloacae* ATCC 13047 | 716541 | 503 | 723 | 0.48% | 0.69% |
+| *S. aureus* NCTC 8325 | 93061 | 7 | 17 | 0.01% | 0.02% |
+| *E. faecium* DO | 333849 | 5 | 5 | 0.00% | 0.00% |
+| **Unclassified** | — | 15,945 | 15,433 | 15.20% | 14.71% |
+
+Also from the same Kraken2 run (32T, Luna): Time 0.928s, Cache Miss Rate% 15.44%, LLC Miss Rate% 14.64%, IPC 1.65 — these are the numbers Centrifuge's own `perf stat` run (Step 4, not done yet) needs to be measured against once we add profiling on top of this same run.
+
+**Pattern:** both tools agree on the overall species distribution, but Centrifuge classifies slightly more reads at every single species, with correspondingly fewer unclassified reads.
+
+> [!WARNING]
+> Per the Week 1 plan: label this **"unvalidated — threshold/rank mismatch, not directly comparable."** Kraken2 and Centrifuge use different default confidence/score thresholds, so this gap could reflect a real sensitivity difference or just be a threshold artifact — not yet something to draw a conclusion from.
+
 ### Actual fix found: IIT Delhi's proxy was never configured
 
 CK independently knew the answer: Luna needs to route outbound traffic through IIT Delhi's institutional proxy, `proxy62.iitd.ac.in:3128`, which was never set in this shell. This exactly matches the diagnosis above — explains the proxy-tunnel-shaped success on one test and the direct-connection hangs on another (whichever path happened to route through vs. around the (unconfigured) proxy). Set via `export HTTP_proxy`/`HTTPS_proxy`/`http_proxy`/`https_proxy=http://proxy62.iitd.ac.in:3128`, persisted to `.bashrc`. `ncbi-genome-download` is Python, and Python's `requests`/`urllib` respect these env vars automatically — no code/flag changes needed on the tool's side. Verification: re-ran the exact request that hung 3.5 minutes earlier; result logged in commands_log.md.
