@@ -1,0 +1,7 @@
+name	taxID	taxRank	genomeSize	numReads	numUniqueReads	abundance
+Staphylococcus aureus subsp. aureus NCTC 8325	93061	strain	2821361	8	4	0.0
+Pseudomonas aeruginosa PAO1	208964	strain	6264404	16088	16086	0.0
+Enterococcus faecium DO	333849	strain	3052572	1	1	0.0
+Escherichia coli str. K-12 substr. MG1655	511145	leaf	4641652	6480	6467	0.0
+Enterobacter cloacae subsp. cloacae ATCC 13047	716541	strain	5598796	233	172	0.0
+Klebsiella pneumoniae subsp. pneumoniae HS11286	1125630	strain	5682322	3110	3021	0.0

@@ -11,5 +11,10 @@
 !kraken2opti/matrix_mul/*.png
 !kraken2opti/matrix_mul/*.svg
 
+# Allow the centrifuge pod5 sweep's raw perf captures and classification counts
+# (0.7 MB total; kept so every figure in centrifuge_pod5_report.md is reproducible)
+!mtp1/result/centrifuge_pod5/raw/*
+!mtp1/result/centrifuge_pod5/class/*
+
 # Allow .gitignore itself
 !.gitignore

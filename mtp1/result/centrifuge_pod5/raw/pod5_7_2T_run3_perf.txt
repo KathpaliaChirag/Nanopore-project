@@ -1,0 +1,20 @@
+report file /home/dell/summer/result/centrifuge_pod5/raw/pod5_7_2T_run3_report.tsv
+Number of iterations in EM algorithm: 0
+Probability diff. (P - P_prev) in the last iteration: 0
+Calculating abundance: 00:00:00
+
+ Performance counter stats for '/home/dell/summer/centrifuge/centrifuge/centrifuge -p 2 -x /home/dell/summer/databases/centrifuge_eskape/cf_base -U /home/dell/summer/perpod5/pod5_7.fastq -S /dev/null --report-file /home/dell/summer/result/centrifuge_pod5/raw/pod5_7_2T_run3_report.tsv':
+
+       7,96,51,782      cache-misses                     #    2.51% of all cache refs         
+    3,16,79,60,539      cache-references                                                      
+      85,94,42,125      LLC-loads                                                             
+       2,75,62,362      LLC-load-misses                  #    3.21% of all LL-cache accesses  
+ 3,46,29,65,70,472      instructions                     #    2.50  insn per cycle            
+ 1,38,76,26,18,013      cycles                                                                
+
+      14.746647917 seconds time elapsed
+
+      29.072629000 seconds user
+       0.384872000 seconds sys
+
+
