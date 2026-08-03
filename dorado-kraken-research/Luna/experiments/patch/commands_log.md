@@ -675,6 +675,30 @@ At T=1, sample_targeted's ~19-20s wall time is *not* a loading artifact at all �
 
 **Confirms the model:** DB-load time is roughly fixed (~3.7s regardless of thread count — it's one sequential load operation), while classification time shrinks as threads increase. `-M`'s benefit = load_time / total_time, so it *grows* with thread count: only ~19.5% saved at T=1 (16.48s → 13.27s, since classification itself takes ~13-16s and dilutes the fixed load cost), but ~73% saved at T=96 (4.76s → 1.28s, since classification is fast enough that the fixed load cost dominates). This matches the ~78% saving already seen at T=32.
 
+### standard_8gb — patched, 1T and 96T (command 65)
+
+| M-mode | Threads | Wall (avg of 3) | IPC |
+|---|---|---|---|
+| no -M | 1 | 15.62s | ~2.09 |
+| no -M | 96 | 4.79s | ~1.47 |
+| -M | 1 | 12.42s | ~2.38 |
+| -M | 96 | 1.30s | ~1.51 |
+
+### standard_8gb — full base vs. patched comparison, all 3 threads × both M-modes
+
+| Threads | M-mode | Baseline | Patched | Delta |
+|---|---|---|---|---|
+| 1 | no -M | 16.48s | 15.62s | **−5.2%** |
+| 1 | -M | 13.27s | 12.42s | **−6.4%** |
+| 32 | no -M | 4.446s | 4.439s | ~0% (noise) |
+| 32 | -M | 0.96s | 0.922s | **−4.0%** |
+| 96 | no -M | 4.76s | 4.79s | ~0% (noise, slightly worse) |
+| 96 | -M | 1.28s | 1.30s | ~0% (noise, slightly worse) |
+
+**New finding — the patch's benefit shrinks as thread count rises, on this DB.** Real, consistent improvement at T=1 (5-6%, both M-modes) and T=32 with -M (4%), but flat-to-slightly-negative at T=96. Working theory: Patch 4's LRU cache is `thread_local` — one private 16K-entry cache per thread. At T=1, that single cache sees the entire 355Mbp read stream, catching every repeated k-mer anywhere in the workload. At T=96, the same workload is sharded 96 ways, so each thread's cache only sees ~1/96th of the reads — a k-mer repeated between reads assigned to *different* threads is invisible to either thread's cache. The effective hit rate should degrade as thread count increases, which matches the observed pattern. Worth testing explicitly (e.g. instrumenting cache hit/miss counts per thread count) if this becomes relevant to Thesis 1's design — a thread-local cache's benefit is inherently coupled to per-thread workload share, which is exactly the kind of "hardware-aware sizing" consideration Thesis 1 is supposed to address.
+
+**standard_8gb sweep complete: all 3 threads × both builds × both M-modes (12 cells).**
+
 ---
 
 ## Known gap — no backup of `compact_hash.cc`
