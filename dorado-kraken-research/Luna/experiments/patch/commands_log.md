@@ -649,6 +649,21 @@ for d in sample_targeted standard_16gb pluspf_103gb; do echo "=== $d ==="; ls -l
 
 **Note:** unlike `standard_8gb`, `-M` barely matters here (~1-4% difference, not ~4.5x) — this DB is only 50MB, small enough that eager-loading vs. lazy-mmap-loading doesn't create a large wall-clock gap either way. Confirms the earlier `-M` finding was specific to large DBs where eager load time dominates.
 
+### sample_targeted — patched (command 63)
+
+| M-mode | Threads | Wall (avg of 3) | IPC | Cache-miss % | LLC-miss % |
+|---|---|---|---|---|---|
+| no -M | 1 | 19.21s | ~1.73 | ~11.2% | ~10.9% |
+| no -M | 32 | 0.90s | ~1.63 | ~16.7% | ~13.8% |
+| no -M | 96 | 1.123s | ~1.31 | ~19.5% | ~14.7% |
+| -M | 1 | 19.51s | ~1.70 | ~11.6% | ~12.2% |
+| -M | 32 | 0.867s | ~1.65 | ~15.1% | ~11.9% |
+| -M | 96 | 1.113s | ~1.32 | ~18.0% | ~12.9% |
+
+**Explains the -M magnitude question:** the `-M` benefit's size scales with how much of total wall-clock time is spent on eager DB loading — which scales with DB size. `sample_targeted` (50MB) has essentially no eager-load tax to eliminate (reading 50MB is milliseconds either way), so `-M` shows only noise-level differences (~1-4%, even reversed at T=1 for the patched build: 19.21s no-M vs 19.51s -M). This is the opposite end of the spectrum from `standard_8gb`'s ~4.5x. **Hypothesis for the rest of the sweep: the -M benefit should scale up further for `standard_16gb` and especially `pluspf_103gb` (111GB), since eager-load cost scales with file size.**
+
+At T=1, sample_targeted's ~19-20s wall time is *not* a loading artifact at all — the DB is tiny — it's genuine single-threaded classification compute time (355Mbp of reads scanned against a 6-genome reference takes that long serially). The dramatic drop to ~0.9-1.1s at 32T/96T is real parallelism benefit, unrelated to the -M question.
+
 ---
 
 ## Known gap — no backup of `compact_hash.cc`
