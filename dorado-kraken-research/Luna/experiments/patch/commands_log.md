@@ -452,6 +452,91 @@ sed -n '109,127p' ~/tools/kraken2-src-baseline/src/compact_hash.cc
 
 ---
 
+## Building baseline and patched binaries (commands 44-52)
+
+### 44
+```bash
+grep -n "MMK" ~/tools/kraken2-src-baseline/src/classify.cc
+```
+**Result:** `534: fprintf(...)`. Confirms 549 (patched tree) − 534 (stock) = 15 = exact size of the LRU cache struct inserted in command 10. Confirms baseline copy is a true unmodified original.
+
+### 45
+```bash
+sed -i '534s/fprintf/\/\/ fprintf/' ~/tools/kraken2-src-baseline/src/classify.cc
+```
+**Why:** apply the same fprintf fix to baseline so it's equal on both sides.
+**Result:** silent success.
+
+### 46
+```bash
+sed -n '530,536p' ~/tools/kraken2-src-baseline/src/classify.cc
+```
+**Result:** confirmed commented out correctly. Baseline tree fully ready: stock + fprintf fix only, no optimization patches.
+
+### 47
+```bash
+cd ~/tools/kraken2-src-baseline/src && make clean && make classify -j 96
+```
+**Result:** clean build, zero errors/warnings. Baseline `classify` binary built.
+
+### 48
+```bash
+cd ~/tools/kraken2-src/src && make clean && make classify -j 96
+```
+**Result:** clean build, zero errors/warnings — including with the new `-march=sapphirerapids -flto=auto -funroll-loops -fno-plt -fuse-linker-plugin` flags and all hand-edits. Patched `classify` binary built.
+
+### 49
+```bash
+ls -la ~/data/kraken2_db && ~/tools/kraken2-src/src/classify --help 2>&1 | head -20
+```
+**Result:** `~/data/kraken2_db` doesn't exist — the documented standard-8GB DB path is stale, same pattern as the Centrifuge session's missing ESKAPE databases.
+
+### 50
+```bash
+ls -la ~/data/ 2>&1 && echo --- && ls -la ~/AccuracyDrift/databases/ 2>&1
+```
+**Result:** `standard_8gb`, `standard_16gb`, `pluspf_103gb`, `sample_targeted` all still present under `~/AccuracyDrift/databases/`. `eskape_650mb`/`eskape_human_4gb` directories are entirely gone (not just their `.k2d` files), confirming the Centrifuge session's finding.
+
+### 51
+```bash
+ls -la ~/AccuracyDrift/databases/standard_8gb/
+```
+**Result:** `hash.k2d` (8,000,000,032 bytes), `taxo.k2d`, `opts.k2d` all present and correctly sized. This is the benchmark DB (replacing the stale `~/data/kraken2_db` path).
+
+### 52
+```bash
+~/tools/kraken2-src/src/classify 2>&1 | head -30
+```
+**Result:** usage message confirms `-H`, `-t`, `-o`, `-p`, `-R`, `-O`, `-M` flags all match the unrun script's assumptions.
+
+---
+
+## Major finding — `-M` (memory mapping) has never been used in this project
+
+### 53
+```bash
+grep -n "\-M\|use_memory_mapping\|MMapFile" ~/tools/kraken2-src/src/classify.cc | head -20
+```
+**Result:** `use_memory_mapping` defaults to `false` (line 135), only set `true` by `-M` (line 832), passed into the `CompactHashTable` constructor (line 154).
+
+### 54
+```bash
+cat ~/tools/kraken2/kraken2 | grep -n "classify\|-M"
+```
+**Result:** the `kraken2` wrapper only passes `-M` to `classify` `if $memory_mapping`.
+
+### 55
+```bash
+grep -n "memory_mapping" ~/tools/kraken2/kraken2
+```
+**Result:** `$memory_mapping` defaults to `0`, only set via an explicit `--memory-mapping` wrapper flag.
+
+**Finding:** every "standard profiling command" in this project's history (`kraken2 --db ... --threads 32 ...`, used for M1-M7, all of AccuracyDrift, the `4.405s` README figure) never included `--memory-mapping`. This means **`-M` was never passed to `classify`, and `MMapFile::OpenFile` — the function Patch 2 edits — has never executed in any measurement this project has ever taken.** The hash table is loaded via some other (non-mmap) path by default. Patch 3 (prefetch in `Get()`) and Patch 4 (LRU cache) are unaffected by this — they apply regardless of how `table_` was populated — but Patch 2's huge-page hints have been structurally inert this whole time.
+
+**Decision (CK):** benchmark both ways — once matching standard practice (no `-M`, comparable to all historical numbers; Patch 2 expected to show ~0% effect here, which is itself the reportable finding) and once with `-M` (to test Patch 2 on its own terms).
+
+---
+
 ## Known gap — no backup of `compact_hash.cc`
 
 Command 6's backup loop only covered the four files the patch file names (`Makefile`, `classify.cc`, `compact_hash.h`, `mmap_file.cc`). Command 24 discovered the real `Get()` implementation lives in `compact_hash.cc`, not `.h` — and that file was edited (commands 28-29) **without ever being backed up first**. There is no `compact_hash.cc.pre_opt_v1`.
