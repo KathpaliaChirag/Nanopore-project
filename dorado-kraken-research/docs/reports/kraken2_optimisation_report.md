@@ -3,21 +3,28 @@
 **Due:** 2026-05-31 (OVERDUE — see status note below)
 **Supervisor:** Kolin sir, Chayanika mam
 
-<!-- Status as of 2026-06-15:
+<!-- Status as of 2026-08-03:
      Sections 1-5, 7, 8, 9 are complete and verified.
-     Section 6 is UNFILLED — waiting on Luna pre-implementation measurements:
-       - Section 6.1 (M1-M7 measurements table): all 10 rows are TBD. Run Luna/experiments/pending_measurements.md M1-M7 first.
-       - Section 6.2 (per-patch benchmark table): all patch rows are TBD. No patches applied and measured yet.
-     Fill section 6 after running pending_measurements.md then run_kraken2_opt_v1.sh.
+     Section 6 is now FILLED — M1-M7 measurements complete (done 2026-06-24, values
+     were already known via AccuracyDrift/patches.md before this session), and
+     Patches 1-4 (the only patches actually implemented in kraken2_opt_v1.patch —
+     Patches 5-10 in Section 4 remain design-only proposals, never coded) have been
+     applied by hand and benchmarked across 4 databases x 3 thread counts x 2 builds
+     x 2 memory-mapping modes (48 cells). Full raw command-by-command log:
+     `Luna/experiments/patch/commands_log.md`. Two headline findings: the patch
+     applied cleanly required real structural adaptation (the live source tree had
+     drifted from what this report's Section 4 assumed — see 6.2), and an unplanned
+     but much larger finding (`-M`/memory-mapping, worth up to 12-14x on large DBs,
+     never used anywhere in this project before) surfaced during benchmarking — see 6.4.
 -->
 
 This report consolidates: (a) baseline profiling already completed on WSL2/Minerva/Luna,
 (b) source-derived correction of earlier inferred algorithms, (c) ten concrete
-optimisation proposals with code diffs, and (d) the pending Luna measurements that
-will calibrate each patch's expected delta. Supplementary files:
+optimisation proposals with code diffs, and (d) the Luna measurements that
+calibrated and then validated each patch's actual delta. Supplementary files:
 `kraken2_get_optimizations.md` (v1 patches), `kraken2_get_optimizations_v2.md`
 (v2 patches), `Luna/experiments/{kraken2_opt_v1.patch, run_kraken2_opt_v1.sh,
-pending_measurements.md}`, and `kraken2_execution_checklist.md`.
+pending_measurements.md, patch/commands_log.md}`, and `kraken2_execution_checklist.md`.
 
 ---
 
@@ -342,38 +349,72 @@ If patches stack independently (different bottlenecks) at midrange estimates:
 
 ---
 
-## 6. Results tables (to fill after Luna runs)
+## 6. Results tables
 
-### 6.1 M1–M7 measurements
+### 6.1 M1–M7 measurements (completed 2026-06-24, Luna; full detail in `AccuracyDrift/patches.md`)
 
 | ID | Metric | Value |
 |---|---|---|
-| M1 | cell size (32 / 40 bit) | TBD |
-| M1 | capacity | TBD |
-| M1 | load factor | TBD |
-| M2 | dTLB miss rate | TBD |
-| M3 | top miss line in Get() | TBD |
-| M4 | DRAM utilisation vs peak | TBD |
-| M5 | minimizer reuse rate | TBD |
-| M5 | top-16 K cumulative coverage | TBD |
-| M6 | c2c HITM share | TBD |
-| M7 | zmm / ymm / xmm count | TBD |
+| M1 | cell size | 32-bit for all official DBs (26+6 split for the small custom `sample_targeted`, 16+16 for `standard_8gb`/`16gb`/`pluspf_103gb`) |
+| M1 | load factor | ≈0.70 across every database (hardcoded in `kraken2-build`: `capacity = n_kmers / 0.70`) |
+| M1 | PF_STRIDE | 16 cells/cache-line for all DBs (4-byte cell); formula `64/sizeof(Cell)` confirmed correct |
+| M2 | dTLB miss rate (top-level, all loads) | 0.05–0.32% — but this is diluted by non-hash-table loads |
+| M2 | dTLB miss rate (hash-table accesses only, normalised) | ≈65% for `standard_8gb` — the real number Patch 2 targets |
+| M3 | top LLC-miss line (`perf record`) | kernel page-table-walker, 33–75% of misses depending on DB size (not `Get()` itself directly — see §2.5's causal-chain note) |
+| M3 | `CompactHashTable::Get()` direct LLC-miss share | 2.24% (sample_targeted) → 5.70% (8gb) → 7.75% (16gb) → 10.57% (pluspf_103gb) — **grows monotonically with DB size** |
+| M4 | DRAM bandwidth utilisation | 4.9–10.7% of peak across all DBs → **conclusively latency-bound, not bandwidth-bound** |
+| M5 | minimizer/k-mer reuse rate | 90.7% |
+| M6 | c2c HITM share | not run (low priority — only matters revisiting NUMA beyond 32T) |
+| M7 | AVX-512 / AVX2 / SSE instruction count | 0 / 0 / 1,308 — **zero vectorisation in the stock binary**, motivating Patch 3's `-march=sapphirerapids` |
 
-### 6.2 Per-patch benchmark
+### 6.2 Patch application — real deviations from what Section 4 assumed
 
-| Patch | wall (s) | Δ vs baseline | LLC-load-misses | dTLB-load-misses | IPC | report identical |
-|---|---:|---:|---:|---:|---:|:---:|
-| baseline (4.405 s) | 4.405 | 0 % | ~1.0 × 10⁹ | TBD | 1.47–1.65 | ✓ |
-| + Patch 3 (flags) | TBD | TBD | TBD | TBD | TBD | TBD |
-| + Patch 2 (huge pages) | TBD | TBD | TBD | TBD | TBD | TBD |
-| + Patch 1 (prefetch) | TBD | TBD | TBD | TBD | TBD | TBD |
-| + Patch 4 (LRU) | TBD | TBD | TBD | TBD | TBD | TBD |
-| + Patch 6 (devirt) | TBD | TBD | TBD | TBD | TBD | TBD |
-| + Patch 7 (single hash) | TBD | TBD | TBD | TBD | TBD | TBD |
-| + Patch 8 (ResolveTree) | TBD | TBD | TBD | TBD | TBD | TBD |
-| + Patch 9 (skip output) | TBD | TBD | TBD | TBD | TBD | TBD |
+Patches 1-4 (the only ones actually implemented — `kraken2_opt_v1.patch` never coded Patches 5-10, which remain design-only proposals in Section 4) were applied by hand on 2026-08-03, not via `git apply`/`run_kraken2_opt_v1.sh` as originally planned. The live source tree on Luna had drifted from what the patch (and this report's Section 2/4) assumed:
 
-Run via `Luna/experiments/run_kraken2_opt_v1.sh`; paste its SUMMARY block.
+- No `.git` in `~/tools/kraken2-src` — the apply script's `git apply`/`git reset --hard` approach would have failed outright.
+- `CompactHashTable` is **not a template class** in this source tree (`CompactHashTable::Get`, not `CompactHashTable<Cell>::Get`) — Section 2.5's `template<typename Cell>` signature and Patch 1's `sizeof(Cell)` don't apply as written. Adapted using `sizeof(*table_)`, an idiom already used elsewhere in `compact_hash.cc`.
+- The `Get()` implementation lives in `compact_hash.cc`, not `compact_hash.h` as the patch assumed.
+- The Makefile was missing `-fPIC -g` and had no `CFLAGS` line — Patch 3's hunk didn't apply cleanly; hand-edited instead. Also, this Makefile's link recipes never reference `$(LDFLAGS)`, so the patch's `LDFLAGS += -flto=auto -fuse-linker-plugin` would have been dead code — folded into `CXXFLAGS` instead, which this Makefile does reuse for linking.
+- A stray, unconditional `fprintf(stderr, "MMK %llu\n", ...)` debug print was found in the per-minimizer hot loop in `classify.cc` — likely leftover instrumentation from the M5 reuse-rate measurement above. Disabled (commented out, not deleted) before any benchmarking, since it would have added millions of syscalls per run and corrupted every timing number.
+
+Full command-by-command record, including every verification step and exact line numbers: `Luna/experiments/patch/commands_log.md`. None of these deviations blocked the patch — every edit was achievable by hand once the real structure was understood — but they mean the patch file was written against a different (older, or never-verified-current) version of the source tree than what's actually deployed.
+
+### 6.3 Benchmark — Patches 1+2+3+4 combined vs. baseline
+
+Not measured as an incremental per-patch ablation (Section 6.2's original template) — Patches 5-10 don't exist to layer in, and 1-4 were tested as the single combined unit `kraken2_opt_v1.patch` actually ships. Measured across 4 databases × 3 thread counts × 2 builds × 2 memory-mapping modes (48 cells, 1 warm-up + 3 timed `perf stat` runs each). Full per-cell data: `Luna/experiments/patch/commands_log.md`.
+
+**Patch effect (Δ wall time vs. baseline, same DB/threads/mode):**
+
+| DB | T=1, no -M | T=1, -M | T=32, no -M | T=32, -M | T=96, no -M | T=96, -M |
+|---|---|---|---|---|---|---|
+| sample_targeted (50MB) | +4% (worse) | +1.5% (worse) | ~0% | +4% | ~0% | +1% (worse) |
+| standard_8gb | **−5.2%** | **−6.4%** | ~0% | **−4.0%** | ~0% | ~0% |
+| standard_16gb | **−3.6%** | **−4.6%** | ~0% | **−2.4%** | ~0% | ~0% |
+| pluspf_103gb (111GB) | **−19.1%** | **−8.5%** | ~0% | **−4.9%** | ~0% | ~1.5% |
+
+**Two consistent patterns, all four DBs:**
+1. **The patch's benefit fades toward zero as thread count rises.** Patch 4's cache is `thread_local` — at high thread counts each thread sees only a small, less-repetitive shard of the read stream, diluting the cache's effective hit rate. Directly relevant to Thesis 1 (hardware-aware adaptive cache): a fixed thread-local cache size doesn't account for per-thread workload share shrinking as thread count grows.
+2. **The patch's benefit at T=1 grows with DB size** (~0% on the LLC-resident `sample_targeted` up to −19% on `pluspf_103gb`) — matches M3's finding that `Get()`'s LLC-miss share itself grows monotonically with DB size, giving Patch 3's prefetch more to work with.
+3. **On the smallest DB, the patch is mildly counterproductive** — the extra branch/cache-check overhead in the hot path isn't worth it when the DB already fits in LLC.
+
+Absolute example (`standard_8gb`, 32T, the historical reference config): baseline 4.446s → patched 4.439s with no `-M` (statistically noise); baseline 0.96s → patched 0.922s with `-M` (real, ~4%, zero overlap between the two ranges across 3 runs each).
+
+### 6.4 Unplanned finding — `-M` (memory-mapping) has a far larger effect than any patch, and was never used in this project
+
+Discovered while setting up the benchmark: `classify`'s `-M` flag (wired to the wrapper's `--memory-mapping`) defaults to **off** in every standard command this project has ever run (M1-M7, all of `AccuracyDrift`, this report's own `4.405s` baseline figure). Without it, the hash table is read eagerly into a heap buffer before classification starts; with it, `mmap()` is used and pages fault in lazily as classification actually touches them — the eager-load cost is absorbed into, and mostly hidden by, the classification phase itself.
+
+| DB | Size | `-M` savings @ T=32 | `-M` savings @ T=96 |
+|---|---|---|---|
+| sample_targeted | 50MB | ~4% | ~1.5% |
+| standard_8gb | 8GB | −78.0% | −73.1% |
+| standard_16gb | 16GB | −84.7% | −82.1% |
+| pluspf_103gb | 111GB | **−92.2%** | **−93.0%** |
+
+On `pluspf_103gb` at realistic thread counts, `-M` alone takes wall time from ~53s to ~4s — **more than a 12x speedup**, an order of magnitude larger than anything Patches 1-4 deliver, and the benefit scales up with DB size. **This is the single highest-leverage, lowest-effort finding in this report and should be adopted as the default invocation for any large-DB Kraken2 run in this project, independent of the patch itself.**
+
+### 6.5 Reconciliation with Section 5's projected 2.6s target
+
+Section 5 projected patches stacking to ~2.6s (a ~41% reduction from 4.405s) by summing independent per-patch estimates. That projection assumed all ten patches would be implemented and that classification time was the dominant cost to attack. Neither held: only Patches 1-4 were ever coded, and — as 6.4 shows — classification is only ~15% of wall time on `standard_8gb` without `-M`; the rest is DB-load time that no patch in Section 4 addresses (Patch 2 only touches the mmap path, which itself only activates with `-M`, an interaction Section 4 never anticipated since `-M` wasn't part of its plan). Patches 1-4 alone reach 4.439s (no `-M`, effectively the 4.405s baseline) or 0.922s (with `-M`, at 32T) — the latter beats the 2.6s target by a wide margin, but for a reason the projection never modelled.
 
 ---
 
