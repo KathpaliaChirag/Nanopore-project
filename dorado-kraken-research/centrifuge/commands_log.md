@@ -518,4 +518,24 @@ Report only shows 4 of the 6 ESKAPE taxids with nonzero reads (*P. aeruginosa*, 
 
 Removing *E. coli* didn't push those ~23K reads to unclassified — most got reassigned to *P. aeruginosa*/*K. pneumoniae* instead, since with 200 strain-diverse genomes available, Centrifuge finds a "good enough" alternative match rather than leaving the read unclassified. **These classification numbers are highly sensitive to reference composition, not just reference size** — worth remembering before treating any single accuracy number as definitive.
 
+### [4.5] Profiled run on eskape_200, 32T (matches Kraken2's eskape_650mb 32T baseline)
+```bash
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  ~/tools/centrifuge/centrifuge -p 32 \
+  -x ~/AccuracyDrift/databases/centrifuge_eskape_200/cf_base \
+  -U ~/results/basecalling/reads_hac.fastq \
+  -S /dev/null --report-file /dev/null
+```
+**Result:** Run three times, identical numbers each time (deterministic, not a fluke): 5.616-5.653s, cache-misses 21.90%, LLC miss 23.82%, IPC 1.46.
+
+| Metric | Kraken2 (`eskape_650mb`, 32T) | Centrifuge (`eskape_200`, 32T) |
+|---|---|---|
+| Wall time | 1.045s | 5.653s (~5.4x slower) |
+| LLC Miss Rate% | 30.53% | 23.82% (lower, but much smaller gap than small-scale) |
+| Cache Miss Rate% | 36.23% | 21.90% |
+| IPC | 1.37 | 1.46 (Centrifuge higher here) |
+
+**Pattern shift vs. the small-scale (sample_targeted) result:** cache-miss advantage shrinks from ~12x lower to only ~1.3x lower as the reference grows — a bigger FM-index is harder to keep cache-resident too. IPC flips from worse-than-Kraken2 (1.03 vs 1.65 at small scale) to better-than-Kraken2 (1.46 vs 1.37) at this scale. But the ~5.4x wall-time slowdown holds steady across both scales — reinforcing that the real bottleneck is threading/synchronization overhead, not cache behavior specifically, since that gap doesn't shrink even as the cache-miss gap does.
+
 ---
