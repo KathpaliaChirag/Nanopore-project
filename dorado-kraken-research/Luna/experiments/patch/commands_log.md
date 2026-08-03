@@ -664,6 +664,17 @@ for d in sample_targeted standard_16gb pluspf_103gb; do echo "=== $d ==="; ls -l
 
 At T=1, sample_targeted's ~19-20s wall time is *not* a loading artifact at all — the DB is tiny — it's genuine single-threaded classification compute time (355Mbp of reads scanned against a 6-genome reference takes that long serially). The dramatic drop to ~0.9-1.1s at 32T/96T is real parallelism benefit, unrelated to the -M question.
 
+### standard_8gb — baseline, 1T and 96T (command 64)
+
+| M-mode | Threads | Wall (avg of 3) | IPC | Cache-miss % | LLC-miss % |
+|---|---|---|---|---|---|
+| no -M | 1 | 16.48s | ~2.15 | ~77.1% | ~77.4% |
+| no -M | 96 | 4.76s | ~1.53 | ~86.3% | ~82.8% |
+| -M | 1 | 13.27s | ~2.43 | ~49.97% | ~48.5% |
+| -M | 96 | 1.28s | ~1.58 | ~74.4% | ~62.5% |
+
+**Confirms the model:** DB-load time is roughly fixed (~3.7s regardless of thread count — it's one sequential load operation), while classification time shrinks as threads increase. `-M`'s benefit = load_time / total_time, so it *grows* with thread count: only ~19.5% saved at T=1 (16.48s → 13.27s, since classification itself takes ~13-16s and dilutes the fixed load cost), but ~73% saved at T=96 (4.76s → 1.28s, since classification is fast enough that the fixed load cost dominates). This matches the ~78% saving already seen at T=32.
+
 ---
 
 ## Known gap — no backup of `compact_hash.cc`
