@@ -699,6 +699,21 @@ At T=1, sample_targeted's ~19-20s wall time is *not* a loading artifact at all �
 
 **standard_8gb sweep complete: all 3 threads × both builds × both M-modes (12 cells).**
 
+### standard_16gb — baseline (command 66)
+
+| M-mode | Threads | Wall (avg of 3) | IPC | Cache-miss % | LLC-miss % |
+|---|---|---|---|---|---|
+| no -M | 1 | 24.08s | ~1.84 | ~82.2% | ~80.8% |
+| no -M | 32 | 8.23s | ~1.65 | ~90.4% | ~85.0% |
+| no -M | 96 | 8.49s | ~1.36 | ~88.7% | ~84.9% |
+| -M | 1 | 17.71s | ~2.16 | ~52.6% | ~49.9% |
+| -M | 32 | 1.257s | ~1.84 | ~76.4% | ~60.4% |
+| -M | 96 | 1.517s | ~1.44 | ~75.1% | ~62.9% |
+
+**Sanity check:** 32T no-`-M` (8.23s) matches M2's own earlier independent measurement of 8.18s for this exact DB/thread config almost exactly.
+
+**Confirms DB-size scaling of the -M effect:** T=1 −26.5% (24.08s→17.71s), T=32 **−84.7%** (8.23s→1.26s), T=96 −82.1% (8.49s→1.52s) — all bigger than the equivalent `standard_8gb` numbers (−19.5%/−78%/−73%), consistent with `-M`'s benefit scaling with DB size at a given thread count.
+
 ---
 
 ## Known gap — no backup of `compact_hash.cc`
