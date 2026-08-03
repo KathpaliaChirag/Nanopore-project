@@ -626,6 +626,31 @@ Same DB/threads, `-M` added (added `dTLB-load-misses`/`dTLB-loads` to the event 
 
 ---
 
+## Full sweep — sample_targeted, standard_8gb, standard_16gb, pluspf_103gb × 1/32/96T × base/patched × no-M/-M
+
+CK requested expanding to the full matrix (command 61 onward). Per-cell methodology: 1 warm-up run + 3 timed `perf stat` runs, same event set and `numactl --cpunodebind=0 --membind=0` pinning as every prior measurement. Full raw output for each (DB, build) pair saved to `~/results/profiling/opt_v1_manual/sweep_<db>_<build>.txt` on Luna; averages tabulated here.
+
+### Pre-sweep check (command 61)
+```bash
+for d in sample_targeted standard_16gb pluspf_103gb; do echo "=== $d ==="; ls -la ~/AccuracyDrift/databases/$d/ 2>&1 | grep -E "hash.k2d|taxo.k2d|opts.k2d|^d|^total"; done
+```
+**Result:** all three confirmed to have `hash.k2d`/`taxo.k2d`/`opts.k2d` present and correctly sized (sample_targeted 51MB hash, standard_16gb 16GB hash, pluspf_103gb 111GB hash).
+
+### sample_targeted — baseline (command 62)
+
+| M-mode | Threads | Wall (avg of 3) | IPC | Cache-miss % | LLC-miss % |
+|---|---|---|---|---|---|
+| no -M | 1 | 20.01s | ~1.76 | ~10.1% | ~12.7% |
+| no -M | 32 | 0.947s | ~1.63 | ~16.7% | ~15.9% |
+| no -M | 96 | 1.10s | ~1.33 | ~19.0% | ~16.3% |
+| -M | 1 | 19.75s | ~1.78 | ~7.1% | ~10.0% |
+| -M | 32 | 0.907s | ~1.66 | ~15.1% | ~14.1% |
+| -M | 96 | 1.083s | ~1.35 | ~18.0% | ~15.2% |
+
+**Note:** unlike `standard_8gb`, `-M` barely matters here (~1-4% difference, not ~4.5x) — this DB is only 50MB, small enough that eager-loading vs. lazy-mmap-loading doesn't create a large wall-clock gap either way. Confirms the earlier `-M` finding was specific to large DBs where eager load time dominates.
+
+---
+
 ## Known gap — no backup of `compact_hash.cc`
 
 Command 6's backup loop only covered the four files the patch file names (`Makefile`, `classify.cc`, `compact_hash.h`, `mmap_file.cc`). Command 24 discovered the real `Get()` implementation lives in `compact_hash.cc`, not `.h` — and that file was edited (commands 28-29) **without ever being backed up first**. There is no `compact_hash.cc.pre_opt_v1`.
