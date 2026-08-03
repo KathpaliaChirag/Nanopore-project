@@ -536,6 +536,26 @@ time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instru
 | Cache Miss Rate% | 36.23% | 21.90% |
 | IPC | 1.37 | 1.46 (Centrifuge higher here) |
 
-**Pattern shift vs. the small-scale (sample_targeted) result:** cache-miss advantage shrinks from ~12x lower to only ~1.3x lower as the reference grows — a bigger FM-index is harder to keep cache-resident too. IPC flips from worse-than-Kraken2 (1.03 vs 1.65 at small scale) to better-than-Kraken2 (1.46 vs 1.37) at this scale. But the ~5.4x wall-time slowdown holds steady across both scales — reinforcing that the real bottleneck is threading/synchronization overhead, not cache behavior specifically, since that gap doesn't shrink even as the cache-miss gap does.
+**Pattern shift vs. the small-scale (sample_targeted) result:** cache-miss advantage shrinks from ~12x lower to only ~1.3x lower as the reference grows — a bigger FM-index is harder to keep cache-resident too. IPC flips from worse-than-Kraken2 (1.03 vs 1.65 at small scale) to better-than-Kraken2 (1.46 vs 1.37) at this scale.
+
+### [4.6] Profiled run on eskape_200, 1T — corrects the earlier thread-contention theory
+```bash
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  ~/tools/centrifuge/centrifuge -p 1 \
+  -x ~/AccuracyDrift/databases/centrifuge_eskape_200/cf_base \
+  -U ~/results/basecalling/reads_hac.fastq \
+  -S /dev/null --report-file /dev/null
+```
+**Result:**
+
+| Metric | Kraken2 (`eskape_650mb`, 1T) | Centrifuge (`eskape_200`, 1T) | Kraken2 (32T) | Centrifuge (32T) |
+|---|---|---|---|---|
+| Wall time | 21.981s | 134.460s | 1.045s | 5.653s |
+| LLC Miss Rate% | 30.70% | 25.21% | 30.53% | 23.82% |
+| Cache Miss Rate% | 34.21% | 22.97% | 36.23% | 21.90% |
+| IPC | 1.47 | 1.57 | 1.37 | 1.46 |
+| Speedup (1T→32T) | 21.03x | **23.79x** | — | — |
+
+**Correction to [4.3]'s conclusion:** at this bigger scale, Centrifuge's speedup (23.79x) actually *exceeds* Kraken2's (21.03x) — the opposite of the sample_targeted result (9.47x vs 21.26x, where Centrifuge scaled much worse). So the "thread contention" theory from [4.3] does not hold universally — it's not a fundamental property of Centrifuge's threading model. More likely explanation: at the tiny 6-genome `sample_targeted` scale, there's so little actual classification work that fixed per-run overhead (index load, thread spawn/teardown for 32 threads) eats a disproportionate share of total time, artificially depressing the apparent speedup — not real lock contention. At a realistic reference size, Centrifuge's threading scales at least as well as Kraken2's. The ~5-6x wall-time gap (both thread counts, both scales) remains real and unexplained by cache misses alone — worth deeper investigation (e.g. `perf record --call-graph dwarf`) as genuine follow-up work, not something this session resolved.
 
 ---
