@@ -587,6 +587,23 @@ Same DB/threads/perf-events, `$BIN` pointed at the patched tree instead (Patches
 
 ---
 
+## Benchmark: baseline, WITH -M (command 59) — major independent finding
+
+Same DB/threads, `-M` added (added `dTLB-load-misses`/`dTLB-loads` to the event list too, since huge pages are a TLB-pressure fix per M2's original reasoning).
+
+| Run | Wall time | Cache-miss % | LLC-load-miss % | dTLB-miss % | Instructions | Cycles | IPC |
+|---|---|---|---|---|---|---|---|
+| 1 | 0.949s | 75.05% | 60.04% | 0.05% | 102.22B | 50.41B | 2.03 |
+| 2 | 0.984s | 75.40% | 60.14% | 0.05% | 102.47B | 52.09B | 1.97 |
+| 3 | 0.944s | 75.76% | 60.80% | 0.05% | 102.06B | 49.67B | 2.05 |
+| **avg** | **~0.96s** | **~75.4%** | **~60.3%** | **0.05%** | **~102.25B** | **~50.7B** | **~2.02** |
+
+**Major finding, independent of the patch itself:** `-M` alone (baseline binary, zero optimization patches) drops wall time from ~4.45s (no `-M`) to **~0.96s — a ~4.5x speedup**, just from switching the hash-table load mechanism. Explanation: without `-M`, `classify` reads the whole 8GB file into a heap buffer eagerly, paying the full load cost up front (the ~3.7s inferred earlier). With `-M`, `mmap()` is used and pages fault in lazily as classification actually touches them — the "load" cost gets absorbed into and mostly hidden by the classification phase itself. LLC-load-miss rate drops from ~83% to ~60%, IPC rises from ~1.87 to ~2.02, despite doing the same classification work.
+
+**Implication:** this project's standard invocation (`kraken2 --db ... --threads N ...`, no `--memory-mapping`) has never used this ~4.5x lever, on top of and separate from anything in `kraken2_opt_v1.patch`. Worth flagging to Kolin sir as its own finding regardless of how the patch itself performs.
+
+---
+
 ## Known gap — no backup of `compact_hash.cc`
 
 Command 6's backup loop only covered the four files the patch file names (`Makefile`, `classify.cc`, `compact_hash.h`, `mmap_file.cc`). Command 24 discovered the real `Get()` implementation lives in `compact_hash.cc`, not `.h` — and that file was edited (commands 28-29) **without ever being backed up first**. There is no `compact_hash.cc.pre_opt_v1`.
