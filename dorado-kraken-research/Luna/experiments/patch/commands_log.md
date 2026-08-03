@@ -331,14 +331,91 @@ sed -n '109,133p' ~/tools/kraken2-src/src/compact_hash.cc
 
 ---
 
-### 31 (in progress)
+### 31
 ```bash
 grep -n "mmap\|MAP_FAILED\|valid_ = true" ~/tools/kraken2-src/src/mmap_file.cc
 ```
 **Why:** locate the real `mmap()` call and `valid_ = true;` line in `mmap_file.cc` for Patch 2 (huge-page `madvise()` hints), rather than trusting the patch's stated line ~52 given everything found so far.
-**Result:** pending.
+**Result:** `57: mmap(...)`, `58: if (fptr_ == MAP_FAILED) {`, `61: valid_ = true;` — matches the patch's assumed structure almost exactly, unlike everything else so far.
 
 ---
+
+### 32
+```bash
+sed -n '54,62p' ~/tools/kraken2-src/src/mmap_file.cc
+```
+**Why:** confirm full context before inserting.
+**Result:** confirmed clean match to patch's assumption — `mmap()` → `if (MAP_FAILED) { err(...); }` → `valid_ = true;`.
+
+---
+
+### 33
+```bash
+cat > /tmp/mmap_insert1.txt <<'EOF'
+  // Hints: try 2 MB pages (cuts DTLB pressure on the 8 GB hash table),
+  // start populating now (avoid first-touch faults in hot path),
+  // skip kernel readahead (access is random not sequential).
+  (void) madvise(fptr_, filesize_, MADV_HUGEPAGE);
+  (void) madvise(fptr_, filesize_, MADV_WILLNEED);
+  (void) madvise(fptr_, filesize_, MADV_RANDOM);
+EOF
+```
+**Why:** stage the three madvise() hints (Patch 2).
+**Result:** staged successfully.
+
+---
+
+### 34
+```bash
+sed -i '60r /tmp/mmap_insert1.txt' ~/tools/kraken2-src/src/mmap_file.cc
+```
+**Why:** insert after line 60 (closing brace of the MAP_FAILED check), before `valid_ = true;`.
+**Result:** silent success.
+
+---
+
+### 35
+```bash
+sed -n '54,67p' ~/tools/kraken2-src/src/mmap_file.cc
+```
+**Why:** verify.
+**Result:** confirmed correct — three madvise() calls sit between the MAP_FAILED check and `valid_ = true;`. **Patch 2 complete. All three source-file edits (Patch 2, 3, 4) done.**
+
+---
+
+### 36
+```bash
+grep -n "CXXFLAGS\|CXX =" ~/tools/kraken2-src/src/Makefile
+```
+**Why:** confirm Makefile line numbers before editing (file untouched since command 4's `cat`).
+**Result:** `1: CXX = g++`, `3: CXXFLAGS =$(KRAKEN2_SKIP_FOPENMP)...`, `4: CXXFLAGS += -DLINEAR_PROBING` — matches earlier full-file `cat`. Also noticed all six link recipes (lines 37-52) use `$(CXX) $(CXXFLAGS) -o $@ $^` and **never reference `$(LDFLAGS)`**.
+**Finding:** the patch's `LDFLAGS += -flto=auto -fuse-linker-plugin` would be dead code in this Makefile — nothing reads `$(LDFLAGS)`. Since `$(CXXFLAGS)` is reused for linking here, folded the LTO/linker flags directly into `CXXFLAGS` instead.
+
+---
+
+### 37
+```bash
+sed -i '3s/.*/CXXFLAGS = $(KRAKEN2_SKIP_FOPENMP) -Wall -std=c++11 -O3 -march=sapphirerapids -mtune=sapphirerapids -flto=auto -funroll-loops -fno-plt -fuse-linker-plugin/' ~/tools/kraken2-src/src/Makefile
+```
+**Why:** replace line 3 wholesale with the augmented flags (all folded into CXXFLAGS, no separate LDFLAGS).
+**Result:** silent success.
+
+---
+
+### 38
+```bash
+cat ~/tools/kraken2-src/src/Makefile | head -6
+```
+**Why:** verify.
+**Result:** confirmed — `CXXFLAGS` now includes `-march=sapphirerapids -mtune=sapphirerapids -flto=auto -funroll-loops -fno-plt -fuse-linker-plugin`, `CXXFLAGS += -DLINEAR_PROBING` untouched. **Patch 1 complete. All four patches now applied.**
+
+---
+
+## Known gap — no backup of `compact_hash.cc`
+
+Command 6's backup loop only covered the four files the patch file names (`Makefile`, `classify.cc`, `compact_hash.h`, `mmap_file.cc`). Command 24 discovered the real `Get()` implementation lives in `compact_hash.cc`, not `.h` — and that file was edited (commands 28-29) **without ever being backed up first**. There is no `compact_hash.cc.pre_opt_v1`.
+
+Recovery path if needed: the exact insertions are fully documented in commands 27-30 above (two blocks, at the same two insertion points, fully reproducible from this log) — reversible by deleting the specific added lines, just without a byte-exact backup file to fall back on. Not blocking, but a real process gap worth naming rather than glossing over.
 
 ## Deviations from the patch file found so far
 
@@ -347,5 +424,7 @@ grep -n "mmap\|MAP_FAILED\|valid_ = true" ~/tools/kraken2-src/src/mmap_file.cc
 3. **Makefile drift**: missing `-fPIC -g`, no `CFLAGS` line, `CXX =` instead of `CXX ?=` — patch's Makefile hunk will not apply via `git apply`/`patch`, requires hand-editing.
 4. **Stray debug instrumentation**: unconditional `fprintf(stderr, "MMK ...)` in the per-minimizer hot loop in `classify.cc`, unrelated to the patch, likely leftover from the M5 k-mer-reuse measurement. Disabled (commented out) before any benchmarking.
 5. **`CompactHashTable` is not a template class** in this source tree — the patch's Patch 3 code (`sizeof(Cell)`) assumes a `template <typename Cell>` class that doesn't exist here. Adapted using `sizeof(*table_)` instead, matching an idiom already used elsewhere in `compact_hash.cc`.
+6. **Patch's `LDFLAGS += ...` would be dead code**: this Makefile's link recipes use `$(CXX) $(CXXFLAGS) -o $@ $^` and never reference `$(LDFLAGS)`. Folded the LTO/linker flags into `CXXFLAGS` instead.
+7. **`compact_hash.cc` was never backed up** before editing — only the four files the patch names were backed up in command 6; the real edit target turned out to be a fifth file. No `.pre_opt_v1` exists for it; see "Known gap" above.
 
 None of these are patch-blocking — every edit has been achievable by hand once the real structure is understood — but they mean **this patch file was written against a different, either older or hypothetical version of the source tree than what's actually deployed on Luna.** Worth mentioning to Kolin sir alongside the eventual benchmark results.
