@@ -580,4 +580,38 @@ time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instru
 
 **Correction to [4.3]'s conclusion:** at this bigger scale, Centrifuge's speedup (23.79x) actually *exceeds* Kraken2's (21.03x) — the opposite of the sample_targeted result (9.47x vs 21.26x, where Centrifuge scaled much worse). So the "thread contention" theory from [4.3] does not hold universally — it's not a fundamental property of Centrifuge's threading model. More likely explanation: at the tiny 6-genome `sample_targeted` scale, there's so little actual classification work that fixed per-run overhead (index load, thread spawn/teardown for 32 threads) eats a disproportionate share of total time, artificially depressing the apparent speedup — not real lock contention. At a realistic reference size, Centrifuge's threading scales at least as well as Kraken2's. The ~5-6x wall-time gap (both thread counts, both scales) remains real and unexplained by cache misses alone — worth deeper investigation (e.g. `perf record --call-graph dwarf`) as genuine follow-up work, not something this session resolved.
 
+### [4.7] 96T on eskape_200 — same collapse, confirms it's a real Centrifuge threading limit
+**Why:** check whether the 96T collapse on sample_targeted was specific to that tiny index, or a general Centrifuge behavior.
+```bash
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  ~/tools/centrifuge/centrifuge -p 96 \
+  -x ~/AccuracyDrift/databases/centrifuge_eskape_200/cf_base \
+  -U ~/results/basecalling/reads_hac.fastq \
+  -S /dev/null --report-file /dev/null
+```
+**Result:**
+
+| Metric | 1T | 32T | 96T |
+|---|---|---|---|
+| Wall time | 134.460s | 5.653s | **16.355s** |
+| IPC | 1.57 | 1.46 | **0.31** |
+| Cache Miss Rate% | 22.97% | 21.90% | 20.97% |
+| LLC Miss Rate% | 25.21% | 23.82% | 22.93% |
+| Speedup vs 1T | 1.00x | 23.79x | **8.22x (worse than 32T!)** |
+
+**Confirms the collapse is a real, general Centrifuge behavior, not a small-index artifact.** Both scales show the exact same pattern: strong scaling up to 32T, then severe regression at 96T (speedup roughly halves-to-thirds from its 32T peak). Luna has exactly 96 physical cores — 96T isn't oversubscribing hardware the way requesting more than 192 logical threads would — so this looks like a genuine limitation in Centrifuge's own threading implementation past ~32 threads, not a Luna-specific hardware quirk. Kraken2, by contrast, barely regresses at 96T on either database (0.928s→1.105s on sample_targeted; similarly mild on eskape_650mb).
+
+**Consolidated 3-point comparison, both DBs, Kraken2 vs Centrifuge:**
+
+| | Kraken2 sample_targeted | Centrifuge sample_targeted | Kraken2 eskape_650mb/200 | Centrifuge eskape_200 |
+|---|---|---|---|---|
+| 1T | 19.729s | 48.461s | 21.981s | 134.460s |
+| 32T | 0.928s | 5.115s | 1.045s | 5.653s |
+| 96T | 1.105s | 19.682s | 1.164s | 16.355s |
+| 1T→32T speedup | 21.26x | 9.47x | 21.03x | 23.79x |
+| 1T→96T speedup | 17.85x | 2.46x | 18.88x | 8.22x |
+
+**Bottom line for Week 1:** Kraken2's speedup is roughly stable from 32T to 96T (mild regression, expected — more threads than needed for the workload). Centrifuge's speedup **collapses** at 96T on both databases — real, reproducible, and the single most actionable finding from this profiling pass. Worth flagging to Kolin sir directly: Centrifuge should not be run at 96T on Luna; its effective thread ceiling for this workload appears to be well below the machine's full core count.
+
 ---
