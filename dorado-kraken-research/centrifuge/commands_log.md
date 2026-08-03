@@ -490,6 +490,28 @@ time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instru
 
 **Real finding, not a fluke:** Centrifuge's lower cache-miss rate holds at both thread counts, ruling out a one-off measurement. But Centrifuge scales far worse with threads — at 1T it's actually *more* IPC-efficient than Kraken2 (2.63 vs 1.78), yet scaling to 32T collapses its IPC to 1.03 while Kraken2 barely drops (1.78→1.65). Kraken2 gets near-ideal 32x speedup (21.26x); Centrifuge only gets 9.47x. **Conclusion: Centrifuge's bottleneck isn't cache misses at all — it's thread contention/synchronization overhead on its FM-index structure that worsens with more threads, unlike Kraken2's classic memory-latency-bound behavior.** This is new, substantive data for the project (first-ever Centrifuge profiling here), not previously published anywhere per the Week 1 plan's own literature review.
 
+### [4.3b] 96T on sample_targeted — severe over-threading collapse
+**Why:** CK requested a 1T/32T/96T sweep across all available databases.
+```bash
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  ~/tools/centrifuge/centrifuge -p 96 \
+  -x ~/AccuracyDrift/databases/centrifuge_sample_targeted/cf_base \
+  -U ~/results/basecalling/reads_hac.fastq \
+  -S /dev/null --report-file /dev/null
+```
+**Result:**
+
+| Metric | 1T | 32T | 96T |
+|---|---|---|---|
+| Wall time | 48.461s | 5.115s | **19.682s** |
+| IPC | 2.63 | 1.03 | **0.22** |
+| Cache Miss Rate% | 0.58% | 0.88% | 0.72% |
+| LLC Miss Rate% | 0.71% | 1.21% | 0.73% |
+| Speedup vs 1T | 1.00x | 9.47x | **2.46x (worse than 32T!)** |
+
+Compare Kraken2 at 96T on this same DB: 1.105s (barely worse than its 0.928s at 32T), IPC 1.34. **Centrifuge goes from ~5.5x slower than Kraken2 at 32T to ~18x slower at 96T** — a severe regression, not a mild one. Cycles ballooned ~10x from 32T to 96T while instructions only ~2x'd, causing the IPC collapse. Read as **thread oversubscription**: 96 threads is far more parallelism than a 6-genome workload has real work to hand out, so most time goes to scheduling/synchronization overhead rather than classification. Consistent with (and extends) the small-scale-overhead theory from [4.6] — at tiny reference scale, Centrifuge's threading doesn't just fail to help past a point, it actively hurts.
+
 ---
 
 ## Mid-scale (200-genome) classification run
