@@ -604,6 +604,28 @@ Same DB/threads, `-M` added (added `dTLB-load-misses`/`dTLB-loads` to the event 
 
 ---
 
+## Benchmark: patched, WITH -M (command 60) — closes out the standard_8gb / 32T picture
+
+| Run | Wall time | LLC-load-miss % | dTLB-miss % | Instructions | Cycles | IPC |
+|---|---|---|---|---|---|---|
+| 1 | 0.930s | 56.90% | 0.06% | 93.80B | 48.03B | 1.95 |
+| 2 | 0.923s | 57.58% | 0.06% | 93.82B | 48.17B | 1.95 |
+| 3 | 0.912s | 57.58% | 0.06% | 93.70B | 47.56B | 1.97 |
+| **avg** | **~0.922s** | **~57.4%** | **0.06%** | **~93.77B** | **~47.9B** | **~1.96** |
+
+## All four corners — standard_8gb, 32 threads
+
+| Build | -M? | Wall time | vs. baseline no-M |
+|---|---|---|---|
+| Baseline | no | ~4.446s | — |
+| Patched | no | ~4.439s | −0.16% (noise) |
+| Baseline | yes | ~0.96s | **−78.4%** (the `-M` lever alone) |
+| Patched | yes | **~0.922s** | **−79.3%** (patches add ~4% more on top of `-M`, non-overlapping ranges: patched 0.912-0.930s vs baseline-M 0.944-0.984s) |
+
+**Full picture for this DB/thread-count:** the patch does nothing measurable without `-M` (classification is too small a fraction of wall time), but with `-M` engaged — where classification is no longer swamped by eager DB loading — the patch's ~4% wall-time improvement becomes real and reproducible (zero overlap between the two ranges), backed by ~8% fewer instructions and ~5.5% fewer cycles. dTLB-miss rate is unchanged (0.05% → 0.06%) — Patch 2's huge-page hint isn't showing up at this aggregate level, consistent with M2's own caveat that this ratio is diluted by non-hash-table loads.
+
+---
+
 ## Known gap — no backup of `compact_hash.cc`
 
 Command 6's backup loop only covered the four files the patch file names (`Makefile`, `classify.cc`, `compact_hash.h`, `mmap_file.cc`). Command 24 discovered the real `Get()` implementation lives in `compact_hash.cc`, not `.h` — and that file was edited (commands 28-29) **without ever being backed up first**. There is no `compact_hash.cc.pre_opt_v1`.
