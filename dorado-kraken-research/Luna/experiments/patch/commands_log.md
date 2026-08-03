@@ -411,6 +411,47 @@ cat ~/tools/kraken2-src/src/Makefile | head -6
 
 ---
 
+## Baseline reconstruction (commands 39-43)
+
+CK chose the "duplicate tree, reconstruct clean baseline" option: rather than disturb the now-fully-patched live tree, duplicate it and reconstruct a fair "stock + fprintf fix only" baseline in the copy, since building baseline straight from the raw `.pre_opt_v1` backups would unfairly include the fprintf bug (inflating the apparent patch benefit).
+
+### 39
+```bash
+cp -r ~/tools/kraken2-src ~/tools/kraken2-src-baseline
+```
+**Why:** duplicate the whole source tree so baseline reconstruction never touches the validated patched tree.
+**Result:** silent success.
+
+### 40
+```bash
+cp ~/tools/kraken2-src-baseline/src/Makefile.pre_opt_v1 ~/tools/kraken2-src-baseline/src/Makefile && cp ~/tools/kraken2-src-baseline/src/classify.cc.pre_opt_v1 ~/tools/kraken2-src-baseline/src/classify.cc && cp ~/tools/kraken2-src-baseline/src/mmap_file.cc.pre_opt_v1 ~/tools/kraken2-src-baseline/src/mmap_file.cc
+```
+**Why:** restore the 3 backed-up files in the baseline copy only (undoes Patch 1, 2, 4 there). `classify.cc` temporarily has the raw uncommented fprintf bug again at this point.
+**Result:** silent success.
+
+### 41
+```bash
+grep -n "PF_STRIDE\|pf_idx\|while (true)" ~/tools/kraken2-src-baseline/src/compact_hash.cc
+```
+**Why:** confirm exact line numbers before reversing the (unbacked-up) Patch 3 insertion in the baseline copy.
+**Result:** `117: PF_STRIDE`, `118: while (true) {`, `119-121: pf_idx block`, `143: while (true) {` (unrelated — that's `FindIndex()`). Matches command 30 exactly, confirming `cp -r` was byte-faithful.
+
+### 42
+```bash
+sed -i '119,122d' ~/tools/kraken2-src-baseline/src/compact_hash.cc && sed -i '115,117d' ~/tools/kraken2-src-baseline/src/compact_hash.cc
+```
+**Why:** delete the two inserted blocks (higher range first) to reconstruct stock `Get()` in the baseline copy.
+**Result:** silent success.
+
+### 43
+```bash
+sed -n '109,127p' ~/tools/kraken2-src-baseline/src/compact_hash.cc
+```
+**Why:** verify the reconstruction is byte-for-byte correct.
+**Result:** confirmed — matches the original stock `Get()` from command 25 exactly. Baseline `compact_hash.cc` correctly reconstructed.
+
+---
+
 ## Known gap — no backup of `compact_hash.cc`
 
 Command 6's backup loop only covered the four files the patch file names (`Makefile`, `classify.cc`, `compact_hash.h`, `mmap_file.cc`). Command 24 discovered the real `Get()` implementation lives in `compact_hash.cc`, not `.h` — and that file was edited (commands 28-29) **without ever being backed up first**. There is no `compact_hash.cc.pre_opt_v1`.
