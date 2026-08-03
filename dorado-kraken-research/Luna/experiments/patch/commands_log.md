@@ -755,6 +755,61 @@ At T=1, sample_targeted's ~19-20s wall time is *not* a loading artifact at all �
 
 **The single biggest finding of this entire sweep:** at 32T and 96T, `-M` takes this DB from **~53s down to ~4s — a 92-93% reduction, more than a 12x speedup** — dwarfing anything Patches 1/3/4 combined could plausibly deliver. At T=1 the effect is smaller in relative terms (−55.3%) but still enormous in absolute terms (110.8s → 49.5s). This confirms the DB-size scaling trend across all four databases tested (50MB: ~0%, 8GB: ~78-84%, 16GB: ~85%, 111GB: ~92-93%) and makes `--memory-mapping` unambiguously the highest-leverage, lowest-effort change available for any large-DB Kraken2 deployment in this project — independent of, and far larger than, the optimization patch itself.
 
+### pluspf_103gb — patched (command 69)
+
+| M-mode | Threads | Wall (avg of 3) | IPC |
+|---|---|---|---|
+| no -M | 1 | 89.62s | ~1.05 |
+| no -M | 32 | 53.42s | ~1.01 |
+| no -M | 96 | 53.14s | ~0.90 |
+| -M | 1 | 45.30s | ~1.12 |
+| -M | 32 | 3.97s | ~1.00 |
+| -M | 96 | 3.66s | ~0.80 |
+
+### pluspf_103gb — full comparison
+
+| Threads | M-mode | Baseline | Patched | Delta |
+|---|---|---|---|---|
+| 1 | no -M | 110.8s | 89.62s | **−19.1%** |
+| 1 | -M | 49.5s | 45.30s | **−8.5%** |
+| 32 | no -M | 53.47s | 53.42s | ~0% |
+| 32 | -M | 4.173s | 3.97s | −4.9% |
+| 96 | no -M | 53.24s | 53.14s | ~0% |
+| 96 | -M | 3.717s | 3.66s | −1.5% |
+
+**Biggest real patch effect anywhere in the sweep, at T=1 on this DB (−19.1% no-M, −8.5% -M).** Consistent with two things compounding: (1) M1/M3's finding that `Get()`'s share of LLC misses grows monotonically with DB size (2.24%→5.70%→7.75%→10.57% across sample_targeted/8gb/16gb/pluspf), so Patch 3's prefetch has the most raw material to work with here; (2) at T=1, Patch 4's thread-local cache sees the entire workload undiluted (per the thread-dilution theory from the standard_8gb section). Same fade-with-thread-count shape as every other DB, though — by 96T the patch effect is back down to ~0-1.5%.
+
+**Full 48-cell sweep complete: 4 DBs × 3 threads × 2 builds × 2 M-modes.**
+
+---
+
+## MASTER SUMMARY — all 4 DBs, all thread counts, both M-modes
+
+### The -M finding (independent of the patch) — scales with DB size
+
+| DB | Size | -M savings @ T=1 | -M savings @ T=32 | -M savings @ T=96 |
+|---|---|---|---|---|
+| sample_targeted | 50MB | ~1% (noise) | ~4% | ~1.5% |
+| standard_8gb | 8GB | −19.5% | −78.0% | −73.1% |
+| standard_16gb | 16GB | −26.5% | −84.7% | −82.1% |
+| pluspf_103gb | 111GB | −55.3% | **−92.2%** | **−93.0%** |
+
+**This project has never used `--memory-mapping` in any standard measurement. On large databases at realistic thread counts (32-96T), it is worth up to a 12-14x speedup — an order of magnitude larger than anything the optimization patch itself delivers. This is the single highest-leverage, lowest-effort finding of the whole session and should be the first thing mentioned to Kolin sir, independent of how the patch discussion goes.**
+
+### The patch's effect (Patches 1+3+4 combined, Patch 2 only active when -M is used) — fades with thread count, grows with DB size at T=1
+
+| DB | T=1, no-M | T=1, -M | T=32, no-M | T=32, -M | T=96, no-M | T=96, -M |
+|---|---|---|---|---|---|---|
+| sample_targeted | ~+4% (worse) | ~+1.5% (worse) | ~0% | ~+4% | ~0% | ~+1% (worse) |
+| standard_8gb | **−5.2%** | **−6.4%** | ~0% | **−4.0%** | ~0% | ~0% |
+| standard_16gb | **−3.6%** | **−4.6%** | ~0% | **−2.4%** | ~0% | ~0% |
+| pluspf_103gb | **−19.1%** | **−8.5%** | ~0% | **−4.9%** | ~0% | ~1.5% |
+
+**Two consistent patterns across every DB tested:**
+1. **The patch's benefit fades toward zero as thread count rises**, on every single DB. Working theory: Patch 4's cache is `thread_local`, so at high thread counts each thread only sees a small, less-repetitive shard of the workload, reducing the cache's effective hit rate. This is directly relevant to Thesis 1 (hardware-aware adaptive cache) — a fixed thread-local cache size doesn't account for how per-thread workload share shrinks as thread count grows.
+2. **The patch's benefit at T=1 grows with DB size** (~0% on the tiny DB that fits in LLC, up to −19% on the 111GB DB) — consistent with `Get()`'s LLC-miss share growing with DB size (M1/M3), giving Patch 3's prefetch more to work with.
+3. **On the smallest DB (sample_targeted), the patch is actually slightly counterproductive** — the extra branch/cache-check overhead in the hot path isn't worth it when the DB already fits in LLC and there's little to prefetch or cache.
+
 ---
 
 ## Known gap — no backup of `compact_hash.cc`
