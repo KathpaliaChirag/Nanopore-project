@@ -537,6 +537,27 @@ grep -n "memory_mapping" ~/tools/kraken2/kraken2
 
 ---
 
+## Benchmark: baseline, no -M (command 57)
+
+```bash
+BIN=~/tools/kraken2-src-baseline/src/classify
+DB=~/AccuracyDrift/databases/standard_8gb
+IN=~/results/basecalling/reads_hac.fastq
+# 3 warm-up runs, then 3 timed runs with perf stat + /usr/bin/time
+```
+Full command and output saved to `~/results/profiling/opt_v1_manual/base_noM.txt` on Luna.
+
+| Run | Wall time | Cache-miss % | LLC-load-miss % | IPC |
+|---|---|---|---|---|
+| 1 | 4.435s | 88.19% | 83.09% | 1.88 |
+| 2 | 4.432s | 88.29% | 83.05% | 1.88 |
+| 3 | 4.472s | 88.15% | 83.11% | 1.85 |
+| **avg** | **~4.446s** | **~88.2%** | **~83.1%** | **~1.87** |
+
+**Sanity check — matches project history:** wall time within ~1% of the documented `4.405s` baseline (README.md), IPC matches M2's own `1.85` figure for this exact DB/thread config almost exactly. Confirms the baseline reconstruction (stock source + fprintf fix only) is faithful, not skewed by our process.
+
+---
+
 ## Known gap — no backup of `compact_hash.cc`
 
 Command 6's backup loop only covered the four files the patch file names (`Makefile`, `classify.cc`, `compact_hash.h`, `mmap_file.cc`). Command 24 discovered the real `Get()` implementation lives in `compact_hash.cc`, not `.h` — and that file was edited (commands 28-29) **without ever being backed up first**. There is no `compact_hash.cc.pre_opt_v1`.
