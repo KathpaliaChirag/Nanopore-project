@@ -740,6 +740,21 @@ At T=1, sample_targeted's ~19-20s wall time is *not* a loading artifact at all �
 
 **standard_16gb sweep complete (12 cells).**
 
+### pluspf_103gb — baseline (command 68) — the biggest -M finding of the sweep
+
+| M-mode | Threads | Wall (avg of 3) | IPC | Cache-miss % | LLC-miss % |
+|---|---|---|---|---|---|
+| no -M | 1 | ~110.8s (119.4/109.5/103.5 — real variance, likely 111GB working-set I/O pressure) | ~1.08 | ~86.9% | ~81.9% |
+| no -M | 32 | 53.47s | ~1.01 | ~94.2% | ~90.7% |
+| no -M | 96 | 53.24s | ~0.92 | ~93.9% | ~90.5% |
+| -M | 1 | 49.5s | ~1.08 | ~68.4% | ~67.9% |
+| -M | 32 | 4.173s | ~1.01 | ~78.5% | ~66.4% |
+| -M | 96 | 3.717s | ~0.83 | ~77.2% | ~65.8% |
+
+**Sanity check:** 32T no-`-M` (53.47s) is in the same ballpark as M4's earlier 57.56s for this exact DB/thread config (small difference likely run-to-run/page-cache-state variance, unsurprising given the noise seen at T=1 for this DB).
+
+**The single biggest finding of this entire sweep:** at 32T and 96T, `-M` takes this DB from **~53s down to ~4s — a 92-93% reduction, more than a 12x speedup** — dwarfing anything Patches 1/3/4 combined could plausibly deliver. At T=1 the effect is smaller in relative terms (−55.3%) but still enormous in absolute terms (110.8s → 49.5s). This confirms the DB-size scaling trend across all four databases tested (50MB: ~0%, 8GB: ~78-84%, 16GB: ~85%, 111GB: ~92-93%) and makes `--memory-mapping` unambiguously the highest-leverage, lowest-effort change available for any large-DB Kraken2 deployment in this project — independent of, and far larger than, the optimization patch itself.
+
 ---
 
 ## Known gap — no backup of `compact_hash.cc`
