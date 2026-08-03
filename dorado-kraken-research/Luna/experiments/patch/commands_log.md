@@ -558,6 +558,35 @@ Full command and output saved to `~/results/profiling/opt_v1_manual/base_noM.txt
 
 ---
 
+## Benchmark: patched, no -M (command 58)
+
+Same DB/threads/perf-events, `$BIN` pointed at the patched tree instead (Patches 1, 3, 4 active; Patch 2 inert, no `-M`).
+
+| Run | Wall time | Cache-miss % | LLC-load-miss % | Instructions | Cycles | IPC |
+|---|---|---|---|---|---|---|
+| 1 | 4.446s | 87.76% | 80.88% | 103.37B | 57.37B | 1.80 |
+| 2 | 4.439s | 87.61% | 80.98% | 103.34B | 57.23B | 1.81 |
+| 3 | 4.432s | 87.95% | 81.01% | 103.33B | 57.38B | 1.80 |
+| **avg** | **~4.439s** | **~87.8%** | **~80.96%** | **~103.35B** | **~57.33B** | **~1.80** |
+
+## Baseline vs patched (no -M) — comparison
+
+| Metric | Baseline | Patched | Delta |
+|---|---|---|---|
+| Wall time | ~4.446s | ~4.439s | **−0.16% — statistically noise** (both ranges overlap heavily) |
+| Instructions | ~111.6B | ~103.35B | **−7.4%** |
+| Cycles | ~59.74B | ~57.33B | **−4.0%** |
+| IPC | ~1.87 | ~1.80 | −3.7% (fewer total instructions but slightly less overlap-efficient mix) |
+| Cache-miss % | ~88.2% | ~87.8% | −0.4pp |
+| LLC-load-miss % | ~83.1% | ~81.0% | −2.1pp (prefetch converting some future misses to hits) |
+| LLC-loads | ~118.2M | ~122.2M | +3.4% (prefetch itself issues extra speculative loads) |
+
+**The real finding: wall-clock time didn't move, despite genuine instruction/cycle-level improvements.** Why: `classify`'s own self-reported line — `"104918 sequences ... processed in 0.68Xs"` — is nearly identical across every single run, baseline and patched alike. The actual classification loop (where Patch 3's prefetch and Patch 4's LRU cache operate) takes well under 0.7s. The remaining **~3.7 of ~4.4 total seconds is spent loading the 8GB hash table into memory before classification starts** — a phase none of Patch 1, 3, or 4 touch. Patch 2 (huge pages via `madvise`) is the one patch aimed at load-time cost, and it's the one that's inert here without `-M`.
+
+**Implication:** this patch's expected gains (per M1-M7) were reasoned about in terms of per-lookup cache-miss cost during classification — but classification is only ~15% of this workload's wall-clock on `standard_8gb`. Even a large relative improvement there caps out at a small absolute one. This makes the `-M` run below not just "does Patch 2 work" but "does Patch 2 attack the part of the runtime that actually dominates here."
+
+---
+
 ## Known gap — no backup of `compact_hash.cc`
 
 Command 6's backup loop only covered the four files the patch file names (`Makefile`, `classify.cc`, `compact_hash.h`, `mmap_file.cc`). Command 24 discovered the real `Get()` implementation lives in `compact_hash.cc`, not `.h` — and that file was edited (commands 28-29) **without ever being backed up first**. There is no `compact_hash.cc.pre_opt_v1`.
