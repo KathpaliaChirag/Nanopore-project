@@ -714,6 +714,32 @@ At T=1, sample_targeted's ~19-20s wall time is *not* a loading artifact at all �
 
 **Confirms DB-size scaling of the -M effect:** T=1 −26.5% (24.08s→17.71s), T=32 **−84.7%** (8.23s→1.26s), T=96 −82.1% (8.49s→1.52s) — all bigger than the equivalent `standard_8gb` numbers (−19.5%/−78%/−73%), consistent with `-M`'s benefit scaling with DB size at a given thread count.
 
+### standard_16gb — patched (command 67)
+
+| M-mode | Threads | Wall (avg of 3) | IPC |
+|---|---|---|---|
+| no -M | 1 | 23.22s | ~1.79 |
+| no -M | 32 | 8.227s | ~1.61 |
+| no -M | 96 | 8.51s | ~1.33 |
+| -M | 1 | 16.90s | ~2.09 |
+| -M | 32 | 1.227s | ~1.78 |
+| -M | 96 | 1.52s | ~1.41 |
+
+### standard_16gb — full comparison
+
+| Threads | M-mode | Baseline | Patched | Delta |
+|---|---|---|---|---|
+| 1 | no -M | 24.08s | 23.22s | −3.6% |
+| 1 | -M | 17.71s | 16.90s | −4.6% |
+| 32 | no -M | 8.23s | 8.227s | ~0% |
+| 32 | -M | 1.257s | 1.227s | −2.4% |
+| 96 | no -M | 8.49s | 8.51s | ~0% |
+| 96 | -M | 1.517s | 1.52s | ~0% |
+
+**Same shape as standard_8gb (best at T=1, fades to ~0% at T=96), but smaller magnitude throughout** (8gb: −5.2%/−6.4%/−4.0%/~0%/~0% vs 16gb: −3.6%/−4.6%/~0%/−2.4%/~0%). Notable tension worth flagging rather than resolving here: M1/M3's own data showed `CompactHashTable::Get()`'s share of LLC misses *increases* with DB size (2.24% sample_targeted → 5.70% 8gb → 7.75% 16gb → 10.57% pluspf), which would predict Patch 3's prefetch should help *more* on bigger DBs — but the measured net patch effect (dominated by Patch 4's cache, per the thread-dilution theory above) doesn't increase accordingly. Possible explanation: Patch 4's thread-local cache dilution effect outweighs Patch 3's growing relevance as DB size increases. Not conclusively separated in this benchmark since all patches were tested together, not in isolation.
+
+**standard_16gb sweep complete (12 cells).**
+
 ---
 
 ## Known gap — no backup of `compact_hash.cc`
