@@ -498,7 +498,7 @@ Same database, same hardware, same classification work — the only thing that c
 
 ### Nobody had ever flipped this switch
 
-Here's the part worth sitting with: `-M` had never been used, not once, anywhere in this project's history. Not in the M1 through M7 measurements. Not in any prior benchmark. Not even in the number this whole project had been quoting for months as "the baseline." Every single timing figure produced before this sweep was measured with the slow, eager-load path, without anyone knowing there was a faster one sitting behind a flag that was never passed.
+Here's the part worth sitting with: `-M` had never been used, not once, anywhere in this project's history. Not in the seven rounds of careful pre-patch measurements mentioned in Part D. Not in any prior benchmark. Not even in the number this whole project had been quoting for months as "the baseline." Every single timing figure produced before this sweep was measured with the slow, eager-load path, without anyone knowing there was a faster one sitting behind a flag that was never passed.
 
 ### How much it's worth, by database size
 
@@ -677,7 +677,7 @@ flowchart LR
 
 **Where this already lives in this project, already labeled.** Patch 4's thread-local k-mer cache (Part D) picks which of its 16,384 slots a lookup goes into by multiplying the k-mer by a fixed constant and taking the top bits — and the patch's own source comment right next to that line already calls it `// Fibonacci hash`. The label was there from the start. What was missing wasn't the name, it was the explanation — nobody had actually worked through why that comment is true, which is exactly what this section just did.
 
-**Where it's headed next.** Thesis 2's planned move from linear probing to double hashing (Part E) needs two cheap, well-distributed hash functions, `h1` for the initial slot and `h2` for the probe step size. Fibonacci hashing is the leading candidate for building both: a single 64-bit product carries enough well-mixed bits that you can slice `h1` from the top and derive `h2` either from a different bit range or from a second, independent odd multiplier. This is explicitly planned future work, not yet implemented — and worth deciding deliberately rather than copying blindly, since slicing two hash functions out of correlated bits of the *same* product risks undermining exactly what double hashing needs (two probe sequences that don't track each other).
+**Where it's headed next.** Thesis 2's planned move from linear probing to double hashing (Part A) needs two cheap, well-distributed hash functions, `h1` for the initial slot and `h2` for the probe step size. Fibonacci hashing is the leading candidate for building both: a single 64-bit product carries enough well-mixed bits that you can slice `h1` from the top and derive `h2` either from a different bit range or from a second, independent odd multiplier. This is explicitly planned future work, not yet implemented — and worth deciding deliberately rather than copying blindly, since slicing two hash functions out of correlated bits of the *same* product risks undermining exactly what double hashing needs (two probe sequences that don't track each other).
 
 ```mermaid
 flowchart LR
@@ -777,7 +777,7 @@ Full motivated explanations for these terms appear earlier in the report. This t
     -U ~/results/basecalling/reads_hac.fastq \
     -S /dev/null --report-file /dev/null  # discard output, we only want the perf counters
   ```
-  The Kraken2 equivalent follows the same shape — swap the binary, add `-M` to enable memory-mapping (see Part D).
+  The Kraken2 equivalent follows the same shape — swap the binary, add `-M` to enable memory-mapping (see Part E).
 
 ### Why this week mattered
 
