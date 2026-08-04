@@ -6,7 +6,7 @@ This document is the single reference for two connected sessions of work: benchm
 
 > [!TIP]
 > **If you read nothing else, read this.**
-> - **Centrifuge is 5-18x slower than Kraken2**, and it isn't close: at 32 threads it's about 5.5x slower, and past 32 threads it falls apart entirely, ending up 14-18x slower at 96 threads. The cause is thread contention — threads getting in each other's way — not a memory or cache problem, which was the opposite of what the theory predicted going in.
+> - **Centrifuge is 5-18x slower than Kraken2 at 32 and 96 threads**, and it isn't close: at 32 threads it's about 5.5x slower, and past 32 threads it falls apart entirely, ending up 14-18x slower at 96 threads. (At 1 thread the gap is smaller and more variable, 2-6x depending on database size — the story really is about what happens as threads scale up.) The cause looks like thread contention — threads getting in each other's way — not a memory or cache problem, which was the opposite of what the theory predicted going in.
 > - **A single flag change (`-M`, memory-mapping) that nobody in this project had ever used gives up to 12-14x speedup on Kraken2's large databases** — bigger than the entire hand-written CPU optimization patch this session set out to test.
 > - Both findings are real, reproducible, and change priorities for the two thesis pieces this work is building toward.
 
@@ -20,25 +20,25 @@ Both sessions happened back to back, in the same week, feeding the same downstre
 
 ```mermaid
 gantt
-    title Week 1 timeline: Centrifuge baseline -> patch application session
+    title Week 1 timeline - Centrifuge baseline then patch application session
     dateFormat YYYY-MM-DD
     axisFormat %b %d
 
     section Centrifuge baseline (Week 1 plan)
-    Step 1: install + build FM-index (Luna)     :done, c1, 2026-08-01, 1d
-    Step 3: run comparison benchmarks           :done, c2, 2026-08-01, 1d
-    Step 4: analyze IPC collapse, write findings:done, c3, 2026-08-01, 2d
-    Step 2: Orion ARM64 port (DROPPED)          :crit, c4, 2026-08-01, 1d
-    Step 6: Fibonacci hashing reading (OPEN)    :active, c5, 2026-08-02, 3d
+    Step 1 - install + build FM-index (Luna)      :done, c1, 2026-08-01, 1d
+    Step 3 - run comparison benchmarks            :done, c2, 2026-08-01, 1d
+    Step 4 - analyze IPC collapse, write findings :done, c3, 2026-08-01, 2d
+    Step 2 - Orion ARM64 port (DROPPED)           :crit, c4, 2026-08-01, 1d
+    Step 6 - Fibonacci hashing reading (OPEN)     :active, c5, 2026-08-02, 3d
 
     section Patch application session
-    Apply kraken2_opt_v1.patch by hand          :done, p1, 2026-08-03, 1d
-    Discover structural deviations (5 items)    :done, p2, 2026-08-03, 1d
-    Discover -M / memory-mapping finding        :done, p3, 2026-08-03, 1d
-    Full 48-cell benchmark sweep                :done, p4, 2026-08-03, 1d
+    Apply kraken2_opt_v1.patch by hand            :done, p1, 2026-08-03, 1d
+    Discover structural deviations (5 items)      :done, p2, 2026-08-03, 1d
+    Discover -M / memory-mapping finding          :done, p3, 2026-08-03, 1d
+    Full 48-cell benchmark sweep                  :done, p4, 2026-08-03, 1d
 
     section Reporting
-    Fill Section 6 of optimisation report       :done, r1, 2026-08-03, 2d
+    Fill Section 6 of optimisation report         :done, r1, 2026-08-03, 2d
 ```
 
 Read left to right, it's really one investigation, not two: the Centrifuge session (Aug 1) established what "good" looks like on Luna, and the patch session (Aug 3) picked that baseline back up two days later, hand-applied a patch that had been sitting untouched for months, and stumbled onto a bigger finding than the patch itself while doing it.
@@ -49,10 +49,10 @@ Jump straight to whichever part you need — each stands on its own, but they re
 
 - **Part A — Centrifuge vs Kraken2 architecture.** What each tool actually does under the hood, and why comparing them is a fair fight rather than apples-to-oranges.
 - **Part B — the genome-download saga & building the baseline.** How a missing genome library, an unset network proxy, and an NCBI download ceiling turned "download some genomes" into most of a session — and how the baseline got built anyway.
-- **Part C — benchmark results & the 96-thread collapse.** The numbers behind the headline finding: where Centrifuge holds up, and exactly where and why it stops.
+- **Part C — benchmark results & the 96-thread collapse.** The numbers behind the headline finding: where Centrifuge holds up, where it falls apart, and how far the investigation got toward explaining why.
 - **Part D — applying the Kraken2 optimization patch.** What the four-part patch was supposed to do, and every way the real source tree on Luna didn't match what the patch assumed.
 - **Part E — the 48-cell benchmark sweep & the memory-mapping discovery.** The full results grid, and the accidental discovery that dwarfs everything else in this report.
-- **Part F — what's next & appendix.** The open threads left on the table, plus reproducibility details (paths, commands, machine setup) for anyone rerunning this work.
+- **Part F — what's next & appendix.** The open threads left on the table, a piece of background reading (Fibonacci hashing) that was assigned weeks ago and never done until now, plus reproducibility details (paths, commands, machine setup) for anyone rerunning this work.
 
 Part A picks up right where the TL;DR left off: the actual mechanics of why Kraken2 and Centrifuge behave so differently under load.
 
@@ -90,7 +90,7 @@ That assumption is wrong. Centrifuge doesn't hash k-mers into a table at all. It
 
 ### Centrifuge: compress the whole reference, then search it one letter at a time
 
-Instead of building a table of chunks, Centrifuge compresses each entire reference genome into a single structure called an **FM-index**. The FM-index is built on the **Burrows-Wheeler Transform (BWT)** — the same underlying idea that powers bzip2 compression. BWT rearranges a text's characters into an order that groups similar surrounding context together, which makes the result far more compressible than the original while still letting you reconstruct the original exactly. Stack an FM-index on top of that transform and you get something that can answer "does this substring exist in the genome, and where" almost instantly, without ever decompressing the genome back to plain text. The BWT itself comes from [Burrows & Wheeler's 1994 technical report, "A Block-sorting Lossless Data Compression Algorithm"](https://www.cs.jhu.edu/~langmea/resources/burrows_wheeler.pdf); the FM-index that makes it searchable comes from [Ferragina & Manzini's 2000 paper, "Opportunistic Data Structures with Applications" (FOCS 2000)](https://dl.acm.org/doi/10.5555/795666.796543).
+Instead of building a table of chunks, Centrifuge compresses each entire reference genome into a single structure called an **FM-index**. The FM-index is built on the **Burrows-Wheeler Transform (BWT)** — the same underlying idea that powers bzip2 compression. BWT rearranges a text's characters into an order that groups similar surrounding context together, which makes the result far more compressible than the original while still letting you reconstruct the original exactly. Stack an FM-index on top of that transform and you get something that can answer "does this substring exist in the genome, and where" almost instantly, without ever decompressing the genome back to plain text. The BWT itself comes from [Burrows & Wheeler's 1994 technical report, "A Block-sorting Lossless Data Compression Algorithm"](https://www.cs.jhu.edu/~langmea/resources/burrows_wheeler.pdf); the FM-index that makes it searchable comes from [Ferragina & Manzini's 2000 paper, "Opportunistic Data Structures with Applications" (FOCS 2000)](https://people.unipmn.it/manzini/papers/focs00.html).
 
 Searching an FM-index uses an algorithm called **backward search**: you match a read against the index one character at a time, starting from the *end* of the read and working toward the start, narrowing down a range of candidate matching positions with every letter you add. Think of it like narrowing a dictionary search by prepending one letter at a time and re-checking which page range could still contain the word — each letter shrinks the plausible range further.
 
@@ -123,7 +123,7 @@ A quick side-by-side of the properties this architecture difference implies:
 | Per-lookup dependency | None — independent | Serial — each step needs the last |
 | Memory footprint | Large (gigabytes to hundreds of GB) | Much smaller (same reference, compressed) |
 | Natural parallelism | Embarrassingly parallel across reads/minimizers | Constrained by the per-read dependency chain |
-| Expected bottleneck | Waiting on DRAM (cache misses) | Waiting on the next serial step (limited ILP) |
+| Expected bottleneck | Waiting on DRAM (cache misses) | Waiting on the next serial step (limited ILP — instruction-level parallelism, how many instructions the CPU can have in flight at once) |
 
 Read this table as two opposite bets, not a "better tool / worse tool" scorecard: Kraken2 bets that cheap, independent, parallel lookups outweigh a huge memory footprint; Centrifuge bets that a small, compressed structure is worth giving up parallel independence for.
 
@@ -151,7 +151,7 @@ Week 1's plan had a short to-do list. Step 1: install Centrifuge, the second cla
 
 ### Step 1: the part that actually went fine
 
-You clone Centrifuge from GitHub, run `make`, and it builds cleanly on the first try — no missing dependencies, no patched-up Makefile, just some harmless warnings about old C++ style. All five binaries (`centrifuge`, `centrifuge-build`, `centrifuge-class`, `centrifuge-inspect`, `centrifuge-download`) show up where they should. You add them to your PATH, and Step 1 is done. This is not where the story is — it's worth one paragraph precisely because nothing went wrong.
+You clone Centrifuge from GitHub, run `make`, and it builds cleanly on the first try — no missing dependencies, no patched-up Makefile, just some harmless warnings about old C++ style. A quick version check confirms you're building the current tip of the codebase (labeled `1.0.5` internally), a step ahead of the last official tagged release (`v1.0.4.2`) — worth knowing so the comparison later in this report is against Centrifuge's actual current state, not a stale release. All five binaries (`centrifuge`, `centrifuge-build`, `centrifuge-class`, `centrifuge-inspect`, `centrifuge-download`) show up where they should. You add them to your PATH, and Step 1 is done. This is not where the story is — it's worth one paragraph precisely because nothing went wrong.
 
 ### Step 3: the data you were counting on was just gone
 
@@ -168,7 +168,7 @@ With no local copy and no backup found anywhere on the machine, the only option 
 
 ### The re-download: three ways to fail before it works
 
-The tool for the job is `ncbi-genome-download`, already installed and ready to pull genome files straight from NCBI (the US National Center for Biotechnology Information, the standard public repository for this kind of data) for the six ESKAPE taxids you need. The original download had pulled 1,149 complete bacterial assemblies, roughly 7GB uncompressed. You need that again.
+The tool for the job is `ncbi-genome-download`, already installed and ready to pull genome files straight from NCBI (the US National Center for Biotechnology Information, the standard public repository for this kind of data) for the six ESKAPE taxids you need. **ESKAPE** is shorthand for six genera of bacteria notorious for antibiotic resistance (Enterococcus, Staphylococcus, Klebsiella, Acinetobacter, Pseudomonas, Enterobacter) — a standard, clinically-relevant stress test for a classifier, the same reason it names every database in this report. The original download had pulled 1,149 complete bacterial assemblies, roughly 7GB uncompressed, as **FASTA** files — a plain-text format for raw DNA sequence (just the letters, no per-letter confidence score, unlike the FASTQ files sequencer reads come in). You need that again.
 
 **Attempt 1** does the obvious thing: download one genome at a time, in sequence. An hour in, only about 25MB of the ~7GB target has landed. At that rate, finishing would take days. You kill it.
 
@@ -203,7 +203,7 @@ flowchart TD
 
 While the big download was busy failing in the background, a smaller, faster path was sitting in plain sight. Not everything had been lost — a folder called `sample_targeted` had survived intact, complete with its taxonomy files and 12 genome files inside it. Sorting out which of those were real and which were unrelated duplicates left exactly 6 usable genomes, covering 6 distinct ESKAPE-relevant organisms (including a bonus E. coli reference not in the strict ESKAPE list).
 
-There was no reason to wait for 1,149 genomes to trickle in before doing anything. Those 6 genomes got concatenated into a single FASTA file and fed straight into `centrifuge-build` — with one small snag along the way (the build script's shebang line expected a `python` command, and Luna only ships `python3`, fixed with a one-line symlink). Once that was sorted, the build finished in 12 seconds. That's the first Centrifuge index this project ever produced, and it came from the small, already-available data — not the download that was still struggling. Not blocking on the slow path meant there was already something to run classification against long before the 200-genome question was settled.
+There was no reason to wait for 1,149 genomes to trickle in before doing anything. Those 6 genomes got concatenated into a single FASTA file and fed straight into `centrifuge-build` — with one small snag along the way (the build script's shebang line — the first line of a script, telling the system which program should run it — expected a `python` command, and Luna only ships `python3`, fixed with a one-line symlink). Once that was sorted, the build finished in 12 seconds. That's the first Centrifuge index this project ever produced, and it came from the small, already-available data — not the download that was still struggling. Not blocking on the slow path meant there was already something to run classification against long before the 200-genome question was settled.
 
 ### What actually got built
 
@@ -217,13 +217,15 @@ So — two indexes, built the hard way. The next question is what actually happe
 
 ### What we measured
 
-You now know how the two tools search (Part A) and what the measurement tools mean (Part B). Here's what actually happened when we ran them.
+You now know how the two tools search (Part A). Here's what actually happened when we ran them — the measurement tools (`perf`, IPC, cache-miss rates) get explained as they come up below.
 
 Both tools classified the exact same input: 104,918 real nanopore sequencing reads, the project's standard test set. Both ran against comparable reference data — a small 6-genome database (`sample_targeted`) and a larger, more realistic one (Kraken2's `eskape_650mb`, Centrifuge's independently-rebuilt 200-genome `eskape_200`, both built around the same six ESKAPE pathogen species). Both ran at three thread counts: 1, 32, and 96. Every run was instrumented with `perf stat`, capturing wall-clock time, cache/LLC-miss rates, and IPC for each configuration.
 
 That gives you a like-for-like comparison at two database scales and three thread counts — six runs per tool, twelve runs total, all on the same machine (Luna).
 
 ### The headline number: Centrifuge is several times slower
+
+Here's the wall-clock time each tool actually took, in seconds, across both databases and all three thread counts:
 
 | Threads | Kraken2 (`sample_targeted`) | Centrifuge (`sample_targeted`) | Kraken2 (`eskape_650mb`/`200`) | Centrifuge (`eskape_200`) |
 |---|---|---|---|---|
@@ -238,6 +240,8 @@ At 32 threads — the best configuration for both tools — Centrifuge is **5.4-
 Here's the intuition you'd bring in from Part A: Kraken2 does independent, scattered hash-table lookups — cache-unfriendly, but at least each lookup doesn't depend on the last. Centrifuge walks its FM-index one character at a time, each step waiting on the result of the step before it — a serial dependency chain. The literature on FM-index search predicts this chain hurts memory locality. Going in, the expectation was: Kraken2 has the cache problem, Centrifuge doesn't need to.
 
 The measurements say the opposite.
+
+Every table below reports the **LLC-miss rate**: the percentage of memory reads that miss even the last-level cache (LLC — the biggest, last-resort on-chip cache before a request has to go all the way to DRAM) and pay that full trip. Lower is better.
 
 | Threads | Kraken2 (`sample_targeted`) LLC-miss% | Centrifuge (`sample_targeted`) LLC-miss% | Kraken2 (`eskape_650mb`/`200`) LLC-miss% | Centrifuge (`eskape_200`) LLC-miss% |
 |---|---|---|---|---|
@@ -269,9 +273,9 @@ xychart-beta
     line "Centrifuge (eskape_200)" [1.57, 1.46, 0.31]
 ```
 
-Read this left to right. At 1 thread, Centrifuge is actually more efficient than Kraken2 — 2.63 vs 1.78. At 32 threads it holds up reasonably: on the larger database it's still slightly ahead of Kraken2 (1.46 vs 1.37). Then at 96 threads, it falls off a cliff — IPC crashes to 0.22-0.31, less than a fifth of where it started.
+Read this left to right. At 1 thread, Centrifuge is actually more efficient than Kraken2 — 2.63 vs 1.78. At 32 threads it holds up reasonably: on the larger database, Centrifuge's IPC (1.46) is still slightly ahead of Kraken2's own IPC there (1.37). Then at 96 threads, it falls off a cliff — IPC crashes to 0.22-0.31, less than a fifth of where it started.
 
-Mechanically: from 32T to 96T, the number of CPU cycles burned roughly 10x'd, while the number of instructions actually completed only about doubled. That ratio — many more cycles spent per instruction finished — is the fingerprint of threads waiting on each other, not threads waiting on memory. If this were a memory-latency problem, you'd expect the LLC-miss rate to spike alongside it; it doesn't (96T LLC-miss% is flat or even slightly lower than 32T's, on both databases). This is thread contention or lock contention: threads queuing for something shared, burning cycles doing nothing useful, exactly like several cashiers all waiting on one shared till.
+Mechanically: from 32T to 96T, the number of CPU cycles burned roughly 10x'd, while the number of instructions actually completed only about doubled. That ratio — many more cycles spent per instruction finished — is the fingerprint of threads waiting on each other, not threads waiting on memory. If this were a memory-latency problem, you'd expect the LLC-miss rate to spike alongside it; it doesn't (96T LLC-miss% is flat or even slightly lower than 32T's, on both databases). This looks like thread contention or lock contention: threads queuing for something shared, burning cycles doing nothing useful, exactly like several cashiers all waiting on one shared till — though exactly which shared resource or lock is responsible is still unconfirmed (more on that in a moment).
 
 Here's how much that costs you in absolute terms:
 
@@ -361,13 +365,13 @@ This session finally applied it. What should have been a quick "run the script, 
 All four changes live in one patch file, gated by the earlier measurements. Here's each one, motivation first.
 
 **Patch 1 — tell the compiler what CPU it's actually running on.**
-A compiler that doesn't know your exact CPU model plays it safe: it only emits instructions guaranteed to work on almost any x86 chip. That's a real cost, and it wasn't hypothetical here — an earlier measurement had found the stock Kraken2 binary used **zero** AVX-512 instructions and **zero** AVX2 instructions, the CPU's modern wide-vector instruction sets. It ran on 1,308 old-style SSE instructions and nothing more, on a chip (Sapphire Rapids) that supports far more. Patch 1 adds compiler flags that name that exact chip, plus a flag called link-time optimization (LTO) that lets the compiler optimize across separate source files instead of one at a time — for example, turning a lookup that currently goes through a generic "virtual call" into a direct, inlined one. It also unrolls the loop that walks the hash table.
+A compiler that doesn't know your exact CPU model plays it safe: it only emits instructions guaranteed to work on almost any x86 chip. That's a real cost, and it wasn't hypothetical here — an earlier measurement had found the stock Kraken2 binary used **zero** AVX-512 instructions and **zero** AVX2 instructions, the CPU's modern wide-vector instruction sets. It ran on 1,308 old-style SSE instructions and nothing more, on a chip (Sapphire Rapids) that supports far more. Patch 1 adds compiler flags that name that exact chip, plus a flag called link-time optimization (LTO) that lets the compiler optimize across separate source files instead of one at a time — for example, turning a lookup that currently goes through a generic "virtual call" (an extra layer of indirection that lets code call one of several possible functions without knowing which in advance, at a small speed cost) into a direct, inlined one. It also unrolls the loop that walks the hash table — duplicating the loop's body a few times so the CPU does more work per pass through its own bookkeeping.
 
 **Patch 2 — use bigger memory pages for a huge, randomly-accessed table.**
-Computers manage memory in fixed-size chunks called pages, and the CPU keeps a small, fast lookup cache (the TLB) of "which page maps to which physical memory" so it doesn't have to work that out from scratch on every access. Standard pages are 4KB, which means an 8GB hash table needs roughly 2.1 million separate page entries — far more than the TLB can ever hold, so it's constantly missing and re-doing that translation work. Patch 2 asks the operating system to use 2MB pages instead, which shrinks the same 8GB table down to about 4,096 page entries — small enough to fit comfortably in the TLB. It also tells the OS not to bother with sequential readahead, since hash-table access is deliberately random, not sequential (see reference [6] on transparent huge pages). One catch, which matters a lot later in this section: this patch only does anything at all if the hash table is loaded through `mmap()` — a detail that turned out to be its own separate discovery.
+Computers manage memory in fixed-size chunks called pages, and the CPU keeps a small, fast lookup cache (the TLB) of "which page maps to which physical memory" so it doesn't have to work that out from scratch on every access. Standard pages are 4KB, which means an 8GB hash table needs roughly 2.1 million separate page entries — far more than the TLB can ever hold, so it's constantly missing and re-doing that translation work. Patch 2 asks the operating system to use 2MB pages instead, which shrinks the same 8GB table down to about 4,096 page entries — small enough to fit comfortably in the TLB. It also tells the OS not to bother with sequential readahead, since hash-table access is deliberately random, not sequential (this is a well-documented technique — see the [Linux kernel's own documentation on transparent huge pages](https://docs.kernel.org/admin-guide/mm/transhuge.html)). One catch, which matters a lot later in this section: this patch only does anything at all if the hash table is loaded through `mmap()` — a detail that turned out to be its own separate discovery.
 
 **Patch 3 — start the next memory fetch before you're done waiting for this one.**
-Every time Kraken2 looks up a k-mer in the hash table, it's a random memory access, and a random access that misses the CPU's cache costs somewhere around 100-300 nanoseconds — the CPU just sits there. An earlier measurement had confirmed this workload is "latency-bound," not "bandwidth-bound": only 4.9-10.7% of the available memory bandwidth was in use, meaning there was plenty of room to ask for more data without congesting anything. Patch 3 exploits that headroom with software prefetching: while waiting on the current lookup, it also issues a request for the next likely memory location, so that wait overlaps instead of stacking up one lookup at a time (see reference [7], the classic hash-join prefetching paper — this is the same idea applied to Kraken2's hash-table probes).
+Every time Kraken2 looks up a k-mer in the hash table, it's a random memory access, and a random access that misses the CPU's cache costs somewhere around 100-300 nanoseconds — the CPU just sits there. An earlier measurement had confirmed this workload is "latency-bound," not "bandwidth-bound": only 4.9-10.7% of the available memory bandwidth was in use, meaning there was plenty of room to ask for more data without congesting anything. Patch 3 exploits that headroom with software prefetching: while waiting on the current lookup, it also issues a request for the next likely memory location, so that wait overlaps instead of stacking up one lookup at a time (the same idea shows up in classic database systems research — see [Chen, Ailamaki, Gibbons & Mowry's paper on hash-join prefetching](https://www.pdl.cmu.edu/PDL-FTP/Database/icde04.pdf) — applied here to Kraken2's hash-table probes instead of a database join).
 
 **Patch 4 — catch repeat lookups before they ever reach the slow table. Designed by Kolin sir.**
 Kraken2 already had a trivial version of this idea: if the current k-mer is literally identical to the one immediately before it (which happens constantly, because of how the sliding window works), skip the lookup. But an earlier measurement found something bigger: 90.7% of minimizers get reused *somewhere* in a given read set — not just next-door, but scattered across different reads entirely. Patch 4, Kolin sir's design, gives each thread its own small private cache — 16,384 entries, 256KB total, sized to sit comfortably inside one CPU core's L2 cache — and checks it before ever touching the real hash table. A hit there means the slow, DRAM-touching lookup never has to happen at all.
@@ -384,7 +388,7 @@ The patch was correct about *what* to change. It was wrong, in several separate 
 
 **4. The function the patch wanted to edit lived somewhere else entirely.** The patch's instructions pointed at one file for the hash-table lookup function. That file only contains a one-line declaration of the function — the actual working code is in a different file. This wasn't just a wrong line number; it also meant an earlier safety step (backing up files before editing them) had already missed this file, since the initial backup pass only covered the files the patch explicitly named. There is no backup of that file's original version. The fix itself was still fully recoverable, because every inserted line was documented step by step as it happened — but it's a gap worth naming honestly rather than glossing over.
 
-**5. A compiler flag the patch wanted to add would have silently done nothing.** Part of Patch 1 tried to attach its link-time-optimization flags to a build variable that, on paper, should control how the final program gets linked. Looking closely at how the actual build file wires things together, that variable is never referenced by any of the six commands that do the actual linking. The flag would have sat there, doing nothing, and nobody would have noticed — the build would have looked normal and the optimization simply wouldn't have happened. Caught before it shipped, by folding those flags into the variable the build file actually uses.
+**5. The Makefile edit needed two separate fixes, not one.** First: the patch's Makefile change assumed specific content already sitting in the file — particular flags, a particular settings line — that simply wasn't there. The edit couldn't be applied automatically at all; it had to be retyped by hand against what the file actually contained. Second, once retyped, part of it tried to attach new link-time-optimization flags to a build variable that, on paper, should control how the final program gets linked. Looking closely at how the actual build file wires things together, that variable is never referenced by any of the six commands that do the actual linking. The flag would have sat there, doing nothing, and nobody would have noticed — the build would have looked normal and the optimization simply wouldn't have happened. Caught before it shipped, by folding those flags into the variable the build file actually uses.
 
 Here's the whole chain, in order:
 
@@ -453,7 +457,7 @@ The four databases:
 | `standard_16gb` | ~16GB |
 | `pluspf_103gb` | ~111GB |
 
-Cross that with 3 thread counts (1, 32, 96), 2 builds (baseline, patched), and 2 loading modes (default, and the `-M` flag) and you get 4 × 3 × 2 × 2 = 48 cells. Every cell was measured with a warm-up run plus three timed runs, on the same NUMA-pinned setup used for every measurement in this project, so the numbers are directly comparable to everything that came before.
+Cross that with 3 thread counts (1, 32, 96), 2 builds (baseline, patched), and 2 loading modes (default, and the `-M` flag) and you get 4 × 3 × 2 × 2 = 48 combinations. Every combination was measured with a warm-up run plus three timed runs, on the same NUMA-pinned setup used for every measurement in this project — NUMA (non-uniform memory access) is what you get on a multi-socket server where each CPU has faster access to its own local memory bank than to another socket's; "pinning" locks a process to one socket so cross-socket memory latency doesn't add noise to the numbers. That keeps everything directly comparable to every measurement that came before.
 
 ### The flag, and what it actually changes
 
@@ -489,6 +493,8 @@ sequenceDiagram
     Note over P: total wall time ~0.96s
     end
 ```
+
+Same database, same hardware, same classification work — the only thing that changed is when and how the data actually arrives in memory. That one difference is worth a lot, as the next section shows.
 
 ### Nobody had ever flipped this switch
 
@@ -540,19 +546,19 @@ xychart-beta
 
 Look at the shape of that chart. The `-M` bar is dramatically shorter than the no-`-M` bar on every database above 50MB, and the gap between "baseline" and "patched" builds barely registers next to it. That's the point of this whole section: a one-flag change dwarfs a four-part, hand-applied source patch.
 
-That doesn't mean the patch did nothing. At a single thread, isolated from `-M`'s effect, the patch has a real and sensible pattern:
+That doesn't mean the patch did nothing. At a single thread, isolated from `-M`'s effect, the patch has a real and roughly sensible pattern:
 
 ```mermaid
 xychart-beta
     title "Patch effect at T=1, no -M — grows with DB size (negative = faster)"
     x-axis [sample_targeted, standard_8gb, standard_16gb, pluspf_103gb]
     y-axis "% change in wall time" -25 --> 5
-    bar "Patch vs baseline" [4, -5.2, -3.6, -19.1]
+    bar "Patch vs baseline" [-4.0, -5.2, -3.6, -19.1]
 ```
 
-The patch's benefit grows as the database gets bigger — up to about 19% faster on the largest, 111GB database. That tracks directly with what Part D found about Patch 3 (the software-prefetching patch): bigger databases give the hash-table lookup function a growing share of the program's total cache misses, meaning there's more for prefetching to actually fix. A bigger database means more raw material for the patch to work with.
+The patch's benefit broadly grows as the database gets bigger — from a small ~4% improvement on the tiny 50MB database up to about 19% faster on the largest, 111GB database (with `standard_16gb` sitting slightly below `standard_8gb`, a wrinkle covered honestly below). That broad trend tracks with what Part D found about Patch 3 (the software-prefetching patch): bigger databases give the hash-table lookup function a growing share of the program's total cache misses, meaning there's more for prefetching to actually fix. A bigger database means more raw material for the patch to work with.
 
-On the smallest database, the patch is a small net loss — wall time gets slightly *worse*, not better. That database already fits comfortably in cache. There's nothing to prefetch and nothing worth caching, so the extra bookkeeping the patch adds to every lookup is pure overhead with no payoff to offset it.
+The smallest database is actually where the patch turns net-negative — just not at 1 thread. Push it to 96 threads instead, and `sample_targeted` is the one case in the whole sweep where the patch ends up a small net loss (wall time about 2-3% worse than baseline, both with and without `-M`). That database fits comfortably in cache at any thread count, so there's very little for prefetching or caching to actually save — and at 96 threads, the extra bookkeeping the patch adds to every lookup has nothing left to offset it against.
 
 ### The patch's benefit fades as thread count rises
 
@@ -575,9 +581,11 @@ This matters beyond this one benchmark. It's exactly the kind of gap the planned
 
 ### The one loose end, honestly flagged
 
-Part D's earlier measurements (M1/M3) showed that the hash-table lookup function's share of total cache misses grows steadily with database size, which predicts the prefetch patch should help more on bigger databases. That prediction held cleanly at 1 thread — the patch's benefit does climb from roughly 0% on the smallest database up to 19% on the largest.
+The measurements taken months before this patch was even applied (mentioned briefly in Part D) showed that the hash-table lookup function's share of total cache misses grows steadily with database size, which predicts the prefetch patch should help more on bigger databases. That prediction held cleanly at 1 thread — the patch's benefit does climb from roughly 0% on the smallest database up to 19% on the largest.
 
 At higher thread counts, the picture gets muddier. `standard_16gb`'s patch effect turned out smaller in magnitude than `standard_8gb`'s at nearly every matching cell, despite the 16GB database having a larger measured share of lookup-related cache misses — the opposite of what the size trend would predict. The likely explanation is that two effects are tangled together here: prefetching getting more useful as databases grow, and the thread-local cache getting less effective as thread count grows, pulling in opposite directions at once. Because all four patches were tested together as one bundle rather than switched on individually, these two effects were never cleanly separated. That's an honest open question for future work — testing the prefetch patch and the cache patch in isolation from each other — not a flaw in what was measured here.
+
+The tables and charts above show the clearest representative slices of the sweep — every single one of the 48 combinations, for every database and thread count, is in the raw log linked in Part F, if you want to check a number this section didn't show.
 
 ### The takeaway
 
@@ -611,7 +619,7 @@ The open items fall into four groups: two are data/infrastructure problems that 
 
 **Group 4 — A recommendation you can act on now.**
 
-- **Adopt `-M` (memory-mapping) as the default invocation for large-database runs, starting immediately.** This isn't speculative — it's the best-supported finding in the whole patch session, and it costs nothing to adopt. See Part D for the full mechanism and the 12-14x numbers.
+- **Adopt `-M` (memory-mapping) as the default invocation for large-database runs, starting immediately.** This isn't speculative — it's the best-supported finding in the whole patch session, and it costs nothing to adopt. See Part E for the full mechanism and the 12-14x numbers.
 
 Here's the same list as a map, tying each thread back to which thesis or follow-up it feeds:
 
@@ -641,6 +649,8 @@ flowchart TD
     Root --> LLM["Ask LLMs for additional ideas<br/>on both thesis pieces (Kolin sir's suggestion)"]
 ```
 
+That's the punch list. Next: the one piece of homework on that map you can actually finish reading right now.
+
 ### The homework: Fibonacci hashing
 
 This was assigned in the Week 1 plan as reading, before any Centrifuge work started. It never got done. Here it is, properly.
@@ -665,7 +675,7 @@ flowchart LR
     T --> TR["well spread out<br/>across the table"]
 ```
 
-**Where this already lives in this project, unnamed.** Patch 4's thread-local k-mer cache (Part D) picks which of its 16,384 slots a lookup goes into by multiplying the k-mer by a fixed constant and taking the top bits. That is Fibonacci hashing. It was never named as such when the patch was written — it's just been sitting in the codebase doing this the whole time.
+**Where this already lives in this project, already labeled.** Patch 4's thread-local k-mer cache (Part D) picks which of its 16,384 slots a lookup goes into by multiplying the k-mer by a fixed constant and taking the top bits — and the patch's own source comment right next to that line already calls it `// Fibonacci hash`. The label was there from the start. What was missing wasn't the name, it was the explanation — nobody had actually worked through why that comment is true, which is exactly what this section just did.
 
 **Where it's headed next.** Thesis 2's planned move from linear probing to double hashing (Part E) needs two cheap, well-distributed hash functions, `h1` for the initial slot and `h2` for the probe step size. Fibonacci hashing is the leading candidate for building both: a single 64-bit product carries enough well-mixed bits that you can slice `h1` from the top and derive `h2` either from a different bit range or from a second, independent odd multiplier. This is explicitly planned future work, not yet implemented — and worth deciding deliberately rather than copying blindly, since slicing two hash functions out of correlated bits of the *same* product risks undermining exactly what double hashing needs (two probe sequences that don't track each other).
 
@@ -679,7 +689,7 @@ flowchart LR
     H2 --> D
 ```
 
-**One distinction worth holding onto.** Fibonacci hashing solves *where a key initially lands* — the mapping from key to first slot. It says nothing about *what happens when two different keys land on the same slot* — that's collision resolution, a separate layer of a hash table's design (linear probing vs. double hashing, covered in Part A's glossary). Conflating the two is an easy mistake to make and a costly one to unwind later in a design: fixing how keys are placed doesn't automatically fix what happens when two of them collide, and vice versa.
+**One distinction worth holding onto.** Fibonacci hashing solves *where a key initially lands* — the mapping from key to first slot. It says nothing about *what happens when two different keys land on the same slot* — that's collision resolution, a separate layer of a hash table's design (linear probing vs. double hashing, covered back in Part A). Conflating the two is an easy mistake to make and a costly one to unwind later in a design: fixing how keys are placed doesn't automatically fix what happens when two of them collide, and vice versa.
 
 **The citation, honestly.** The standard academic source is Knuth, *The Art of Computer Programming, Volume 3: Sorting and Searching* (2nd edition, Addison-Wesley, 1998), Section 6.4, "Hashing," which introduces multiplicative hashing and the golden-ratio-derived multiplier specifically. A specific page range (508–513) shows up in secondary sources, but that range could not be independently verified against the book itself — treat it as unconfirmed and cite the section number (6.4) rather than a page range unless you get physical or library access to check. For the practical, worked-example version of the same idea — clearly secondary and further reading, not a substitute for the Knuth citation — see Malte Skarupke's 2018 blog post, ["Fibonacci Hashing: The Optimization that the World Forgot"](https://probablydance.com/2018/06/16/fibonacci-hashing-the-optimization-that-the-world-forgot-or-a-better-alternative-to-integer-modulo/). It's the easier entry point, and it's what the rest of this section's explanation leaned on for the mechanism.
 
@@ -735,7 +745,7 @@ Full motivated explanations for these terms appear earlier in the report. This t
 | Wood, D.E., Lu, J., & Langmead, B. (2019). "Improved metagenomic analysis with Kraken 2." *Genome Biology*, 20, 257. | https://doi.org/10.1186/s13059-019-1891-0 |
 | Kim, D., Song, L., Breitwieser, F.P., & Salzberg, S.L. (2016). "Centrifuge: rapid and sensitive classification of metagenomic sequences." *Genome Research*, 26(12), 1721-1729. | https://genome.cshlp.org/content/26/12/1721 |
 | Burrows, M., & Wheeler, D.J. (1994). "A Block-sorting Lossless Data Compression Algorithm." DEC SRC Research Report 124. | https://www.cs.jhu.edu/~langmea/resources/burrows_wheeler.pdf |
-| Ferragina, P., & Manzini, G. (2000). "Opportunistic Data Structures with Applications." FOCS 2000, pp. 390-398. | https://people.unipmn.it/manzini/papers/focs00.html |
+| Ferragina, P., & Manzini, G. (2000). "Opportunistic Data Structures with Applications." FOCS 2000, pp. 390-398. | https://people.unipmn.it/manzini/papers/focs00.html (author-hosted copy) |
 | Knuth, D.E. *The Art of Computer Programming, Vol. 3: Sorting and Searching* (2nd ed., 1998), Section 6.4, "Hashing." (Page range 508-513 seen in secondary sources — unconfirmed; cite the section, not the page range.) | No open-access link — library/physical copy |
 | Skarupke, M. (2018). "Fibonacci Hashing: The Optimization that the World Forgot" — secondary/further-reading, not a substitute for the Knuth citation above. | https://probablydance.com/2018/06/16/fibonacci-hashing-the-optimization-that-the-world-forgot-or-a-better-alternative-to-integer-modulo/ |
 | "Transparent Hugepage Support," The Linux Kernel Documentation. | https://docs.kernel.org/admin-guide/mm/transhuge.html |
@@ -760,12 +770,12 @@ Full motivated explanations for these terms appear earlier in the report. This t
 - **Kraken2 source (patch target):** `~/tools/kraken2-src/` (not `~/kraken2-src` — that path doesn't exist).
 - **Standard test reads:** `~/results/basecalling/reads_hac.fastq` (104,918 reads), used for every baseline in this report.
 - **Standard perf command pattern (Centrifuge, 32 threads):**
-  ```
+  ```bash
   perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
-    numactl --cpunodebind=0 --membind=0 \
-    ~/tools/centrifuge/centrifuge -p 32 -x <index> \
+    numactl --cpunodebind=0 --membind=0 \  # pin to one NUMA node, see Part E
+    ~/tools/centrifuge/centrifuge -p 32 -x <index> \  # -p = thread count
     -U ~/results/basecalling/reads_hac.fastq \
-    -S /dev/null --report-file /dev/null
+    -S /dev/null --report-file /dev/null  # discard output, we only want the perf counters
   ```
   The Kraken2 equivalent follows the same shape — swap the binary, add `-M` to enable memory-mapping (see Part D).
 
