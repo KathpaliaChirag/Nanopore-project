@@ -426,3 +426,47 @@ Not recorded — next entry in this file is the 2026-07-25 pivot back (Meeting 8
 
 ### Next meeting
 2026-08-05, 4–5 pm (standing Wednesday slot)
+
+---
+
+## Meeting 10 — 2026-08-05 (Wednesday, 4–5 pm)
+
+**Attendees:** Kolin sir, Chirag K
+**Format:** Weekly check-in
+
+### Topics covered
+
+1. **Bracken — reviewed, already covered by Chirag Suthar**
+   - Bracken (Bayesian re-estimation of Kraken2/KrakenUniq's read counts down to species/genus level) was looked into as a possible benchmark angle.
+   - Chirag Suthar has already done this — Bracken is a post-hoc abundance re-estimator, not a standalone classifier, so it always runs paired with Kraken2/KrakenUniq rather than replacing it. Not a candidate comparator on its own.
+
+2. **Finalise the tool shortlist to benchmark/speed up against**
+   - Core ask: pin down which tools the thesis work will actually be compared/optimised against, beyond the already-mandated Centrifuge baseline.
+   - Named explicitly: **Centrifuge, Centrifuger** ("etc." — open-ended, more to be researched), i.e. look past Centrifuge itself to its newer FM-index successor and other adjacent tools.
+
+3. **ESKAPE-relevant tools with better cache-miss / GPU performance**
+   - Look specifically for classifiers/approaches that do better than Kraken2 on (a) cache-miss behaviour (directly relevant to Thesis 1's adaptive k-mer cache) and (b) GPU performance (relevant to the lab's adjacent Dorado GPU work).
+   - Framed as an ESKAPE-panel-relevant search, not a generic literature scan — stay anchored to the clinical ESKAPE classification use case.
+
+4. **Core framing: pick a tool on the time-vs-space tradeoff curve**
+   - Sir's framing: this is fundamentally a search along a **time/space tradeoff** — no single tool wins on both axes, so the job is to identify where on that curve each candidate sits and which one(s) make sense as the thesis's comparison point(s).
+
+### Same-day follow-up (Chirag K, same session as this meeting)
+
+Kicked off a 4-agent parallel research pass same day to start answering item 2–4 above. Headline candidates surfaced (full detail in chat history, not yet written into a report doc):
+- **Metabuli** (Nat. Methods 2024) — hybrid DNA+AA k-mer scheme, best independent accuracy evidence on long-read/Nanopore data specifically; strongest single candidate.
+- **Centrifuger** (Genome Biology 2024) — direct FM-index successor to Centrifuge (Langmead lab, not a Centrifuge version bump), ~2x lower memory, better low-rank accuracy; easiest to justify as a "modernised Centrifuge" comparator.
+- **Sylph** (Nat. Biotechnol. 2024/2025) — 10–50x less CPU, ~30x less memory than Kraken2, but a species-abundance profiler not a per-read classifier — secondary/stretch candidate only.
+- **MetaCache-GPU** and **GPMeta** — GPU hash-table redesigns for the same k-mer-lookup problem; candidate GPU-performance comparators.
+- **kache-hash** (bioRxiv, Feb 2026) and **MegIS** (CMU SAFARI, ISCA 2024) — not comparators, but must-cite prior art: kache-hash is a cache-conscious k-mer hash table conceptually adjacent to Thesis 1 (needs explicit differentiation in the writeup); MegIS frames "table lookup is the bottleneck" for Kraken2-class classifiers, same core premise as this thesis at a different memory tier.
+- No prior published work found using classic double hashing (as opposed to cuckoo hashing) in a genomics hash table — flagged as a genuine, citable gap for Thesis 2.
+
+### Action items
+- Finalise the tool shortlist for benchmarking (Metabuli + Centrifuger as primary candidates per same-day research above — confirm with sir before locking in)
+- Continue researching ESKAPE-relevant tools on cache-miss and GPU-performance axes
+- Write up the time/space tradeoff framing and where each candidate tool sits on it, as a short report
+- Carried over: apply `kraken2_opt_v1.patch` and measure the real delta (still outstanding)
+- Carried over: get Centrifuge running (setup + first data)
+
+### Next meeting
+2026-08-12, 4–5 pm (standing Wednesday slot) — *unconfirmed, per the standing cadence*
