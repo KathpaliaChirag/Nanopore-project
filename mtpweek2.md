@@ -9,8 +9,8 @@ flowchart LR
     K -.new this week.-> CG[Centrifuger]
     MB -.accuracy on long reads.-> K
     CG -.same family as.-> CF
-    T1["Thesis 1: Adaptive K-mer Cache"] -.protects.-> Speed["Kraken2's speed edge"]
-    T2["Thesis 2: Cell-Width + Double Hashing"] -.protects.-> Speed
+    T1["Thesis 1 - Adaptive K-mer Cache"] -.protects.-> Speed["Kraken2's speed edge"]
+    T2["Thesis 2 - Cell-Width + Double Hashing"] -.protects.-> Speed
 ```
 
 ## Why this week
@@ -43,28 +43,104 @@ Only one commit landed between `WEEK1_REPORT.md` and today — Meeting 10's minu
 
 Two of these are real gaps that will need attention eventually — the missing DB rebuild and the `compact_hash.cc` backup aren't going away, just waiting their turn. One is a trivial fix with no reason to still be pending. The rest are correctly sequenced behind this week's actual job: locking in what Kraken2 and Centrifuge get compared against, before either thesis writes a line of implementation code.
 
+```mermaid
+flowchart TD
+    subgraph Fixed["Fixed this week"]
+        F1["-M memory-mapping flag flipped on in run_kraken2_opt_v1.sh"]
+    end
+
+    subgraph Expected["Expected, not a problem"]
+        E1["Thesis 1 adaptive k-mer cache not started"]
+        E2["Thesis 2 cell-width and double hashing not started"]
+    end
+
+    subgraph Deferred["Deferred"]
+        D1["eskape_650mb and eskape_human_4gb DBs missing, need full rebuild"]
+        D2["ncbi-genome-download v0.3.3 200-genome ceiling"]
+        D3["perf record dwarf trace for Centrifuge's 96-thread IPC collapse"]
+        D4["compact_hash.cc.pre_opt_v1 backup missing, low priority"]
+    end
+
+    classDef fixed fill:#2ea44f,stroke:#1a7f37,color:#fff
+    classDef expected fill:#0969da,stroke:#0550ae,color:#fff
+    classDef deferred fill:#6e7781,stroke:#57606a,color:#fff
+
+    class F1 fixed
+    class E1,E2 expected
+    class D1,D2,D3,D4 deferred
+```
+
 That job starts with the tool shortlist itself — which candidates made the cut, which didn't, and why.
 
 ## Finalising the tool shortlist
 
-Meeting 10 asked for one thing: a benchmark shortlist beyond Centrifuge, with an ESKAPE-relevant cache-miss/GPU angle and an honest time/space tradeoff framing. Here's the decision. You add two tools outright — **Metabuli** and **Centrifuger**. You hold one tool — **Sylph** — pending a scope decision. You drop one tool that already got reviewed — **Bracken**. You cite four pieces of prior art without benchmarking them. And you keep one claim in your back pocket that no one else has made yet. The rest of this section justifies each call.
+Meeting 10 asked for one thing: a benchmark shortlist beyond Centrifuge, with an ESKAPE-relevant cache-miss/GPU angle and an honest time/space tradeoff framing. Here's the decision, laid out below — the rest of this section justifies each call.
+
+```mermaid
+flowchart TD
+    Dec["Meeting 10 tool-shortlist decision"]
+
+    subgraph IN["Benchmarked — in the comparison"]
+        direction LR
+        K(["Kraken2"])
+        CF(["Centrifuge"])
+        MB(["Metabuli"])
+        CG(["Centrifuger"])
+    end
+
+    subgraph HELD["Held — pending scope decision"]
+        SY{{"Sylph"}}
+    end
+
+    subgraph OUT["Ruled out"]
+        BR>"Bracken"]
+    end
+
+    subgraph CITE["Cited only — prior art, never benchmarked"]
+        direction LR
+        KH[["kache-hash"]]
+        MG[["MegIS"]]
+        MCG[["MetaCache-GPU"]]
+        GP[["GPMeta"]]
+    end
+
+    Dec -.already running, plus two new.-> IN
+    Dec -.hold, scope call needed.-> HELD
+    Dec -.reviewed, dropped.-> OUT
+    Dec -.cite, do not benchmark.-> CITE
+
+    classDef inStyle fill:#d4edda,stroke:#28a745,color:#155724,stroke-width:2px
+    classDef heldStyle fill:#fff3cd,stroke:#ffc107,color:#856404,stroke-width:2px
+    classDef outStyle fill:#f8d7da,stroke:#dc3545,color:#721c24,stroke-width:2px
+    classDef citeStyle fill:#e2e3e5,stroke:#6c757d,color:#383d41,stroke-width:2px
+
+    class K,CF,MB,CG inStyle
+    class SY heldStyle
+    class BR outStyle
+    class KH,MG,MCG,GP citeStyle
+
+    style IN fill:#eafaf1,stroke:#28a745,stroke-width:1px
+    style HELD fill:#fffbea,stroke:#ffc107,stroke-width:1px
+    style OUT fill:#fdecea,stroke:#dc3545,stroke-width:1px
+    style CITE fill:#f1f2f3,stroke:#6c757d,stroke-width:1px,stroke-dasharray: 4 4
+```
 
 ### Metabuli: added for accuracy, not for efficiency
 
-Kraken2 and Centrifuge both stumble on long reads. Nanopore reads carry indels — insertions and deletions from the sequencer, not from biology — and both tools' exact k-mer matching treats an indel-shifted k-mer as a mismatch against every reference it should have hit. Portik et al. (2022) documented the damage directly: Kraken2, Centrifuge, Bracken, and MetaPhlAn3 all produce many spurious low-abundance species calls on long-read data from this exact failure mode, a problem abundance filtering only partially corrects. That's not noise you average away — it's a systematic accuracy gap in both tools you're already benchmarking.
+Kraken2 and Centrifuge both stumble on long reads. Nanopore reads carry indels — insertions and deletions from the sequencer, not from biology — and both tools' exact k-mer matching treats an indel-shifted k-mer as a mismatch against every reference it should have hit. Portik et al. (2022) documented the damage with real numbers: on the PacBio HiFi ATCC mock community, Kraken2 correctly found all 20 true species but also called 96 false-positive species at default filtering (precision 0.17), and Centrifuge called 16 false positives (precision 0.56) — both classifiers over-calling low-abundance species from indel-shifted k-mers. A moderate 0.1% abundance filter cuts Kraken2's false positives to roughly 10 or fewer, but at some real cost to recall. That's not noise you average away — it's a systematic accuracy gap in both tools you're already benchmarking, and it's the reason the paper's own recommendation is to reach for long-read-native tools (BugSeq, MEGAN-LR, sourmash) instead of filtering your way out of it. See the Sources section at the end of this document for the full citation.
 
 Metabuli (Kim & Steinegger, *Nature Methods* 2024) targets that gap directly. It combines amino-acid-level and DNA-level k-mer matching, so an indel that breaks the DNA match can still be caught at the amino-acid level. That's why it earns a shortlist spot: it's the one tool here that can survive the exact failure mode Portik et al. documented.
 
-Here's the wrong intuition to name before it costs you a benchmark run: you might assume the newer, accuracy-focused tool is also the leaner one. It isn't, necessarily. Metabuli's own docs describe "8 GiB sufficient" — but that's a tunable cap you set at classify time, not a measured peak. An independent third-party test (the Movi Color paper, PMC12154825, Table 3) ran Metabuli head-to-head against Kraken2 on a real 75,166-genome Pseudomonadota database, and the result cuts the other way: Kraken2 used **34 GB** against Metabuli's **54–56 GB**, and Kraken2 finished in **36.82s (16 threads) / 445.19s (1 thread)** against Metabuli's **932.00s / 9,868.75s** — roughly 22–25x slower.
+Here's the wrong intuition to name before it costs you a benchmark run: you might assume the newer, accuracy-focused tool is also the leaner one. It isn't, necessarily. Metabuli's own docs describe "8 GiB sufficient" — but that's a tunable cap you set at classify time, not a measured peak. A third-party test (the Movi Color paper, PMC12154825, Table 3 — a 2025 bioRxiv preprint, not yet peer-reviewed) ran Metabuli head-to-head against Kraken2 on a real 75,166-genome Pseudomonadota database, and the result cuts the other way: Kraken2 used **34 GB** against Metabuli's **54–56 GB**, and Kraken2 finished in **36.82s (16 threads) / 445.19s (1 thread)** against Metabuli's **932.00s / 9,868.75s** — roughly 22–25x slower. One caveat worth carrying forward: this test is independent of Metabuli's authors, but not fully independent of Kraken2's — co-author Ben Langmead is also a co-author of the original Kraken2 paper. That doesn't invalidate the numbers, but treat this as a credible third-party data point, not a neutral referee.
 
 > [!WARNING]
-> Metabuli is an accuracy comparator, not an efficiency comparator. When you write up the time/space tradeoff section, do not present Metabuli as cheap or fast — the sourced, independent number says the opposite. Its case rests entirely on sensitivity for long-read, indel-heavy data.
+> Metabuli is an accuracy comparator, not an efficiency comparator. When you write up the time/space tradeoff section, do not present Metabuli as cheap or fast — the sourced third-party number says the opposite. Its case rests entirely on sensitivity for long-read, indel-heavy data.
 
 ### Centrifuger: the real FM-index successor, not a version bump
 
 Centrifuge is your required baseline, so a genuine successor in the same algorithmic family — FM-index-based, not k-mer-based — is worth more to your space-tradeoff story than an unrelated tool would be. Centrifuger (Song et al., *Genome Biology* 2024) is that successor. It isn't Centrifuge with a new release number; it's a from-scratch implementation using a run-block-compressed Burrows-Wheeler transform, built specifically to shrink the memory footprint that made Centrifuge expensive to index at scale.
 
-The two build-time footprints you already have (see the full sourced comparison later in this document) let you check that claim yourself: Centrifuge needs 69 GB for a 109-Gbp NCBI nt index, and Centrifuger needs 43 GB for a 140-Gbp RefSeq prokaryotic index. Normalised per gigabase of reference sequence, that's roughly 0.63 GB/Gbp for Centrifuge against roughly 0.31 GB/Gbp for Centrifuger — about half, on the same algorithm family. That's the "~2x more memory-efficient" claim, and it comes straight out of the numbers you already have, not a separate source.
+The two build-time footprints you already have (see the full sourced comparison later in this document) let you check that claim yourself: Centrifuge needs 69 GB for a 109-Gbp NCBI nt index, and Centrifuger's 140-Gbp RefSeq prokaryotic index is 41 GB on disk (classifying reads against it peaks a little higher, at 43 GB). Normalised per gigabase of reference sequence, that's roughly 0.63 GB/Gbp for Centrifuge against roughly 0.29-0.31 GB/Gbp for Centrifuger — about half, on the same algorithm family. That's the "~2x more memory-efficient" claim, and it comes straight out of the numbers you already have, not a separate source.
 
 Acknowledge the failure point here too: memory efficiency doesn't come free. At 8 threads, Centrifuger classifies roughly 1.2M reads/min against Centrifuge's 2.7M and Kraken2's 6.7M — Centrifuger is the slowest of the three, including slower than the tool it's meant to succeed. What it buys back is accuracy: on CAMI2, species-level sensitivity is up 72.9% over Centrifuge and 54.1% over Kraken2, with precision up 8.3% and 11.0% respectively; on real WGS data the gains are smaller but still positive (sensitivity +10.6%/+1.3%, precision +5.8%/+18.6%). Same family as your baseline, real memory win, real speed cost — that's a complete tradeoff story, and it's the reason Centrifuger belongs on the shortlist. The full sourced comparison — memory, speed, and accuracy for all five tools on the shortlist — lives in the dedicated time/space tradeoff section below; the short version: Kraken2 anchors cheap-and-fast, Metabuli anchors accurate-but-expensive, Centrifuger sits in between.
 
@@ -98,9 +174,36 @@ Shortlist proposal is ready for sir's sign-off: Metabuli and Centrifuger recomme
 
 Centrifuge gave you one alternative to Kraken2's hash table: an FM-index, walked one character at a time instead of hashed. Metabuli gives you a second, and it's a different kind of alternative — it adds an amino-acid-level classification layer on top of DNA k-mers, aiming to catch what Kraken2 and Centrifuge both miss on long, error-prone Nanopore reads. That's the case for adding it: sensitivity on the reads this project actually cares about, not a smaller or faster index.
 
-Don't expect Metabuli to win on resource cost, though — the tool-shortlist section above already walked through the independent Movi Color benchmark showing Kraken2 beating it on both memory and speed (roughly 22-25x faster). Metabuli's pitch is accuracy, not speed or memory. Keep that in mind before writing up any Metabuli number next to a Kraken2 one — a fast, light number is not what you should expect to see.
+Don't expect Metabuli to win on resource cost, though — the tool-shortlist section above already walked through the third-party Movi Color benchmark showing Kraken2 beating it on both memory and speed (roughly 22-25x faster). Metabuli's pitch is accuracy, not speed or memory. Keep that in mind before writing up any Metabuli number next to a Kraken2 one — a fast, light number is not what you should expect to see.
 
 The good news is on the Orion side, and it's a real reversal from Week 1. Centrifuge's ARM64 story was bad: a dead x86 SSE2/CPUID inline-asm bug inherited from Bowtie2, unfixed upstream for six years, bad enough that a from-source build wasn't even worth trying as a fallback. Metabuli's ARM64 story is the opposite. Real prebuilt ARM64 binaries exist, and Metabuli's own `mmseqs2` dependency has genuine NEON support — no known ARM64 build-failure issues at all. Orion is the easy machine this time.
+
+```mermaid
+flowchart TD
+    subgraph LunaPath["Luna path"]
+        direction TB
+        L1["conda install metabuli (bioconda, v1.2.0)"]
+        L1F["fallback - build from source<br/>git clone --recurse-submodules<br/>cmake + make"]
+        L1 -.if solve fails.-> L1F
+    end
+
+    subgraph OrionPath["Orion path - one step this time, unlike Centrifuge's fallback ladder"]
+        direction TB
+        O1["prebuilt ARM64 binary<br/>metabuli-linux-arm64.tar.gz<br/>(or conda - same recipe, no build needed)"]
+    end
+
+    L1 --> DB
+    L1F --> DB
+    O1 --> DB
+
+    DB["Build ESKAPE database<br/>FASTA list + accession-to-taxid map + taxonomy dir"] --> CLS["Classify Nanopore reads<br/>metabuli classify --seq-mode 3"]
+    CLS --> OUT["6-column report<br/>clade pct, clade reads, direct reads, rank, taxID, name"]
+
+    classDef easy fill:#d4f7d4,stroke:#2e7d32,stroke-width:2px
+    classDef shared fill:#e8eef7,stroke:#4a6fa5,stroke-width:1px
+    class O1 easy
+    class DB,CLS,OUT shared
+```
 
 ### 1. Install on Luna
 
@@ -188,6 +291,35 @@ With Metabuli running on both machines, you'll have a third classifier in the he
 
 The name invites a lazy assumption: "Centrifuger" sounds like Centrifuge with a bug fix bolted on. It isn't. It's a from-scratch FM-index implementation — a run-block-compressed BWT, built independently — not a fork of the Bowtie2/Centrifuge codebase. That distinction isn't trivia. Centrifuge's ARM64 build fails for a codebase-specific reason: Bowtie2's x86-only CPUID detection code, hardcoded `-msse2`, no ARM path, dead upstream since 2019. Centrifuger doesn't carry that code, so it doesn't inherit that specific failure. That's not the same as a guarantee it builds clean on Orion — more on that below.
 
+```mermaid
+flowchart TD
+    subgraph LUNA["Luna path - low risk"]
+        direction TB
+        L1["Install - conda or from-source make"] --> L2["Build ESKAPE index"]
+        L2 --> L3["Classify reads"]
+        L3 --> L4["8-column TSV output"]
+    end
+
+    subgraph ORION["Orion path - unknown, needs testing"]
+        direction TB
+        O1["Install - from-source make only"]:::unknown
+        Q1["? No prebuilt binary for any arch - never confirmed working on ARM64"]:::note
+        O1 -.-> Q1
+        O1 -->|if it succeeds| O2["Build ESKAPE index"]
+        O1 -.->|if it fails| OF["Document exact error, move on"]:::note
+        O2 --> O3["Classify reads"]
+        O3 --> O4["8-column TSV output"]
+    end
+
+    L4 -.same script adaptation needed.-> ADAPT["Adapt parsing script - different 8-column shape vs Kraken2/Metabuli"]
+    O4 -.-> ADAPT
+
+    classDef unknown stroke-dasharray: 5 5,stroke:#d9822b,stroke-width:2px,fill:#fff3e0
+    classDef note stroke-dasharray: 3 3,stroke:#d9822b,color:#d9822b,fill:none
+    style LUNA stroke:#2e7d32,stroke-width:2px
+    style ORION stroke-dasharray: 6 3,stroke:#d9822b,stroke-width:2px
+```
+
 ### 1. Install on Luna
 
 Bioconda first, same pattern as every other tool this project has installed:
@@ -248,7 +380,7 @@ $ ./centrifuger -x ~/AccuracyDrift/databases/centrifuger_eskape/cg_base \
 
 ### 5. Memory: watch the right number
 
-Centrifuger's whole design point is memory frugality — the paper reports 43GB for a 140-Gbp full RefSeq-scale prokaryotic build, roughly half what comparable FM-index tools need at that scale. Your ESKAPE-only index is nowhere near that scale, so don't expect or chase the paper's headline number — the number worth watching this week is how Centrifuger's footprint compares to Kraken2's on the same six genomes, not to Centrifuger's own full-scale build.
+Centrifuger's whole design point is memory frugality — the paper reports a 41GB on-disk index for a 140-Gbp full RefSeq-scale prokaryotic build, with classification peaking a little higher at 43GB, roughly half what comparable FM-index tools need at that scale. Your ESKAPE-only index is nowhere near that scale, so don't expect or chase the paper's headline number — the number worth watching this week is how Centrifuger's footprint compares to Kraken2's on the same six genomes, not to Centrifuger's own full-scale build.
 
 ### 6. GPU
 
@@ -266,19 +398,37 @@ Here's the sourced comparison, pulled straight from the round-1 research pass. N
 |---|---|---|---|---|
 | Kraken2 | 10.6 GB (9.1-Gbp bacteria+archaea+viral RefSeq index; Kraken1 on the same refs = 72.4 GB) | 93M paired-end reads/min @ 16 threads | Sensitivity/PPV/F1 reported per-genus, no single headline number | Wood, Lu & Langmead, *Genome Biology* 2019 |
 | Centrifuge | 4.2 GB (4,278 genomes); 69 GB (full NCBI nt, 109 Gbp) | 10M reads/20min @ 1 core; ~563K reads/min @ 8 cores (Kim et al. 2016, simulated — a different, older benchmark; see the Centrifuger row below for the same-study, Song et al. 2024, 8-thread number: Centrifuge 2.7M reads/min) | Species: 76.9% sens / 98.4% prec; Genus: 93.1% sens / 99.6% prec (simulated) | Kim et al., *Genome Research* 2016 |
-| Centrifuger | 43 GB (140-Gbp RefSeq prokaryotic DB: 23GB RBBWT + 17GB seq IDs + overhead) | ~163K reads/min/thread; @8 threads: Centrifuger 1.2M, Centrifuge 2.7M, **Kraken2 6.7M reads/min (fastest of the three)** | CAMI2: species sensitivity +72.9%/+54.1% vs Centrifuge/Kraken2, precision +8.3%/+11.0%. Real WGS: sens +10.6%/+1.3%, prec +5.8%/+18.6% | Song et al., *Genome Biology* 2024 |
-| Metabuli | "8 GiB sufficient" is a tunable cap, not a fixed peak — independent test showed 54-56GB vs Kraken2's 34GB on a 75K-genome DB | Independent test (Movi Color, PMC12154825, Table 3): 16T — Kraken2 36.82s vs Metabuli 932.00s (~25.3x); 1T — Kraken2 445.19s vs Metabuli 9,868.75s (~22.2x) (see finding below) | CAMI2 plant-associated: covers 99%/98% of best DNA-/AA-only classifiers' calls jointly | Kim & Steinegger, *Nat. Methods* 2024; independent numbers from Movi Color, PMC12154825 |
+| Centrifuger | 41 GB on-disk index (140-Gbp RefSeq prokaryotic DB: 23GB RBBWT + 17GB seq IDs + overhead); 43 GB peak while classifying | ~163K reads/min/thread; @8 threads: Centrifuger 1.2M, Centrifuge 2.7M, **Kraken2 6.7M reads/min (fastest of the three)** | CAMI2: species sensitivity +72.9%/+54.1% vs Centrifuge/Kraken2, precision +8.3%/+11.0%. Real WGS: sens +10.6%/+1.3%, prec +5.8%/+18.6% | Song et al., *Genome Biology* 2024 |
+| Metabuli | "8 GiB sufficient" is a tunable cap, not a fixed peak — third-party test showed 54.26-55.59GB vs Kraken2's 34.17-34.58GB peak RSS on a 75K-genome DB | Third-party test (Movi Color, PMC12154825, Table 3, 2025 preprint): 16T — Kraken2 36.82s vs Metabuli 932.00s (~25.3x); 1T — Kraken2 445.19s vs Metabuli 9,868.75s (~22.2x) (see finding below) | CAMI2 plant-associated: covers 99%/98% of best DNA-/AA-only classifiers' calls jointly | Kim & Steinegger, *Nat. Methods* 2024; numbers from Movi Color, PMC12154825 (shares a co-author with the Kraken2 paper — see Sources) |
 | Sylph (not per-read, abundance profiler) | <4 GB for >25K genomes vs Bracken's 134 GB (30x less); 16 GB for 85,205 prokaryote + 2.9M viral DB | >100x less CPU time, >50x less wall time than next-fastest tool | Highest F1 on CAMI2 Marine & Strain Madness; 92% precision/82% F1 on synthetic undercharacterized metagenome (others <50%/<60%) | Shaw & Yu, *Nature Biotechnology* 2024 |
 
 A word of caution before you read anything into these side by side: these numbers come from different papers, different reference databases, and different hardware. A GB figure from one row and a reads/min figure from another aren't measured on the same yardstick. Treat this table as a map of where each tool roughly sits, not a leaderboard you can rank by column.
 
 That caution matters even more for which rows belong next to each other at all. Kraken2, Centrifuge, Centrifuger, and Metabuli are apples-to-apples — all four are per-read classifiers, all four answer "what taxon does this individual read come from." Sylph is not in that group. Sylph is an abundance profiler: it estimates what fraction of a sample each organism makes up, not what each individual read is. Different output granularity, different question. Its memory and speed numbers look spectacular next to Kraken2's, but that's not a fair fight — it's not doing the same job. Sylph stays in this table as a stretch-goal reference point, not a real competitor to the other four.
 
-Now the finding worth sitting with. Metabuli's own paper reports it running comfortably in "8 GiB" — that reads like a clear memory win over Kraken2's 10.6GB. But that figure is a tunable cap, not what Metabuli actually uses at realistic scale. The one independent head-to-head test in this research — the Movi Color paper, run on a real 75,166-genome Pseudomonadota database — found the opposite of what Metabuli's own numbers suggest: **Kraken2 used less memory (34GB vs Metabuli's 54-56GB) and was roughly 22-25x faster — 36.82s (16 threads) / 445.19s (1 thread) vs Metabuli's 932.00s (16 threads) / 9,868.75s (1 thread)**. That's not a close call on either axis. Metabuli isn't a free lunch. Its real case is classification sensitivity and accuracy on long, indel-heavy reads — catching what Kraken2 and Centrifuge miss, per Portik et al. 2022's false-positive findings — not resource efficiency. If Metabuli shows up in this thesis's benchmark suite, it belongs there as an accuracy comparator, full stop, not a "smaller and faster too" one.
+Now the finding worth sitting with. Metabuli's own paper reports it running comfortably in "8 GiB" — that reads like a clear memory win over Kraken2's 10.6GB. But that figure is a tunable cap, not what Metabuli actually uses at realistic scale. The one head-to-head test in this research — the Movi Color paper, run on a real 75,166-genome Pseudomonadota database — found the opposite of what Metabuli's own numbers suggest: **Kraken2 used less memory (34GB vs Metabuli's 54-56GB) and was roughly 22-25x faster — 36.82s (16 threads) / 445.19s (1 thread) vs Metabuli's 932.00s (16 threads) / 9,868.75s (1 thread)**. That's not a close call on either axis — though carry the same caveat from above: this test isn't fully independent of Kraken2's authorship lineage, so treat it as strong third-party evidence, not a neutral referee's verdict. Metabuli isn't a free lunch. Its real case is classification sensitivity and accuracy on long, indel-heavy reads — catching what Kraken2 and Centrifuge miss, per Portik et al. 2022's false-positive findings (96 vs 16 false-positive species on the HiFi ATCC mock community, before filtering — see Sources) — not resource efficiency. If Metabuli shows up in this thesis's benchmark suite, it belongs there as an accuracy comparator, full stop, not a "smaller and faster too" one.
 
 Centrifuger is the honest contrast case. It trades away speed for memory in the way you'd expect from any classic tradeoff: at 8 threads it manages 1.2M reads/min against Kraken2's 6.7M — genuinely slower, no surprise there. But it's the leanest of the FM-index-family tools relative to what it buys, and it closes most of the accuracy gap that plagued Centrifuge (species sensitivity up 54.1% over Kraken2 on CAMI2). No hidden reversal, no asterisk — Centrifuger sits where its design says it should sit.
 
 So here's what the table actually tells you about this thesis. Kraken2's speed advantage over everything else in this table is real and shows up two ways: the table's own headline figure, 93M paired-end reads/min at 16 threads (Wood et al. 2019, its own benchmark hardware), and — the number that actually matters for a same-study comparison — 6.7M reads/min at 8 threads against Centrifuger's 1.2M and Centrifuge's 2.7M, all three from Song et al. 2024. Those two Kraken2 numbers aren't the same measurement (different thread count, different paper, different hardware), so don't quote 93M as if it's directly beating Centrifuger's 1.2M — the fair, same-study comparison is 6.7M vs 1.2M vs 2.7M, and Kraken2 still wins that one clean. Add the roughly 22-25x margin over Metabuli on real data (Movi Color, PMC12154825), and every same-study comparison in this table points the same direction. Thesis 1 (the adaptive k-mer cache) and Thesis 2 (cell-width reduction + double hashing) are both, explicitly, attempts to make Kraken2 itself cheaper on memory without giving up that speed. That's the opposite move from what Metabuli and Centrifuger make — they buy something (accuracy, memory) by spending speed. This thesis is betting it doesn't have to make that trade at all. Neither thesis has started implementation yet — both are still fully open per the carried-over Week 1 punch list — but this table is the argument for why they're worth doing: Kraken2's speed is the one asset on this whole curve that nothing else here matches, and it's the one thing a naive memory-shrinking approach could easily throw away by accident. Protecting it, not trading it, is the actual design constraint for both theses going into Week 2.
+
+```mermaid
+flowchart LR
+    subgraph Curve["The time/space tradeoff curve — schematic position, not exact plotted values"]
+        direction LR
+        Cheap["Cheap-and-fast pole<br/>low memory, high throughput"] -.anchor.-> K["Kraken2<br/>10.6GB · 6.7M reads/min @ 8T<br/>speed anchor of the whole table"]
+        K -.gives up some speed, stays cheap.-> CF["Centrifuge<br/>4.2-69GB · 2.7M reads/min @ 8T<br/>modest accuracy"]
+        CF -.trades more speed for memory and accuracy.-> CG["Centrifuger<br/>41-43GB · 1.2M reads/min @ 8T<br/>closes most of the accuracy gap"]
+        CG -.trades most speed for accuracy.-> MB["Metabuli<br/>54-56GB · roughly 22-25x slower than Kraken2<br/>accuracy anchor of the whole table"]
+        MB -.anchor.-> Exp["Accurate-but-expensive pole<br/>high memory, low throughput"]
+    end
+
+    K -.not a fair comparison, different question entirely.-> SY["Sylph<br/>abundance profiler, not per-read classifier<br/>under 4-16GB, over 100x less CPU time"]
+
+    T["Thesis 1 and Thesis 2"] -.bet on holding this exact position, not drifting toward Metabuli or Centrifuger.-> K
+
+    Note["Note - left-to-right order and spacing are relative and conceptual only.<br/>Real sourced numbers live in the table above this diagram; don't read position as measured precision."]
+```
 
 ## Starter study: getting double hashing right
 
@@ -308,7 +458,32 @@ slot[i] = (h1 + i * h2) & (table_size - 1);
 
 Two multiplies, not one sliced product. `C1` stays the constant already living in Patch 4, so `h1` costs nothing new. `C2` is a second, independently well-vetted odd constant — it doesn't need to be exotic, splitmix64's is a standard, battle-tested choice. The `| 1` on `h2` forces it odd, which makes it coprime to Kraken2's power-of-2 table size, which is what guarantees the probe sequence `h1, h1+h2, h1+2h2, ...` eventually visits every slot instead of cycling through a subset and false-declaring the table full.
 
-Worth saying plainly: no existing genomics or k-mer hash table checked so far — Jellyfish, KMC2/3, Gerbil, CHTKC, KCMBT — already does this. This isn't a case of going and reading how someone else solved it first. Thesis 2's double-hashing move is genuinely open ground for the field.
+```mermaid
+flowchart LR
+    K["k-mer<br/>64-bit integer"]
+
+    subgraph TRAP["The trap - slicing one product"]
+        M0["x C<br/>one Fibonacci multiply"] --> P0["64-bit product"]
+        P0 -->|"slice top bits"| H1bad["h1<br/>well mixed"]
+        P0 -->|"slice a different<br/>bit range"| H2bad["h2<br/>weak, correlated<br/>with the raw key"]
+    end
+
+    subgraph FIX["The fix - two independent multiplies"]
+        M1["x C1<br/>golden-ratio constant<br/>already in Patch 4"] --> P1["64-bit product 1"]
+        M2["x C2<br/>splitmix64 constant<br/>independent, odd"] --> P2["64-bit product 2"]
+        P1 -->|"top bits"| H1["h1<br/>initial slot"]
+        P2 -->|"top bits, forced odd"| H2["h2<br/>probe step"]
+    end
+
+    K --> M0
+    K --> M1
+    K --> M2
+    H2bad --> Clu["probe step re-creates<br/>the clustering double<br/>hashing was meant to escape"]
+    H1 --> D["double hashing probe sequence<br/>h1, h1+h2, h1+2h2, ..."]
+    H2 --> D
+```
+
+Worth saying plainly: no existing genomics or k-mer hash table checked so far — Jellyfish, KMC2/3, Gerbil, CHTKC, KCMBT — already does this. This isn't a case of going and reading how someone else solved it first. Thesis 2's double-hashing move is genuinely open ground for the field. (The classic academic source behind the multiplicative-hashing idea itself, not the double-hashing extension, is Knuth, *TAOCP Vol. 3*, 2nd ed., Section 6.4 — see Sources.)
 
 ### What Week 2 needs out of this
 
@@ -320,13 +495,27 @@ Meeting 10 asked you directly about GPU performance. You don't have a good answe
 
 Here's the honest counter-pull: Thesis 1 and Thesis 2 are both CPU-hardware-efficiency work — cache topology, hashing schemes, memory bandwidth. A GPU classifier doesn't test either thesis. It's context for the "what about GPU performance" question, not a result either thesis needs. Treat it that way: a stretch goal, not the critical path. If it slips, nothing else in this plan slips with it.
 
+```mermaid
+flowchart TD
+    Start["Stretch goal check-in"] --> D1{"Is it roughly midweek AND are Metabuli and Centrifuger both running?"}
+    D1 -- "No" --> Skip["Skip the GPU comparator this week entirely - revisit next week. Nothing else in the plan slips with it."]
+    D1 -- "Yes" --> D2{"Which GPU classifier?"}
+    D2 -- "GPMeta" --> Reject["Do not attempt - binary-only, no source, no documented CUDA/compute-capability requirement, dormant since June 2024, later bug report went unanswered"]
+    D2 -- "MetaCache-GPU" --> Pick["Recommended - actively maintained, real commits into 2026, live issue responses"]
+    Pick --> B1["Confirm Luna's CUDA version is 11.8 or newer for sm_89 - resolve first if older, not mid-build"]
+    B1 --> B2["git submodule update --init --recursive - pulls warpcore hashtable + bb_segsort"]
+    B2 --> B3["make gpu CUDA_ARCH=sm_89"]
+    B3 --> B4["Build ESKAPE-scale index only - full RefSeq needs ~120GB GPU memory, Luna's 2xL40S gives 96GB total"]
+    B4 --> Done["Done - GPU comparator numbers ready to fold into the write-up"]
+```
+
 ### Pick MetaCache-GPU, not GPMeta
 
 Two GPU-capable k-mer classifiers exist. Only one is worth your time this week.
 
 #### GPMeta — do not attempt
 
-It ships as a binary-only release: no source, no Makefile, nothing to fix if it breaks. There's no documented CUDA version or compute-capability requirement anywhere in the repo. The binaries are ~2022-2023 vintage, built for whatever GPU generation existed then — Luna's L40S is Ada Lovelace (compute capability sm_89), and running an old binary against a newer architecture risks a bare "no kernel image available for this device" error with no source to diagnose it from. The project has been dormant since June 2024, and there's an open crash-on-build issue that's sat unanswered for over a year. This isn't "a few hours of setup and see." It may simply not work, and if it doesn't, you won't know why. Skip it.
+It ships as a binary-only release: no source, no Makefile, nothing to fix if it breaks. There's no documented CUDA version or compute-capability requirement anywhere in the repo. The binaries are ~2022-2023 vintage, built for whatever GPU generation existed then — Luna's L40S is Ada Lovelace (compute capability sm_89), and running an old binary against a newer architecture risks a bare "no kernel image available for this device" error with no source to diagnose it from. The project has been dormant since June 2024 — its one code contributor answered an early build-crash report that same month, but a later bug report from August 2024 has sat unanswered ever since. This isn't "a few hours of setup and see." It may simply not work, and if it doesn't, you won't know why. Skip it.
 
 #### MetaCache-GPU — recommended
 
@@ -357,7 +546,7 @@ Only pick this up if Metabuli and Centrifuger are both running by roughly midwee
 
 ## Day-by-day schedule, risk, and what "done" means this week
 
-Same budget as Week 1: 2-4 focused hours a day, not full days. This week is nominally bigger than Week 1 — two comparators (Metabuli and Centrifuger) instead of one — but the definition of done below only requires both on Luna, not Orion; Week 1 actually finished its Luna work in about 2 of its 5 days and treated Orion as optional, so "2 tools, Luna-required" and "1 tool, both machines nominally planned" land at roughly the same real workload. That's what makes this week's scope defensible rather than doubled. It only fits if the two tools run as separate parallel tracks on Luna, Orion runs alongside rather than after, and the write-up gets folded in as numbers land instead of dumped at the end. The week runs Thursday 2026-08-06 through Monday 2026-08-10, leaving Tuesday and Wednesday morning as unscheduled buffer before the Wednesday 4-5pm meeting — same shape as Week 1's gap before its own Wednesday meeting.
+Same budget as Week 1: 2-4 focused hours a day, not full days. This week is nominally bigger than Week 1 — two comparators instead of one — but Orion stays optional here just like it was in Week 1, and Week 1 finished its required Luna work in about 2 of its 5 days. That's why doubling the tool count doesn't double the required workload: it only fits if the two tools run as separate parallel tracks on Luna, Orion runs alongside rather than after, and the write-up gets folded in as numbers land instead of dumped at the end. The week runs Thursday 2026-08-06 through Monday 2026-08-10, leaving Tuesday and Wednesday morning as unscheduled buffer before the Wednesday 4-5pm meeting — same shape as Week 1's gap before its own Wednesday meeting.
 
 | Day | Focus | Hours | Depends on |
 |---|---|---|---|
@@ -406,4 +595,130 @@ The critical path is Luna, twice over: install → index → classify has to com
 ### Definition of done this week
 
 You've proposed the tool shortlist and written it down — Metabuli and Centrifuger as primary additions, Sylph held pending a scope call — ready for sir's sign-off, not locked in unilaterally. You've got Metabuli and Centrifuger both producing real wall-time and memory numbers on Luna, each against a custom-built ESKAPE index, and you've written those numbers into the time/space tradeoff comparison alongside the existing Kraken2/Centrifuge baseline. You've made `-M` the default in `run_kraken2_opt_v1.sh` — no more zero-`-M` runs. You've got the double-hashing starter study as reading and formula-verification notes; you don't need an implementation yet, and none is expected this week. Orion success — on either tool — and the MetaCache-GPU stretch goal are both nice-to-have, not required; a documented Orion failure counts as a fine outcome as long as it's precise. Still not required, still open: the missing eskape DB rebuilds, the Centrifuge 96T dwarf trace, any Thesis 1/2 implementation work, the `compact_hash.cc` backup, and the `ncbi-genome-download` 200-genome ceiling — none of that is this week's job, and none of it should quietly slip into it.
+
+## Sources and Further Reading
+
+Every claim above with a number attached to it traces back to one of these. Each entry is the real, verified citation — title, venue, and a plain-language summary of what the source actually says — not a re-derived paraphrase. Grouped by role in this document: the two baselines, the two primary comparators, the secondary/ruled-out tools, the must-cite prior art, and the hashing-theory sources behind the double-hashing formula.
+
+### The two baselines
+
+#### [Improved metagenomic analysis with Kraken 2](https://doi.org/10.1186/s13059-019-1891-0)
+**Wood, D.E., Lu, J. & Langmead, B., *Genome Biology* 20:257, 2019**
+
+Kraken 2 replaces Kraken 1's memory-hungry sorted list of every k-mer and its lowest-common-ancestor (LCA) with a probabilistic compact hash table, and only indexes minimizers (a subsampled set of representative k-mers per read window) instead of every k-mer. Classification still works by exact k-mer matching: each k-mer (via its minimizer) is looked up in the hash table and mapped to a taxon, and a read's final call is the LCA that best explains its matched k-mers. This redesign cuts memory use by about 85% — a standard RefSeq bacterial/archaeal/viral index that took 72.4 GB under Kraken 1 needs only 10.6 GB under Kraken 2 — while also making it roughly 5x faster, classifying paired-end reads at over 93 million reads/minute with 16 threads (versus ~18 million reads/minute for Kraken 1), with accuracy held roughly constant.
+
+*Why it's cited here:* Kraken 2's compact-hash-table/minimizer design is the direct ancestor of the cell-width and cache-locality work in Thesis 2 and Thesis 1 of this project, and its RefSeq-index/speed numbers (10.6 GB, 93M reads/min) are the baseline this project's patch and -M benchmarks are measured against.
+
+#### [Centrifuge: rapid and sensitive classification of metagenomic sequences](https://doi.org/10.1101/gr.210641.116)
+**Kim, D., Song, L., Breitwieser, F.P. & Salzberg, S.L., *Genome Research* 26(12):1721-1729, 2016**
+
+Centrifuge takes a fundamentally different indexing strategy from Kraken: instead of hashing and looking up fixed-length k-mers, it builds a Burrows-Wheeler-Transform/FM-index over the reference genomes (the same family of data structure used by read aligners like Bowtie and BWA) and searches character-by-character, which supports variable-length exact matches rather than fixed k-mer lookups. Before indexing, Centrifuge also deduplicates near-identical sequence across closely related strains, which is a major reason it can fit an index for roughly 4,278 prokaryotic genomes into just 4.2 GB, versus tens to hundreds of GB for k-mer-hash approaches over comparable genome sets. In their benchmarks Centrifuge classified simulated reads at about 563,000 reads/minute on 8 cores, with 76.9% sensitivity and 98.4% precision at the species level.
+
+*Why it's cited here:* Centrifuge is the FM-index-based classifier this project uses as the comparison baseline for both thesis pieces, since its BWT/compressed-index approach represents the opposite point on the memory-vs-speed tradeoff curve from Kraken2's hash-table design that Thesis 1 and Thesis 2 are trying to improve.
+
+### The two primary comparators added this week
+
+#### [Metabuli: sensitive and specific metagenomic classification via joint analysis of amino acid and DNA](https://www.nature.com/articles/s41592-024-02273-y)
+**Kim, J. & Steinegger, M., *Nature Methods* 21, 971-973 (2024)**
+
+Metabuli classifies metagenomic reads by jointly analyzing them at two levels simultaneously: raw DNA k-mers and 6-frame-translated amino acid (AA) k-mers, packed together into a single k-mer structure the authors call a "metamer." DNA-based classifiers like Kraken2 are highly specific but lose sensitivity on novel or under-represented taxa; pure AA-based classifiers are the opposite. By scoring both channels per read, Metabuli aims to get DNA-level specificity and AA-level sensitivity in one pass. This joint-channel design also gives it resilience against indel-heavy reads: an insertion or deletion destroys exact-match DNA k-mers downstream of it, but the same indel frequently leaves the translated amino acid sequence locally alignable, so the AA channel can still register a hit the DNA channel alone would miss. On the CAMI2 plant-associated benchmark, Metabuli covers 99% of the calls made by the best pure-DNA classifier and 98% of the calls made by the best pure-AA classifier.
+
+*Why it's cited here:* Metabuli is the joint-DNA/AA sensitivity-specificity approach this project's cell-width/double-hashing thesis (Thesis 2) is being benchmarked against, and its metamer indel-robustness argument is the direct counterpoint to Kraken2's pure-DNA-k-mer design.
+
+#### [Movi Color: fast and accurate long-read classification with the move structure](https://pmc.ncbi.nlm.nih.gov/articles/PMC12154825/)
+**Tan, S., Majidian, S., Langmead, B. & Zakeri, M.; bioRxiv preprint, posted 27 May 2025 (Dept. of Computer Science, Johns Hopkins University)**
+
+Movi Color is a long-read taxonomic classifier built on the "move structure," a compressed FM-index-style indexing scheme, aimed at scaling classification to large long-read reference databases. As part of evaluating it, the authors ran a head-to-head benchmark against Kraken2 (v2.1.3) and Metabuli (v1-82ee9) on a 75,166-genome Pseudomonadota reference database using the CAMI2 plant-associated read set. Kraken2 used substantially less memory than Metabuli across both thread counts tested (34.17-34.58 GB vs. 54.26-55.59 GB peak RSS) and was markedly faster (445.19s vs. 9,868.75s at 1 thread; 36.82s vs. 932.00s at 16 threads — Metabuli roughly 22-25x slower). This is not a benchmark run by either Kraken2's or Metabuli's own authors — it comes from the Movi/move-structure team building a third tool. One caveat worth flagging: co-author Ben Langmead is also a co-author of the original Kraken2 paper, so the benchmark is independent of Metabuli's authors but not fully independent of Kraken2's authorship lineage. It is also, as of this citation, a bioRxiv preprint, not yet peer-reviewed.
+
+*Why it's cited here:* this is the third-party evidence backing this project's claim that Kraken2 beats Metabuli on both memory and speed in practice — with the Langmead/Kraken2 authorship overlap and preprint status both noted as caveats rather than presenting the comparison as a neutral, peer-reviewed referee call.
+
+#### [Centrifuger: lossless compression of microbial genomes for efficient and accurate metagenomic sequence classification](https://link.springer.com/article/10.1186/s13059-024-03244-4)
+**Song, L. & Langmead, B., *Genome Biology* 25, article 106 (2024)**
+
+Centrifuger replaces Centrifuge's Bowtie2-derived FM-index with its own from-scratch implementation built on a novel run-block compressed Burrows-Wheeler transform, achieving sublinear space complexity while still supporting fast rank queries; because it doesn't inherit Bowtie2's FM-index code, it also sidesteps the ARM64 build issues that come bundled with that codebase. The on-disk index for a 140-Gbp RefSeq prokaryotic database is 41 GB, and classifying reads against it peaks at 43 GB — either way, roughly half what comparable FM-index-based classifiers require. That compression isn't free: on CAMI2 benchmark data at 8 threads, Centrifuger classifies more slowly than both Centrifuge and Kraken2. In exchange, accuracy improves substantially — mean species-level sensitivity is 72.9% higher than Centrifuge's and 54.1% higher than Kraken2's, with precision gains of 8.3% and 11.0% respectively. The work received the RECOMB 2024 Best Paper Award.
+
+*Why it's cited here:* it is the accuracy/memory reference point this project's thesis pieces are being benchmarked against, and its "own FM-index, not a Bowtie2 fork" design is the reason it doesn't hit the ARM64 build problems documented for Centrifuge in this repo. Install/build commands in this document are pulled directly from its [GitHub repository](https://github.com/mourisl/centrifuger) (`centrifuger-build`, `centrifuger`, `centrifuger-quant`).
+
+### Secondary and ruled-out tools
+
+#### [Rapid species-level metagenome profiling and containment estimation with sylph](https://www.nature.com/articles/s41587-024-02412-y)
+**Shaw, J. & Yu, Y. W., *Nature Biotechnology* 43, 1348-1359 (2024)**
+
+Sylph is a metagenome *profiler*, not a per-read *classifier* — it sketches genomes and reads with FracMinHash and estimates containment average nucleotide identity (ANI) between each reference and the sample, rather than labeling individual reads. Indexing/querying >25,000 genomes took sylph <4 GB of memory versus 134 GB for Bracken (about 30-fold less), and it was >100-fold faster in CPU time and >50-fold faster in wall-clock time than the next-fastest tool tested. On CAMI2 Marine and Strain Madness, sylph achieved the highest F1 score of all methods compared.
+
+*Why it's cited here:* sylph is the closest existing tool to this project's "smaller database" thesis direction, and shows how far memory footprint can shrink versus k-mer-indexing classifiers — it's held as a secondary/stretch comparator only, since it answers a different question (abundance, not per-read classification) than Kraken2/Centrifuge/Centrifuger/Metabuli.
+
+#### [Bracken: estimating species abundance in metagenomics data](https://peerj.com/articles/cs-104/)
+**Lu, J., Breitwieser, F. P., Thielen, P. & Salzberg, S. L., *PeerJ Computer Science* 3, e104 (2017)**
+
+Bracken is a post-processing statistical layer, not a standalone classifier: it takes the taxonomy-labeled read counts Kraken (or KrakenUniq) already produced — where many reads get "stuck" at higher-rank LCA nodes — and uses Bayesian re-estimation to redistribute those counts down to species or genus abundance estimates. It has no k-mer database or read-mapping step of its own, so it cannot be run or benchmarked independently of the classifier that feeds it.
+
+*Why it's cited here:* this document treats Bracken only as context — its 134 GB memory figure is the baseline sylph is compared against above — and explicitly excludes it from standalone classifier comparisons since it has no independent classification path. Already reviewed by Chirag Suthar per Meeting 10.
+
+#### [Evaluation of taxonomic classification and profiling methods for long-read shotgun metagenomic sequencing datasets](https://link.springer.com/article/10.1186/s12859-022-05103-0)
+**Portik, D. M., Brown, C. T. & Pierce-Ward, N. T., *BMC Bioinformatics* 23, 541 (2022)**
+
+This paper benchmarks eleven taxonomic classification/profiling methods on PacBio HiFi and Oxford Nanopore mock-community datasets with known compositions. On the HiFi ATCC mock community, Kraken2 correctly detected all 20 true species but also called 96 false-positive species at default filtering (precision 0.17); Centrifuge fared better but still produced 16 false positives (precision 0.56). A moderate 0.1% abundance filter reduced Kraken2's false-positive count to roughly 10 or fewer, at some cost to recall. Long-read-native tools (BugSeq, MEGAN-LR, sourmash) achieved high precision and recall without needing this filtering, and the authors recommend them as best-practice long-read profiling tools.
+
+*Why it's cited here:* provides the concrete, verified numbers behind this document's claim that Kraken2/Centrifuge over-call low-abundance spurious taxa on long reads — 96 false positives/precision 0.17 for Kraken2 and 16/0.56 for Centrifuge on the HiFi ATCC benchmark before filtering — directly motivating why any cache/cell-width changes to Kraken2 must be evaluated on precision, not just speed/memory.
+
+### Must-cite prior art (not benchmarked)
+
+#### [kache-hash: A dynamic, concurrent, and cache-efficient hash table for streaming k-mer operations](https://www.biorxiv.org/content/10.64898/2026.02.13.705625v1)
+**Khan, J., Patro, R. & Pandey, P., bioRxiv preprint, posted 2026-02-16**
+
+kache-hash targets a mismatch in existing k-mer hash tables: static structures exploit the "streaming" locality of k-mers (consecutive k-mers share k-1 nucleotides and arrive in order) but can't support dynamic updates, while concurrent hash tables support updates but ignore that locality. The authors build it on Iceberg hashing but replace its generic hash function with a minimizer-based hash, forcing consecutive k-mers into the same bucket so hot buckets stay cache-resident. On the human genome they report 1.58-2.62x higher insertion throughput, up to 6.1x higher query throughput, and a 7.39x reduction in cache misses versus IcebergHT.
+
+*Why it's cited here:* it targets the same "keep hot buckets in cache" problem as Thesis 1's set-associative, LLC-topology-aware adaptive k-mer cache, so the eventual writeup needs to explicitly differentiate the two rather than let them read as the same idea.
+
+#### [MegIS: High-Performance, Energy-Efficient, and Low-Cost Metagenomic Analysis with In-Storage Processing](https://arxiv.org/abs/2406.19113)
+**Mansouri Ghiasi, N. et al. (CMU SAFARI, Mutlu's group), ISCA 2024**
+
+MegIS is presented as the first in-storage-processing system for the full metagenomic analysis pipeline, motivated by the observation that data movement driven by hash-table lookups against large reference databases is the dominant bottleneck for metagenomic classifiers — the same premise this project builds on for Kraken2, diagnosed one tier down the memory/storage hierarchy. Headline results: 2.7x-37.2x speedup over performance-optimized software tools, 1.5x-5.1x over the best prior processing-in-memory accelerator.
+
+*Why it's cited here:* it establishes, at ISCA-tier peer review, that hash-table lookup is the dominant bottleneck for Kraken2-class classifiers — the identical diagnosis underlying both of this project's theses — but attacks it via a storage/PIM accelerator rather than CPU-cache/LLC-aware software.
+
+#### [MetaCache-GPU: Ultra-Fast Metagenomic Classification](https://arxiv.org/abs/2106.08150)
+**Kobus, R., Müller, A., Jünger, D., Hundt, C., Schmidt, B., ICPP '21 / arXiv:2106.08150, 2021**
+
+MetaCache-GPU re-architects the k-mer indexing core of the CPU tool MetaCache into a massively-parallel GPU hash table built on "warpcore" (a GPU hash-table library) and "bb_segsort" (a GPU segmented-sort library). The paper reports index-build speedups of roughly 61-72x over CPU MetaCache and up to 64-72x over Kraken2 on RefSeq-scale databases using 8 GPUs, plus query speedups of up to 153x. GPU support is merged into the main branch of [muellan/metacache](https://github.com/muellan/metacache), which shows real commit activity into 2026.
+
+*Why it's cited here:* actively maintained with 2026 commits and live issue responses, making it the credible GPU stretch-goal build target for this document.
+
+#### [GPMeta: a GPU-accelerated method for ultrarapid pathogen identification from metagenomic sequences](https://academic.oup.com/bib/article/24/2/bbad092/7077155)
+**Wang, X. et al., *Briefings in Bioinformatics* 24(2), bbad092, 2023**
+
+GPMeta is a GPU-accelerated pathogen classifier using a "succinct hash index scheme" that shards large databases into GPU-memory-sized partitions. The paper claims it beats Kraken2 and Centrifuge on precision/recall and speed. However, its [GitHub repo](https://github.com/Bgi-LUSH/GPMeta) ships only prebuilt binaries with no source, Makefile, or documented CUDA/compute-capability requirement, and repo activity stopped after a June 2024 README merge — its one code contributor answered an early build-crash report that same month, but a later bug report from August 2024 has gone unanswered ever since.
+
+*Why it's cited here:* explicitly not recommended as a build target — binary-only release with an undocumented CUDA/compute-capability requirement, real risk of failing on newer GPU architectures, and a dormant, unresponsive repo.
+
+### The hashing theory behind the double-hashing formula
+
+#### [Double hashing](https://en.wikipedia.org/wiki/Double_hashing)
+**Wikipedia contributors (accessed 2026-08-07)**
+
+Defines the standard double-hashing probe sequence, h(i,x) = (h1(x) + i·h2(x)) mod table_size, and the key correctness requirement: h2(x) must be coprime to the table size for every key, or the probe sequence only visits a subset of slots before cycling.
+
+*Why it's cited here:* source of the double-hashing formula and the coprimality constraint this document's h1/h2 design must satisfy.
+
+#### [Fibonacci Hashing: The Optimization that the World Forgot](https://probablydance.com/2018/06/16/fibonacci-hashing-the-optimization-that-the-world-forgot-or-a-better-alternative-to-integer-modulo/)
+**Skarupke, M., probablydance.com (2018)**
+
+Walks through multiplicative ("Fibonacci") hashing as a practical replacement for integer modulo: multiply the key by the odd, golden-ratio-derived constant `0x9E3779B97F4A7C15` and take the top bits of the product as the table index, since a multiplication's high bits are a well-mixed function of the entire input key. Already cited in this project's `WEEK1_REPORT.md` as the source for Patch 4's own Fibonacci-hash cache.
+
+*Why it's cited here:* this document's h1/h2 double-hashing scheme extends the same single-multiply idea into two independent multiplies, one per hash function, rather than deriving both from one product.
+
+#### [Fast Splittable Pseudorandom Number Generators](https://dl.acm.org/doi/10.1145/2660193.2660195)
+**Steele, G.L. Jr., Lea, D. & Flood, C.H., OOPSLA 2014, pp. 453-472**
+
+The academic origin of the SplitMix generator family (adopted into Java 8 as `java.util.SplittableRandom`), whose mixing function is the basis for splitmix64. The public-domain 64-bit reference implementation's second mixing constant, `0xBF58476D1CE4E5B9`, is the second multiplier used in this document's h2 formula. Both the constant and the mixing structure have seen over a decade of independent scrutiny with no reported weaknesses.
+
+*Why it's cited here:* traces the second multiplier used in this document's h2 formula to a peer-reviewed, independently-vetted source distinct from the Fibonacci-hashing constant used in h1 — the decorrelation double hashing needs from its two hash functions.
+
+#### The Art of Computer Programming, Volume 3: Sorting and Searching
+**Knuth, D.E., 2nd edition, Addison-Wesley, 1998 — Section 6.4, "Hashing" (no URL, physical/paywalled source)**
+
+The classic academic source introducing multiplicative hashing and the golden-ratio-derived multiplier this document's h1/h2 scheme ultimately rests on. As already noted in this project's `WEEK1_REPORT.md`, a specific page range (508-513) appears in secondary sources but could not be independently verified against the physical text — cited by section number (6.4) only, not by page range.
+
+*Why it's cited here:* the primary academic citation for multiplicative hashing that both Skarupke's post and this document's double-hashing design build on.
 
