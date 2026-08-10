@@ -43,7 +43,7 @@ bench () {
   # 3 warm runs to remove page-cache noise, then 3 timed runs.
   for _ in 1 2 3; do
     "$bin" -H "$DB/hash.k2d" -t "$DB/taxo.k2d" -o "$DB/opts.k2d" \
-           -p 32 -R /dev/null -O /dev/null "$INPUT" >/dev/null 2>&1
+           -p 32 -M -R /dev/null -O /dev/null "$INPUT" >/dev/null 2>&1
   done
   : > "$txt"
   for i in 1 2 3; do
@@ -51,7 +51,7 @@ bench () {
       numactl --cpunodebind=0 --membind=0 \
       perf stat -x, -e $PERF_EVENTS \
       "$bin" -H "$DB/hash.k2d" -t "$DB/taxo.k2d" -o "$DB/opts.k2d" \
-             -p 32 -R /dev/null -O /dev/null "$INPUT" \
+             -p 32 -M -R /dev/null -O /dev/null "$INPUT" \
         >/dev/null 2>>"$txt"
   done
 }
