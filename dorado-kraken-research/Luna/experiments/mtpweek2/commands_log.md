@@ -345,3 +345,29 @@ cat ~/AccuracyDrift/results/metabuli/eskape_run_report.tsv
 **Metabuli classification on Luna: done.** Three runs captured (32T/default-RAM, 32T/400GiB-RAM, 96T/default-RAM) for the tradeoff write-up.
 
 ---
+
+### 39 — perf stat cache-miss capture, matching Kraken2/Centrifuge's exact methodology
+```bash
+cd ~/tools/Metabuli/build
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  src/metabuli classify --seq-mode 3 \
+  ~/results/basecalling/reads_hac.fastq \
+  ~/AccuracyDrift/databases/metabuli_eskape \
+  ~/AccuracyDrift/results/metabuli \
+  eskape_run_perf \
+  --threads 32
+```
+**Why:** CK asked for a Kraken2/Centrifuge/Metabuli comparison including cache-miss data, not just wall-time. Existing Kraken2 numbers on the comparable ESKAPE-scale DB (`eskape_650mb`, 32T) already in `AccuracyDrift/RESULTS.md`, and existing Centrifuge numbers (`eskape_200`, 32T) already in `centrifuge/commands_log.md` §4.5 — reused both rather than re-running. Only Metabuli needed a fresh perf-stat capture, using the identical event list and `numactl` pinning both prior tools were measured with, so all three are genuinely comparable.
+**Result:**
+
+| Metric | Kraken2 (`eskape_650mb`, 32T) | Centrifuge (`eskape_200`, 32T) | Metabuli (`metabuli_eskape`, 32T) |
+|---|---|---|---|
+| Wall time | 1.045s | 5.653s | 12.731s |
+| Cache Miss Rate% | 36.23% | 21.90% | 78.97% |
+| LLC Miss Rate% | 30.53% | 23.82% | 44.57% |
+| IPC | 1.37 | 1.46 | 2.07 |
+
+**Finding:** Metabuli has by far the worst cache locality of the three (LLC miss rate ~1.5x Kraken2, ~1.9x Centrifuge) — the mechanistic cache-level reason behind its wall-clock cost, consistent with its accuracy-over-efficiency design. Counter-intuitively, it also has the *highest* IPC (2.07 vs 1.37/1.46) despite the worst miss rates — likely the amino-acid translation/scoring compute partially hides DRAM latency behind real work rather than idling on stalls. Worth citing as a genuine nuance in the write-up, not just "Metabuli is slower."
+
+---
