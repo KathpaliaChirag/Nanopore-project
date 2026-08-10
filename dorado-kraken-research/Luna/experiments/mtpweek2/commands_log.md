@@ -371,3 +371,59 @@ time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instru
 **Finding:** Metabuli has by far the worst cache locality of the three (LLC miss rate ~1.5x Kraken2, ~1.9x Centrifuge) — the mechanistic cache-level reason behind its wall-clock cost, consistent with its accuracy-over-efficiency design. Counter-intuitively, it also has the *highest* IPC (2.07 vs 1.37/1.46) despite the worst miss rates — likely the amino-acid translation/scoring compute partially hides DRAM latency behind real work rather than idling on stalls. Worth citing as a genuine nuance in the write-up, not just "Metabuli is slower."
 
 ---
+
+### 40-41 — Metabuli thread sweep: 1T and 96T perf-stat
+```bash
+# 1T (no numactl, matching how this project measured Kraken2/Centrifuge's own 1T rows)
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  src/metabuli classify --seq-mode 3 ~/results/basecalling/reads_hac.fastq \
+  ~/AccuracyDrift/databases/metabuli_eskape ~/AccuracyDrift/results/metabuli \
+  eskape_run_perf_1t --threads 1
+
+# 96T (numactl restored)
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  src/metabuli classify --seq-mode 3 ~/results/basecalling/reads_hac.fastq \
+  ~/AccuracyDrift/databases/metabuli_eskape ~/AccuracyDrift/results/metabuli \
+  eskape_run_perf_96t --threads 96
+```
+**Result — full Metabuli thread sweep on `metabuli_eskape`, same reads_hac.fastq:**
+
+| Threads | Wall time | Cache Miss Rate% | LLC Miss Rate% | IPC |
+|---|---|---|---|---|
+| 1 | 127.977s | 83.10% | 73.55% | 2.43 |
+| 32 | 12.731s | 78.97% | 44.57% | 2.07 |
+| 96 | 11.491s | 71.39% | 37.74% | 1.16 |
+
+**Finding:** LLC miss rate falls monotonically as thread count rises (73.55%→44.57%→37.74%) — the opposite of the naive "more threads, more LLC contention" expectation. Likely explanation: at 1T a single thread sorts/searches the full 705M-k-mer buffer serially over one large diffuse working set, whereas at higher thread counts that same work is partitioned into smaller per-thread chunks with better individual locality, and that win outweighs added LLC-sharing pressure. IPC's drop from 32T→96T (2.07→1.16) matches the familiar "past the thread sweet spot, contention costs you" pattern already documented for Kraken2's own 32T/96T numbers (`eskape_650mb`: IPC 1.37→1.13). At 1T, Metabuli's wall time (128.0s) lands close to Centrifuge's 1T number on `eskape_200` (134.46s) — both far slower than Kraken2's 1T (21.98s).
+
+**Metabuli thread-sweep profiling: done** (1T/32T/96T, wall-time + full perf-stat cache-miss/IPC data).
+
+---
+
+## Building Centrifuger's ESKAPE index
+
+### 42
+```bash
+~/tools/centrifuger/centrifuger-build 2>&1 | head -30
+```
+**Why:** verify actual required flags before running (Metabuli's build needed two corrections; check Centrifuger too).
+**Result:** `-r`/`--taxonomy-tree`/`--name-table`/`--conversion-table`/`-o`/`-t`/`--build-mem` all confirmed exactly as the plan documented. No corrections needed this time.
+
+---
+
+### 43 — 32T build
+```bash
+mkdir -p ~/AccuracyDrift/databases/centrifuger_eskape
+cd ~/tools/centrifuger
+time ./centrifuger-build -r ~/AccuracyDrift/databases/eskape_genomes_combined.fasta \
+    --taxonomy-tree ~/AccuracyDrift/databases/sample_targeted/taxonomy/nodes.dmp \
+    --name-table ~/AccuracyDrift/databases/sample_targeted/taxonomy/names.dmp \
+    --conversion-table ~/AccuracyDrift/databases/eskape_genomes_seqid2taxid.map \
+    -o ~/AccuracyDrift/databases/centrifuger_eskape/cg_base \
+    -t 32 --build-mem 400G
+```
+**Why:** reuses the exact same combined FASTA Centrifuge itself used in Week 1 (same 200-genome/4-species panel, same caveat about the missing 2 ESKAPE species applies here too), plus the real taxonomy and the existing `seqid2taxid.map` as `--conversion-table` (this file's format matches Centrifuger's expectation directly — no reformatting needed here, unlike Metabuli).
+**Result:** succeeded. 693 sequences, 1,105,382,541 bp total reference. **Wall time: 2m55.995s** (user 23m54.4s, sys 0m19.6s).
+
+---
