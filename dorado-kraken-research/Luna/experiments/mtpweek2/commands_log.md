@@ -489,3 +489,65 @@ time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instru
 **Finding:** small uptick in LLC miss rate at 96T (42.44%→44.02%, more threads sharing LLC bandwidth during parallel chunk-sorting), but wall time still improves (167.6s→132.6s) and IPC still rises (1.66→1.74) — the added parallelism wins outright here, unlike classify-time workloads where contention past 32T actually costs more than it gives back.
 
 ---
+
+## Classifying reads_hac.fastq with Centrifuger
+
+### 48 — first attempt, wrong flag
+```bash
+./centrifuger -p 32 -x ~/AccuracyDrift/databases/centrifuger_eskape/cg_base -u ~/results/basecalling/reads_hac.fastq > ~/AccuracyDrift/results/centrifuger_32t.tsv
+```
+**Result:** `invalid option -- 'p'`. Centrifuger's own usage text (printed on error) confirmed thread count is `-t INT`, not `-p` (that's Centrifuge's flag, not Centrifuger's) — corrected in command 49.
+
+---
+
+### 49 — 32T classify, corrected
+```bash
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  ./centrifuger -t 32 \
+  -x ~/AccuracyDrift/databases/centrifuger_eskape/cg_base \
+  -u ~/results/basecalling/reads_hac.fastq > ~/AccuracyDrift/results/centrifuger_32t.tsv
+```
+**Result:** 90,255/104,918 reads classified (86.02%). **Wall time: 8.777s**, Cache Miss Rate% 9.60%, LLC Miss Rate% 9.15%, IPC 1.11. LLC miss rate notably lower than even Centrifuge's own `eskape_200` number (23.82%, Week 1) — consistent with Centrifuger's whole design point being a leaner, more compressed index than Centrifuge.
+
+---
+
+### 50-51 — 1T and 96T, completing the sweep
+```bash
+# 1T (no numactl)
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  ./centrifuger -t 1 -x ~/AccuracyDrift/databases/centrifuger_eskape/cg_base \
+  -u ~/results/basecalling/reads_hac.fastq > ~/AccuracyDrift/results/centrifuger_1t.tsv
+
+# 96T
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  ./centrifuger -t 96 -x ~/AccuracyDrift/databases/centrifuger_eskape/cg_base \
+  -u ~/results/basecalling/reads_hac.fastq > ~/AccuracyDrift/results/centrifuger_96t.tsv
+```
+**Result — full Centrifuger classify thread sweep:**
+
+| Threads | Wall time | Cache Miss Rate% | LLC Miss Rate% | IPC | Classified% |
+|---|---|---|---|---|---|
+| 1 | 216.881s | 10.45% | 10.07% | 1.13 | 86.02% |
+| 32 | 8.777s | 9.60% | 9.15% | 1.11 | 86.02% |
+| 96 | 4.087s | 9.34% | 8.73% | 0.88 | 86.02% |
+
+**Finding:** Centrifuger's LLC miss rate stays remarkably flat across the whole thread range (10.07%→9.15%→8.73%) — far less thread-sensitive than either Kraken2 or Metabuli. Wall time keeps improving all the way to 96T (216.9s→8.8s→4.1s) even though IPC drops there (1.11→0.88) — unlike Kraken2, which can get *worse* at 96T on wall-clock, Centrifuger's raw parallelism win outweighs the per-cycle efficiency loss all the way through.
+
+**Centrifuger classification on Luna: done.** Full 1T/32T/96T sweep with perf-stat cache-miss data, same reads_hac.fastq as every other tool.
+
+---
+
+## Full four-way comparison, 32T, same methodology throughout
+
+| Tool | DB/index | Wall time | Cache Miss Rate% | LLC Miss Rate% | IPC | Classified% |
+|---|---|---|---|---|---|---|
+| Kraken2 | `eskape_650mb` | 1.045s | 36.23% | 30.53% | 1.37 | 65.28% |
+| Centrifuge | `eskape_200` | 5.653s | 21.90% | 23.82% | 1.46 | (not re-derived here, see `centrifuge/commands_log.md`) |
+| Centrifuger | `centrifuger_eskape/cg_base` | 8.777s | 9.60% | 9.15% | 1.11 | 86.02% |
+| Metabuli | `metabuli_eskape` | 12.731s | 78.97% | 44.57% | 2.07 | 92.41% |
+
+All four measured with the identical `perf stat` event list and `numactl --cpunodebind=0 --membind=0` pinning, all four against the same underlying 200-genome/4-species ESKAPE panel (missing *E. faecium* and *Enterobacter* spp. — see finding in commands 32-33), all four classifying the same `reads_hac.fastq`. Kraken2 is fastest and has the best cache locality of the pack in absolute wall-time terms; Centrifuger has the *lowest* LLC miss rate of all four despite being slower than Kraken2 (a real memory-efficiency-over-speed tradeoff, exactly as its own paper claims); Metabuli is both slowest and has by far the worst cache locality, but classifies the highest proportion of reads (92.41%) and has the highest IPC — its accuracy-first design shows up clearly in this comparison, not just as a claim from its paper.
+
+---
