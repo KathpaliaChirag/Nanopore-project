@@ -283,3 +283,65 @@ grep -P "^(1280|287|470|573)\t" ~/AccuracyDrift/databases/sample_targeted/taxono
 **Metabuli ESKAPE database build: done.** Database at `~/AccuracyDrift/databases/metabuli_eskape/`.
 
 ---
+
+## Classifying reads_hac.fastq with Metabuli
+
+### 34
+```bash
+src/metabuli classify --help 2>&1 | head -20
+```
+**Why:** verify the plan's classify command against the real tool before running it (build step already needed two corrections).
+**Result:** `--seq-mode INT Single-end: 1, Paired-end: 2, Long read: 3 [2]` confirmed, positional argument order (`query file`, `database dir`, `output dir`, `job ID`) confirmed. Plan's classify command was accurate as written.
+
+---
+
+### 35 — first run: 32 threads, default RAM (128 GiB)
+```bash
+mkdir -p ~/AccuracyDrift/results/metabuli
+time src/metabuli classify --seq-mode 3 \
+    ~/results/basecalling/reads_hac.fastq \
+    ~/AccuracyDrift/databases/metabuli_eskape \
+    ~/AccuracyDrift/results/metabuli \
+    eskape_run \
+    --threads 32
+```
+**Result:** 104,918 reads processed, 705,675,816 query k-mers extracted, 93,958,406 k-mer matches. **Wall time: 13.438s** (user 2m30.4s, sys 0m14.3s). Much faster than the plan's cited "22-25x slower than Kraken2" Movi Color figure — that number was measured on a 75,166-genome database; ours is a 4-species ESKAPE panel, entirely different scale, not a contradiction.
+
+---
+
+### 36 — second run: 32 threads, --max-ram 400 (matching the build step)
+```bash
+time src/metabuli classify --seq-mode 3 \
+    ~/results/basecalling/reads_hac.fastq \
+    ~/AccuracyDrift/databases/metabuli_eskape \
+    ~/AccuracyDrift/results/metabuli \
+    eskape_run_32t_ram400 \
+    --threads 32 --max-ram 400
+```
+**Result:** same read/k-mer counts as run 35 (expected, deterministic classification). **Wall time: 27.366s** (user 2m28.4s, sys 0m27.3s) — nearly double the first run's wall time despite near-identical user CPU time. Single-run result, direction is counter-intuitive (more RAM headroom, slower wall time) — flagged as possible noise, not a confirmed finding; would need repeat runs to verify before citing in the write-up.
+
+---
+
+### 37 — third run: 96 threads, default RAM
+```bash
+time src/metabuli classify --seq-mode 3 \
+    ~/results/basecalling/reads_hac.fastq \
+    ~/AccuracyDrift/databases/metabuli_eskape \
+    ~/AccuracyDrift/results/metabuli \
+    eskape_run_96t \
+    --threads 96
+```
+**Result:** same read/k-mer counts again. **Wall time: 11.996s** (user 4m47.99s, sys 0m56.5s) — marginally faster wall-clock than 32T (13.4s → 12.0s, ~11% improvement) but roughly triple the total CPU effort (user+sys combined). Same "beyond the sweet-spot thread count, contention outweighs added parallelism" pattern this project already documented for Kraken2 at 32T — a useful cross-tool consistency note for the write-up.
+
+---
+
+### 38 — verifying real output
+```bash
+ls -la ~/AccuracyDrift/results/metabuli/
+cat ~/AccuracyDrift/results/metabuli/eskape_run_report.tsv
+```
+**Result:** all three runs produced `_classifications.tsv`, `_krona.html`, and `_report.tsv` outputs. Report shows sensible classification: 92.41% of reads classified, distributed exactly across the 4 known-present species (*P. aeruginosa* 59.27%, *K. pneumoniae* 32.33%, *A. baumannii* 0.21%, *S. aureus* 0.055%), 7.59% unclassified. 6-column report shape confirmed (`clade_proportion, clade_count, taxon_count, rank, taxID, name`) — same Kraken2-style shape the plan described, minor column-name differences only.
+
+**Metabuli classification on Luna: done.** Three runs captured (32T/default-RAM, 32T/400GiB-RAM, 96T/default-RAM) for the tradeoff write-up.
+
+---
