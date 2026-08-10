@@ -457,3 +457,35 @@ time ./centrifuger-build -r ~/AccuracyDrift/databases/eskape_genomes_combined.fa
 **Centrifuger ESKAPE index build: done.** Three indexes at `~/AccuracyDrift/databases/centrifuger_eskape/cg_base{,_1t,_96t}`.
 
 ---
+
+### 46-47 — perf stat on the build step (32T and 96T), by request
+```bash
+# 32T
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  ./centrifuger-build -r ~/AccuracyDrift/databases/eskape_genomes_combined.fasta \
+    --taxonomy-tree ~/AccuracyDrift/databases/sample_targeted/taxonomy/nodes.dmp \
+    --name-table ~/AccuracyDrift/databases/sample_targeted/taxonomy/names.dmp \
+    --conversion-table ~/AccuracyDrift/databases/eskape_genomes_seqid2taxid.map \
+    -o ~/AccuracyDrift/databases/centrifuger_eskape/cg_base_32t_perf -t 32 --build-mem 400G
+
+# 96T
+time perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  ./centrifuger-build -r ~/AccuracyDrift/databases/eskape_genomes_combined.fasta \
+    --taxonomy-tree ~/AccuracyDrift/databases/sample_targeted/taxonomy/nodes.dmp \
+    --name-table ~/AccuracyDrift/databases/sample_targeted/taxonomy/names.dmp \
+    --conversion-table ~/AccuracyDrift/databases/eskape_genomes_seqid2taxid.map \
+    -o ~/AccuracyDrift/databases/centrifuger_eskape/cg_base_96t_perf -t 96 --build-mem 400G
+```
+**Why:** CK asked why we weren't capturing cache-miss data on the build step too. This project has never perf-profiled index building before (build is a one-time cost, not the repeated hot-path classify's cache-miss metric is meant to optimize) — but CK wanted it anyway for completeness. Ran 32T and 96T only (1T skipped by CK's choice, would have cost another ~20 min re-run for the least-interesting data point).
+**Result:**
+
+| Threads | Wall time | Cache Miss Rate% | LLC Miss Rate% | IPC |
+|---|---|---|---|---|
+| 32 | 167.568s | 52.83% | 42.44% | 1.66 |
+| 96 | 132.584s | 51.24% | 44.02% | 1.74 |
+
+**Finding:** small uptick in LLC miss rate at 96T (42.44%→44.02%, more threads sharing LLC bandwidth during parallel chunk-sorting), but wall time still improves (167.6s→132.6s) and IPC still rises (1.66→1.74) — the added parallelism wins outright here, unlike classify-time workloads where contention past 32T actually costs more than it gives back.
+
+---
