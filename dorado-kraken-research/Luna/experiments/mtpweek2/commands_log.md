@@ -427,3 +427,33 @@ time ./centrifuger-build -r ~/AccuracyDrift/databases/eskape_genomes_combined.fa
 **Result:** succeeded. 693 sequences, 1,105,382,541 bp total reference. **Wall time: 2m55.995s** (user 23m54.4s, sys 0m19.6s).
 
 ---
+
+### 44-45 — 1T and 96T builds, completing the thread sweep
+```bash
+# 1T
+time ./centrifuger-build -r ~/AccuracyDrift/databases/eskape_genomes_combined.fasta \
+    --taxonomy-tree ~/AccuracyDrift/databases/sample_targeted/taxonomy/nodes.dmp \
+    --name-table ~/AccuracyDrift/databases/sample_targeted/taxonomy/names.dmp \
+    --conversion-table ~/AccuracyDrift/databases/eskape_genomes_seqid2taxid.map \
+    -o ~/AccuracyDrift/databases/centrifuger_eskape/cg_base_1t -t 1 --build-mem 400G
+
+# 96T
+time ./centrifuger-build -r ~/AccuracyDrift/databases/eskape_genomes_combined.fasta \
+    --taxonomy-tree ~/AccuracyDrift/databases/sample_targeted/taxonomy/nodes.dmp \
+    --name-table ~/AccuracyDrift/databases/sample_targeted/taxonomy/names.dmp \
+    --conversion-table ~/AccuracyDrift/databases/eskape_genomes_seqid2taxid.map \
+    -o ~/AccuracyDrift/databases/centrifuger_eskape/cg_base_96t -t 96 --build-mem 400G
+```
+**Result — full Centrifuger build thread sweep, same 693-sequence/1.1Gbp reference:**
+
+| Threads | Wall time | Speedup vs 1T |
+|---|---|---|
+| 1 | 20m39.114s (1239.1s) | 1.00x |
+| 32 | 2m55.995s (176.0s) | 7.04x |
+| 96 | 2m6.643s (126.6s) | 9.79x |
+
+**Finding:** unlike every classify-time thread sweep seen so far this session (Kraken2 peaks at 32T then degrades; Metabuli's IPC drops 32T→96T), Centrifuger's *build* step keeps improving all the way to 96T — a further 1.39x gain from 32T→96T, no degradation. Mechanistic reason: index building is suffix-array sorting split into many independent chunks (17 chunks at 32T, 66 at 96T per the log output) — far more embarrassingly parallel than the memory-bound hash/k-mer lookups that dominate classify-time workloads, so it doesn't hit the same LLC-contention wall. 1T→32T speedup (7.04x for 32x threads) is well sub-linear, reflecting real coordination/merge overhead across chunks even in this favorable case.
+
+**Centrifuger ESKAPE index build: done.** Three indexes at `~/AccuracyDrift/databases/centrifuger_eskape/cg_base{,_1t,_96t}`.
+
+---
