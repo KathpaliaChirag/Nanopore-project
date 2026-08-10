@@ -162,3 +162,32 @@ src/metabuli version
 **Metabuli install on Luna: done.** Binary at `~/tools/Metabuli/build/src/metabuli`.
 
 ---
+
+### 18
+```bash
+cd ~/tools && git clone https://github.com/mourisl/centrifuger.git
+```
+**Why:** clone Centrifuger, same conventional `~/tools/` folder. No submodules needed here (only dependency is `pthreads`, part of the standard C library).
+**Result:** clean clone, no errors.
+
+---
+
+### 19
+```bash
+cd centrifuger && make
+```
+**Why:** Centrifuger ships a plain Makefile (no cmake step needed, unlike Metabuli).
+**Result:** compiled successfully with many warnings (unused variables etc., non-blocking, did not stop the build).
+
+---
+
+### 20
+```bash
+ls -la centrifuger centrifuger-build centrifuger-quant 2>&1; ./centrifuger --help 2>&1 | head -10
+```
+**Why:** confirm all three expected binaries exist and at least one runs without crashing.
+**Result:** all three present, executable, real file sizes. `--help` isn't a recognized flag, but `centrifuger` fell back to printing its usage text instead of crashing, confirming it runs.
+
+**Centrifuger install on Luna: done.** Binaries at `~/tools/centrifuger/{centrifuger,centrifuger-build,centrifuger-quant}`.
+
+---
