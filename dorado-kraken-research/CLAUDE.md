@@ -30,7 +30,7 @@ Luna needs **two separate things** for outbound internet - missing either one ca
 
 ```bash
 tmux                                                              # persistent session - login daemon must keep running
-env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY python3 ~/iitd-login.py -d   # unset proxy first, login needs direct access
+env -u http_proxy -u https_proxy -u HTTP_proxy -u HTTPS_proxy python3 ~/iitd-login.py -d   # unset proxy first, login needs direct access (names are case-sensitive - must match the export lines below exactly)
 # enter IIT Delhi kerberos ID (kid) and password when prompted
 # detach WITHOUT killing it: Ctrl+B, then D
 
