@@ -191,3 +191,95 @@ ls -la centrifuger centrifuger-build centrifuger-quant 2>&1; ./centrifuger --hel
 **Centrifuger install on Luna: done.** Binaries at `~/tools/centrifuger/{centrifuger,centrifuger-build,centrifuger-quant}`.
 
 ---
+
+## Building Metabuli's ESKAPE database
+
+### 21
+```bash
+find ~ -maxdepth 4 \( -iname "eskape_genomes*" -o -iname "*.fna" -o -iname "nucl_gb.accession2taxid*" -o -iname "nodes.dmp" -o -iname "names.dmp" -o -iname "seqid2taxid.map" \) 2>/dev/null
+```
+**Why:** locate the existing ESKAPE genome/taxonomy files from Week 1's Centrifuge build, to reuse rather than re-download.
+**Result:** found `~/AccuracyDrift/databases/eskape_genomes/` (folder), `eskape_genomes_seqid2taxid.map`, `eskape_genomes_combined.fasta`. No `nucl_gb.accession2taxid.gz` found anywhere in this search depth.
+
+---
+
+### 22-23
+```bash
+~/tools/Metabuli/build/src/metabuli build --help 2>&1
+head -5 ~/AccuracyDrift/databases/eskape_genomes_seqid2taxid.map
+find ~/AccuracyDrift/databases/eskape_genomes -iname "*.fna" | wc -l
+```
+**Why:** check Metabuli's actual required inputs against the plan doc rather than trust it blindly (two smaller inaccuracies already found earlier this session), inspect the existing map file's format, and get the real genome-file layout/count.
+**Result:** `metabuli build <db dir> <FASTA list> <accession2taxid> [options]` confirmed. Existing map file is 2-column (`accession.version`, `taxid`), no header. Genomes are nested under `eskape_genomes/refseq/bacteria/<assembly accession>/*.fna` (not flat as the plan assumed) — 200 files total. 200 matches the known `ncbi-genome-download` 200-genome ceiling bug already on the Week 1 punch list.
+
+---
+
+### 24-26 — reading the source to determine the real accession2taxid format
+```bash
+grep -rn "accession2taxid" ~/tools/Metabuli/src --include=*.cpp --include=*.h -l
+grep -n "fillAcc2TaxIdMap" -A 30 ~/tools/Metabuli/src/commons/IndexCreator.cpp
+grep -n "^.*fillAcc2TaxIdMap" ~/tools/Metabuli/src/commons/*.cpp ~/tools/Metabuli/src/commons/*.h
+sed -n '264,360p' ~/tools/Metabuli/src/commons/common.cpp
+```
+**Why:** rather than guess whether the existing 2-column map file would work, read the actual parser (`fillAcc2TaxIdMap` in `common.cpp:264`).
+**Finding:** the parser (1) explicitly skips line 1 as a header, and (2) parses each remaining line with `sscanf(line, "%s\t%*s\t%d\t%*d")` — i.e. expects NCBI's real 4-column `accession2taxid` format (`accession`, `accession.version` [ignored], `taxid`, `gi` [ignored]), using the **bare, version-stripped accession** (column 1) as the lookup key. The existing `seqid2taxid.map` (versioned accession + taxid, 2 columns, no header) does not match this shape at all.
+
+---
+
+### 27 — synthesizing a compliant accession2taxid file
+```bash
+awk -F'\t' 'BEGIN{print "accession\taccession.version\ttaxid\tgi"} {acc=$1; sub(/\.[0-9]+$/,"",acc); print acc"\t"$1"\t"$2"\t0"}' ~/AccuracyDrift/databases/eskape_genomes_seqid2taxid.map > ~/AccuracyDrift/databases/eskape_accession2taxid.tsv
+```
+**Why:** rather than download NCBI's full official `nucl_gb.accession2taxid.gz` (multi-GB, covers all of GenBank) just to get taxIDs for 200 genomes we already have mapped, generate a minimal correctly-shaped file from data already on disk.
+**Result:** produced a properly-headed, 4-column file with bare accession in column 1, matching the parser's expectations exactly.
+
+---
+
+### 28-29 — locating the real taxonomy directory
+```bash
+ls -la ~/tools/kraken2-src/data/*.dmp
+ls -la ~/AccuracyDrift/databases/pluspf_103gb/*.dmp
+find ~ -iname "taxdump*" -o -iname "merged.dmp" 2>/dev/null
+ls -la ~/AccuracyDrift/databases/sample_targeted/taxonomy/
+```
+**Why:** the first `nodes.dmp`/`names.dmp` found (in `kraken2-src/data/`) were only ~2KB each — too small to be the real NCBI taxonomy (~2.5M taxa), almost certainly toy test fixtures bundled with the Kraken2 source repo.
+**Result:** `sample_targeted/taxonomy/` has the real, complete taxdump: 216MB `nodes.dmp`, 290MB `names.dmp`, 1.9MB `merged.dmp`, plus the original `taxdmp.zip`. Used as `--taxonomy-path`.
+
+---
+
+### 30
+```bash
+find ~/AccuracyDrift/databases/eskape_genomes -iname "*.fna" > ~/AccuracyDrift/databases/eskape_fasta_list.txt
+wc -l ~/AccuracyDrift/databases/eskape_fasta_list.txt
+```
+**Result:** 200 genome paths written, confirmed.
+
+---
+
+### 31 — the actual build
+```bash
+mkdir -p ~/AccuracyDrift/databases/metabuli_eskape
+cd ~/tools/Metabuli/build
+time src/metabuli build ~/AccuracyDrift/databases/metabuli_eskape \
+    ~/AccuracyDrift/databases/eskape_fasta_list.txt \
+    ~/AccuracyDrift/databases/eskape_accession2taxid.tsv \
+    --taxonomy-path ~/AccuracyDrift/databases/sample_targeted/taxonomy/ \
+    --threads 32 \
+    --max-ram 400
+```
+**Result:** succeeded. Real taxonomy loaded correctly (2,840,139 nodes, 99,346 merged nodes). "All accessions are mapped to taxonomy" — no skipped/unmapped accessions. 693 observed accessions across 200 genome files. 478,999,005 k-mers extracted, 24,977,880 unique k-mers written.
+**Wall time: 2m35.570s real (23m48.6s user, 2m5.6s sys — reflects the 32-thread parallelism).**
+
+---
+
+### 32-33 — species-coverage finding
+```bash
+cut -f2 ~/AccuracyDrift/databases/eskape_genomes_seqid2taxid.map | sort -u
+grep -P "^(1280|287|470|573)\t" ~/AccuracyDrift/databases/sample_targeted/taxonomy/names.dmp | grep "scientific name"
+```
+**Why:** the build reported only "4 unique taxIDs / 4 unique species" across 200 genomes — surprising for a 6-species ESKAPE panel, worth confirming against the source data rather than assuming a Metabuli bug.
+**Finding (important, not Metabuli-specific):** the source `eskape_genomes_seqid2taxid.map` itself only contains 4 distinct taxIDs: 287 (*Pseudomonas aeruginosa*), 470 (*Acinetobacter baumannii*), 573 (*Klebsiella pneumoniae*), 1280 (*Staphylococcus aureus*). **Enterococcus faecium and Enterobacter species are completely absent** from this "ESKAPE" genome set — almost certainly a downstream effect of the already-known `ncbi-genome-download` 200-genome-ceiling bug. This affects every classifier benchmarked against this dataset, not just Metabuli — Kraken2 and Centrifuge's existing Week 1 numbers were run against the same 4-of-6-species panel. Worth an explicit caveat in this week's write-up, and a candidate follow-up once the DB-rebuild punch-list item is eventually picked up.
+
+**Metabuli ESKAPE database build: done.** Database at `~/AccuracyDrift/databases/metabuli_eskape/`.
+
+---
