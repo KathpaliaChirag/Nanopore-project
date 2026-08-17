@@ -102,4 +102,71 @@ This is the one that actually answers "how do we derive the formula," not just "
 
 ---
 
-*(More sections landing as the rest of wave 1 reports back: advanced hashing schemes, hardware-aware/CXL caching, and a sweep for anything 2025-2026 that might threaten either thesis.)*
+## Advanced hashing / collision-resolution schemes beyond linear, double, and cuckoo
+
+1. **Robin Hood hashing** and **Hopscotch hashing** — both **dead ends for this project**, and worth recording as such so nobody re-chases them. Both solve variance/neighborhood problems that only matter under *online insert/delete* — for a table built once and never mutated, you get the same end-state probe-length profile just by placing keys optimally during the bulk build, no runtime swap/displacement logic needed. Robin Hood: Celis 1986, recent variance proof [arXiv:1605.04031](https://arxiv.org/pdf/1605.04031). Hopscotch: Herlihy, Shavit, Tzafrir, DISC 2008, recent lock-free/RDMA variants exist but target concurrent tables Kraken2 doesn't need.
+
+2. **Bucketized multi-way cuckoo hashing** — d candidate buckets per key, cuckoo displacement across buckets, O(1) worst-case lookup at very high load factor.
+
+   > [!NOTE]
+   > Already applied to k-mers: **hackgap** (Zentgraf & Rahmann, WABI 2022) uses subdivided multi-way bucketed cuckoo hash tables specifically for gapped-k-mer counting. This slightly undercuts double hashing's novelty claim less than it might seem — cuckoo and double hashing are a genuinely different collision-resolution family (bucketed relocation vs. probe-sequence formula) — but cite hackgap as related work, not as competing with the double-hashing claim.
+
+3. **Power-of-d-choices + simple tabulation hashing** — Azar et al. 1994; Aamand et al., ICALP 2018 ([arXiv:1407.6846](https://arxiv.org/pdf/1407.6846)). Each key gets d independent candidate cells, placed in whichever is least loaded at build time; simple tabulation hashing gives O(1) evaluation via small cache-resident lookup tables. For a build-once table, this is a strong fit — no online rebalancing needed, lookups check only d fixed precomputed cells, directly comparable in probe cost to double hashing's 2-probe scheme but with better worst-case load-balance guarantees. No genomics-specific application found — **flagging this as a real candidate to prototype alongside double hashing**, not just cite.
+
+4. **Minimal perfect hashing (MPHF) family** — BBHash, PTHash/PtrHash (SEA 2025), SSHash, LPHash. Eliminates collision resolution entirely via a build-time bijection from the known key set to slots, rather than optimizing probing.
+
+   > [!IMPORTANT]
+   > This is already the dominant established solution for static k-mer sets in genomics (SSHash/LPHash routinely cited, 0.5-0.9 bits/k-mer). Cite it explicitly as the reason double hashing is scoped as *a probing-scheme improvement*, not a switch to MPHF — MPHF needs the full key set fixed at build time with no slack for new taxa later, and needs separate handling for negative queries. Anticipate this as the first question sir or a reviewer asks: "why not just use a perfect hash?"
+
+5. **k-Perfect Hashing (k-PHF)** — Groot Koerkamp, Hermann, Sanders, Walzer, ESA 2026 ([arXiv:2607.07257](https://arxiv.org/pdf/2607.07257)), very recent. Maps keys into fixed-capacity cache-line bins via a tiny cache-resident perfect hash function — branchless, single-cache-miss lookup, supports negative queries. Structurally the closest match found anywhere in this search to Kraken2's actual cell design (fixed-capacity cache-line bins). No genomics application exists yet; unimplemented outside the authors' own benchmark. **Flag to sir as a second theory-adjacent stretch goal**, alongside the already-known Elastic/Funnel hashing — not a near-term build target, but worth knowing it exists before finalizing the "future work" list.
+
+## Sweep: anything 2025-2026 that could threaten either thesis
+
+> [!WARNING]
+> **Chimera / IMCF, with a companion classifier "TAXICF"** (bioRxiv Mar 2025, ICIC 2026) — an Interleaved Merged/Cuckoo Filter that groups taxon bins by capacity to cut space waste under skewed bin sizes, explicitly targeting database size and memory. This is the **closest thing found anywhere in this whole research pass to a direct scoop of Thesis 2**. It's cuckoo-based, not double-hashing-based — a genuinely different collision-resolution family — so the novelty claim likely survives, but this needs the same close-read-and-differentiate treatment Kun-peng got today, before Wednesday if possible. [github.com/LoadStar822/Chimera](https://github.com/LoadStar822/Chimera), [TAXICF paper](https://link.springer.com/chapter/10.1007/978-981-92-3498-1_30).
+
+Five other tools found, lower risk:
+
+- **Taxor (HIXF)** — Genome Research 2024, hierarchical interleaved XOR filters, >50% memory/index-size reduction. Already flagged above (in the AMQ-filters section) as needing its own differentiation paragraph — repeated here because it showed up independently in this sweep too, which is a signal it's a real must-address, not a minor citation.
+- **Slacken** — NAR Genomics and Bioinformatics, July 2025. Spark-based distributed Kraken2 reimplementation that *deliberately avoids* the compact hash table, storing full records instead — opposite direction from this project's compression thesis. Low scoop risk, useful as a counter-example: trades hash compactness for precision at cluster scale.
+- **genCRC32** — Bioinformatics Advances, Jan 2026. Collision-free CRC32-based hashing for short k-mers via bit-packing and tuned CRC32 polynomials. Not a classifier, a hash-function primitive — worth citing as recent hash-design prior art for Thesis 2's hash function choice, low scoop risk (it's a hash function, not a cell layout or probing scheme).
+- **DuoHash** — ICCABS 2025, fast spaced-seed hashing for k-mer counting, up to 11x speedup. Adjacent, not classification-focused, low overlap.
+- **MetageNN** — neural-network long-read classifier, <1/4 the memory of Kraken2, >7x faster than MetaMaps/GeNet. Different mechanism entirely (NN vs. hash table) — low scoop risk for either thesis, but a relevant memory-efficiency comparator on Nanopore data specifically if the comparator table ever wants a non-hash-based entry.
+
+**Novelty claims re-checked (actively trying to falsify, not just confirm):**
+- Double hashing (not cuckoo) in a genomic hash table, 2025-2026: **not found anywhere** — the only near-hits are Chimera/TAXICF's cuckoo-family work, which is a different collision-resolution approach. **Claim survives.**
+- Per-organism bitmask/presence-vector cell for small fixed panels: **not found anywhere**, including in a dedicated re-check against a 2016 bitpacking-for-offset-arrays paper that turned out to solve a different problem (compressing position lists, not organism-membership bits). **Claim survives.**
+
+## Hardware-aware / CXL / NUMA caching (non-genomics systems research, 2023-2025)
+
+1. **HybridTier** — Song et al., ASPLOS 2025 ([paper](https://www.sihangliu.com/docs/hybridtier_asplos25.pdf)). Classifies memory pages hot/cold using both long-term frequency and short-term "access momentum" (rate of change), so pages that just turned hot/cold get caught fast, not just steady-state-hot ones — 2-7.8x less overhead memory, 1.7-3.5x fewer cache misses than prior CXL tiering systems. Closest analog found to "evict cold k-mers to a slower tier instead of discarding" — the momentum-based classifier is directly adaptable to skew-aware eviction, tracking short-term momentum per k-mer bucket so recently-hot organisms aren't evicted just for being new. **Caveat:** needs real CXL hardware exposing a slow tier via OS page migration — Luna (4th-gen Xeon) supports CXL 1.1 at the platform level, but there's no evidence the lab machine has a populated CXL memory expander. May only be simulable.
+
+2. **Lightweight frequency-based CXL tiering** — companion/earlier line of work ([arXiv:2312.04789](https://arxiv.org/abs/2312.04789)), a simpler frequency-counter-only policy, useful as a cheap fallback baseline if HybridTier's momentum-tracking proves too expensive for the k-mer cache's hot path.
+
+3. **Simple cache partitioning via Intel CAT** — Boucher et al., CMU tech report. Static LLC-way partitioning between a latency-critical key-value store and co-tenants; shows cache contention alone inflates a KV-store's P99.9 tail latency 5x, and CAT partitioning nearly eliminates it. Real number to cite for how much LLC interference costs a lookup-heavy service, on a hash-lookup workload specifically — validates the same conclusion Farshin (already cited) reached. **Caveat:** Intel-only — works on Luna (Xeon Platinum 8468), but Orion (ARM64 Jetson) has no equivalent mechanism, so this is a Luna-only technique.
+
+4. **PIM-Tree** — Kang, Zhao, Blelloch, Dhulipala, Gu, McGuffey, Gibbons, PVLDB 2023 ([arXiv:2211.10516](https://arxiv.org/abs/2211.10516)).
+
+   > [!IMPORTANT]
+   > Strongest match found anywhere in this search for the "biology-dependent skew-aware eviction" half of Thesis 1. A skew-resistant index that dynamically routes hot ranges differently from cold ranges rather than statically partitioning — built for processing-in-memory hardware, but the routing *logic* transfers even without real PIM hardware (neither Luna nor Orion has any). Real metagenomic read streams are Zipf-skewed toward a handful of dominant taxa — exactly the regime this paper targets. Template for a skew-aware admission/eviction policy: route/cache hot taxa's k-mers differently than the long tail.
+
+5. **Phoenix** — NUMA-aware thread and page-table placement, kernel module, [arXiv:2502.10923](https://arxiv.org/abs/2502.10923), Feb 2025. Coordinates thread placement and page-table placement live based on observed access behavior — 2.09x fewer CPU cycles, 1.58x fewer page-walk cycles vs. prior NUMA placement. Suggests detecting topology via `/sys` or `hwloc` at startup (exactly what "read actual LLC size at startup" needs) then re-evaluating live, not just once. **Caveat:** Orion is single-NUMA-node, so this is Luna-only, and only matters above the ~32-thread NUMA-crossover point already flagged elsewhere as unmeasured.
+
+**Cross-cutting note:** none of these five — or any paper found in any of the eight wave-1 searches — has been applied to genomics/k-mer/metagenomics workloads. That confirms the whole "hardware-aware caching for a k-mer classifier" framing remains a citable, real gap for Thesis 1.
+
+---
+
+## Wave 1 complete — what needs to happen before Wednesday
+
+Eight research streams, all landed. Three close-reads are now queued, same treatment as today's Kun-peng session:
+
+1. **Chimera/TAXICF (IMCF)** — closest real scoop risk to Thesis 2 found in this entire pass. Cuckoo-based, not double-hashing, but targets the same "smaller database" territory. Highest priority close-read.
+2. **Taxor (HIXF)** — flagged twice independently (once from the filters search, once from the sweep). XOR-filter-based taxonomic classification, >50% index-size reduction.
+3. **kache-hash** — flagged weeks ago for Thesis 1, never actually deep-read. Do it now while in close-read mode, same as Kun-peng and the two above.
+
+Two genuinely new implementation candidates surfaced, beyond the four already planned:
+
+- **Power-of-d-choices + tabulation hashing** — a real, implementable alternative/complement to double hashing for a build-once table, no genomics prior art.
+- The **LLM KV-cache eviction analogy** (Scissorhands/H2O/SnapKV/PyramidKV) and **PIM-Tree's skew-resistant routing** are two independent, unconnected literatures that both land on the same answer for Thesis 1's eviction policy — track decayed historical importance per k-mer, route hot vs. long-tail differently. That convergence from two unrelated fields is itself worth a sentence in the write-up.
+
+One anticipated objection now has an answer ready: MPHF (SSHash/PTHash) is genomics' existing dominant static-hash-table paradigm — "why not just use a perfect hash instead of double hashing" is the first question a reviewer will ask, and the answer (MPHF can't handle new taxa post-build, needs separate negative-query handling) is now on record.
