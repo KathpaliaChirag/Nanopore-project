@@ -170,3 +170,29 @@ Two genuinely new implementation candidates surfaced, beyond the four already pl
 - The **LLM KV-cache eviction analogy** (Scissorhands/H2O/SnapKV/PyramidKV) and **PIM-Tree's skew-resistant routing** are two independent, unconnected literatures that both land on the same answer for Thesis 1's eviction policy — track decayed historical importance per k-mer, route hot vs. long-tail differently. That convergence from two unrelated fields is itself worth a sentence in the write-up.
 
 One anticipated objection now has an answer ready: MPHF (SSHash/PTHash) is genomics' existing dominant static-hash-table paradigm — "why not just use a perfect hash instead of double hashing" is the first question a reviewer will ask, and the answer (MPHF can't handle new taxa post-build, needs separate negative-query handling) is now on record.
+
+---
+
+# Wave 2 — close reads and the ML-systems reframe
+
+## Mixture-of-Experts routing and expert caching (the "general ML model" angle)
+
+The reframe you asked for — "think of Kraken2 as a general ML model with these properties" — pointed straight at MoE serving systems: an MoE router picks which expert handles each input token, which sounds like Kraken2 picking which taxon a k-mer belongs to. The honest result is a **split verdict**, and the split matters more than either half alone.
+
+**What transfers cleanly — expert caching and placement:**
+
+1. **MoE-Infinity** — Xue et al., 2024 ([arXiv:2401.14361](https://arxiv.org/abs/2401.14361)). Traces per-request expert activation *sparsity* at runtime and uses those traces — not just recency — to drive which experts stay GPU-resident. **Translation:** use observed per-sample/per-organism k-mer hit patterns to predict which hash-table regions go hot next, not just which were hot last — feeds skew-aware eviction.
+2. **Fiddler** — Kamahori et al., ICLR 2025 ([arXiv:2402.07033](https://arxiv.org/abs/2402.07033)). Keeps as many hot experts GPU-resident as a fixed memory budget allows, pushes cold-expert compute to CPU instead of transferring cold weights. **Translation:** frame LLC-topology-aware cache sizing as exactly this — a hardware-budget allocation problem, cold lookups falling back to DRAM the way Fiddler falls back to CPU.
+3. **SiDA-MoE** — Du et al., MLSys 2024 ([arXiv:2310.18859](https://arxiv.org/abs/2310.18859)). Predicts activation sparsity *ahead of* the forward pass, partitions experts across memory tiers accordingly — up to 80% memory savings, <1% accuracy loss. Adds a prediction step on top of Fiddler's static placement — a possible refinement: predict hot k-mer regions from a fast pre-pass instead of purely reactive counters.
+4. **Chameleon** (MICRO 2025) — general MoE-serving skew measurements: ~15-20% of experts handle ~80% of tokens, Zipf-distributed activation, skew-aware policies (SLRU/LFRU) beat plain LRU by 8-15 points hit-rate on skewed traffic. Directly citable precedent for "don't use plain LRU here" independent of the genomics framing.
+
+**What doesn't transfer — and why it's worth knowing that, not just the parts that work:**
+
+> [!IMPORTANT]
+> Kraken2's k-mer-to-taxon mapping is a **deterministic, exact hash lookup** — same k-mer always resolves to the same node, no ambiguity. MoE routing is a **learned, soft/probabilistic** decision that tolerates approximate answers with graceful degradation. That kills the more exotic half of the analogy: Pre-gated MoE and ProMoE's speculative prefetch rely on a soft signal available *before* the lookup finishes — Kraken2 has no such signal, only the k-mer itself. Sticky/cache-aware routing tricks (biasing a trainable router toward already-cached experts) have no equivalent either — Kraken2's hash function can't be nudged. The part of the analogy that's load-bearing is narrower than it first looks: *placement and caching policy for an empirically skewed access distribution* transfers; *speculation and routing-bias* do not.
+
+**Routing-decision memoization — weaker than hoped.** No MoE paper caches the router's decision for literally-repeated inputs the way a k-mer cache memoizes exact repeated lookups, because LLM inputs are almost never bit-identical between requests. Not a useful angle here.
+
+**Bioinformatics connection:** searched explicitly, found none — every MoE-in-genomics hit found uses MoE as a *model architecture* for prediction tasks (GC-MoE, AMR-MoEGA), never as a systems analogy for lookup infrastructure. Genuinely open, on top of the KV-cache-eviction gap already found in wave 1.
+
+**Caveat common to the whole angle:** these systems assume GPU-memory-constrained, PCIe-transfer-cost serving. The specific latency-hiding mechanics (async prefetch overlapped with GPU compute) don't map onto a CPU L2/L3 cache, where the cost being hidden is a DRAM cache-line fill — orders of magnitude cheaper than a PCIe expert transfer. Take the skew/placement *policies*, leave the *mechanics* behind.
