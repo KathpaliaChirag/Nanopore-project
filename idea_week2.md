@@ -55,6 +55,23 @@ Kun-peng got let off easy because it lives at a completely different memory tier
 
 **Recommended framing for the write-up:** cite kache-hash as the closest CPU-cache-tier prior art and lean on the contrast explicitly — "hash-function-level static locality for streaming workloads" vs. "runtime-adaptive bounded cache with skew-aware eviction for classification workloads." Pre-empt the obvious reviewer question ("why not just use kache-hash's bucket layout for Kraken2's table?") with exactly that distinction, since the overlap here is real enough that the question will come up.
 
+### Chimera / TAXICF (IMCF) — differentiation from Thesis 2 (2026-08-17 close read)
+
+> [!WARNING]
+> This is the one finding from the whole deep-research pass that actually needs a caveat added to the "smaller database" pitch, not just a defense of it. Read the full Chimera preprint text directly (not just search snippets) before treating anything below as settled — this is high-confidence.
+
+**What Chimera/IMCF/ICF actually is.** Tian, Zhang, Wei, Zou, Wang, Luo, *Chimera* (bioRxiv 2025.03.26.645388, March 2025; [github.com/malabz/Chimera](https://github.com/malabz/Chimera)), with a classifier companion **TAXICF** (Tian, Zhang, Zou, ICIC 2026 — paywalled, only abstract-level detail available, treat with more caution than Chimera itself). IMCF is a genuine **cuckoo filter** — Fan et al.'s 2014 partial-key construction, 16-bit fingerprint, XXH64 hashing, kick-out relocation on collision — wrapped in an interleaved-Bloom-filter-style packing for AVX2 parallel querying, with a bin-packing step that sizes each filter to its taxon's actual minimizer count instead of forcing every filter to the size of the largest taxon.
+
+**The part that needs a caveat.** This is a real, substantial database-size reduction — and it happens on disk, not just in RAM the way Kun-peng's did: 29.7GB vs. Kraken2's 73.4GB on RefSeq Complete, built 162x faster, and the only one of six benchmarked tools (Chimera, Kraken2, Bracken, Ganon, Ganon2, Taxor) that could complete the full RefSeq build inside a 1TB memory ceiling at all. On the outcome-level "smaller database" framing, Chimera is a more direct hit than Kun-peng was, and that needs an explicit caveat and citation in the write-up rather than being glossed over.
+
+**Why the underlying mechanisms still survive.** Thesis 2's actual lever is different from all of Chimera's three real space-saving mechanisms:
+- Cell-width reduction shrinks a fixed-width field in an *exact* open-addressed table holding a compacted taxid. IMCF is a *probabilistic* approximate-membership structure — a 16-bit fingerprint is not a compacted ID, it's "probably associated with one of up to 16 candidate species," resolved downstream by statistical (EM/VEM) voting across many minimizers, not by bit-level compaction.
+- Most of Chimera's actual savings come from FMC (a minimizer-capping/deduplication strategy — a data-volume lever) and capacity-aware bin-packing across filters (a load-balancing lever). Neither touches "bits per stored ID."
+- **Double hashing:** IMCF's two hash functions implement cuckoo-style bucket relocation, not open-addressing double hashing with a probe-stride derived from a second hash. Different collision-resolution family entirely — the claim that no genomics k-mer hash table uses classic double hashing survives.
+- **Bitmask cell:** IMCF's 4-bit field is a species *index* (one of up to 16 candidates), not a presence *bitmask* where multiple simultaneous bits mean multi-species membership. Collisions get filtered out as noise by EM/VEM voting, not preserved as signal by ORing — the opposite design philosophy from the ESKAPE bitmask cell. Chimera also targets 300,000+ species taxonomies; the "under-explored gap at N=6" framing is untouched since that's the opposite scale regime.
+
+**Bottom line:** cite Chimera and caveat the "smaller database" outcome claim — it's a real, disk-size-reducing competitor using a different structure. But cell-width reduction, double hashing, and the 6-bit bitmask cell are all mechanistically untouched by it and can be stated as clean going into Wednesday.
+
 ## Novelty claims confirmed safe to state
 
 13. No existing work combines adaptive caching + reduced-width/double hashing + a small fixed organism panel — this project's exact combination.
