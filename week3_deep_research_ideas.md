@@ -211,3 +211,45 @@ Wave 1 flagged this as "genuinely underexplored, worth prototyping." A real feas
 **Why plain power-of-d-choices as a standalone replacement is a bad idea at this project's scale:** single-slot d=2 cuckoo caps load factor near 50% (Pătrașcu-Thorup, JACM 2012) — roughly doubling memory versus Kraken2's current linear probing at comparable load, a real cost for a memory-bound genomics DB. At this project's table sizes (not distributed-systems scale), lg lg n is tiny (~4-5 for n≈10⁸) — the asymptotic max-load gain over plain hashing is marginal here, diminishing returns. And critically, power-of-d-choices attacks max bucket occupancy/chain length, not false-positive rate — which is the actual axis Thesis 2's exponential-FP-law problem lives on. Partial fit to the real pain point.
 
 **Verdict: don't build plain power-of-d-choices as a double-hashing replacement.** Do prototype the combined version: double hashing generates 2-4 bucket candidates, bucketed 4-way (libcuckoo — real, deployed precedent, >95% load factor — uses exactly this shape), greedy-packed at build time. This is cheap (reuses existing f/g), gives bounded-d prefetchable lookups (directly feeding the §5 "latency-hiding lookup cache" future-work item), and — worth noting — libcuckoo's 4-way bucket structure happens to mirror Thesis 1's own 4-way set-associative cache baseline, a coincidence worth exploiting rather than ignoring. Frame it as a build-time placement optimization layered on top of double hashing, not a rival collision-resolution scheme.
+
+---
+
+# Synthesis — the whole pass, ready for Wednesday
+
+Two waves, 13 agents, covering everything from classic AMQ-filter theory to LLM KV-cache eviction to MoE serving systems. Here's what actually changes going into the meeting.
+
+## Three close-reads, three different outcomes — the honest scorecard
+
+| Tool | Threatens | Verdict |
+|---|---|---|
+| **Kun-peng** (earlier today) | "Smaller database" | Survives — same DB size, only RAM footprint shrinks, different memory tier entirely |
+| **kache-hash** | Thesis 1's adaptive cache | Survives, but the closest real overlap found — same CPU-cache tier, needs mechanism-level defense (static hash-function locality vs. runtime-adaptive eviction), not a tier-based dismissal |
+| **Chimera/TAXICF** | "Smaller database" | **Doesn't fully survive** — genuinely shrinks the on-disk database via cuckoo filters, needs an explicit caveat in the write-up. Underlying mechanisms (cell-width, double hashing, bitmask) still untouched |
+| **Taxor** | Bitmask cell specifically | Survives cleanly — never shares storage between organisms, so its collisions are a structurally different, non-OR failure mode |
+
+**The one thing to say differently on Wednesday because of this:** "smaller database" can no longer be pitched as an unqualified outcome claim — Chimera already gets there, via cuckoo filters, for large taxonomies. The pitch needs to be specifically about the *mechanism* (cell-width + double hashing + bitmask cell for a small fixed panel), not the headline number, with Chimera cited as "outcome-adjacent, mechanism-different."
+
+## Two independent literatures converged on the same answer for Thesis 1
+
+LLM KV-cache eviction (Scissorhands' "persistence of importance," H2O's heavy-hitter scoring) and general systems research on skew-resistant indexing (PIM-Tree's hot/cold routing) — two fields that don't cite each other — both land on: **track decayed historical importance per item, route/protect hot items differently from the long tail, don't rely on recency alone.** MoE expert-caching research (Fiddler, MoE-Infinity, SiDA-MoE) adds a third, independent confirmation from yet another field. Recsys embedding caching (CachedEmbedding) adds a fourth: combine offline frequency priors with runtime counters. Four unrelated literatures, one converging answer — that convergence is itself worth a sentence in Thesis 1's write-up, not just the individual citations.
+
+## What's implementable now, ranked
+
+1. **Double hashing** — already planned, still the cleanest first target (unchanged from before this research pass).
+2. **Combined double-hashing + power-of-d-choices bucket placement** — new this pass, cheap (reuses the same hash pair), real precedent (libcuckoo), feeds the §5 latency-hiding-cache future-work item directly.
+3. **Scissorhands-style decayed-importance eviction** for Thesis 1, informed by the four-literature convergence above — the strongest-grounded version of "biology-dependent adaptive eviction" now available, better-cited than W-TinyLFU/ARC alone.
+4. **Trace-driven LLC sizing** (Bandana's method: simulate candidate cache sizes against real read traces, pick the cheapest one hitting a target) — concrete methodology for the LLC-topology-aware sizing piece, not just "read `/sys` at startup."
+5. **Bitmask-cell false-positive formula** — derivation strategy now exists (Count-Min-style one-sided Markov bound, re-targeted at OR instead of sum, occupancy-corrected for the real probing scheme) — this is now a "sit down and derive it" task, not an open research question.
+
+## Three citations that pre-empt reviewer questions before they're asked
+
+- **MPHF (SSHash/PTHash)** answers "why not just use a perfect hash instead of double hashing?"
+- **hackgap's bucketized cuckoo** answers "hasn't cuckoo hashing already been tried on k-mers?" (yes, but double hashing is a different family, still untried)
+- **kache-hash's static locality vs. Thesis 1's runtime adaptivity** answers "why not just use kache-hash's bucket layout?"
+
+## What to bring to sir Wednesday
+
+1. Kun-peng and Chimera/TAXICF are strong candidates for the comparator table (both live, both real, both DB-compatible-ish or at least directly benchmarked against Kraken2) — decide scope with sir, same open question already flagged for Kun-peng.
+2. The "smaller database" pitch needs the reframe above — mechanism over headline number.
+3. Four independent literatures (KV-cache eviction, PIM-Tree, MoE serving, recsys embedding caching) converging on the same eviction-policy answer is a genuinely strong grounding story for Thesis 1 that didn't exist before today.
+4. Two new implementation candidates worth floating: combined double-hash/power-of-d-choices bucket placement, and Scissorhands-style decayed importance as the concrete eviction mechanism.
