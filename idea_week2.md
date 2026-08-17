@@ -25,6 +25,23 @@ Short, point-wise list of ideas found for Thesis 1 and Thesis 2, from a 7-agent 
 
 12. **Kun-peng** — a real, actively maintained tool (Rust, March 2026 paper) that reuses Kraken2's own database format and claims up to 24x less build memory, 473x less query memory, and 4.73x faster classification than Kraken2. Directly competes with the "smaller database" pitch — read it closely before finalizing that framing, the way `kache-hash` already gets an explicit differentiation paragraph.
 
+### Kun-peng — differentiation from the "smaller database" pitch (2026-08-17 close read)
+
+You want to know if Kun-peng steals Thesis 2's headline before you finalize the framing. It doesn't — but it does steal a *word*, and you need to stop using that word the way we have been.
+
+**What Kun-peng actually does.** Chen, Zhang, Peng, Huang, Liu, Shen & Jiang, *Kun-peng: an ultra-memory-efficient, fast, and accurate pan-domain taxonomic classifier* (bioRxiv Dec 2024 → *Briefings in Bioinformatics* 27(2), March 2026, DOI 10.1093/bib/bbag119 — [paper](https://academic.oup.com/bib/article/27/2/bbag119/8525000), [code](https://github.com/eric9n/Kun-peng)) is a Rust reimplementation of Kraken2's classification algorithm. It keeps Kraken2's hash function, cell width, and linear-probing collision resolution completely unchanged — the paper states it plainly: Kun-peng is "fully compatible with Kraken2's hash-table format." What it changes is how that *unmodified* hash table gets loaded. Kraken2 pulls the whole table into RAM at once; Kun-peng slices it into sequential ~4GB blocks on disk (its "Intelligent Block-Partitioned Database Structure") and loads only the block a query batch actually needs, on demand.
+
+> [!IMPORTANT]
+> The on-disk database is the *same size* as Kraken2's — the paper's own build-comparison table lists it as identical (~81GB for their 75,796-genome reference). Kun-peng does not build a smaller database. It builds the same database and avoids holding all of it in RAM at once.
+
+That's the correction to make before Wednesday: "smaller database" is our word, and Kun-peng hasn't taken it — the stored structure is byte-for-byte the same size either way. What Kun-peng *has* taken is "less memory," and it's taken it at a scale that makes our number look small if Thesis 2 gets framed as a memory-reduction story: 24x less build memory, up to 473x less query memory, 4.73x faster classification (Kun-peng-F mode), all benchmarked up to a 4.3TB, 204,477-genome pan-domain database built with only 4.1GB peak RAM, on an AMD EPYC 7742 (128 cores, 512GB RAM), 10 threads. Centrifuge and Centrifuger are both in their comparison too — both showed higher false-positive rates than Kun-peng across several CAMI-II-style datasets. Metabuli isn't mentioned. No LLC/cache-hierarchy discussion anywhere in the paper — the memory story stops at block-file granularity.
+
+**Why this doesn't compete with Thesis 2 — it composes with it.** Kun-peng operates one level up the stack from where Thesis 2 lives. Thesis 2 shrinks the *cell*: fewer bits per hash-table entry (32→24→16-bit), plus double hashing to hold back the false-positive cliff as cells get smaller. That changes what's stored. Kun-peng shrinks nothing stored — it changes how an unmodified table streams off disk, in coarse 4GB blocks, with no eviction policy below the block-file level. Run Thesis 2's narrower cells through Kun-peng-style block-partitioning and you'd get smaller blocks, fewer blocks per genome set, and a lower peak-RAM number than either technique gets alone. That's a genuine "future work" sentence for the write-up, not a defensive one.
+
+**Why this doesn't compete with Thesis 1 either.** Thesis 1 lives at the CPU-cache tier — KB/MB-scale, LLC-topology-aware, evicting on access pattern. Kun-peng lives at the RAM/disk tier — GB-scale, block-file streaming, confirmed no eviction policy, no cache-awareness at all. Different memory-hierarchy level, no overlap. Cite it as sibling prior art for "table lookup dominates cost," same treatment as MegIS already gets.
+
+**Open question for sir.** Kun-peng is live, maintained, Kraken2-DB-compatible, and has a March 2026 peer-reviewed paper — that's a stronger case for the *comparator table* (next to Metabuli/Centrifuger) than for cite-only treatment like kache-hash and MegIS get. Worth raising directly on Wednesday: if it goes in the table, it needs an ARM64/Orion buildability check (Rust toolchain — likely fine, but unverified) before it can be scheduled alongside the existing Metabuli/Centrifuger install work.
+
 ## Novelty claims confirmed safe to state
 
 13. No existing work combines adaptive caching + reduced-width/double hashing + a small fixed organism panel — this project's exact combination.
