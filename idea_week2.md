@@ -72,6 +72,23 @@ Kun-peng got let off easy because it lives at a completely different memory tier
 
 **Bottom line:** cite Chimera and caveat the "smaller database" outcome claim — it's a real, disk-size-reducing competitor using a different structure. But cell-width reduction, double hashing, and the 6-bit bitmask cell are all mechanistically untouched by it and can be stated as clean going into Wednesday.
 
+### Taxor (HIXF) — differentiation from Thesis 2 (2026-08-17 close read)
+
+Good news this time — the bitmask-cell claim survives cleanly, and the reason why is worth understanding, not just trusting.
+
+**What HIXF actually is.** Ulrich & Renard, *Taxor* (Genome Research 2024, DOI 10.1101/gr.278623.123, [github.com/JensUweUlrich/Taxor](https://github.com/JensUweUlrich/Taxor)). A Hierarchical Interleaved XOR Filter is many single-organism XOR filters — one per reference "bin" — laid out with their arrays concatenated slot-by-slot into one bitvector, so a single memory read returns every bin's fingerprint slice at once (a direct extension of the Interleaved Bloom Filter trick from the same group's earlier Raptor/HIBF work). The "hierarchical" half is a dynamic-programming layer (HyperLogLog sketches + Jaccard distance) that splits oversized references across multiple technical bins and merges undersized ones into shared bins with their own child filter one level down — a tree of *filters*, not a tree of taxa.
+
+> [!IMPORTANT]
+> **The load-bearing finding:** each bin gets its own dedicated, independently-sized fingerprint array. Interleaving only changes memory *layout* for cache-parallel reads — bins never share storage. A Taxor false positive is an uninserted k-mer coincidentally matching a stored fingerprint *within one bin's own array*, never two organisms' presence bits OR'd together into a shared cell. That OR-collision regime is exactly what the 6-bit bitmask cell proposes, and it doesn't exist in Taxor. Different failure mode, different design.
+
+**Scale confirms the gap holds.** Taxor is designed for thousands of bins with wildly divergent genome sizes (benchmarked on 21,003 RefSeq-217 genomes: 11,579 viral + 8,938 bacterial + 403 archaeal + 83 fungal) — the entire point of "hierarchical" is handling that size heterogeneity. At a flat 6-organism ESKAPE panel, the split/merge DP machinery wouldn't engage at all; Taxor's whole reason for existing doesn't apply at this scale.
+
+**Benchmarks** (vs. Kraken2, Centrifuge, MetaMaps, KMCP, Ganon): index 8.9GB vs. Kraken2's 25.6GB (65% smaller, 40% smaller than KMCP's), build ~80min/15.2GB peak, query ~3.5min/7.8GB peak on 426k ONT reads, precision 0.91-0.97, recall 0.89-0.97.
+
+**Hashing and false-positive math — no overlap.** Pure XOR-filter peeling construction (3-uniform hypergraph peeling, Graf & Lemire's method) — no linear probing, double hashing, or cuckoo displacement anywhere, at build or query time. And there's no novel false-positive derivation in the paper at all: they cite the generic XOR-filter bound (~1/2^L, L=8 ⇒ ~0.39%) for the base filter, and explicitly state there's "no theoretical derivation" for their syncmer confidence threshold — it's calibrated empirically against simulated reads, not derived. The OR-collision math the bitmask cell needs doesn't exist here to borrow or to compete with.
+
+**Bottom line:** cite Taxor for the "smaller database" outcome claim (real, and via yet another different structure than both Kun-peng and Chimera), but the bitmask-cell mechanism and its false-positive math are genuinely untouched — Taxor's design philosophy (never share storage, so never need OR-collision math) is the opposite of what the bitmask cell deliberately does.
+
 ## Novelty claims confirmed safe to state
 
 13. No existing work combines adaptive caching + reduced-width/double hashing + a small fixed organism panel — this project's exact combination.
