@@ -66,4 +66,40 @@ The rest of this family, ranked by relevance:
 
 ---
 
-*(More sections landing as the rest of wave 1 reports back: recsys embedding-table caching, feature-hashing collision math for the bitmask cell, advanced hashing schemes, hardware-aware/CXL caching, and a sweep for anything 2025-2026 that might threaten either thesis.)*
+## Recsys embedding-table caching (DLRM-adjacent systems)
+
+Searched explicitly for prior work applying this style of caching to genomics/bioinformatics indexing — found none. Genomics k-mer caching work cites minimizers and locality-sensitive hashing, not hot/cold embedding-row placement. Same shape of gap as double hashing: nobody's crossed these two literatures.
+
+1. **FAE (Framework for Accelerating Embeddings)** — Adnan et al., VLDB 2022 ([arXiv:2103.00686](https://arxiv.org/abs/2103.00686)). Profiles access counts on a data sample, picks a hot/cold threshold from that profile (on Criteo's dataset, the top 6.8% of rows take ~76% of accesses), places hot rows in fast memory. **Translation:** profile the k-mer access histogram per organism/dataset offline, size the cache to the hot fraction, pick the threshold from that profile instead of relying purely on runtime decay. The GPU/CPU split doesn't transfer; the sampling-based threshold selection does, cheaply.
+
+2. **Bandana** — Eisenman, Naumov et al. (Facebook), MLSys 2019 ([arXiv:1811.05922](https://arxiv.org/abs/1811.05922)). Two ideas: co-locate rows likely to be read together in the same physical block, and pick DRAM cache size by simulating candidate sizes against traced access logs rather than guessing. **Translation:** the co-location idea maps to grouping k-mers from the same genomic region into the same cache line/cell block. The trace-driven sizing method is a concrete, liftable technique for the LLC-topology-aware sizing piece — replay real read traces through a cache simulator to pick per-core cache size instead of guessing a fraction of LLC.
+
+3. **Frequency-aware software cache (CachedEmbedding, ColossalAI)** — arXiv:2208.05321, 2022.
+
+   > [!IMPORTANT]
+   > Closest existing analogue to Thesis 1's whole eviction-policy pitch found so far: precomputes offline access-frequency priors and layers them on top of a runtime LFU-like eviction, so cold rows *known* to be rare get evicted preferentially even before they'd naturally age out. Translation is almost 1:1 — combine offline k-mer frequency priors (from reference genome composition) with runtime W-TinyLFU counters, instead of recency alone. Single-node, single-table — architecturally the closest of the five to Kraken2's setup.
+
+4. **Hierarchical Parameter Server (HPS)** — NVIDIA Merlin HugeCTR ([arXiv:2210.08804](https://arxiv.org/abs/2210.08804)). Explicit 3-tier cache (GPU HBM → CPU DRAM → SSD) with frequency-driven promotion/demotion. Template for generalizing LLC-topology-aware sizing to more than two tiers (L2-private / LLC-shared / DRAM) even without a GPU tier.
+
+5. **ERCache** — Meta Ads, [arXiv:2410.06497](https://arxiv.org/abs/2410.06497), Oct 2024. Per-workload-class eviction/TTL tuning plus a failover cache serving stale-but-valid entries under load. Weakest fit — no k-mer analogue to "stale but usable" (a k-mer either is or isn't in the table) — but a reminder that per-organism policy tuning (not one global policy) is a legitimate design axis.
+
+**Caveat across all five:** every one of these targets multi-GB/TB tables at datacenter scale with GPU or multi-node hardware, amortizing cache-management overhead over huge batches. Kraken2 makes cache decisions per-lookup on one CPU node — the *policies* (frequency priors, tiered sizing, trace-driven simulation) transfer far better than any actual code would.
+
+## Feature-hashing / sketch collision theory — a derivation strategy for the bitmask cell
+
+This is the one that actually answers "how do we derive the formula," not just "who else has a similar idea." Three source techniques, then the fitted answer.
+
+1. **Feature hashing** — Weinberger, Dasgupta, Langford, Smola, Attenberg, ICML 2009 ([arXiv:0902.2206](https://arxiv.org/abs/0902.2206)). Multiplies a *signed* hash (±1) onto each feature before accumulating, so collisions cancel in expectation (E[ζ(t)ζ(t′)]=0 for t≠t′) instead of biasing the result — then bounds the tail with Talagrand's concentration inequality.
+2. **Count-Sketch** — Charikar, Chen, Farach-Colton, ICALP 2002. Same signed-cancellation idea, generalized: variance bounded via Chebyshev on the L2 norm of the rest of the vector, boosted to a high-probability bound with median-of-means.
+3. **Count-Min Sketch** — Cormode & Muthukrishnan, 2005. Deliberately *unsigned* — counters only ever increase, so error is strictly one-sided, and Markov's inequality applies directly without needing cancellation.
+
+> [!IMPORTANT]
+> **The bitmask cell is structurally an OR-accumulator, not a sum — so it's the odd one out relative to all three.** Signed-hash cancellation (techniques 1 and 2) can't help here: OR has no additive inverse to cancel against. Bit-flip events are strictly one-directional (bits only ever turn on), which makes **Count-Min's one-sided Markov/union-bound machinery the right template**, not feature hashing's signed trick — re-targeted at OR instead of sum, and split per-organism instead of per-query. Concretely: for a cell with load factor λ = N/m, and organism *i* truly absent from that cell, "spurious bit set" is the probability that ≥1 of organism *i*'s k-mers (weighted by its genome-representation share p_i) also lands in this cell — a balls-into-bins occupancy calculation per organism per cell, summed via linearity of expectation into E[# spurious bits | true bits] per cell, then averaged over the table for expected FPR per organism as a function of (N, m, p_i).
+
+**Already solved elsewhere under a different name? Checked explicitly — no.** Bifrost's Blocked Bloom Filter stores existence only; organism/color membership lives in a *separate* compressed matrix, never OR'd into the same cell. Mantis/Squeakr make the base structure exact (zero false positives) specifically to dodge this problem, keeping color classes in a side table. Sequence Bloom Tree/SSBT/HowDeSBT give each organism its own filter, unioned only at query time. Nobody stores N organism-presence bits packed into one collision-prone cell and derives the OR-collision math for it — confirmed genuinely open.
+
+**Concrete next step, not just theory:** the naive m-choose-k birthday-paradox collision count is wrong for an open-addressed table, because probing redistributes k-mers away from full cells — collisions become occupancy-dependent, not independent. First task is re-deriving "effective number of distinct k-mers landing in the final cell" under Kraken2/Patch 4's actual probing scheme (linear now, double hashing planned), *then* plugging per-organism skew p_i into that corrected occupancy model — and validating the closed form against an instrumented run of the real hash table rather than trusting it blind.
+
+---
+
+*(More sections landing as the rest of wave 1 reports back: advanced hashing schemes, hardware-aware/CXL caching, and a sweep for anything 2025-2026 that might threaten either thesis.)*
