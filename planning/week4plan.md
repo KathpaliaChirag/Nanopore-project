@@ -15,6 +15,8 @@ If you're reading this cold, this is the one thing to understand before anything
 | 🟠 **REPORT CLAIMED** | Already written in the existing report's §5 ("Future Work"), *designed but never run* — our own prior claim, quoted below |
 | 🟢 **WE'RE ADDING** | New this week, not requested by sir or written in the report — our own contribution |
 
+Every table, diagram, and fallback further down carries one of these four — if a claim below doesn't obviously trace back to sir's email or the report (quoted next), it's ours.
+
 ## Source of truth — the three inputs, quoted exactly
 
 ### 🟡 SIR ASKED — his email, verbatim
@@ -55,7 +57,7 @@ A fourth item exists in the report too, separate from "the three" sir is pointin
 - A real method for the sizing step — trace-driven simulation against real read-access data, adapted from **Bandana** (Facebook's technique for sizing a small DRAM cache in front of much larger embedding-table storage, by simulating dozens of candidate cache configurations against real production read traces), not just reading LLC size and guessing a fraction of it.
 - Organism-blocked predictive partitioning — translated from a competing metagenomic classifier's trick (**Kun-peng**) at a different memory tier.
 - Bucket placement on top of double hashing — reusing the same hash pair to generate multiple candidate slots, not just a probe stride.
-- The actual false-positive formula for the bitmask cell — the report names the cell but never derives its collision math (its existing model describes linear-probing/double-hashing cells, not a shared OR-collision bitmask). Derivation strategy adapted from **Count-Min Sketch** (a probabilistic data structure that estimates how often something has been seen, even when multiple things share the same storage slot and collide).
+- A proposed false-positive formula for the bitmask cell — the report names the cell but never derives its collision math (its existing model describes linear-probing/double-hashing cells, not a shared OR-collision bitmask). Derivation strategy adapted from **Count-Min Sketch** (a probabilistic data structure that estimates how often something has been seen, even when multiple things share the same storage slot and collide).
 
 ## Where each track sits in the system
 
@@ -72,13 +74,13 @@ flowchart LR
     style F fill:#1a2a3d,stroke:#3d6fa8,stroke-width:2px,color:#cfe0f2
 ```
 
-Track A changes what happens before the big table is ever touched. Track B changes the table itself. The final step of both tracks — 🟠 report item 1 — is where they merge into one implementation.
+Track A changes what happens before the big table is ever touched. Track B changes the table itself. Track B's final step — 🟠 report item 1, the merge — is where the two come together into one implementation, using whatever Track A has built by then; Track A's own build order (below) doesn't end at the merge itself, it ends at S5, a separate stretch goal.
 
 ## Multi-week roadmap — from this week to done
 
 Nine top-level steps stand between where the project is now and a Wednesday-ready pair of thesis results — five in Track A (S1–S5), four in Track B (B1–B3, since B0 is already published). Each one bundles multiple real sub-steps once every design decision and every benchmark gets its own line: 39 in total below (35 across the two build tracks, plus 4 more for the comparator sweep), 19 of them measurable. That number is what actually paces the calendar below, not the top-level count.
 
-This roadmap has already been corrected twice. It originally fit both tracks into one week — once the sub-steps were made explicit, that estimate was obviously wrong. Thirty-nine real commits don't fit where nine did, because the overhead per cycle (build, five benchmark runs, log, push) doesn't shrink just because a step got smaller. Five weeks became six. A second pass caught one more problem: week 6 originally bundled the merge together with the comparator sweep, but the merge is the one step in this whole plan explicitly allowed to run long. Boxing it into a fixed few days alongside another deliverable was setting that week up to slip on purpose, so it now gets a full week of its own. Six weeks became seven real weeks, plus the same one-week buffer as before. None of this is scope creep — it's the fallback framework's own rule 2, applied to the plan itself: a bad number is data, not a failure, and this one got corrected twice before either version cost a real week.
+This roadmap has already been corrected twice. It originally fit both tracks into one week — once the sub-steps were made explicit, that estimate was obviously wrong. 39 real commits don't fit where nine did, because the overhead per cycle (build, five benchmark runs, log, push) doesn't shrink just because a step got smaller. Five weeks became six. A second pass caught one more problem: week 6 originally bundled the merge together with the comparator sweep, but the merge is the one step in this whole plan explicitly allowed to run long. Boxing it into a fixed few days alongside another deliverable was setting that week up to slip on purpose, so it now gets a full week of its own. Six weeks became seven — the same one-week buffer just moved a week later. None of this is scope creep — it's the fallback framework's own rule 2, applied to the plan itself: a bad number is data, not a failure, and this one got corrected twice before either version cost a real week.
 
 ```mermaid
 gantt
@@ -98,7 +100,7 @@ gantt
     section Week 8 — write-up
     Thesis 1 + Thesis 2 chapters              :w8, after w7, 7d
     section Week 9 — review
-    Sir feedback at Wednesday meeting         :w9, after w8, 7d
+    Sir's feedback at Wednesday meeting        :w9, after w8, 7d
     section Week 10 — buffer
     Slip absorption / housekeeping item       :w10, after w9, 7d
 ```
@@ -124,7 +126,7 @@ Read the Depends-on column as the real critical path: each week only has somethi
 
 ## How this plan survives failure — the fallback framework
 
-Nine steps, each touching performance-sensitive C++ on a shared machine, is nine chances for a build to break, a number to look wrong, or Luna's network to be uncooperative. Rather than write a bespoke contingency for each of the nine, one decision tree covers all of them — every step in Track A and Track B below points back to this same tree.
+Nine steps, each touching performance-sensitive C++ on a shared machine, are nine chances for a build to break, a number to look wrong, or Luna's network to be uncooperative. Rather than write a bespoke contingency for each of the nine, one decision tree covers all of them — every step in Track A and Track B below points back to this same tree.
 
 ```mermaid
 flowchart TD
@@ -160,8 +162,8 @@ Four rules make this tree do its job instead of just looking thorough:
 ```mermaid
 flowchart TD
     S0["S0 — 🔵 ALREADY DONE\nClean base Kraken2\nno cache at all"] --> S1
-    S1["S1 — 🟢 WE'RE ADDING\nour reference point\nsingle-slot cache"] --> S2
-    S2["S2 — 🟡 SIR ASKED\nhis actual baseline:\n4-way set-associative"] --> S3
+    S1["S1 — 🟢 WE'RE ADDING\nOur reference point\nsingle-slot cache"] --> S2
+    S2["S2 — 🟡 SIR ASKED\nHis actual baseline:\n4-way set-associative"] --> S3
     S3["S3 — 🟡 SIR ASKED\nLLC-topology-aware sizing\n(method: 🟢 ours)"] --> S4
     S4["S4 — 🟡 SIR ASKED\nBiology-dependent eviction\n(mechanism: 🟢 ours)"] --> S5
     S5["S5 — 🟢 WE'RE ADDING\nOrganism-blocked\npredictive partitioning"]
@@ -248,7 +250,7 @@ S3's real cost is S3.3's simulator, not the detection or trace-collection steps 
 
 | Sub-step | Type | What it does | If it fails |
 |---|---|---|---|
-| S4.1 | Design | Design the decay function: a per-entry importance score that fades with time-since-access, replacing LRU's binary recent/not-recent bit. Sanity-check it with a standalone script first — no build, no Luna — plotting decay score against time-since-access and frequency for a few synthetic access patterns shaped like the report's 90.7% reuse-rate/dominant-species-skew numbers, confirming the ranking isn't degenerate at either extreme before S4.2 spends a full build-and-benchmark cycle on it | No stable decay shape on paper — borrow TinyLFU's counter-decay (a cache-eviction technique that periodically halves frequency counters instead of tracking exact recency) as a starting point. It's periodic and frequency-based, not identical to this step's continuous per-entry design, but close enough to build from instead of inventing one from scratch |
+| S4.1 | Design | Design the decay function: a per-entry importance score that fades with time-since-access, replacing LRU's binary recent/not-recent bit. Sanity-check it with a standalone script first — no build, no Luna — plotting decay score against time-since-access and frequency for a few synthetic access patterns shaped like the report's 90.7% reuse-rate/dominant-species-skew numbers, screening for an obviously degenerate ranking at either extreme before S4.2 spends a full build-and-benchmark cycle on it | No stable decay shape on paper — borrow TinyLFU's counter-decay (a cache-eviction technique that periodically halves frequency counters instead of tracking exact recency) as a starting point. It's periodic and frequency-based, not identical to this step's continuous per-entry design, but close enough to build from instead of inventing one from scratch |
 | S4.2 | Measured | Wire the decay score into the eviction path (evict lowest score) and benchmark it alone, no protection yet | This is the case S4's existing fallback already names — fall back to plain LRU as interim S4, don't build protection on an unstable base |
 | S4.3 | Design | Define what counts as "universally hot" (e.g. a cross-read frequency threshold) and flag qualifying k-mers for protection | No clean threshold separates hot from noise — ship S4 as decay-only for now, revisit pinning as a later add-on, not a blocker |
 | S4.4 | Design | Make protection a hard skip in eviction candidate selection — pinned entries are excluded outright, not just given a high score that can still decay away | The cache still evicts pinned entries under load — fix the skip logic before touching the benchmark |
@@ -306,7 +308,7 @@ flowchart TD
     style B1F fill:#1a3320,stroke:#4a8a54,color:#d3ecd8
     style B1bF fill:#1a3320,stroke:#4a8a54,stroke-dasharray: 4 3,color:#d3ecd8
     style B2F fill:#3d3311,stroke:#c9a227,color:#f2e6b8
-    style B3F fill:#3d1a1a,stroke:#c0392b,color:#f2d3d3
+    style B3F fill:#3d3311,stroke:#c9a227,color:#f2e6b8
 ```
 
 B3 is the one branch here that never turns red — it just moves later, exactly as the callout above says.
@@ -320,7 +322,7 @@ Same shape as Track A above, applied to the four Track B steps. Sub-step IDs use
 | Sub-step | Type | What it does | If it fails |
 |---|---|---|---|
 | B1.1 | Design | Implement h2(key) from a hash family structurally unlike h1's (different multiplier/bit-mixing), forced odd/nonzero | If an original design stalls, borrow a hash pair from a known-good published double-hashing implementation rather than invent one |
-| B1.2 | Measured | Correlation/chi-square test of h1(key) vs h2(key) over real k-mer keys, before wiring h2 in | If h2 correlates with h1, don't retune it — swap in an unrelated family (e.g. bit-mixing, not multiplicative) and re-test; correlation silently collapses it toward linear probing |
+| B1.2 | Measured | Correlation/chi-square test of h1(key) vs. h2(key) over real k-mer keys, before wiring h2 in | If h2 correlates with h1, don't retune it — swap in an unrelated family (e.g. bit-mixing, not multiplicative) and re-test; correlation silently collapses it toward linear probing |
 | B1.3 | Design | Replace the linear-probing stride with `slot = (h1(key) + i*h2(key)) % size` in the lookup/insert path | Gate the new path behind a compile-time flag so linear probing is one rebuild away, keeping the fallback framework's small-diff diagnose step intact |
 | B1.4 | Measured | Fill the table to ~95%+ load, confirm every probe sequence terminates and reaches every open slot | Force table size to stay prime (or power-of-2 with h2 forced odd) so gcd(h2, size)=1 holds by construction, instead of patching runtime cases |
 | B1.5 | Measured | Run the standard benchmark, measure actual probe length and cliff shift, compare against the ≈6→≈2.5 and ≈1.3-bit projections | Same as B1's own fallback — don't discard a miss, re-derive the false-positive model from what was actually measured; the correction is the finding |
@@ -345,8 +347,7 @@ B1b's fallback never says "log it and continue" the way S2's does — a worse nu
 | B2.2 | Measured | Implement the 6-bit-per-organism cell's bit layout and its set/query logic | If set/query doesn't round-trip, roll back to B1/B1b's cell, mark B2 BLOCKED, and swap to Track A while debugging — B2 isn't optional, don't cut it |
 | B2.3 | Measured | Measure the real false-positive rate and compare it against B2.1's derivation | If the measured rate misses the derived formula, report the cell with its measured, not derived, collision rate and flag the gap openly — B2's existing fallback, unchanged |
 
-> [!IMPORTANT]
-> B2 is not optional, the same as B3 below — it's report §5 item 3, one of the three things sir asked to see completed. If B2.2's implementation gets stuck, mark it BLOCKED and swap effort to Track A rather than cutting it, exactly like the per-step table above already says.
+**B2 is not optional**, the same as B3 below — it's report §5 item 3, one of the three things sir asked to see completed. If B2.2's implementation gets stuck, mark it BLOCKED and swap effort to Track A rather than cutting it, exactly like the per-step table above already says.
 
 **B3 — merge with Track A's cache** (6 sub-steps — the riskiest step in the plan, where a wrong answer or worse number is a real problem, not data to log and move past)
 
@@ -386,7 +387,7 @@ Same command this project has used for every prior measurement — keeps step 0 
 1. Implement the one change for this sub-step, against the clean (or previous sub-step's) source — nothing else touched.
 2. `make -s clean && make -s -j 96` — rebuild. Build failure → the diagnose/rollback branch in the fallback framework above, not a reason to touch a second file while debugging.
 3. Run the exact same profiling command as step 0, same database, same thread count — **five times**, not once, so a one-off noisy run can't masquerade as a real regression. (Design sub-steps skip this — there's no binary to benchmark yet.)
-4. Log the result next to the previous sub-step's number, worse or better either way.
+4. Log the result next to the previous sub-step's number, worse or better either way — this is the number that goes into the safe-zone ledger's commit cell in the next step, so keep it somewhere you can copy from (a scratch file, a comment, whatever's fastest).
 5. Commit and push before starting the next sub-step. **This push is the safe zone** — nothing about this sub-step is "done" until this line has happened.
 
 **Reading the 5 numbers, not just eyeballing them.** For each measured sub-step, compute the coefficient of variation (CV = stdev ÷ mean) across the 5 runs — for wall-clock time and for whatever perf counter this step is being judged on. CV ≤ 5%: trust the mean, log it, move on. CV > 5%: don't average through the noise — check for contention on the shared machine first (another job running, thermal throttling, same category as the existing Luna-proxy check), then re-run all 5. Once the numbers are trustworthy, deciding whether a delta between two steps is real takes the same rigor as computing it: build a 95% confidence interval per config (mean ± t-value × stdev/√5). Non-overlapping intervals confirm a real difference — but overlapping intervals do *not* prove there's no difference, that's a known false-negative trap, so for any delta that's small, borderline, or feeding a thesis claim, run a one-line Welch's t-test instead of trusting the eyeball check.
@@ -395,10 +396,10 @@ Same command this project has used for every prior measurement — keeps step 0 
 
 ## Safe-zone checkpoint ledger
 
-Every row below gets its commit hash filled in the moment that sub-step's push happens — this table is the fast answer to "what's our last known-good state" if a later step goes sideways, without needing to dig through `git log`. Top-level rows (bold, unindented) summarize their children — "(see sub-steps)" in the commit column means look one level down, not that nothing happened. Skim the shape on a first read, not every row: only S0/B0 are populated so far, everything else fills in as the weeks go.
+Every row below gets its commit hash filled in the moment that sub-step's push happens, with the actual result appended right next to it in the same cell — for a Measured sub-step, something like `3f9a2c1 — 3.9s, CV 2.1%`; for a Design sub-step, just the hash. This table is the fast answer to "what's our last known-good state" if a later step goes sideways, without needing to dig through `git log`. Top-level rows (bold, unindented) summarize their children — "(see sub-steps)" in the commit column means look one level down, not that nothing happened. Skim the shape on a first read, not every row: only S0/B0 are populated so far, everything else fills in as the weeks go.
 
 > [!NOTE]
-> The Status column below is a separate done/not-started indicator (🔵 done, ⬜ not started), not the 🔵🟡🟠🟢 attribution-tag system from the top of this document — it just reuses the same 🔵 icon.
+> The Status column below is a separate progress indicator (🔵 done, ⬜ not started, 🔴 blocked — matching "mark it BLOCKED" wherever the fallback framework says it), not the 🔵🟡🟠🟢 attribution-tag system from the top of this document — it just reuses the 🔵 icon.
 
 39 sub-steps below (19 Measured, 20 Design), plus 12 top-level rows = 51 rows total.
 
