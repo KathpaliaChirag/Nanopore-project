@@ -470,3 +470,33 @@ Kicked off a 4-agent parallel research pass same day to start answering item 2�
 
 ### Next meeting
 2026-08-12, 4–5 pm (standing Wednesday slot) — *unconfirmed, per the standing cadence*
+
+---
+
+## Meeting 11 — 2026-08-19 (Wednesday, 4–5 pm)
+
+**Attendees:** Kolin sir, Chirag K
+**Format:** Weekly check-in
+
+> No entry exists for the 2026-08-12 slot noted above — either it didn't happen or wasn't logged. Flagging the gap rather than silently skipping past it.
+
+### Topics covered
+
+1. **Scope locked to three concrete pieces, aimed at a paper submission**
+   - Sir set the target: build a working package on top of base Kraken2 combining three things from the future-work report, then write it up as a paper.
+   - The three pieces, as discussed: (1) the LLC/cache piece — architecturally designed to *adapt* (topology-aware sizing, not a fixed-size cache), (2) the bitmask cell (report §5 item 3 — one `Get()` answers all six ESKAPE panel members), (3) cell-width reduction (the already-published 32/24/16-bit cell work, now to be packaged alongside the two new pieces rather than left as a standalone prior result).
+   - Note: this list is *not* identical to the report's own "three items of future work" (which were the merged cache, double hashing, and the bitmask cell) — double hashing wasn't named here, and cell-width reduction (already done) was named instead. Worth confirming with sir whether double hashing is folded in implicitly or genuinely out of scope for this specific push.
+
+2. **Target: a conference submission around 13 September 2026**
+   - Explicit deadline pressure — the three pieces need to come together as one demonstrable package before that date, not as three separate unfinished threads.
+
+3. **Report back next week**
+   - Progress on the package goes to sir at the next standing Wednesday meeting (2026-08-26).
+
+### Action items
+- Build the package: LLC-adaptive cache + bitmask cell + cell-width reduction, combined on top of base Kraken2 — target working state before the 13 Sept conference date
+- Confirm with sir whether double hashing (report item 2) is in or out of scope for this specific paper push, given it wasn't named in this meeting's three-item list
+- Report progress at the 2026-08-26 meeting
+
+### Next meeting
+2026-08-26, 4–5 pm (standing Wednesday slot)
