@@ -2,6 +2,8 @@
 
 Every piece of this gets built fresh, against real base Kraken2, one change at a time, benchmarked before the next change goes in. By the end of the week you should have a number for every single piece of both theses, not one combined "it's faster now" figure per thesis.
 
+Reading this cold and short on time? Jump to **"What Wednesday should walk away with"** near the end for the this-week summary, or **"What 'done' actually means"** in the roadmap section for the whole-project finish line. Everything between those two points is reference material for actually executing each step, not something you need to read start to finish in one sitting.
+
 ## Reading key — four tags, used on every step below
 
 If you're reading this cold, this is the one thing to understand before anything else: every single step in this plan gets exactly one of these four tags, always in this order, no exceptions.
@@ -50,10 +52,10 @@ A fourth item exists in the report too, separate from "the three" sir is pointin
 ### 🟢 WE'RE ADDING — beyond both of the above
 
 - The eviction algorithm's actual mechanism — sir asked for "adaptive eviction," the report doesn't specify one. Decayed-importance tracking, grounded in four independent literatures (LLM inference caching, Mixture-of-Experts caching, recommendation-system caching, general skew-resistant indexing) that converged on this design without citing each other, plus permanent protection for universally-hot k-mers — that second piece leans more on production practice (e.g. Redis's manual hot-key handling) than on an independent convergence in that literature.
-- A real method for the sizing step — trace-driven simulation against real read-access data (Bandana's method), not just reading LLC size and guessing a fraction of it.
-- Organism-blocked predictive partitioning — translated from a competing tool's trick (Kun-peng) at a different memory tier.
+- A real method for the sizing step — trace-driven simulation against real read-access data, adapted from **Bandana** (Facebook's technique for sizing a small DRAM cache in front of much larger embedding-table storage, by simulating dozens of candidate cache configurations against real production read traces), not just reading LLC size and guessing a fraction of it.
+- Organism-blocked predictive partitioning — translated from a competing metagenomic classifier's trick (**Kun-peng**) at a different memory tier.
 - Bucket placement on top of double hashing — reusing the same hash pair to generate multiple candidate slots, not just a probe stride.
-- The actual false-positive formula for the bitmask cell — the report names the cell but never derives its collision math (its existing model describes linear-probing/double-hashing cells, not a shared OR-collision bitmask). Derivation strategy adapted from Count-Min Sketch.
+- The actual false-positive formula for the bitmask cell — the report names the cell but never derives its collision math (its existing model describes linear-probing/double-hashing cells, not a shared OR-collision bitmask). Derivation strategy adapted from **Count-Min Sketch** (a probabilistic data structure that estimates how often something has been seen, even when multiple things share the same storage slot and collide).
 
 ## Where each track sits in the system
 
@@ -74,10 +76,9 @@ Track A changes what happens before the big table is ever touched. Track B chang
 
 ## Multi-week roadmap — from this week to done
 
-Nine top-level steps stand between where the project is now and a Wednesday-ready pair of thesis results — five in Track A (S1–S5), four in Track B (B1–B3, since B0 is already published). Each one bundles multiple real sub-steps once every design decision and every benchmark gets its own line: 35 in total, 16 of them measurable. That number is what actually paces the calendar below, not the top-level count.
+Nine top-level steps stand between where the project is now and a Wednesday-ready pair of thesis results — five in Track A (S1–S5), four in Track B (B1–B3, since B0 is already published). Each one bundles multiple real sub-steps once every design decision and every benchmark gets its own line: 39 in total below (35 across the two build tracks, plus 4 more for the comparator sweep), 19 of them measurable. That number is what actually paces the calendar below, not the top-level count.
 
-> [!NOTE]
-> This roadmap originally fit both tracks into one week. Once the sub-steps below were made explicit, that estimate was obviously wrong — 35 real commits don't fit where 9 did, because the overhead per cycle (build, five benchmark runs, log, push) doesn't shrink just because a step got smaller. Five weeks became six. That's not scope creep — it's the fallback framework's own rule 2 applied to the plan itself: a bad number is data, not a failure, and this one got corrected before it cost a real week.
+This roadmap has already been corrected twice. It originally fit both tracks into one week — once the sub-steps were made explicit, that estimate was obviously wrong. Thirty-nine real commits don't fit where nine did, because the overhead per cycle (build, five benchmark runs, log, push) doesn't shrink just because a step got smaller. Five weeks became six. A second pass caught one more problem: week 6 originally bundled the merge together with the comparator sweep, but the merge is the one step in this whole plan explicitly allowed to run long. Boxing it into a fixed few days alongside another deliverable was setting that week up to slip on purpose, so it now gets a full week of its own. Six weeks became seven real weeks, plus the same one-week buffer as before. None of this is scope creep — it's the fallback framework's own rule 2, applied to the plan itself: a bad number is data, not a failure, and this one got corrected twice before either version cost a real week.
 
 ```mermaid
 gantt
@@ -85,39 +86,41 @@ gantt
     dateFormat  YYYY-MM-DD
     axisFormat  %b %d
     section Week 4 — Track A S1-S3, Track B B1
-    Track A S1-S3 (10 sub-steps)          :active, w4a, 2026-08-19, 7d
-    Track B B1 (5 sub-steps)              :active, w4b, 2026-08-19, 7d
+    Track A S1-S3 (10 sub-steps)              :active, w4a, 2026-08-19, 7d
+    Track B B1 (5 sub-steps)                  :active, w4b, 2026-08-19, 7d
     section Week 5 — Track A S4-S5, Track B B1b-B2
-    Track A S4-S5 (8 sub-steps)           :w5a, after w4a, 7d
-    Track B B1b-B2 (6 sub-steps)          :w5b, after w4b, 7d
-    section Week 6 — merge + compare
-    B3 merge (6 sub-steps)                :w6a, after w5a, 4d
-    Centrifuge/Metabuli/Centrifuger sweep :w6b, after w6a, 3d
-    section Week 7 — write-up
-    Thesis 1 + Thesis 2 chapters          :w7, after w6b, 7d
-    section Week 8 — review
-    Sir feedback at Wednesday meeting     :w8, after w7, 7d
-    section Week 9 — buffer
-    Slip absorption / housekeeping item   :w9, after w8, 7d
+    Track A S4-S5 (8 sub-steps)               :w5a, after w4a, 7d
+    Track B B1b-B2 (6 sub-steps)              :w5b, after w4b, 7d
+    section Week 6 — merge only
+    B3 merge (6 sub-steps)                    :w6, after w5a w5b, 7d
+    section Week 7 — compare
+    Comparator sweep vs merged build (4 sub-steps) :w7, after w6, 7d
+    section Week 8 — write-up
+    Thesis 1 + Thesis 2 chapters              :w8, after w7, 7d
+    section Week 9 — review
+    Sir feedback at Wednesday meeting         :w9, after w8, 7d
+    section Week 10 — buffer
+    Slip absorption / housekeeping item       :w10, after w9, 7d
 ```
 
 > [!NOTE]
-> Dates are a planning scaffold, not a promise — they start from today (2026-08-19, a Wednesday) and assume nothing blocks. Every week boundary lands on a Wednesday to match the standing meeting, and every fallback below names exactly where a blocked sub-step's time comes from, so a slip in week 4 shows up as a smaller buffer in week 9, not a silently missed step.
+> Dates are a planning scaffold, not a promise — they start from today (2026-08-19, a Wednesday) and assume nothing blocks. Every week boundary lands on a Wednesday to match the standing meeting, and every fallback below names exactly where a blocked sub-step's time comes from, so a slip in week 4 shows up as a smaller buffer in week 10, not a silently missed step.
 
 **What each week is actually for:**
 
 | Week | Goal | Depends on | If it slips |
 |---|---|---|---|
 | 4 (now) | Every Design/prep sub-step, plus whichever Measured sub-steps that unlocks, for Track A S1→S3 and Track B B1 | Nothing — both tracks start from 🔵 already-done baselines and run independently | Push incomplete sub-steps into week 5. S1's sub-steps are the first to cut if truly stuck, matching S1's existing optional status — S2's and S3's are not, sir and his email named both directly |
-| 5 | The same, for Track A S4→S5 and Track B B1b→B2 | Week 4 leaving S1–S3 and B1 in a measured, mergeable state | Push into week 9's buffer. Cut S5's and B1b's sub-steps first — both are stretch goals — and keep S4's and B2's in place, since sir and the report asked for those directly |
-| 6 | B3's full 6-sub-step merge (Track A's cache + Track B's hashing/cell into one implementation) and the three-way comparator sweep (Centrifuge, Metabuli, Centrifuger) | Track A and Track B both reaching a mergeable state by the end of week 5 | Push the merge into week 7. Start the write-up on whatever's merged by then, and amend it once B3 clears |
-| 7 | Turn the measured tables into the two thesis chapters | Week 6's numbers being real, not projected | Draft with whatever's measured so far. Mark it clearly as provisional, and backfill it once week 6 finishes |
-| 8 | Sir's review at the standing Wednesday meeting, revisions from his feedback | A draft existing to review | This is the one week that can't silently absorb a slip — if there's nothing to show, say so at the meeting instead of skipping it |
-| 9 | Buffer — catches anything still open, or does the report's 4th "housekeeping" item (ESKAPE panel extension, upstreaming, ≥200MB-L3 re-run) if nothing slipped | Everything above | If week 9 isn't enough either, that's an explicit escalation at the next Wednesday meeting, not a quiet extension |
+| 5 | The same, for Track A S4→S5 and Track B B1b→B2 | Week 4 leaving S1–S3 and B1 in a measured, mergeable state | Push into week 6, delaying the merge's start. Cut S5's and B1b's sub-steps first — both are stretch goals — and keep S4's and B2's in place, since sir and the report asked for those directly |
+| 6 | B3's full 6-sub-step merge (Track A's cache + Track B's hashing/cell into one implementation) — its own week, nothing else scheduled against it | Track A and Track B both reaching a mergeable state by the end of week 5 | Let it run into week 7. B3 is the one step in this plan explicitly allowed to take longer rather than roll back — the comparator sweep waits for it, it doesn't share the week |
+| 7 | The three-way comparator sweep (Centrifuge, Metabuli, Centrifuger) against the finished merged build | B3 clearing its correctness and regression checks in week 6 | Push into week 8, compressing the write-up's runway. The standalone tool re-runs can start opportunistically during week 6's slack even while B3 is still running — only the final comparison table needs B3 fully done |
+| 8 | Turn the measured tables into the two thesis chapters | Week 7's numbers being real, not projected | Draft with whatever's measured so far. Mark it clearly as provisional, and backfill it once week 7 finishes |
+| 9 | Sir's review at the standing Wednesday meeting, revisions from his feedback | A draft existing to review | This is the one week that can't silently absorb a slip — if there's nothing to show, say so at the meeting instead of skipping it |
+| 10 | Buffer — catches anything still open, or does the report's 4th "housekeeping" item (ESKAPE panel extension, upstreaming, ≥200MB-L3 re-run) if nothing slipped | Everything above | If week 10 isn't enough either, that's an explicit escalation at the next Wednesday meeting, not a quiet extension |
 
-Read the Depends-on column as the real critical path: each week only has something real to work with once the row above it lands clean, so a slip's cost shows up immediately in the next week's row instead of hiding until the write-up in week 7.
+Read the Depends-on column as the real critical path: each week only has something real to work with once the row above it lands clean, so a slip's cost shows up immediately in the next week's row instead of hiding until the write-up in week 8.
 
-**What "done" actually means.** This plan is done when four things are true, all already defined above: (1) Track A has real numbers through S4 — S2's baseline, S3's sizing, S4's eviction, the three pieces sir named; S1 and S5 are optional and don't gate this. (2) Track B has real numbers through B3 — B1's double hashing, B2's bitmask cell, B3's merge into Track A's cache, the report's top open item; B1b is optional. (3) The three-way comparator sweep (Centrifuge, Metabuli, Centrifuger) is complete, not just the Centrifuge comparison sir asked for directly. (4) Both thesis chapters are drafted and have had one round of sir's Wednesday review. None of this carries a calendar date, because sir gave none — his email is an open-ended "continue the work," not a deadline. What this document does commit to is narrower: it plans concretely through week 9. If week 9 absorbs everything above, the plan finishes on schedule. If it doesn't — or week 8's review opens new work instead of closing it — this document's job ends there too. The next step at that point is a conversation with sir about week 10, not a silent extension of a nine-week plan.
+**What "done" actually means.** This plan is done when four things are true, all already defined above: (1) Track A has real numbers through S4 — S2's baseline, S3's sizing, S4's eviction, the three pieces sir named; S1 and S5 are optional and don't gate this. (2) Track B has real numbers through B3 — B1's double hashing, B2's bitmask cell, B3's merge into Track A's cache, the report's top open item; B1b is optional. (3) The three-way comparator sweep (Centrifuge, Metabuli, Centrifuger) is complete against the merged build, not just the Centrifuge comparison sir asked for directly. (4) Both thesis chapters are drafted and have had one round of sir's Wednesday review. Sir gave no calendar date for any of this — his email is an open-ended "continue the work," not a deadline, so none of the above carries one either. What this document does commit to is narrower: it plans concretely through week 10. If week 10 absorbs everything above, the plan finishes on schedule. If it doesn't, or week 9's review opens new work instead of closing it, this document's job ends there too. The next step at that point is a conversation with sir about week 11, not a silent extension of a ten-week plan.
 
 ## How this plan survives failure — the fallback framework
 
@@ -147,10 +150,10 @@ flowchart TD
 
 Four rules make this tree do its job instead of just looking thorough:
 
-1. **A safe zone is a pushed commit, tagged — not just pushed.** "It's working on my terminal" is not a safe zone — if Luna's session drops before the push, that step's work doesn't exist yet. The existing action-plan discipline below ("commit and push before starting the next step") already does the push; tag it too, right after — `git tag safe/S2` — so "roll back to the last safe zone" means one literal `git checkout safe/S2`, not a hunt through `git log` for the right hash.
+1. **A safe zone is a pushed commit, tagged — not just pushed.** "It's working on my terminal" is not a safe zone — if Luna's session drops before the push, that sub-step's work doesn't exist yet. The existing action-plan discipline below ("commit and push before starting the next sub-step") already does the push; tag every **Measured** sub-step's commit too, right after — `git tag safe/S2.4`, not just `safe/S2` — so "roll back to the last safe zone" means one literal `git checkout safe/S2.4`, without hunting `git log` for the right hash and without accidentally discarding earlier sub-steps' already-committed work. **Design** sub-steps get committed and pushed too, for the same resumability reason, but skip the tag — there's no benchmark yet to validate them against.
 2. **A bad number is data, not a failure, unless it's a genuine dead end.** Sir's own baseline (S2, 4-way set-associative) might measure worse than the simpler S1 reference point. That's expected, not a failure. Log it and keep it anyway — S3/S4 need associativity to make sense regardless. Distinguish "worse but necessary" from "worse and going nowhere" using the question in the diagram, not gut feel.
-3. **Before rolling back a blocked step, branch off the blocked state first.** `git branch parking/S4-decayed-importance` (name it after whatever the step actually is) before touching anything else, so the abandoned attempt isn't lost — it's resumable later with `git checkout parking/S4-decayed-importance` instead of re-deriving whatever was half-working from memory.
-4. **Blocked steps get swapped, not stalled on — and "blocked" is a scope trigger, not a clock.** Track A and Track B run independently until B3 — if Track A's eviction step (S4) is stuck, jump to Track B's bitmask cell (B2) instead of losing a day. What actually decides "stuck": if fixing the current step's build failure would mean touching a second file or system beyond the one change under test, that's the signal to roll back — not a fixed time-box. Real perf-engineering practice deliberately avoids hard deadlines here (Chromium's regression policy is the well-known example) because a clock either kills a legitimately-slow-to-diagnose bug early, or gets blown through anyway — neither version of a clock actually helps.
+3. **Before rolling back a blocked step, branch off the blocked state first.** `git branch parking/S4.1-decay-scoring` if only one sub-step stalled, or `git branch parking/S4-decayed-importance` if the whole step is abandoned — name it after whatever's actually blocked, before touching anything else, so the abandoned attempt isn't lost. It's resumable later with `git checkout parking/...` instead of re-deriving whatever was half-working from memory.
+4. **Blocked steps get swapped, not stalled on — and "blocked" is a scope trigger, not a clock.** Track A and Track B run independently until B3 — if Track A's eviction step (S4) is stuck, jump to Track B's bitmask cell (B2) instead of losing a day. What actually decides "stuck": if fixing the current step's build failure would mean touching a second file or system beyond the one change under test, that's the signal to roll back — not a fixed time-box. Real perf-engineering practice deliberately avoids hard deadlines here (Chromium's regression policy is the well-known example), because a clock either kills a legitimately-slow-to-diagnose bug early, or gets blown through anyway — neither version of a clock actually helps.
 
 ## Track A — Thesis 1, the build order
 
@@ -180,11 +183,11 @@ Each arrow is one commit, one benchmark run, one number.
 | S0 | 🔵 ALREADY DONE | Clean `kraken2-src`, unmodified | The true zero point | N/A — nothing to fall back from |
 | S1 | 🟢 WE'RE ADDING | Thread-local single-slot cache | Our own reference point — not sir's ask, not in the report | Optional step — if it's stuck, skip straight to S2 and note S1 as "not measured," since S2 doesn't depend on it |
 | S2 | 🟡 SIR ASKED | 4-way set-associative | His email, "Baseline 4-way set associative" | Not skippable — sir named this the starting point. If it measures worse than S1, log it anyway (see rule 2 in the fallback framework) and keep going |
-| S3 | 🟡 SIR ASKED + 🟢 WE'RE ADDING | LLC-topology-aware sizing, trace-driven size selection | Target from his email; the trace-driven *method* is ours | If the trace-driven simulation can't be built in time, fall back to a simpler heuristic (fixed fraction of detected LLC size), tag the result 🟢-fallback explicitly, and revisit the real method in the week-9 buffer |
+| S3 | 🟡 SIR ASKED + 🟢 WE'RE ADDING | LLC-topology-aware sizing, trace-driven size selection | Target from his email; the trace-driven *method* is ours | If the trace-driven simulation can't be built in time, fall back to a simpler heuristic (fixed fraction of detected LLC size), tag the result 🟢-fallback explicitly, and revisit the real method in the week-10 buffer |
 | S4 | 🟡 SIR ASKED + 🟢 WE'RE ADDING | Biology-dependent adaptive eviction — decayed importance, protected conserved k-mers | Target from his email; the *mechanism* (4-literature convergence) is ours | If decayed-importance tracking is unstable, fall back to plain LRU as an interim S4 so S5 isn't blocked, and swap effort to Track B (B1/B2) while it's debugged |
 | S5 | 🟢 WE'RE ADDING | Organism-blocked predictive partitioning | Entirely ours — not in his email, not in the report | First step to cut under time pressure — it's a stretch goal (already shown dashed in the diagram above), not something sir or the report asked for |
 
-Target to benchmark against: 🟠 the report's own projection, **4.405s → ~3.0s → ~2.6s**, never actually run. This week either confirms or corrects that number for real.
+Target to benchmark against: 🟠 the report's own projection, **4.405s → ~3.0s → ~2.6s**, never actually run. S4 is the step that actually reaches this projection's territory — week 5 either confirms that number for real or corrects it.
 
 Same logic as the fallback framework above, fast-reference form for Track A's five steps:
 
@@ -193,7 +196,7 @@ flowchart TD
     S1["S1 blocked?"] -->|yes| S1F["Skip to S2 — S1 was\nour own reference point,\nS2 doesn't depend on it"]
     S2["S2 blocked or\nmeasures worse?"] -->|blocked| S2F["Not optional — this is sir's\nnamed baseline. Debug before\nmoving on, use the fallback\nframework's diagnose step"]
     S2 -->|worse than S1| S2G["Log it anyway and continue —\nS3/S4 need associativity\nto make sense regardless"]
-    S3["S3 blocked?"] -->|yes| S3F["Fallback to fixed-fraction-of-LLC\nsizing, tag as 🟢-fallback,\nrevisit trace-driven method in\nweek-9 buffer"]
+    S3["S3 blocked?"] -->|yes| S3F["Fallback to fixed-fraction-of-LLC\nsizing, tag as 🟢-fallback,\nrevisit trace-driven method in\nweek-10 buffer"]
     S4["S4 blocked?"] -->|yes| S4F["Fallback to plain LRU as\ninterim S4, swap effort to\nTrack B while debugging"]
     S5["S5 blocked?"] -->|yes| S5F["Cut it — stretch goal,\nfirst thing to drop under\ntime pressure"]
 
@@ -217,6 +220,8 @@ Same five steps as above, broken into the granular sub-steps that actually get b
 | S1.1 | Design | Add a thread-local key+result slot with check-then-overwrite logic ahead of the big table | If the slot isn't truly per-thread (race/stale hits), fix it before benchmarking |
 | S1.2 | Measured | Run step 0's profiling command, log next to the 4.405s baseline | Skip to S2.1, log S1 "not measured" — S2 doesn't depend on it |
 
+S1 is the only sub-step pair in Track A with no design branching — everything past this point has at least one real decision to make before its benchmark.
+
 **S2 — 4-way set-associative** (4 sub-steps — three real design decisions before the benchmark)
 
 | Sub-step | Type | What it does | If it fails |
@@ -226,24 +231,30 @@ Same five steps as above, broken into the granular sub-steps that actually get b
 | S2.3 | Design | Pick a simple interim replacement rule (e.g. round-robin) for which way gets evicted — S4 replaces this later | If round-robin proves unstable, drop to random replacement to unblock the benchmark |
 | S2.4 | Measured | Run the profiling command, log against S0/S1 | Not skippable — sir's named baseline. If blocked, diagnose per the fallback framework; if worse than S1, log it anyway (rule 2) |
 
+S2.3's replacement rule is deliberately a placeholder — S4 replaces it for real, so don't over-invest in it here.
+
 **S3 — LLC-topology-aware sizing** (4 sub-steps — detect, collect, simulate, wire in)
 
 | Sub-step | Type | What it does | If it fails |
 |---|---|---|---|
 | S3.1 | Design | Query Luna's real L3 size, associativity, and core-sharing layout, instead of the flat size the fallback heuristic uses | If fine-grained sharing/associativity info isn't available, fall back to just the flat L3 size the fixed-fraction fallback already relies on |
-| S3.2 | Design | Capture a real k-mer lookup trace, or synthesize one from the report's own 90.7% reuse-rate and dominant-species-skew numbers | If a real trace can't be captured in time, synthesize one from those already-measured numbers instead |
-| S3.3 | Design | Feed S3.1's topology and S3.2's trace through the Bandana-style simulator to pick a cache size and predict its hit rate | If the simulator can't be built/run in time, skip straight to the fixed-fraction-of-LLC heuristic, tag 🟢-fallback, revisit in the week-9 buffer |
+| S3.2 | Design | Capture a real k-mer lookup trace, or synthesize one from the report's own 90.7% reuse-rate and dominant-species-skew numbers | If capturing a real trace won't fit the timeline, synthesize one from those already-measured numbers instead |
+| S3.3 | Design | Feed S3.1's topology and S3.2's trace through the Bandana-style simulator to pick a cache size and predict its hit rate | If the simulator won't build or run in time, skip straight to the fixed-fraction-of-LLC heuristic, tag 🟢-fallback, revisit in the week-10 buffer |
 | S3.4 | Measured | Parameterize the cache with S3.3's (or the fallback's) chosen size, build, and benchmark | If it measures worse than S2, log it anyway (rule 2) — S4 needs a sized cache to build on regardless of which number wins |
+
+S3's real cost is S3.3's simulator, not the detection or trace-collection steps around it — budget accordingly if week 4 gets tight.
 
 **S4 — biology-dependent adaptive eviction** (5 sub-steps — decay and protection get separated so each has its own checkpoint)
 
 | Sub-step | Type | What it does | If it fails |
 |---|---|---|---|
-| S4.1 | Design | Design the decay function: a per-entry importance score that fades with time-since-access, replacing LRU's binary recent/not-recent bit | No stable decay shape on paper — borrow TinyLFU's counter-decay directly instead of inventing one |
-| S4.2 | Measured | Wire the decay score into the eviction path (evict lowest score) and benchmark it alone, no protection yet | This is the case S4's existing fallback already names — fall back to plain LRU as interim S4, before protection is built on an unstable base |
+| S4.1 | Design | Design the decay function: a per-entry importance score that fades with time-since-access, replacing LRU's binary recent/not-recent bit | No stable decay shape on paper — borrow TinyLFU's counter-decay (a cache-eviction technique that periodically halves frequency counters instead of tracking exact recency) as a starting point. It's periodic and frequency-based, not identical to this step's continuous per-entry design, but close enough to build from instead of inventing one from scratch |
+| S4.2 | Measured | Wire the decay score into the eviction path (evict lowest score) and benchmark it alone, no protection yet | This is the case S4's existing fallback already names — fall back to plain LRU as interim S4, don't build protection on an unstable base |
 | S4.3 | Design | Define what counts as "universally hot" (e.g. a cross-read frequency threshold) and flag qualifying k-mers for protection | No clean threshold separates hot from noise — ship S4 as decay-only for now, revisit pinning as a later add-on, not a blocker |
-| S4.4 | Design | Make protection a hard skip in eviction candidate selection — pinned entries are excluded outright, not just given a high score that can still decay away | Pinned entries still get evicted under load — fix the skip logic before touching the benchmark |
+| S4.4 | Design | Make protection a hard skip in eviction candidate selection — pinned entries are excluded outright, not just given a high score that can still decay away | The cache still evicts pinned entries under load — fix the skip logic before touching the benchmark |
 | S4.5 | Measured | Benchmark decay + protection together — this is the number that fills S4's row in the ledger | Regresses vs. S4.2's decay-only number — keep S4.2 as the safe zone, log the regression honestly, don't quietly drop protection to hide it |
+
+S4.2's isolated decay-only benchmark is the whole reason this step got split in the first place — it's the one number that tells you decay actually works before protection has any chance to mask a problem underneath it.
 
 **S5 — organism-blocked predictive partitioning** (3 sub-steps — stretch goal, first cut under time pressure)
 
@@ -278,7 +289,7 @@ flowchart TD
 | B1 | 🟠 REPORT CLAIMED | Linear probing replaced with double hashing | Report §5 item 2 — predicted to cut probe length `p` from ≈6 to ≈2.5, shift the cliff ≈1.3 bits, open the door to a sub-16-bit cell | If the measured cliff shift misses the ≈1.3-bit projection, don't discard it — re-derive the false-positive model empirically from what was actually measured. That correction *is* the finding, not a failure |
 | B1b | 🟢 WE'RE ADDING | Reuse the double-hash pair for 2-4 candidate slots, bucketed 4-way, greedy-packed at build time | Ours — not in the report or sir's email | Second step to cut under time pressure (after S5) — stretch goal, dashed in the diagram above |
 | B2 | 🟠 REPORT CLAIMED + 🟢 WE'RE ADDING | 6-bit-per-organism bitmask cell | Report §5 item 3; the false-positive derivation for it is ours | If the Count-Min-Sketch-adapted collision math doesn't hold up against measured false-positive rates, report the cell as a working design with an *empirically measured* (not fully theory-justified) collision rate, and flag the gap as an open question rather than blocking the step |
-| B3 | 🟠 REPORT CLAIMED | Merge with Track A's cache into one implementation | Report §5 item 1 — "the single highest-priority open item" in the whole report | Not skippable — see callout below. If Track A isn't mergeable yet, this step's time moves to week 6, not off the plan |
+| B3 | 🟠 REPORT CLAIMED | Merge with Track A's cache into one implementation | Report §5 item 1 — "the single highest-priority open item" in the whole report | Not skippable — see callout below. If it needs more than its own week, it bleeds into week 7 and delays the comparator sweep's start, not off the plan |
 
 > [!IMPORTANT]
 > Step B3 is not optional. The report calls the merge the single highest-priority open item across both tracks and says the two designs should merge into one implementation rather than built twice. It only makes sense once Track A is far enough along to merge into — sequence it last, don't skip it.
@@ -290,7 +301,7 @@ flowchart TD
     B1["B1 measured cliff shift\nmisses ≈1.3-bit projection?"] -->|yes| B1F["Not a failure — re-derive the\nfalse-positive model from what\nwas actually measured, report\nthe correction as the finding"]
     B1b["B1b blocked?"] -->|yes| B1bF["Cut it — second stretch goal\nto drop, after S5"]
     B2["B2's collision math doesn't\nmatch measured FP rate?"] -->|yes| B2F["Report the cell with its\nmeasured (not derived) collision\nrate, flag the theory gap openly"]
-    B3["Track A not mergeable\nyet when B3 comes up?"] -->|yes| B3F["Push B3 to week 6 —\nnot optional, not droppable,\njust later than planned"]
+    B3["B3 needs more than\nits own week?"] -->|yes| B3F["Bleeds into week 7,\ndelays the sweep —\nnot optional, not droppable,\njust later than planned"]
 
     style B1F fill:#1a3320,stroke:#4a8a54,color:#d3ecd8
     style B1bF fill:#1a3320,stroke:#4a8a54,stroke-dasharray: 4 3,color:#d3ecd8
@@ -314,13 +325,17 @@ Same shape as Track A above, applied to the four Track B steps. Sub-step IDs use
 | B1.4 | Measured | Fill the table to ~95%+ load, confirm every probe sequence terminates and reaches every open slot | Force table size to stay prime (or power-of-2 with h2 forced odd) so gcd(h2, size)=1 holds by construction, instead of patching runtime cases |
 | B1.5 | Measured | Run the standard benchmark, measure actual probe length and cliff shift, compare against the ≈6→≈2.5 and ≈1.3-bit projections | Same as B1's own fallback — don't discard a miss, re-derive the false-positive model from what was actually measured; the correction is the finding |
 
+B1.2's independence check happens on paper, before B1.3 ever wires h2 into real probing code — a correlated pair should never reach a benchmark.
+
 **B1b — bucket placement** (3 sub-steps — stretch goal, second thing cut after S5)
 
 | Sub-step | Type | What it does | If it fails |
 |---|---|---|---|
 | B1b.1 | Design | Decide the greedy build-time rule for picking among an entry's 2-4 double-hash candidate slots (e.g. least-loaded-first), and what happens when all are full | If no rule is clearly better on paper, default to least-loaded-first and let benchmarking settle it |
-| B1b.2 | Measured | Build the 2-4-slot bucketed table at build time per the chosen policy | If entries get dropped or the load factor misses target, roll back to B1's table and cut B1b, per its stretch-goal status |
+| B1b.2 | Measured | Build the 2-4-slot bucketed table at build time per the chosen policy | If the packer drops entries or the load factor misses target, roll back to B1's table and cut B1b, per its stretch-goal status |
 | B1b.3 | Measured | Run the standard benchmark on the packed table, logged against B1's number | A worse number doesn't block B2 (unlike S2 blocking S3/S4) — cut B1b under time pressure rather than log-and-continue |
+
+B1b's fallback never says "log it and continue" the way S2's does — a worse number here just means cutting it, since nothing downstream depends on it the way S3/S4 depend on S2.
 
 **B2 — bitmask cell** (3 sub-steps — derive, implement, validate)
 
@@ -330,6 +345,9 @@ Same shape as Track A above, applied to the four Track B steps. Sub-step IDs use
 | B2.2 | Measured | Implement the 6-bit-per-organism cell's bit layout and its set/query logic | If set/query doesn't round-trip, roll back to B1/B1b's cell, mark B2 BLOCKED, and swap to Track A while debugging — B2 isn't optional, don't cut it |
 | B2.3 | Measured | Measure the real false-positive rate and compare it against B2.1's derivation | If the measured rate misses the derived formula, report the cell with its measured, not derived, collision rate and flag the gap openly — B2's existing fallback, unchanged |
 
+> [!IMPORTANT]
+> B2 is not optional, the same as B3 below — it's report §5 item 3, one of the three things sir asked to see completed. If B2.2's implementation gets stuck, mark it BLOCKED and swap effort to Track A rather than cutting it, exactly like the per-step table above already says.
+
 **B3 — merge with Track A's cache** (6 sub-steps — the riskiest step in the plan, where a wrong answer or worse number is a real problem, not data to log and move past)
 
 | Sub-step | Type | What it does | If it fails |
@@ -338,7 +356,7 @@ Same shape as Track A above, applied to the four Track B steps. Sub-step IDs use
 | B3.2 | Design | Rewrite Track A's cache-entry struct and tag-compare logic to match whatever format B2 actually emits | Keep iterating as long as needed; skipping it risks silent miscompiles or misclassification downstream |
 | B3.3 | Design | Point Track A's cache-miss handler at B1/B1b/B2's real lookup (not a stub), and get the combined tree building clean | Diagnose against this merge diff specifically — both patches build alone, so the bug is in the seam; take the extra time |
 | B3.4 | Measured | Run the merged binary against known-answer accuracy fixtures; confirm output matches the pre-merge baseline before any speed number is trusted | Never benchmark speed on a wrong-answer build — keep debugging as long as it takes; a fast wrong number is worse than a late right one |
-| B3.5 | Measured | Profile the merged system with the standard benchmark; compare against both tracks' best solo numbers | The one case where worse is a real warning, not data to log — return to B3.1/B3.2 and hunt the interaction bug; slower is fine, a regression is not |
+| B3.5 | Measured | Profile the merged system with the standard benchmark; compare against both tracks' best solo numbers, including re-checking S4's decay/protection-specific hit-rate behavior on its own, not just aggregate wall-clock — B3.2 rewrote the exact struct that mechanism reads and writes, so an aggregate win from Track B's own gains could hide a broken protection flag | The one case where worse is a real warning, not data to log — return to B3.1/B3.2 and hunt the interaction bug; slower is fine, a regression is not |
 | B3.6 | Measured | Once B3.5 clears both comparisons, run and record the single number both thesis chapters report | Treat as an ordinary noisy-run issue — check Luna proxy/tmux state, then re-run; this only runs after B3.5 passes, so failure here is operational, not structural |
 
 B3 is the one place in this whole breakdown where "if it fails" never means cut or roll back — every fallback above says keep going, because the report calls this merge the single highest-priority open item in the whole project.
@@ -375,10 +393,12 @@ Same command this project has used for every prior measurement — keeps step 0 
 
 ## Safe-zone checkpoint ledger
 
-Every row below gets its commit hash filled in the moment that sub-step's push happens — this table is the fast answer to "what's our last known-good state" if a later step goes sideways, without needing to dig through `git log`. Top-level rows (bold, unindented) summarize their children — "(see sub-steps)" in the commit column means look one level down, not that nothing happened.
+Every row below gets its commit hash filled in the moment that sub-step's push happens — this table is the fast answer to "what's our last known-good state" if a later step goes sideways, without needing to dig through `git log`. Top-level rows (bold, unindented) summarize their children — "(see sub-steps)" in the commit column means look one level down, not that nothing happened. Skim the shape on a first read, not every row: only S0/B0 are populated so far, everything else fills in as the weeks go.
 
 > [!NOTE]
 > The Status column below is a separate done/not-started indicator (🔵 done, ⬜ not started), not the 🔵🟡🟠🟢 attribution-tag system from the top of this document — it just reuses the same 🔵 icon.
+
+39 sub-steps below (19 Measured, 20 Design), plus 12 top-level rows = 51 rows total.
 
 | Step | Type | What it is | Safe-zone commit | Status |
 |---|---|---|---|---|
@@ -428,18 +448,34 @@ Every row below gets its commit hash filled in the moment that sub-step's push h
 | ↳ B3.4 | Measured | Correctness check | _fill in_ | ⬜ not started |
 | ↳ B3.5 | Measured | Regression check | _fill in_ | ⬜ not started |
 | ↳ B3.6 | Measured | Final combined benchmark | _fill in_ | ⬜ not started |
+| **Comparator** | Top-level | Three-way sweep vs. Centrifuge/Metabuli/Centrifuger | *(see sub-steps)* | ⬜ not started |
+| ↳ C1 | Measured | Re-run Centrifuge vs. merged build | _fill in_ | ⬜ not started |
+| ↳ C2 | Measured | Re-run Metabuli vs. merged build | _fill in_ | ⬜ not started |
+| ↳ C3 | Measured | Re-run Centrifuger vs. merged build | _fill in_ | ⬜ not started |
+| ↳ C4 | Design | Compile four-way comparison table + narrative | _fill in_ | ⬜ not started |
 
-By this week's Wednesday, every S1–S3 and B1 row (parent and sub-step) should carry a real commit hash. S4, S5, B1b, B2, and B3 belong to week 5 and week 6 per the re-paced roadmap above, so they're supposed to stay ⬜ not started until then.
+By this week's Wednesday, every S1–S3 and B1 row (parent and sub-step) should carry a real commit hash. Everything from S4 onward belongs to later weeks per the roadmap above, so it's supposed to stay ⬜ not started until then.
 
 ## What Wednesday should walk away with
 
-By the end of this week, Track A should have real, measured numbers through S3 (S0 cited, S1–S3 freshly measured across their 10 sub-steps) and Track B through B1 (B0 cited, B1 freshly measured across its 5 sub-steps) — not the full six-row/five-row picture, since S4, S5, B1b, B2, and B3 now land in weeks 5 and 6 per the re-paced roadmap above. Every number carries one of the four tags above so it's immediately clear whose idea it was. The report's own 4.405s → 3.0s → 2.6s path has never been run end to end; once S4 and B2 land in week 5, this plan either confirms that path or replaces it with what actually happened. Any sub-step marked BLOCKED in the safe-zone ledger above gets said out loud at the meeting — the fallback framework exists so a blocked step is a one-line status update, not a surprise.
+By the end of this week, Track A should have real, measured numbers through S3 (S0 cited, S1–S3 freshly measured across their 10 sub-steps) and Track B through B1 (B0 cited, B1 freshly measured across its 5 sub-steps) — not the full six-row/five-row picture, since S4 onward now lands across weeks 5 through 7 per the re-paced roadmap above. Every number carries one of the four tags above so it's immediately clear whose idea it was. The report's own 4.405s → 3.0s → 2.6s path has never been run end to end; once S4 lands in week 5, this plan either confirms that path or replaces it with what actually happened. Any sub-step marked BLOCKED in the safe-zone ledger above gets said out loud at the meeting — the fallback framework exists so a blocked step is a one-line status update, not a surprise.
 
 ## Comparator baseline — 🟡 SIR ASKED (Centrifuge) + 🟢 WE'RE ADDING (Metabuli, Centrifuger)
 
 His email is explicit on this, both times: "for both, compare against Centrifuge." That's his literal instruction, and it names exactly one tool. Metabuli and Centrifuger sit alongside it as 🟢 our own addition. The comparator-tools shortlist decision settled on both as primary additions next to Centrifuge. Sylph stayed secondary — it's an abundance profiler, not a drop-in per-read classifier like the other three.
 
-This baseline isn't a first-time setup. `WEEK2_REPORT.md` Part C3 already has a working four-way comparison — Kraken2, Centrifuge, Centrifuger, and Metabuli, all measured with identical counters and hardware pinning at 32 threads. Neither track's numbers mean anything on their own without that comparison sitting next to them — what's left is a re-run against Track A/B's new builds, not building the comparator harness from scratch.
+This baseline isn't a first-time setup. `WEEK2_REPORT.md` Part C3 already has a working four-way comparison — Kraken2, Centrifuge, Centrifuger, and Metabuli, all measured with identical counters and hardware pinning at 32 threads. Neither track's numbers mean anything on their own without that comparison sitting next to them — what's left is a re-run against the finished merged build, not building the comparator harness from scratch.
+
+**Comparator sweep — sub-step detail** (4 sub-steps, scheduled week 7, after B3 finishes)
+
+| Sub-step | Type | What it does | If it fails |
+|---|---|---|---|
+| C1 | Measured | Re-run Centrifuge against the merged build, same counters and thread pinning as WEEK2_REPORT.md's Part C3 baseline | Check the Luna proxy/tmux setup first (see warning below) before assuming Centrifuge itself broke |
+| C2 | Measured | Re-run Metabuli, same conditions | Same as C1 — proxy first, then treat as an ordinary tool-specific bug |
+| C3 | Measured | Re-run Centrifuger, same conditions | Same as C1 |
+| C4 | Design | Compile the four-way comparison table (merged Kraken2 vs. Centrifuge vs. Centrifuger vs. Metabuli) and write the comparison narrative | If the merged build doesn't clearly win, that's real data too — the same rule 2 that applies to every benchmark in this plan applies here |
+
+C1–C3 don't strictly need B3 finished to start — each is a standalone tool re-run — but C4's actual comparison table does, since it needs B3.6's finished number to compare against.
 
 > [!WARNING]
 > If Centrifuge/Metabuli/Centrifuger installs or runs start hanging or intermittently failing on Luna, check the proxy setup before assuming the tool is broken. Luna needs both a `tmux`-persisted `iitd-login.py` session and four `proxy62.iitd.ac.in:3128` environment variables for outbound internet — missing either one looks exactly like a flaky download, not a config problem. This has cost real debugging time before.
