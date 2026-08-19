@@ -49,7 +49,7 @@ Written before this week, describing work that was *designed but never run*:
 
 **Item 3 — the bitmask cell.** A 6-bit-per-organism value so one table lookup answers presence/absence for every panel member at once, instead of one lookup per organism.
 
-A fourth item exists in the report too, separate from "the three" sir is pointing at: extending the panel to the missing ESKAPE member (*A. baumannii*), upstreaming the 16/24-bit cells to mainline Kraken2, and re-running the sweeps on a ≥200MB-L3 server. Worth keeping on the radar, not part of this week's core plan.
+A fourth item exists in the report too, separate from "the three" sir is pointing at: extending the panel to the missing ESKAPE member (the report names *A. baumannii*, though `WEEK2_REPORT.md` later found it's actually present in the built databases — the two genuinely missing are *E. faecium* and *Enterobacter* species, so this item needs re-scoping before anyone touches it, not just picking up as written), upstreaming the 16/24-bit cells to mainline Kraken2, and re-running the sweeps on a ≥200MB-L3 server. Worth keeping on the radar, not part of this week's core plan.
 
 ### 🟢 WE'RE ADDING — beyond both of the above
 
