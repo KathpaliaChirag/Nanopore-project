@@ -206,7 +206,7 @@ The CPU launches each batch of kernels then immediately calls `cudaStreamSynchro
 
 ## Part 3 — Matrix Multiply Benchmark Study
 
-Built 12 C implementations in `All_Matric_Mul_perf_stats/` to empirically validate cache-blocking theory. Profiled with `perf stat` (WSL2) at N=1024, 2048, and 10000.
+Built 12 C implementations in `All_Matrix_Mul_perf_stats/` to empirically validate cache-blocking theory. Profiled with `perf stat` (WSL2) at N=1024, 2048, and 10000.
 
 ### N=10000 Results (wall time, ranked)
 
@@ -291,4 +291,4 @@ Luna advantages: 3.2× larger L3 cache (210 MB — can potentially hold much of 
 
 *Full raw data and commands: `report.md` (detailed narrative) · `report1.md` (original 2-page)*  
 *Lab server comparison: `Luna_vs_Minerva.md`*  
-*Matrix multiply full results: `All_Matric_Mul_perf_stats/PERF_REPORT.md`*
+*Matrix multiply full results: `All_Matrix_Mul_perf_stats/PERF_REPORT.md`*

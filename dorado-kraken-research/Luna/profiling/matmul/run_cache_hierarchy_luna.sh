@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # run_cache_hierarchy_luna.sh — Intel Sapphire Rapids replacement for the
-# AMD-only run_cache_hierarchy.sh in All_Matric_Mul_perf_stats/.
+# AMD-only run_cache_hierarchy.sh in All_Matrix_Mul_perf_stats/.
 #
 # Uses mem_load_retired.* (PEBS) events for per-level hit/miss accounting.
 # Requires perf_event_paranoid <= 0 (already set on Luna, see events_reference.md).

@@ -161,7 +161,7 @@ Next meeting / deadline: **2026-05-17**.
 ## 2026-05-27 - Study session 7 - Matrix multiply perf benchmarks (WSL2)
 
 - **Goal:** build a suite of matrix multiply implementations to study cache behaviour with `perf stat`
-- **12 C implementations written and built** (`All_Matric_Mul_perf_stats/`):
+- **12 C implementations written and built** (`All_Matrix_Mul_perf_stats/`):
   - `naive_ijk` - baseline, column-stride B access (worst cache)
   - `ikj_order` - hoist A[i][k], stream B-row sequentially (25× speedup, zero complexity)
   - `kij_order` - outer k loop; good at small N, degrades at large N

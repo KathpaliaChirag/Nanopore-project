@@ -27,7 +27,7 @@
 
 ## Phase 1 — Matrix Multiply Benchmarks (re-run from WSL2)
 
-Re-run the full `All_Matric_Mul_perf_stats/` suite with:
+Re-run the full `All_Matrix_Mul_perf_stats/` suite with:
 - Full LLC miss rates
 - Accurate IPC
 - stalled-cycles-backend (memory stall %)

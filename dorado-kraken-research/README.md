@@ -287,7 +287,7 @@ This remains a proposed, forward-looking optimisation: it has not been implement
 
 Built 12 CPU implementations and 7 GPU CUDA kernels to empirically study cache access patterns, vectorisation, and parallelism on real hardware. This is the empirical foundation for kraken2 optimisation decisions.
 
-→ full CPU report: [Luna/profiling/matmul/report/REPORT.md](Luna/profiling/matmul/report/REPORT.md) | WSL2 data: [All_Matric_Mul_perf_stats/PERF_REPORT.md](All_Matric_Mul_perf_stats/PERF_REPORT.md)
+→ full CPU report: [Luna/profiling/matmul/report/REPORT.md](Luna/profiling/matmul/report/REPORT.md) | WSL2 data: [All_Matrix_Mul_perf_stats/PERF_REPORT.md](All_Matrix_Mul_perf_stats/PERF_REPORT.md)
 
 ### 7a. CPU variants - WSL2 wall time (N=1024, best to worst)
 
@@ -1279,7 +1279,7 @@ Nanopore-project/
 │       ├── run_kraken2_opt_v1.sh          <- apply + benchmark script
 │       └── pending_measurements.md        <- M1-M7 commands (all run; results in profiling/pending/)
 │
-├── All_Matric_Mul_perf_stats/             <- matrix multiply benchmark (WSL2 perf stat)
+├── All_Matrix_Mul_perf_stats/             <- matrix multiply benchmark (WSL2 perf stat)
 │   ├── PERF_REPORT.md                     <- WSL2 results: N=1024/2048/10000
 │   ├── Makefile                           <- 12 CPU + 7 GPU variants
 │   └── perf_results/                      <- raw perf stat output files

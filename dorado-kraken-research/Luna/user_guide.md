@@ -56,12 +56,12 @@ df -h
 
 ## Running the Matrix Multiply Benchmarks on Luna
 
-The source files are in `All_Matric_Mul_perf_stats/` on your local machine.
+The source files are in `All_Matrix_Mul_perf_stats/` on your local machine.
 Copy them to Luna:
 
 ```bash
 # From your local machine / WSL:
-scp -r "All_Matric_Mul_perf_stats/" <user>@<luna>:~/matmul/
+scp -r "All_Matrix_Mul_perf_stats/" <user>@<luna>:~/matmul/
 ```
 
 On Luna:

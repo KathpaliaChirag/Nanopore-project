@@ -2,7 +2,7 @@
 build_report.py - parse all matmul profiling data and emit graphs + numbers.
 
 Sources:
-  WSL2 CPU:  All_Matric_Mul_perf_stats/PERF_REPORT.md (hardcoded in DATA below)
+  WSL2 CPU:  All_Matrix_Mul_perf_stats/PERF_REPORT.md (hardcoded in DATA below)
   Luna CPU:  Luna/profiling/matmul/perf_results_luna/{N1024,N2048,N10000,tma}/*.txt
   Luna GPU:  Luna/profiling/matmul_gpu_bundle/timing.log
 
@@ -27,7 +27,7 @@ OUT      = Path(__file__).parent / "graphs"
 OUT.mkdir(parents=True, exist_ok=True)
 
 # -------------------------------------------------------------------------
-# WSL2 reference numbers - transcribed from All_Matric_Mul_perf_stats/PERF_REPORT.md
+# WSL2 reference numbers - transcribed from All_Matrix_Mul_perf_stats/PERF_REPORT.md
 # These are the authoritative WSL2 results we already analysed.
 # -------------------------------------------------------------------------
 WSL2 = {

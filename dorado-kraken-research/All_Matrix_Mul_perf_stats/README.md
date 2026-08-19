@@ -2,11 +2,11 @@
 
 A collection of matrix multiplication implementations designed for `perf stat` analysis. Each variant isolates a specific optimisation technique so you can directly compare cache behaviour, IPC, vectorisation, and parallelism.
 
-**WSL2 results** (wall time, cache miss rates, N=1024/2048/10000): `All_Matric_Mul_perf_stats/PERF_REPORT.md`
+**WSL2 results** (wall time, cache miss rates, N=1024/2048/10000): `All_Matrix_Mul_perf_stats/PERF_REPORT.md`
 
-**Luna re-run** (bare metal Xeon, accurate IPC, TMA, stall %, N=1024/2048/10000): `reports/matrix_multiplication/README.md` and `Luna/profiling/results_matmul_luna.md`
+**Luna re-run** (bare metal Xeon, accurate IPC, TMA, stall %, N=1024/2048/10000): `matmul_reports/matrix_multiplication/README.md` and `Luna/profiling/results_matmul_luna.md`
 
-**GPU benchmark** (L40S, 6 kernels, N=1024 to N=10000, cuBLAS tensor TF32 at 122,923 GFLOPS): `reports/matrix_multiplication/README.md`, section "GPU performance (L40S, N=10000)"
+**GPU benchmark** (L40S, 6 kernels, N=1024 to N=10000, cuBLAS tensor TF32 at 122,923 GFLOPS): `matmul_reports/matrix_multiplication/README.md`, section "GPU performance (L40S, N=10000)"
 
 ---
 
@@ -140,7 +140,7 @@ tiled_avx2 ≈ tiled ≈ omp_tiled < ikj_order ≈ kij_order ≈ auto_vec_O3 < t
 ## File layout
 
 ```
-All_Matric_Mul_perf_stats/
+All_Matrix_Mul_perf_stats/
 ├── naive_ijk.c
 ├── ikj_order.c
 ├── kij_order.c

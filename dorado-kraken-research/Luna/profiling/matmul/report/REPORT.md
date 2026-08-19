@@ -4,7 +4,7 @@
 **Date:** 2026-06-02
 **Hardware coverage:** AMD Ryzen 7 5800H (WSL2), Intel Xeon Platinum 8468 (Luna CPU), NVIDIA L40S (Luna GPU)
 **Source data:**
-- `All_Matric_Mul_perf_stats/PERF_REPORT.md` (WSL2 numbers, transcribed in `build_report.py`)
+- `All_Matrix_Mul_perf_stats/PERF_REPORT.md` (WSL2 numbers, transcribed in `build_report.py`)
 - `Luna/profiling/matmul/perf_results_luna/` (Luna CPU perf-stat + TMA, parsed live)
 - `Luna/profiling/matmul_gpu_bundle/timing.log` (L40S timing sweep, parsed live)
 
@@ -57,7 +57,7 @@ N = 1024, 2048, 10000 on CPU. N = 1024, 2048, 4096, 10000 on GPU (added 4096 bec
 
 ## 2. WSL2 results — what we already knew
 
-The full WSL2 analysis is in `All_Matric_Mul_perf_stats/PERF_REPORT.md`. Numbers reproduced here are transcribed in `build_report.py` so the cross-platform graphs are reproducible from one entry point.
+The full WSL2 analysis is in `All_Matrix_Mul_perf_stats/PERF_REPORT.md`. Numbers reproduced here are transcribed in `build_report.py` so the cross-platform graphs are reproducible from one entry point.
 
 ### 2.1 Wall time at N=1024 and N=2048
 

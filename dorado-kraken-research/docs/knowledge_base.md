@@ -3212,7 +3212,7 @@ From Dorado on Minerva: same GEMM pattern as WSL2 but with full SM throughput % 
 
 ## 20. Matrix Multiply Benchmark Suite (2026-05-28)
 
-12 C implementations built in `All_Matric_Mul_perf_stats/` to empirically study how cache access patterns, loop reordering, SIMD, and thread parallelism interact with real hardware. All profiled with WSL2 `perf stat` at N=1024, 2048, and 10000. Source: `All_Matric_Mul_perf_stats/PERF_REPORT.md`.
+12 C implementations built in `All_Matrix_Mul_perf_stats/` to empirically study how cache access patterns, loop reordering, SIMD, and thread parallelism interact with real hardware. All profiled with WSL2 `perf stat` at N=1024, 2048, and 10000. Source: `All_Matrix_Mul_perf_stats/PERF_REPORT.md`.
 
 ### Implementations (ranked by N=10000 wall time)
 

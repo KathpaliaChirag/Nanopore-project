@@ -25,7 +25,10 @@ dorado-kraken-research/      <- CURRENT FOCUS (as of 2026-07-25): Dorado (GPU ba
                                 critical facts, patch status) - still accurate, just scoped to that subfolder now.
   CLAUDE_RECAP.md            <- session recap for the old work.
   README.md                  <- old project's master summary.
-  AccuracyDrift/, Luna/, Minerva/, WSL2/, docs/, scripts/, reports/, presentation(s)/  <- old project's data/docs.
+  AccuracyDrift/, Luna/, Minerva/, WSL2/, docs/, scripts/, matmul_reports/, presentations/, All_Matrix_Mul_perf_stats/,
+    centrifuge/  <- old project's data/docs. (Reorganized 2026-08-19: presentation/ merged into presentations/,
+    top-level reports/ renamed matmul_reports/ to stop colliding with docs/reports/, All_Matric_Mul_perf_stats/
+    typo fixed to All_Matrix_Mul_perf_stats/ - see dorado-kraken-research/CLAUDE.md for full internal layout.)
 ```
 
 **If you are asked to work on Dorado, Kraken2, Luna, Orion/Jetson profiling, perf commands, the optimisation patch, AccuracyDrift, the k-mer cache thesis, cell-width/double-hashing, or Centrifuge comparisons** - go read `dorado-kraken-research/CLAUDE.md` first. All of that file's machine list, key paths, standard profiling commands, and critical facts are still correct; only the location moved.

@@ -35,7 +35,7 @@ perf stat -e \
 
 ## Results — N = 1024
 
-> Data collected and recorded in `reports/matrix_multiplication/README.md`, section "execution time, Luna (bare metal)" and "all metrics at N=1024 (Luna)".
+> Data collected and recorded in `matmul_reports/matrix_multiplication/README.md`, section "execution time, Luna (bare metal)" and "all metrics at N=1024 (Luna)".
 
 Condensed table (full data in the report above):
 
@@ -58,7 +58,7 @@ Condensed table (full data in the report above):
 
 ## Results — N = 2048
 
-> Data collected and recorded in `reports/matrix_multiplication/README.md`, section "scaling behaviour" (Luna wall time scaling table). N=2048 row present for all 12 variants. Detailed per-metric breakdown at N=2048 not separately tabulated here; see that table for timing and scaling ratios.
+> Data collected and recorded in `matmul_reports/matrix_multiplication/README.md`, section "scaling behaviour" (Luna wall time scaling table). N=2048 row present for all 12 variants. Detailed per-metric breakdown at N=2048 not separately tabulated here; see that table for timing and scaling ratios.
 
 | Binary | Time (ms) | Notes |
 |---|---|---|
@@ -81,7 +81,7 @@ IPC, LLC miss %, and stall % at N=2048 not separately run; only timing collected
 
 ## TMA Breakdown (naive_ijk vs tiled_avx2)
 
-> Data collected and recorded in `reports/matrix_multiplication/README.md`, section "TMA: top-down microarchitecture analysis (Luna)".
+> Data collected and recorded in `matmul_reports/matrix_multiplication/README.md`, section "TMA: top-down microarchitecture analysis (Luna)".
 
 Key results (see report for full narrative):
 

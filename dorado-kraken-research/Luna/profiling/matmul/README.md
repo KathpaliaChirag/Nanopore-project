@@ -1,6 +1,6 @@
 # Luna Matmul Profiling — Runbook
 
-Source matrix-multiply benchmarks live in `All_Matric_Mul_perf_stats/` on the local repo. WSL2 runs are complete (see `All_Matric_Mul_perf_stats/PERF_REPORT.md`). This directory holds the **Luna re-run scripts** that capture what WSL2 could not: accurate IPC, native Sapphire Rapids stall events, and TMA breakdown.
+Source matrix-multiply benchmarks live in `All_Matrix_Mul_perf_stats/` on the local repo. WSL2 runs are complete (see `All_Matrix_Mul_perf_stats/PERF_REPORT.md`). This directory holds the **Luna re-run scripts** that capture what WSL2 could not: accurate IPC, native Sapphire Rapids stall events, and TMA breakdown.
 
 CPU: 2x Xeon Platinum 8468 (Sapphire Rapids), 503 GB RAM, native Linux (no Hyper-V throttling).
 

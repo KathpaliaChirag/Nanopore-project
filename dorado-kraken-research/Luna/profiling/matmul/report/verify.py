@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[4]
 REPORT  = Path(__file__).parent / "REPORT.md"
 DATA    = json.loads((Path(__file__).parent / "extracted_data.json").read_text())
-WSL_MD  = (ROOT / "All_Matric_Mul_perf_stats" / "PERF_REPORT.md").read_text()
+WSL_MD  = (ROOT / "All_Matrix_Mul_perf_stats" / "PERF_REPORT.md").read_text()
 TIMING  = (ROOT / "Luna" / "profiling" / "matmul_gpu_bundle" / "timing.log").read_text()
 
 fails = []

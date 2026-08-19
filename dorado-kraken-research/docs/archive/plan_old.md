@@ -882,7 +882,7 @@ Day 4 (Report):
 Day 5 (Matrix multiply benchmarks):
   [x] Built 12 C implementations (naive_ijk through prefetch_ikj)
   [x] perf stat at N=1024, 2048, 10000 — 22 result files
-  [x] Key findings documented in All_Matric_Mul_perf_stats/PERF_REPORT.md
+  [x] Key findings documented in All_Matrix_Mul_perf_stats/PERF_REPORT.md
   [x] omp_tiled winner (112s at N=10000), prefetch_ikj paradox confirmed
 
 Day 6 (Lab server setup):
