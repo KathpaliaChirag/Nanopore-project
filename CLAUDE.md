@@ -12,6 +12,12 @@ The project pivoted to Mamba-as-MHA on 2026-07-04, then pivoted back to the krak
 MAMBA_MHA_EXPLAINER.md      <- PAUSED, not abandoned (paused again 2026-07-25, was active 2026-07-04 to
                                 2026-07-25). Mamba reformulated as MHA/attention for hardware efficiency.
                                 Long-form study document, written for zero ML background, code embedded inline.
+reports/                    <- status reports at the whole-project level: SUMMER_REPORT.md, WEEK1_REPORT.md,
+                                WEEK2_REPORT.md. Weekly reports are produced by the pipeline in
+                                feedback_weekly_plan_pipeline (see memory) after each Wednesday meeting.
+planning/                   <- weekly plans, idea catalogs, and standalone research notes: plan_2026-07-25.md,
+                                mtpweekNplan.md / mtpweekN.md, idea_week2.md, week3_*.md, week4plan.md.
+presentations/               <- root-level slide decks and presentation source material (week3_deck.html, JUNE.md.txt).
 dorado-kraken-research/      <- CURRENT FOCUS (as of 2026-07-25): Dorado (GPU basecaller) + Kraken2 (CPU
                                 k-mer classifier) profiling and optimisation, now extending into two thesis
                                 directions per Kolin sir - see "Project purpose (current)" below.

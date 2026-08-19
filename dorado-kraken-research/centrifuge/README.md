@@ -2,7 +2,7 @@
 
 Both thesis pieces (adaptive k-mer cache, cell-width + double hashing) need a real comparison point, not just Kraken2's own numbers. This folder is where that comparison point gets built: Centrifuge, installed and run the same way Kraken2 was, on the same machines, against the same ESKAPE genomes.
 
-Full week plan lives at `../../mtpweek1plan.md`. This folder is the working log while that plan gets executed.
+Full week plan lives at `../../planning/mtpweek1plan.md`. This folder is the working log while that plan gets executed.
 
 ## Files
 

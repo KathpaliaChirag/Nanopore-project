@@ -1127,7 +1127,7 @@ xychart-beta
 
 ### 12b. Cell-Width Reduction - the kraken2opti Report (joint with Chirag Suthar)
 
-A second, separately-written report formalises the 24-bit/16-bit hash-cell experiment mentioned in `SUMMER_REPORT.md` "two side results" and extends it with a cross-hardware validation sweep. → [docs/reports/kraken2opti_report.tex](docs/reports/kraken2opti_report.tex)
+A second, separately-written report formalises the 24-bit/16-bit hash-cell experiment mentioned in `../reports/SUMMER_REPORT.md` "two side results" and extends it with a cross-hardware validation sweep. → [docs/reports/kraken2opti_report.tex](docs/reports/kraken2opti_report.tex)
 
 The core result is an exponential false-positive law for Kraken2's compact-hash lookup: `FP_read ≈ N·p·2⁻ᵇ`, where `b` is the number of check bits left in the cell after narrowing it. Solving for where `FP_read ≈ 1` predicts a sharp accuracy cliff at **b* ≈ 13 check bits**. That prediction is then confirmed two ways:
 

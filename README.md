@@ -18,7 +18,7 @@ Two Kraken2 lookups are on the critical path — `CompactHashTable::Get()` for t
 
 This project has pivoted twice. It started on Dorado/Kraken2 profiling, moved to a Mamba-as-MHA exploration on 2026-07-04, and moved back on 2026-07-25 after Prof. Kolin Paul emailed asking to continue the summer work toward two thesis pieces. Read that email as the reason everything below exists: he wants the summer's cache-miss diagnosis and the cell-width experiment turned into two complete, Centrifuge-benchmarked contributions.
 
-**If you're picking this up cold**, the fastest path in is: read `SUMMER_REPORT.md` for the profiling story (why Kraken2 is memory-bound, not compute-bound), then `dorado-kraken-research/docs/reports/kraken2opti_report.tex` for the cell-width-reduction result that grew out of it, then come back here for what's still open.
+**If you're picking this up cold**, the fastest path in is: read `reports/SUMMER_REPORT.md` for the profiling story (why Kraken2 is memory-bound, not compute-bound), then `dorado-kraken-research/docs/reports/kraken2opti_report.tex` for the cell-width-reduction result that grew out of it, then come back here for what's still open.
 
 ## The two thesis pieces
 
@@ -53,7 +53,7 @@ Neither thesis has been benchmarked against Centrifuge yet — every number so f
 
 ## What's done vs. what's open
 
-**Done, measured, not projected:** the Dorado GPU profiling, the six-database accuracy/cache-cliff sweep across Luna and Orion, and the cell-width experiment itself (24-bit and 16-bit cells, 1,728-run cross-hardware validation). See `SUMMER_REPORT.md` and `dorado-kraken-research/README.md` for the full data.
+**Done, measured, not projected:** the Dorado GPU profiling, the six-database accuracy/cache-cliff sweep across Luna and Orion, and the cell-width experiment itself (24-bit and 16-bit cells, 1,728-run cross-hardware validation). See `reports/SUMMER_REPORT.md` and `dorado-kraken-research/README.md` for the full data.
 
 **Open:**
 - Building the two theses above — neither has started
@@ -71,7 +71,10 @@ Start here when it picks back up: **[`MAMBA_MHA_EXPLAINER.md`](MAMBA_MHA_EXPLAIN
 
 | Path | What's there |
 |---|---|
-| [`SUMMER_REPORT.md`](SUMMER_REPORT.md) | The profiling narrative: why Dorado is GPU-bound and Kraken2 is memory-bound, in prose |
+| [`reports/SUMMER_REPORT.md`](reports/SUMMER_REPORT.md) | The profiling narrative: why Dorado is GPU-bound and Kraken2 is memory-bound, in prose |
+| [`reports/`](reports/) | Weekly and summer status reports (`SUMMER_REPORT.md`, `WEEK1_REPORT.md`, `WEEK2_REPORT.md`) |
+| [`planning/`](planning/) | Weekly plans, idea catalogs, and research notes (`mtpweek1plan.md`, `mtpweek2.md`, `week4plan.md`, etc.) |
+| [`presentations/`](presentations/) | Slide decks and presentation source material |
 | [`dorado-kraken-research/`](dorado-kraken-research/) | All Dorado/Kraken2 profiling data, patches, and reports — see its own `README.md` for the full 15-section writeup |
 | [`dorado-kraken-research/docs/reports/kraken2opti_report.tex`](dorado-kraken-research/docs/reports/kraken2opti_report.tex) | The cell-width-reduction report (with Chirag Suthar) — the source for Thesis 2 and the "three items of future work" |
 | [`MAMBA_MHA_EXPLAINER.md`](MAMBA_MHA_EXPLAINER.md) | The paused Mamba-as-attention direction |

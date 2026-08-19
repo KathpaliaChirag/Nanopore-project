@@ -1,0 +1,676 @@
+<title>Kraken2 Cache &amp; Hash Redesign</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#E7EEF5; --bg-raised:#F2F6FA; --ink:#17253A; --ink-dim:#52657C;
+  --line:#B9C9DA; --line-soft:#D3DEEA; --accent:#A85D18; --accent-ink:#FCEFDE;
+  --grid:rgba(23,37,58,0.06); --shadow:rgba(23,37,58,0.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C1420; --bg-raised:#111B29; --ink:#DCE7F2; --ink-dim:#8FA3BA;
+    --line:#243448; --line-soft:#1A2636; --accent:#E29A46; --accent-ink:#231705;
+    --grid:rgba(220,231,242,0.05); --shadow:rgba(0,0,0,0.5);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C1420; --bg-raised:#111B29; --ink:#DCE7F2; --ink-dim:#8FA3BA;
+  --line:#243448; --line-soft:#1A2636; --accent:#E29A46; --accent-ink:#231705;
+  --grid:rgba(220,231,242,0.05); --shadow:rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:'IBM Plex Sans',system-ui,sans-serif;
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:28px 28px;
+}
+.page{ min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:28px 16px; gap:16px; }
+.stage{
+  position:relative; width:min(94vw,1180px); aspect-ratio:16/9;
+  background:var(--bg-raised); border:1px solid var(--line);
+  box-shadow:0 18px 50px var(--shadow);
+  overflow:hidden;
+}
+.stage::after{ content:""; position:absolute; left:0; right:0; top:0; height:2px; background:linear-gradient(90deg, transparent, var(--accent), transparent); opacity:0; pointer-events:none; z-index:5; }
+@media (prefers-reduced-motion: no-preference){
+  .stage::after{ animation:scan 6s linear infinite; }
+}
+@keyframes scan{ 0%{ top:0; opacity:0; } 6%{ opacity:.3; } 94%{ opacity:.3; } 100%{ top:100%; opacity:0; } }
+
+.slide{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  padding:26px 40px 30px; opacity:0; pointer-events:none;
+}
+.slide.active{ opacity:1; pointer-events:auto; }
+@media (prefers-reduced-motion: no-preference){
+  .slide{ clip-path:inset(0 100% 0 -2px); transition:opacity .2s ease, clip-path .6s cubic-bezier(.65,0,.35,1); }
+  .slide.active{ clip-path:inset(0 0 0 -2px); }
+
+  @keyframes matIn{ from{ opacity:0; transform:translateY(9px) scale(.985); } to{ opacity:1; transform:none; } }
+  .slide.active > h1.hed, .slide.active > h2.sub, .slide.active .body > *{ animation:matIn .55s cubic-bezier(.22,.61,.36,1) both; }
+  .slide.active > h1.hed{ animation-delay:.02s; }
+  .slide.active > h2.sub{ animation-delay:.09s; }
+  .slide.active .body > *:nth-child(1){ animation-delay:.16s; }
+  .slide.active .body > *:nth-child(2){ animation-delay:.23s; }
+  .slide.active .body > *:nth-child(3){ animation-delay:.30s; }
+  .slide.active .body > *:nth-child(4){ animation-delay:.37s; }
+  .slide.active .body > *:nth-child(5){ animation-delay:.44s; }
+}
+
+.tblock{ display:flex; justify-content:space-between; align-items:flex-start; border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:16px; }
+.tblock .code{ font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.08em; color:var(--ink-dim); text-transform:uppercase; }
+.tblock .code b{ color:var(--ink); }
+.tblock .meta{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--ink-dim); text-align:right; letter-spacing:.04em; }
+
+h1.hed{ font-family:'Big Shoulders Display',sans-serif; font-weight:700; font-size:clamp(26px,3.4vw,40px); text-transform:uppercase; letter-spacing:.01em; margin:0 0 4px; text-wrap:balance; line-height:1.02; }
+h2.sub{ font-family:'IBM Plex Sans',sans-serif; font-weight:400; font-size:15px; color:var(--ink-dim); margin:0 0 14px; text-wrap:balance; }
+.body{ flex:1; min-height:0; display:flex; flex-direction:column; gap:12px; overflow:auto; }
+p{ margin:0; line-height:1.5; font-size:14px; }
+.lead{ font-size:16px; line-height:1.45; }
+
+.tag{ display:inline-flex; align-items:center; font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.09em; text-transform:uppercase; padding:3px 9px; border:1px solid var(--ink); border-radius:2px; color:var(--ink); white-space:nowrap; }
+.tag-accent{ border-color:var(--accent); background:var(--accent); color:var(--accent-ink); }
+
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:22px; flex:1; min-height:0; }
+.grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+
+.panel{ border:1px solid var(--line); background:var(--bg); padding:12px 14px; border-radius:2px; }
+.panel .k{ font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-dim); margin-bottom:4px; }
+.panel .v{ font-size:14px; line-height:1.45; }
+
+table.tsheet{ width:100%; border-collapse:collapse; font-size:12.5px; }
+table.tsheet th{ font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.07em; text-transform:uppercase; color:var(--ink-dim); text-align:left; padding:6px 10px; border-bottom:1px solid var(--ink); }
+table.tsheet td{ padding:7px 10px; border-bottom:1px solid var(--line-soft); vertical-align:top; line-height:1.4; }
+table.tsheet td.num, table.tsheet th.num{ font-family:'IBM Plex Mono',monospace; font-variant-numeric:tabular-nums; }
+table.tsheet tr:last-child td{ border-bottom:none; }
+
+.figwrap{ flex:1; min-height:0; display:flex; flex-direction:column; }
+.figwrap svg{ width:100%; height:auto; flex:1; min-height:0; }
+figcaption{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-dim); margin-top:6px; letter-spacing:.02em; }
+figure{ margin:0; display:flex; flex-direction:column; min-height:0; flex:1; }
+
+.dg-box{ fill:var(--bg-raised); stroke:var(--ink); stroke-width:1.4; }
+.dg-box-accent{ fill:var(--accent); fill-opacity:.14; stroke:var(--accent); stroke-width:1.6; }
+.dg-line{ stroke:var(--ink); stroke-width:1.4; fill:none; }
+.dg-line-dim{ stroke:var(--ink-dim); stroke-width:1; fill:none; stroke-dasharray:3 3; }
+.dg-line-accent{ stroke:var(--accent); stroke-width:2; fill:none; }
+.dg-label{ font-family:'IBM Plex Mono',monospace; font-size:11px; fill:var(--ink); }
+.dg-label-dim{ font-family:'IBM Plex Mono',monospace; font-size:9.5px; fill:var(--ink-dim); }
+.dg-label-accent{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; fill:var(--accent); font-weight:600; }
+.dg-tick{ stroke:var(--ink-dim); stroke-width:1; }
+
+.list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.list li{ display:flex; gap:12px; align-items:baseline; font-size:14px; line-height:1.45; }
+.list .n{ font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--accent); min-width:16px; }
+
+.foot{ position:absolute; left:0; right:0; bottom:8px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:9.5px; color:var(--ink-dim); letter-spacing:.06em; }
+
+.navrow{ display:flex; align-items:center; gap:14px; }
+.navbtn{ font-family:'IBM Plex Mono',monospace; font-size:16px; width:34px; height:34px; border:1px solid var(--line); background:var(--bg-raised); color:var(--ink); cursor:pointer; border-radius:2px; }
+.navbtn:hover{ border-color:var(--accent); color:var(--accent); }
+.navbtn:focus-visible, .dot:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.dots{ display:flex; gap:6px; }
+.dot{ width:7px; height:7px; border-radius:50%; border:1px solid var(--ink-dim); background:transparent; cursor:pointer; padding:0; transition:box-shadow .3s; }
+.dot.on{ background:var(--accent); border-color:var(--accent); box-shadow:0 0 0 3px rgba(168,93,24,.18); }
+@media (prefers-reduced-motion: no-preference){
+  .dot.on{ animation:dotpulse 2.4s ease-in-out infinite; }
+  @keyframes dotpulse{ 0%,100%{ box-shadow:0 0 0 2px rgba(168,93,24,.16); } 50%{ box-shadow:0 0 0 6px rgba(168,93,24,.06); } }
+}
+.hint{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--ink-dim); }
+.hint::after{ content:"\2588"; margin-left:5px; opacity:.55; }
+@media (prefers-reduced-motion: no-preference){
+  .hint::after{ animation:blink 1s steps(1) infinite; }
+  @keyframes blink{ 50%{ opacity:0; } }
+}
+.gaugeband{ width:42px; }
+@media (prefers-reduced-motion: no-preference){
+  .gaugeband{ width:0; transition:width 1s cubic-bezier(.22,.7,.2,1) .35s; }
+  .slide.active .gaugeband{ width:42px; }
+}
+.flowdot{ fill:var(--accent); }
+@media (prefers-reduced-motion: reduce){ .flowdot{ display:none; } }
+.tblock .meta{ font-variant-numeric:tabular-nums; }
+.countup{ font-variant-numeric:tabular-nums; }
+
+@media print{
+  body{ background:#fff; }
+  .navrow, .hint{ display:none; }
+  .page{ padding:0; }
+  .stage{ box-shadow:none; border:none; width:100vw; aspect-ratio:auto; height:auto; }
+  .slide{ position:relative; opacity:1 !important; pointer-events:auto; page-break-after:always; height:100vh; }
+}
+</style>
+
+<div class="page">
+  <div class="stage" id="stage">
+
+    <!-- 1 COVER -->
+    <section class="slide active" data-n="1">
+      <div class="tblock"><span class="code">KR2-OPT · <b>COVER</b></span><span class="meta">SHEET 01/14 · REV 2026-08-19</span></div>
+      <div class="body" style="justify-content:center;">
+        <h1 class="hed" style="font-size:clamp(30px,5vw,54px);">Adaptive K-mer Caching &amp;<br>Cell-Width / Hashing Redesign</h1>
+        <h2 class="sub" style="font-size:17px;">Two thesis pieces extending Kraken2 — progress and build plan, Week 3</h2>
+        <div style="display:flex; gap:28px; align-items:center; margin-top:18px;">
+          <svg viewBox="0 0 120 60" width="120" height="60" role="img" aria-label="Hash table cell divided into bit fields, cover motif">
+            <rect x="1" y="1" width="118" height="58" class="dg-box"/>
+            <line x1="76" y1="1" x2="76" y2="59" class="dg-line"/>
+            <text x="38" y="34" text-anchor="middle" class="dg-label">TAXID</text>
+            <text x="98" y="34" text-anchor="middle" class="dg-label-dim">CHK</text>
+            <text x="38" y="52" text-anchor="middle" class="dg-label-dim">24 bit</text>
+            <text x="98" y="52" text-anchor="middle" class="dg-label-dim">8 bit</text>
+          </svg>
+          <div>
+            <div class="panel" style="border:none; padding:0;">
+              <div class="v">Prepared for <b>Prof. Kolin Paul</b><br>Kraken2 optimisation thesis — dorado-kraken-research</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="foot">KRAKEN2 CACHE &amp; HASH REDESIGN — WEDNESDAY BRIEFING</div>
+    </section>
+
+    <!-- 2 BOTTLENECK -->
+    <section class="slide" data-n="2">
+      <div class="tblock"><span class="code">KR2-OPT · <b>THE BOTTLENECK</b></span><span class="meta">SHEET 02/14</span></div>
+      <h1 class="hed">Latency-Bound, Not Compute-Bound</h1>
+      <h2 class="sub">Every measurement points at the same cause</h2>
+      <div class="body">
+        <p class="lead">Classifying a read means looking up every minimizer — a representative short DNA fragment — in a hash table built from reference genomes, tens to hundreds of gigabytes, with an essentially random access pattern. The CPU spends most of its time waiting on memory, not calculating.</p>
+        <figure>
+          <svg viewBox="0 0 900 140" role="img" aria-label="Bandwidth gauge showing measured DRAM utilization of 4.9 to 10.7 percent against full peak capacity">
+            <line x1="60" y1="90" x2="860" y2="90" class="dg-line"/>
+            <line x1="60" y1="84" x2="60" y2="96" class="dg-tick"/>
+            <line x1="260" y1="84" x2="260" y2="96" class="dg-tick"/>
+            <line x1="460" y1="84" x2="460" y2="96" class="dg-tick"/>
+            <line x1="660" y1="84" x2="660" y2="96" class="dg-tick"/>
+            <line x1="860" y1="84" x2="860" y2="96" class="dg-tick"/>
+            <text x="60" y="112" text-anchor="middle" class="dg-label-dim">0%</text>
+            <text x="260" y="112" text-anchor="middle" class="dg-label-dim">25%</text>
+            <text x="460" y="112" text-anchor="middle" class="dg-label-dim">50%</text>
+            <text x="660" y="112" text-anchor="middle" class="dg-label-dim">75%</text>
+            <text x="860" y="112" text-anchor="middle" class="dg-label-dim">100% of peak DRAM bandwidth</text>
+            <rect x="99" y="78" height="24" class="dg-box-accent gaugeband"/>
+            <line x1="120" y1="78" x2="120" y2="30" class="dg-line-dim"/>
+            <text x="120" y="20" text-anchor="middle" class="dg-label-accent">measured: 4.9–10.7%</text>
+          </svg>
+          <figcaption>DRAM bandwidth utilization during real Kraken2 classification runs (M4 profiling) — nearly the entire bar is idle capacity.</figcaption>
+        </figure>
+        <div class="grid3">
+          <div class="panel"><div class="k">Reuse rate</div><div class="v">Same k-mer looked up again and again — <b><span class="countup" data-target="90.7" data-decimals="1">0.0</span>%</b> reuse measured (M5)</div></div>
+          <div class="panel"><div class="k">Lever one</div><div class="v">Shrink the table — more of it fits in fast memory</div></div>
+          <div class="panel"><div class="k">Lever two</div><div class="v">Catch repeats before they reach the table at all</div></div>
+        </div>
+      </div>
+      <div class="foot">TWO LEVERS FOLLOW DIRECTLY FROM THE PROFILING DATA</div>
+    </section>
+
+    <!-- 3 PIPELINE -->
+    <section class="slide" data-n="3">
+      <div class="tblock"><span class="code">KR2-OPT · <b>CLASSIFICATION PIPELINE</b></span><span class="meta">SHEET 03/14</span></div>
+      <h1 class="hed">Where Each Thesis Intervenes</h1>
+      <h2 class="sub">One pipeline, two different points of attack</h2>
+      <div class="figwrap">
+        <svg viewBox="0 0 1000 260" role="img" aria-label="Pipeline diagram from read to classification, with Thesis 1 marked at the cache-check stage and Thesis 2 marked at the hash and table lookup stage">
+          <g font-family="IBM Plex Mono">
+            <!-- boxes -->
+            <g id="boxes">
+              <rect x="10" y="110" width="95" height="56" class="dg-box"/><text x="57" y="143" text-anchor="middle" class="dg-label">read</text>
+              <rect x="125" y="110" width="95" height="56" class="dg-box"/><text x="172" y="143" text-anchor="middle" class="dg-label">k-mers</text>
+              <rect x="240" y="110" width="105" height="56" class="dg-box"/><text x="292" y="143" text-anchor="middle" class="dg-label">minimizers</text>
+              <rect x="365" y="110" width="90" height="56" class="dg-box"/><text x="410" y="143" text-anchor="middle" class="dg-label">hash</text>
+              <rect x="475" y="110" width="105" height="56" class="dg-box-accent"/><text x="527" y="136" text-anchor="middle" class="dg-label">cache</text><text x="527" y="151" text-anchor="middle" class="dg-label">check</text>
+              <rect x="600" y="110" width="120" height="56" class="dg-box"/><text x="660" y="136" text-anchor="middle" class="dg-label">table</text><text x="660" y="151" text-anchor="middle" class="dg-label">lookup</text>
+              <rect x="740" y="110" width="90" height="56" class="dg-box"/><text x="785" y="143" text-anchor="middle" class="dg-label">LCA</text>
+              <rect x="850" y="110" width="140" height="56" class="dg-box"/><text x="920" y="143" text-anchor="middle" class="dg-label">classify</text>
+            </g>
+            <!-- arrows -->
+            <g class="dg-line" marker-end="url(#arrowhead)">
+              <line x1="105" y1="138" x2="123" y2="138"/>
+              <line x1="220" y1="138" x2="238" y2="138"/>
+              <line x1="345" y1="138" x2="363" y2="138"/>
+              <line x1="455" y1="138" x2="473" y2="138"/>
+              <line x1="580" y1="138" x2="598" y2="138"/>
+              <line x1="720" y1="138" x2="738" y2="138"/>
+              <line x1="830" y1="138" x2="848" y2="138"/>
+            </g>
+          </g>
+          <circle r="4" class="flowdot">
+            <animateMotion dur="3.2s" repeatCount="indefinite" path="M57,138 L172,138 L292,138 L410,138 L527,138 L660,138 L785,138 L920,138"/>
+          </circle>
+          <!-- callouts -->
+          <line x1="527" y1="30" x2="527" y2="108" class="dg-line-accent"/>
+          <text x="527" y="20" text-anchor="middle" class="dg-label-accent">Thesis 1 — adaptive cache sits here</text>
+          <line x1="410" y1="205" x2="410" y2="168" class="dg-line-dim"/>
+          <line x1="660" y1="205" x2="660" y2="168" class="dg-line-dim"/>
+          <line x1="410" y1="205" x2="660" y2="205" class="dg-line-dim"/>
+          <text x="535" y="222" text-anchor="middle" class="dg-label-dim">Thesis 2 — cell width, hashing scheme, and collision handling redesigned here</text>
+        </svg>
+      </div>
+      <div class="foot">Thesis 1 changes what happens before the big table is touched — Thesis 2 changes the table itself</div>
+    </section>
+
+    <!-- 4 PATCH 4 -->
+    <section class="slide" data-n="4">
+      <div class="tblock"><span class="code">KR2-OPT · <b>PATCH 4 — WHAT EXISTS TODAY</b></span><span class="meta">SHEET 04/14</span></div>
+      <h1 class="hed">Patch 4 — Sir's Existing Cache</h1>
+      <h2 class="sub">Thread-local, direct-mapped, already applied and benchmarked</h2>
+      <div class="grid2">
+        <figure>
+          <svg viewBox="0 0 420 220" role="img" aria-label="Direct mapped cache diagram: a key hashes to exactly one candidate slot, forcing immediate eviction on collision">
+            <text x="10" y="24" class="dg-label-dim">direct-mapped — 1 candidate slot</text>
+            <circle cx="30" cy="90" r="14" class="dg-box"/><text x="30" y="94" text-anchor="middle" class="dg-label" font-size="10">key</text>
+            <g>
+              <rect x="90" y="70" width="42" height="40" class="dg-box"/>
+              <rect x="136" y="70" width="42" height="40" class="dg-box"/>
+              <rect x="182" y="70" width="42" height="40" class="dg-box-accent"/>
+              <rect x="228" y="70" width="42" height="40" class="dg-box"/>
+              <rect x="274" y="70" width="42" height="40" class="dg-box"/>
+              <rect x="320" y="70" width="42" height="40" class="dg-box"/>
+            </g>
+            <line x1="44" y1="90" x2="203" y2="90" class="dg-line-accent" marker-end="url(#arrowhead)"/>
+            <text x="203" y="140" text-anchor="middle" class="dg-label-accent">only slot — collision evicts immediately</text>
+            <text x="10" y="185" class="dg-label-dim">16,384 entries · 256KB/thread · fits in L2</text>
+            <text x="10" y="203" class="dg-label-dim">k-mer reuse rate: 90.7% measured (M5)</text>
+          </svg>
+        </figure>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="panel"><div class="k">Design credit</div><div class="v">Kolin sir's own design — a small cache in front of the big table, catching repeat lookups before they hit it.</div></div>
+          <table class="tsheet">
+            <tr><th>Status</th><th class="num"></th></tr>
+            <tr><td>Applied &amp; benchmarked</td><td class="num">2026-08-03</td></tr>
+            <tr><td>Benefit at low thread count</td><td class="num">real, up to −19%</td></tr>
+            <tr><td>Behavior as threads rise</td><td class="num">shrinks toward ~0%</td></tr>
+            <tr><td>Behavior as DB size rises</td><td class="num">grows</td></tr>
+          </table>
+          <div class="panel" style="border-color:var(--accent);"><div class="k" style="color:var(--accent);">The gap this leaves</div><div class="v">One shared slot per key, one fixed size for every machine. Thesis 1 fixes exactly this.</div></div>
+        </div>
+      </div>
+      <div class="foot">Thread-count weakness above is the direct motivation for Thesis 1's hardware-aware sizing</div>
+    </section>
+
+    <!-- 5 SCOPE (deliberately plain, no accent) -->
+    <section class="slide" data-n="5">
+      <div class="tblock"><span class="code">KR2-OPT · <b>ASSIGNED SCOPE</b></span><span class="meta">SHEET 05/14</span></div>
+      <h1 class="hed">What Was Assigned</h1>
+      <h2 class="sub">Stated exactly as given — method comes on the following slides</h2>
+      <div class="grid2">
+        <div class="panel">
+          <div class="k">Thesis 1 — Adaptive K-mer Cache</div>
+          <ul class="list" style="margin-top:10px;">
+            <li><span class="n">·</span><span>Upgrade Patch 4 to a 4-way set-associative baseline</span></li>
+            <li><span class="n">·</span><span>Make cache size aware of the actual hardware it runs on</span></li>
+            <li><span class="n">·</span><span>A biology-driven adaptive eviction policy</span></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <div class="k">Thesis 2 — Cell-Width + Double Hashing</div>
+          <ul class="list" style="margin-top:10px;">
+            <li><span class="n">·</span><span>A merged latency-hiding lookup cache, tied to Thesis 1</span></li>
+            <li><span class="n">·</span><span>Replace linear probing with double hashing</span></li>
+            <li><span class="n">·</span><span>A 6-bit-per-organism bitmask cell</span></li>
+          </ul>
+        </div>
+      </div>
+      <div class="foot">Three items each. No method specified for any of them — that's what follows</div>
+    </section>
+
+    <!-- 6 THESIS1 ARCHITECTURE -->
+    <section class="slide" data-n="6">
+      <div class="tblock"><span class="code">KR2-OPT · <b>THESIS 1 — ARCHITECTURE</b></span><span class="meta">SHEET 06/14</span></div>
+      <h1 class="hed">Where the Cache Lives, and Why 4-Way</h1>
+      <div class="grid2">
+        <figure>
+          <svg viewBox="0 0 460 280" role="img" aria-label="Memory hierarchy from L1 through disk, with the adaptive cache highlighted at the L2/L3 tier">
+            <rect x="140" y="20" width="180" height="46" class="dg-box"/><text x="230" y="40" text-anchor="middle" class="dg-label">L1</text><text x="230" y="55" text-anchor="middle" class="dg-label-dim" font-size="9">~48KB · ~1ns</text>
+            <rect x="90" y="80" width="280" height="46" class="dg-box-accent"/><text x="230" y="100" text-anchor="middle" class="dg-label-accent">L2 / L3 — cache lives here</text><text x="230" y="115" text-anchor="middle" class="dg-label-dim" font-size="9">MBs–100s MB · ~4–40ns</text>
+            <rect x="40" y="140" width="380" height="46" class="dg-box"/><text x="230" y="160" text-anchor="middle" class="dg-label">RAM — the big hash table</text><text x="230" y="175" text-anchor="middle" class="dg-label-dim" font-size="9">10s–100s GB · ~80–120ns</text>
+            <rect x="10" y="200" width="440" height="46" class="dg-box"/><text x="230" y="220" text-anchor="middle" class="dg-label">Disk</text><text x="230" y="235" text-anchor="middle" class="dg-label-dim" font-size="9">TB scale · ~10–100μs</text>
+          </svg>
+        </figure>
+        <figure>
+          <svg viewBox="0 0 420 280" role="img" aria-label="Direct mapped versus 4-way set associative comparison: one candidate slot versus four candidate slots per key">
+            <text x="0" y="20" class="dg-label-dim">direct-mapped (today)</text>
+            <circle cx="20" cy="60" r="12" class="dg-box"/>
+            <rect x="70" y="46" width="36" height="28" class="dg-box-accent"/>
+            <rect x="110" y="46" width="36" height="28" class="dg-box"/>
+            <rect x="150" y="46" width="36" height="28" class="dg-box"/>
+            <line x1="32" y1="60" x2="88" y2="60" class="dg-line-accent" marker-end="url(#arrowhead)"/>
+            <text x="0" y="100" class="dg-label-dim" font-size="10">1 candidate — any collision evicts</text>
+
+            <text x="0" y="160" class="dg-label-dim">4-way set-associative (Thesis 1)</text>
+            <circle cx="20" cy="200" r="12" class="dg-box"/>
+            <rect x="70" y="186" width="36" height="28" class="dg-box-accent"/>
+            <rect x="110" y="186" width="36" height="28" class="dg-box-accent"/>
+            <rect x="150" y="186" width="36" height="28" class="dg-box-accent"/>
+            <rect x="190" y="186" width="36" height="28" class="dg-box-accent"/>
+            <line x1="32" y1="200" x2="86" y2="197" class="dg-line-dim"/>
+            <line x1="32" y1="200" x2="126" y2="197" class="dg-line-dim"/>
+            <line x1="32" y1="200" x2="166" y2="197" class="dg-line-dim"/>
+            <line x1="32" y1="200" x2="206" y2="197" class="dg-line-accent" marker-end="url(#arrowhead)"/>
+            <text x="0" y="240" class="dg-label-dim" font-size="10">4 candidates — collision only forces eviction if all 4 are full</text>
+          </svg>
+        </figure>
+      </div>
+      <div class="foot">The fix borrows a well-known CPU hardware-cache idea and applies it to a software k-mer cache</div>
+    </section>
+
+    <!-- 7 THESIS1 OUR CONTRIBUTION -->
+    <section class="slide" data-n="7">
+      <div class="tblock"><span class="code">KR2-OPT · <b>THESIS 1 — MECHANISM</b></span><span class="meta">SHEET 07/14</span></div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h1 class="hed">The Eviction Policy — Four Fields, One Answer</h1>
+        <span class="tag tag-accent">our design</span>
+      </div>
+      <h2 class="sub">Sir asked for "biology-dependent adaptive eviction." Nothing more specific than that.</h2>
+      <div class="grid2">
+        <figure>
+          <svg viewBox="0 0 460 300" role="img" aria-label="Four independent fields of computer science converging on the same eviction principle: decayed importance, protect universally hot items">
+            <rect x="10" y="10" width="200" height="40" class="dg-box"/><text x="110" y="34" text-anchor="middle" class="dg-label" font-size="10">LLM KV-cache eviction</text>
+            <rect x="250" y="10" width="200" height="40" class="dg-box"/><text x="350" y="34" text-anchor="middle" class="dg-label" font-size="10">MoE expert caching</text>
+            <rect x="10" y="70" width="200" height="40" class="dg-box"/><text x="110" y="94" text-anchor="middle" class="dg-label" font-size="10">Recsys embedding caching</text>
+            <rect x="250" y="70" width="200" height="40" class="dg-box"/><text x="350" y="94" text-anchor="middle" class="dg-label" font-size="10">Skew-resistant indexing</text>
+            <line x1="110" y1="50" x2="230" y2="210" class="dg-line-dim"/>
+            <line x1="350" y1="50" x2="230" y2="210" class="dg-line-dim"/>
+            <line x1="110" y1="110" x2="230" y2="210" class="dg-line-dim"/>
+            <line x1="350" y1="110" x2="230" y2="210" class="dg-line-dim"/>
+            <rect x="110" y="210" width="240" height="66" class="dg-box-accent"/>
+            <text x="230" y="235" text-anchor="middle" class="dg-label-accent" font-size="10">decayed importance,</text>
+            <text x="230" y="250" text-anchor="middle" class="dg-label-accent" font-size="10">protect universal hot items</text>
+            <text x="230" y="265" text-anchor="middle" class="dg-label-dim" font-size="8.5">unconditionally, not just recently-used ones</text>
+          </svg>
+        </figure>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div class="panel"><div class="k">Named sources</div><div class="v">Scissorhands (decayed importance) · StreamingLLM (protect universal "sinks") · PIM-Tree (skew-resistant routing) · CachedEmbedding (offline frequency priors)</div></div>
+          <div class="panel"><div class="k">Genomic translation</div><div class="v">"Sinks" = conserved k-mers hit constantly across nearly every sample. Protect them unconditionally; track decayed hit-history for everything else instead of pure recency.</div></div>
+          <div class="panel" style="border-color:var(--accent);"><div class="k" style="color:var(--accent);">Sizing method</div><div class="v">Simulate candidate cache sizes against real read traces, pick the cheapest that hits target hit-rate (Bandana's method) — not a guessed fraction of available cache.</div></div>
+        </div>
+      </div>
+      <div class="foot">Four literatures that don't cite each other, landing on the same design — that convergence is itself the finding</div>
+    </section>
+
+    <!-- 8 THESIS1 NEW IDEA -->
+    <section class="slide" data-n="8">
+      <div class="tblock"><span class="code">KR2-OPT · <b>THESIS 1 — EXTENSION</b></span><span class="meta">SHEET 08/14</span></div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h1 class="hed">Organism-Blocked, Predictive Partitioning</h1>
+        <span class="tag tag-accent">our design — new this week</span>
+      </div>
+      <h2 class="sub">A translation of a competing tool's trick, moved down a memory tier</h2>
+      <div class="figwrap">
+        <svg viewBox="0 0 900 200" role="img" aria-label="Cache bar divided into six unequal organism blocks, with a sliding read window predicting and pre-warming the relevant block">
+          <text x="0" y="18" class="dg-label-dim">read stream, last k-mers scanned</text>
+          <g>
+            <circle cx="20" cy="40" r="6" class="dg-line"/><circle cx="40" cy="40" r="6" class="dg-line"/>
+            <circle cx="60" cy="40" r="6" class="dg-box-accent"/><circle cx="80" cy="40" r="6" class="dg-box-accent"/>
+            <circle cx="100" cy="40" r="6" class="dg-box-accent"/><circle cx="120" cy="40" r="6" class="dg-line"/>
+          </g>
+          <text x="150" y="44" class="dg-label-dim" font-size="10">recent window trends toward one organism →</text>
+          <line x1="80" y1="55" x2="180" y2="110" class="dg-line-accent" marker-end="url(#arrowhead)"/>
+          <text x="185" y="118" class="dg-label-accent" font-size="10">pre-warm predicted block</text>
+
+          <g>
+            <rect x="10" y="140" width="130" height="46" class="dg-box-accent"/><text x="75" y="167" text-anchor="middle" class="dg-label" font-size="10">Efm</text>
+            <rect x="140" y="140" width="90" height="46" class="dg-box"/><text x="185" y="167" text-anchor="middle" class="dg-label" font-size="10">Sau</text>
+            <rect x="230" y="140" width="160" height="46" class="dg-box"/><text x="310" y="167" text-anchor="middle" class="dg-label" font-size="10">Kpn</text>
+            <rect x="390" y="140" width="70" height="46" class="dg-box"/><text x="425" y="167" text-anchor="middle" class="dg-label" font-size="9">Aba</text>
+            <rect x="460" y="140" width="120" height="46" class="dg-box"/><text x="520" y="167" text-anchor="middle" class="dg-label" font-size="10">Pae</text>
+            <rect x="580" y="140" width="90" height="46" class="dg-box"/><text x="625" y="167" text-anchor="middle" class="dg-label" font-size="10">Ecl</text>
+          </g>
+          <text x="10" y="196" class="dg-label-dim" font-size="9">each organism gets its own slice of the cache, sized by measured prevalence — not one shared flat pool</text>
+        </svg>
+      </div>
+      <div class="panel" style="border-color:var(--accent); margin-top:8px;"><div class="v">Kun-peng, a competing tool, streams a huge database in 4GB on-demand blocks at the <b>RAM/disk tier</b> to cut memory use. That trick doesn't transfer directly — different scale entirely — but the underlying principle does: don't treat the resident set as one flat pool, partition it into meaningful blocks and decide block-level residency. Here the block is "one organism," at the <b>CPU-cache tier</b>, with a short read-local prediction window on top.</div></div>
+      <div class="foot">Not yet fully vetted — presented as a real candidate, not a settled result</div>
+    </section>
+
+    <!-- 9 THESIS2 ARCHITECTURE -->
+    <section class="slide" data-n="9">
+      <div class="tblock"><span class="code">KR2-OPT · <b>THESIS 2 — ARCHITECTURE</b></span><span class="meta">SHEET 09/14</span></div>
+      <h1 class="hed">Narrower Cells, and What They Cost</h1>
+      <div class="grid2">
+        <figure>
+          <svg viewBox="0 0 420 220" role="img" aria-label="Three hash table cell widths, 32, 24, and 16 bits, each divided into taxon-ID bits and check bits">
+            <text x="0" y="18" class="dg-label-dim">cell width, already reduced</text>
+            <rect x="0" y="30" width="320" height="34" class="dg-box"/><line x1="230" y1="30" x2="230" y2="64" class="dg-line"/>
+            <text x="115" y="52" text-anchor="middle" class="dg-label" font-size="10">taxid — 24 bit</text><text x="275" y="52" text-anchor="middle" class="dg-label-dim" font-size="9">chk 8</text>
+            <text x="330" y="52" class="dg-label-dim" font-size="10">32-bit cell</text>
+
+            <rect x="0" y="90" width="240" height="34" class="dg-box"/><line x1="170" y1="90" x2="170" y2="124" class="dg-line"/>
+            <text x="85" y="112" text-anchor="middle" class="dg-label" font-size="10">taxid — 17</text><text x="205" y="112" text-anchor="middle" class="dg-label-dim" font-size="9">chk 7</text>
+            <text x="250" y="112" class="dg-label-dim" font-size="10">24-bit cell</text>
+
+            <rect x="0" y="150" width="160" height="34" class="dg-box-accent"/><line x1="110" y1="150" x2="110" y2="184" class="dg-line"/>
+            <text x="55" y="172" text-anchor="middle" class="dg-label-accent" font-size="10">taxid — 11</text><text x="135" y="172" text-anchor="middle" class="dg-label-dim" font-size="9">c5</text>
+            <text x="170" y="172" class="dg-label-dim" font-size="10">16-bit cell</text>
+            <text x="0" y="210" class="dg-label-dim" font-size="9">fewer bits per cell → more entries fit per byte of memory</text>
+          </svg>
+        </figure>
+        <figure>
+          <svg viewBox="0 0 420 220" role="img" aria-label="Qualitative curve of false positive rate rising with load factor, shifted left as cells get narrower">
+            <line x1="30" y1="190" x2="30" y2="20" class="dg-line"/>
+            <line x1="30" y1="190" x2="400" y2="190" class="dg-line"/>
+            <text x="10" y="15" class="dg-label-dim" font-size="9">FP rate</text>
+            <text x="380" y="208" class="dg-label-dim" font-size="9">load factor</text>
+            <path d="M30,188 C120,185 220,150 340,40" class="dg-line-dim"/>
+            <path d="M30,188 C90,182 170,140 260,40" class="dg-line-accent"/>
+            <text x="265" y="35" class="dg-label-accent" font-size="9">narrower cell</text>
+            <text x="342" y="45" class="dg-label-dim" font-size="9">wider cell</text>
+            <text x="30" y="212" class="dg-label-dim" font-size="8.5">qualitative — exact law published earlier; narrower cells shift the cliff left</text>
+          </svg>
+        </figure>
+      </div>
+      <div class="foot">Already done, already published — the extension work starts on the next slide</div>
+    </section>
+
+    <!-- 10 DOUBLE HASH + BITMASK -->
+    <section class="slide" data-n="10">
+      <div class="tblock"><span class="code">KR2-OPT · <b>THESIS 2 — COLLISION HANDLING</b></span><span class="meta">SHEET 10/14</span></div>
+      <h1 class="hed">Double Hashing, and a Gentler Kind of Mistake</h1>
+      <div class="grid2">
+        <figure>
+          <svg viewBox="0 0 420 220" role="img" aria-label="Linear probing checks the next slot sequentially; double hashing jumps a computed distance, scattering collisions">
+            <text x="0" y="16" class="dg-label-dim">linear probing (today)</text>
+            <g>
+              <rect x="0" y="26" width="34" height="30" class="dg-box"/><rect x="34" y="26" width="34" height="30" class="dg-box-accent"/><rect x="68" y="26" width="34" height="30" class="dg-box-accent"/><rect x="102" y="26" width="34" height="30" class="dg-box-accent"/><rect x="136" y="26" width="34" height="30" class="dg-box"/>
+            </g>
+            <path d="M51,56 L85,56 L119,56" class="dg-line-accent" marker-end="url(#arrowhead)"/>
+            <text x="0" y="76" class="dg-label-dim" font-size="9">always checks the immediate next cell</text>
+
+            <text x="0" y="120" class="dg-label-dim">double hashing (Thesis 2)</text>
+            <g>
+              <rect x="0" y="130" width="34" height="30" class="dg-box-accent"/><rect x="34" y="130" width="34" height="30" class="dg-box"/><rect x="68" y="130" width="34" height="30" class="dg-box"/><rect x="102" y="130" width="34" height="30" class="dg-box-accent"/><rect x="136" y="130" width="34" height="30" class="dg-box"/><rect x="170" y="130" width="34" height="30" class="dg-box-accent"/>
+            </g>
+            <path d="M17,145 C60,90 150,90 187,145" class="dg-line-accent" marker-end="url(#arrowhead)"/>
+            <text x="0" y="182" class="dg-label-dim" font-size="9">jump distance set by a second hash — collisions scatter, not clump</text>
+          </svg>
+        </figure>
+        <figure>
+          <svg viewBox="0 0 420 220" role="img" aria-label="Bitmask cell OR collision: a true entry for one organism gains a spurious extra bit from an unrelated colliding entry, rather than being overwritten entirely">
+            <text x="0" y="16" class="dg-label-dim">true content — this k-mer is only from Efm</text>
+            <g font-size="9">
+              <rect x="0" y="26" width="26" height="26" class="dg-box-accent"/><text x="13" y="43" text-anchor="middle" class="dg-label" font-size="9">1</text>
+              <rect x="26" y="26" width="26" height="26" class="dg-box"/><text x="39" y="43" text-anchor="middle" class="dg-label" font-size="9">0</text>
+              <rect x="52" y="26" width="26" height="26" class="dg-box"/><text x="65" y="43" text-anchor="middle" class="dg-label" font-size="9">0</text>
+              <rect x="78" y="26" width="26" height="26" class="dg-box"/><text x="91" y="43" text-anchor="middle" class="dg-label" font-size="9">0</text>
+              <rect x="104" y="26" width="26" height="26" class="dg-box"/><text x="117" y="43" text-anchor="middle" class="dg-label" font-size="9">0</text>
+              <rect x="130" y="26" width="26" height="26" class="dg-box"/><text x="143" y="43" text-anchor="middle" class="dg-label" font-size="9">0</text>
+            </g>
+            <text x="0" y="70" class="dg-label-dim" font-size="8.5">Efm  Sau  Kpn  Aba  Pae  Ecl</text>
+            <text x="0" y="100" class="dg-label-dim">unrelated colliding entry — actually from Pae</text>
+            <path d="M60,115 L60,150" class="dg-line-dim" marker-end="url(#arrowhead)"/>
+            <text x="70" y="135" class="dg-label-dim" font-size="9">OR'd into the same cell</text>
+            <g font-size="9">
+              <rect x="0" y="160" width="26" height="26" class="dg-box-accent"/><text x="13" y="177" text-anchor="middle" class="dg-label" font-size="9">1</text>
+              <rect x="26" y="160" width="26" height="26" class="dg-box"/><text x="39" y="177" text-anchor="middle" class="dg-label" font-size="9">0</text>
+              <rect x="52" y="160" width="26" height="26" class="dg-box"/><text x="65" y="177" text-anchor="middle" class="dg-label" font-size="9">0</text>
+              <rect x="78" y="160" width="26" height="26" class="dg-box"/><text x="91" y="177" text-anchor="middle" class="dg-label" font-size="9">0</text>
+              <rect x="104" y="160" width="26" height="26" class="dg-box-accent"/><text x="117" y="177" text-anchor="middle" class="dg-label" font-size="9">1</text>
+              <rect x="130" y="160" width="26" height="26" class="dg-box"/><text x="143" y="177" text-anchor="middle" class="dg-label" font-size="9">0</text>
+            </g>
+            <text x="104" y="200" text-anchor="middle" class="dg-label-accent" font-size="8.5">spurious — not overwritten</text>
+          </svg>
+        </figure>
+      </div>
+      <div class="foot">A collision here costs one wrong "maybe," never the whole answer — Kraken2's normal collision destroys it completely</div>
+    </section>
+
+    <!-- 11 THESIS2 OUR CONTRIBUTION -->
+    <section class="slide" data-n="11">
+      <div class="tblock"><span class="code">KR2-OPT · <b>THESIS 2 — MECHANISM</b></span><span class="meta">SHEET 11/14</span></div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <h1 class="hed">Reusing the Hash Pair, Deriving the Formula</h1>
+        <span class="tag tag-accent">our design</span>
+      </div>
+      <div class="grid2">
+        <figure>
+          <svg viewBox="0 0 420 220" role="img" aria-label="Power of d choices: the same double hash pair generates two candidate slots, the key is placed in whichever is emptier at build time">
+            <text x="0" y="16" class="dg-label-dim">same h1/h2 pair, used differently</text>
+            <circle cx="20" cy="90" r="12" class="dg-box"/><text x="20" y="94" text-anchor="middle" class="dg-label" font-size="9">key</text>
+            <rect x="90" y="60" width="40" height="30" class="dg-box-accent"/><text x="110" y="80" text-anchor="middle" class="dg-label" font-size="9">full</text>
+            <rect x="140" y="110" width="40" height="30" class="dg-box"/><text x="160" y="130" text-anchor="middle" class="dg-label" font-size="9">open</text>
+            <line x1="32" y1="90" x2="90" y2="75" class="dg-line-dim"/>
+            <line x1="32" y1="90" x2="140" y2="125" class="dg-line-accent" marker-end="url(#arrowhead)"/>
+            <text x="0" y="180" class="dg-label-dim" font-size="9">h1 candidate is full → placed at h2 candidate instead, at build time</text>
+            <text x="0" y="200" class="dg-label-dim" font-size="9">no online rebalancing needed — table is built once, never mutated</text>
+          </svg>
+        </figure>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <div class="panel"><div class="k">Bucket placement</div><div class="v">Reuse the double-hash pair Thesis 2 already needs to generate 2–4 candidate slots, bucketed 4-way (libcuckoo precedent). Near-free — same two calculations, consumed differently.</div></div>
+          <div class="panel" style="border-color:var(--accent);"><div class="k" style="color:var(--accent);">False-positive formula for the bitmask cell</div><div class="v">Borrowed technique: Count-Min Sketch's one-sided error bound, adapted for OR instead of sum. Confirmed nobody has published this derivation anywhere.</div></div>
+        </div>
+      </div>
+      <div class="foot">Sir named the bitmask cell as future work — the math behind its mistake rate is new work, done here</div>
+    </section>
+
+    <!-- 12 PRIOR ART -->
+    <section class="slide" data-n="12">
+      <div class="tblock"><span class="code">KR2-OPT · <b>PRIOR-ART CHECK</b></span><span class="meta">SHEET 12/14</span></div>
+      <h1 class="hed">Four Close Reads, One Honest Caveat</h1>
+      <h2 class="sub">Every claim below checked against the closest real competing tool</h2>
+      <table class="tsheet">
+        <tr><th>Tool</th><th>What it does</th><th>Verdict</th></tr>
+        <tr><td>Kun-peng</td><td>Streams the DB in on-demand RAM/disk blocks — same DB size, less memory</td><td>Survives — different memory tier entirely</td></tr>
+        <tr><td>kache-hash</td><td>Cache-friendly hash-function layout for streaming k-mer counting</td><td>Survives — same tier, but static layout vs. our runtime-adaptive eviction</td></tr>
+        <tr><td><b>Chimera / TAXICF</b></td><td>Cuckoo filters — genuinely shrinks the on-disk database, for 300,000+ species</td><td><b>Partial — real disk-size win, different mechanism, different scale</b></td></tr>
+        <tr><td>Taxor</td><td>XOR filters, one dedicated array per organism, never shares storage</td><td>Survives cleanly — can't have our OR-collision problem by design</td></tr>
+      </table>
+      <div class="panel" style="border-color:var(--accent); margin-top:14px;"><div class="v">The one framing change this forces: "smaller database" can't be pitched as an unqualified outcome number anymore — Chimera already gets there, via cuckoo filters, for large taxonomies. The pitch has to be the specific mechanism, for a small fixed panel.</div></div>
+      <div class="foot">Read in full, not from abstracts — sources on file in the project repo</div>
+    </section>
+
+    <!-- 13 OPEN QUESTIONS -->
+    <section class="slide" data-n="13">
+      <div class="tblock"><span class="code">KR2-OPT · <b>OPEN QUESTIONS</b></span><span class="meta">SHEET 13/14</span></div>
+      <h1 class="hed">Decisions Only Sir Can Make</h1>
+      <ul class="list" style="margin-top:6px;">
+        <li><span class="n">1</span><span><b>Comparator table scope</b> — Kun-peng and Chimera/TAXICF are both live, maintained, peer-reviewed, and benchmarked directly against Kraken2. Add them to the real comparator table next to Metabuli/Centrifuger, or keep them cite-only like kache-hash and Taxor?</span></li>
+        <li><span class="n">2</span><span><b>Build order</b> — double hashing first, as proposed on the next sheet — confirm, or reprioritize Thesis 1's eviction policy first since it now has the strongest literature grounding?</span></li>
+        <li><span class="n">3</span><span><b>A possible third angle</b> — do Thesis 1 and Thesis 2 help or fight each other when combined (narrower cells raise collision rate, which may make the cache less trustworthy)? A real open question, not a commitment — flagged here for a decision on whether it's worth measuring.</span></li>
+      </ul>
+      <div class="foot">Not proposals dressed as questions — genuinely undecided</div>
+    </section>
+
+    <!-- 14 ROADMAP -->
+    <section class="slide" data-n="14">
+      <div class="tblock"><span class="code">KR2-OPT · <b>PROPOSED BUILD ORDER</b></span><span class="meta">SHEET 14/14</span></div>
+      <h1 class="hed">Five Steps, Awaiting Sign-Off</h1>
+      <div class="figwrap">
+        <svg viewBox="0 0 1000 160" role="img" aria-label="Five step roadmap in sequence: double hashing, bucket placement, eviction policy, trace driven sizing, bitmask derivation">
+          <g font-family="IBM Plex Mono" font-size="10.5">
+            <g>
+              <rect x="10" y="50" width="170" height="50" class="dg-box-accent"/><text x="95" y="72" text-anchor="middle" class="dg-label">1 · double</text><text x="95" y="87" text-anchor="middle" class="dg-label">hashing</text>
+              <rect x="215" y="50" width="170" height="50" class="dg-box"/><text x="300" y="72" text-anchor="middle" class="dg-label">2 · bucket</text><text x="300" y="87" text-anchor="middle" class="dg-label">placement</text>
+              <rect x="420" y="50" width="170" height="50" class="dg-box"/><text x="505" y="72" text-anchor="middle" class="dg-label">3 · eviction</text><text x="505" y="87" text-anchor="middle" class="dg-label">policy</text>
+              <rect x="625" y="50" width="170" height="50" class="dg-box"/><text x="710" y="72" text-anchor="middle" class="dg-label">4 · trace-driven</text><text x="710" y="87" text-anchor="middle" class="dg-label">sizing</text>
+              <rect x="830" y="50" width="160" height="50" class="dg-box"/><text x="910" y="72" text-anchor="middle" class="dg-label">5 · bitmask</text><text x="910" y="87" text-anchor="middle" class="dg-label">derivation</text>
+            </g>
+            <g class="dg-line" marker-end="url(#arrowhead)">
+              <line x1="180" y1="75" x2="213" y2="75"/>
+              <line x1="385" y1="75" x2="418" y2="75"/>
+              <line x1="590" y1="75" x2="623" y2="75"/>
+              <line x1="795" y1="75" x2="828" y2="75"/>
+            </g>
+          </g>
+        </svg>
+      </div>
+      <div class="panel" style="margin-top:10px;"><div class="v">Cleanest first target, extends infrastructure already built — then a near-free add-on, then the best-grounded new mechanism from today's research, then a concrete sizing method, then the one piece of open math nobody else has solved.</div></div>
+      <div class="foot">END OF BRIEFING — KR2-OPT · WEEK 3</div>
+    </section>
+
+  </div>
+
+  <div class="navrow">
+    <button class="navbtn" id="prevBtn" aria-label="Previous slide">‹</button>
+    <div class="dots" id="dots"></div>
+    <button class="navbtn" id="nextBtn" aria-label="Next slide">›</button>
+    <span class="hint">← → or click</span>
+  </div>
+</div>
+
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <marker id="arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="color:var(--ink)"/>
+    </marker>
+  </defs>
+</svg>
+
+<script>
+(function(){
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var dotsWrap = document.getElementById('dots');
+  var cur = 0;
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function animateCountUps(slideEl){
+    var els = slideEl.querySelectorAll('.countup');
+    els.forEach(function(el){
+      var target = parseFloat(el.getAttribute('data-target'));
+      var decimals = parseInt(el.getAttribute('data-decimals') || '0', 10);
+      if(reduced){ el.textContent = target.toFixed(decimals); return; }
+      var start = performance.now(), dur = 900;
+      function tick(now){
+        var p = Math.min(1, (now - start) / dur);
+        var eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = (target * eased).toFixed(decimals);
+        if(p < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+  slides.forEach(function(_, i){
+    var d = document.createElement('button');
+    d.className = 'dot' + (i===0 ? ' on' : '');
+    d.setAttribute('aria-label', 'Go to slide ' + (i+1));
+    d.addEventListener('click', function(){ go(i); });
+    dotsWrap.appendChild(d);
+  });
+  var dots = Array.prototype.slice.call(dotsWrap.children);
+  function go(i){
+    if(i < 0 || i >= slides.length) return;
+    slides[cur].classList.remove('active');
+    dots[cur].classList.remove('on');
+    cur = i;
+    slides[cur].classList.add('active');
+    dots[cur].classList.add('on');
+    animateCountUps(slides[cur]);
+  }
+  animateCountUps(slides[0]);
+  document.getElementById('prevBtn').addEventListener('click', function(){ go(cur-1); });
+  document.getElementById('nextBtn').addEventListener('click', function(){ go(cur+1); });
+  document.getElementById('stage').addEventListener('click', function(e){
+    var r = this.getBoundingClientRect();
+    var x = e.clientX - r.left;
+    if(e.target.closest('.navbtn') || e.target.closest('.dot')) return;
+    if(x > r.width * 0.6) go(cur+1);
+    else if(x < r.width * 0.4) go(cur-1);
+  });
+  window.addEventListener('keydown', function(e){
+    if(e.key === 'ArrowRight' || e.key === ' ') { go(cur+1); e.preventDefault(); }
+    if(e.key === 'ArrowLeft') { go(cur-1); e.preventDefault(); }
+  });
+})();
+</script>

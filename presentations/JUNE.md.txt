@@ -1,0 +1,794 @@
+slide 1 
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+system stats luna vs orion vs lab desktop stats to be added in a table format (added)
+Create a hardware comparison table slide with the title "Experimental Machines". The table should have 4 columns: one label column and three machine columns (Luna, Orion, Lab Desktop). Use the following data:
+
+┌─────────────────┬──────────────────────────────────┬──────────────────────────────────────┬─────────────┐
+│                 │               Luna               │                Orion                 │ Lab Desktop │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ Platform        │ Dell R760 (Server)               │ NVIDIA Jetson AGX Orin 64GB          │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ Architecture    │ x86_64 (Sapphire Rapids)         │ ARM64 (Cortex-A78AE)                 │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ CPU             │ Intel Xeon Platinum 8468         │ ARM Cortex-A78AE                     │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ Cores / Threads │ 96 cores / 192 threads           │ 12 cores / 3 clusters × 4 (no HT)    │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ Clock           │ 3.8 GHz                          │ 2.2 GHz                              │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ NUMA Nodes      │ 2                                │ 1                                    │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ SIMD            │ AVX-512 + AMX                    │ NEON                                 │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ L1d Cache       │ 48 KB/core                       │ 64 KB/core                           │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ L2 Cache        │ 2 MB/core                        │ 256 KB/core                          │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ LLC (L3)        │ 210 MB total                     │ 6 MB total (2 MB/cluster)            │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ Memory Type     │ DDR5, discrete                   │ LPDDR5, unified (CPU+GPU share)      │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ RAM             │ 503 GB                           │ 64 GB                                │ —           │
+├─────────────────┼──────────────────────────────────┼──────────────────────────────────────┼─────────────┤
+│ GPU             │ 2× NVIDIA L40S (46 GB VRAM each) │ Ampere, 2048 CUDA cores (integrated) │ —           │
+└─────────────────┴──────────────────────────────────┴──────────────────────────────────────┴─────────────┘
+
+Make the LLC row visually highlighted as it is the most critical metric. Keep the design clean and minimal. The slide is for a computer architecture research presentation.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+slide 2 
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+recap of kraken profiling what takes how much time in a run over a 700mb fastq file shown with graphs 
+Create a slide titled "Where Does Kraken2 Spend Its Time?"
+
+Subtitle: Profiling on Luna — 104,918 reads, 703 MB HAC FASTQ, 8 GB standard database, 1 thread
+
+---
+Layout: Two charts side by side, equal width
+
+---
+LEFT CHART — Horizontal bar chart
+
+Title: "CPU Time by Function (gprof, 1T)"
+
+Bars in this exact order top to bottom:
+
+┌─────────────────────────────────┬────────────┐
+│            Function             │ % CPU Time │
+├─────────────────────────────────┼────────────┤
+│ MinimizerScanner::NextMinimizer │ 53.35%     │
+├─────────────────────────────────┼────────────┤
+│ CompactHashTable::Get           │ 23.23%     │
+├─────────────────────────────────┼────────────┤
+│ ClassifySequence                │ 7.27%      │
+├─────────────────────────────────┼────────────┤
+│ reverse_complement              │ 6.69%      │
+├─────────────────────────────────┼────────────┤
+│ AddHitlistString                │ 3.15%      │
+├─────────────────────────────────┼────────────┤
+│ Others                          │ 6.31%      │
+└─────────────────────────────────┴────────────┘
+
+- All bars in steel blue except CompactHashTable::Get — make it red
+- Show percentage labels at end of each bar
+- Clean minimal style, no gridlines, white background
+
+---
+RIGHT CHART — Two bar comparison
+
+Title: "CompactHashTable::Get() — The Hidden Bottleneck"
+
+Two bars only:
+
+┌───────────────────────┬────────┐
+│        Metric         │ Value  │
+├───────────────────────┼────────┤
+│ Share of Instructions │ 0.65%  │
+├───────────────────────┼────────┤
+│ Share of LLC Misses   │ 96.24% │
+└───────────────────────┴────────┘
+
+- Instructions bar: blue, short
+- LLC Misses bar: red, tall and dramatic
+- Add a text callout between/below the bars: "Executes 0.65% of instructions — causes 96.24% of all LLC read misses"
+- Same clean minimal style
+
+---
+Bottom of slide — small caption text:
+
+Source: gprof (CPU time) + cachegrind (LLC miss attribution) | Luna, Xeon Platinum 8468, 8 GB Kraken2 standard database
+
+---
+Clean, minimal, research presentation style. Dark text on white background. No decorative elements.
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+slide 3 recap of dorado profiling what tikes how much time on dorado and i think this was not done previously
+Here's the headline finding from all three:
+
+┌───────┬───────────────────┬──────────────────────────────┐
+│ Model │   Architecture    │       Top GPU consumer       │
+├───────┼───────────────────┼──────────────────────────────┤
+│ fast  │ LSTM (small)      │ GEMM 30.8%                   │
+├───────┼───────────────────┼──────────────────────────────┤
+│ hac   │ LSTM (large)      │ LSTM 68%                     │
+├───────┼───────────────────┼──────────────────────────────┤
+│ sup   │ Transformer + FP8 │ RMSNorm 17% + FP8-GEMM 43.6% │
+└───────┴───────────────────┴──────────────────────────────┘
+
+The sup model is architecturally completely different — it's a Transformer (like GPT), not an RNN at all. It uses FP8 quantization which is an Ada Lovelace-native feature. 
+That's why the batch size collapses to 96 — the model is massive. And cudaStreamSynchronize spikes back to 97.3% — the CPU is almost constantly blocked waiting on the GPU.
+
+The key finding: WSL2 showed 82% GEMM. On L40S that's completely wrong — the GPU finishes GEMM so fast it exposes what's underneath. Each model has a different dominant kernel:
+
+┌───────────────┬───────┬──────────────┬─────────────┐
+│               │ fast  │     hac      │     sup     │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ Architecture  │ LSTM  │ LSTM (large) │ Transformer │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ Precision     │ FP16  │ FP16         │ FP8 + FP16  │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ GEMM %        │ 30.8% │ 15.0%        │ 43.6%       │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ LSTM %        │ 27.5% │ 68.0%        │ 0%          │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ Beam Search % │ 14.8% │ 2.1%         │ 8.5%        │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ Attention %   │ 0%    │ 0%           │ 10.4%       │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ RMSNorm %     │ 0%    │ 0%           │ 17.1%       │
+├───────────────┼───────┼──────────────┼─────────────┤
+
+  Read 1 file, ran 2 shell commands
+
+This is great data — and very different from what WSL2 showed. The L40S results tell a much more interesting story. Here's what we have:
+
+The key finding: WSL2 showed 82% GEMM. On L40S that's completely wrong — the GPU finishes GEMM so fast it exposes what's underneath. Each model has a different dominant kernel:
+
+┌───────────────┬───────┬──────────────┬─────────────┐
+│               │ fast  │     hac      │     sup     │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ Architecture  │ LSTM  │ LSTM (large) │ Transformer │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ Precision     │ FP16  │ FP16         │ FP8 + FP16  │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ GEMM %        │ 30.8% │ 15.0%        │ 43.6%       │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ LSTM %        │ 27.5% │ 68.0%        │ 0%          │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ Beam Search % │ 14.8% │ 2.1%         │ 8.5%        │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ Attention %   │ 0%    │ 0%           │ 10.4%       │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ RMSNorm %     │ 0%    │ 0%           │ 17.1%       │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ Wall time     │ 33.9s │ 55.0s        │ 4m 26s      │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ GPU vs CPU    │ 28.6× │ 107×         │ ~3,000×     │
+├───────────────┼───────┼──────────────┼─────────────┤
+│ CPU blocked   │ 96.5% │ 96.1%        │ 97.3%       │
+└───────────────┴───────┴──────────────┴─────────────┘
+
+For slide 3, I'd propose two visuals:
+1. Stacked bar chart — kernel breakdown (GEMM / LSTM / Beam SeOther) for fast vs hac vs sup
+2. GPU speedup bar — 28.6× / 107× / ~3000× vs CPU
+
+Create a slide titled "Dorado GPU Basecalling — What Takes Time?"
+
+Subtitle: nsys profiling on Luna L40S (Ada Lovelace, 91.6 TFLOPS FP32) | 104,918 reads, same pod5 input across all models
+
+---
+Layout: Two charts side by side
+
+---
+LEFT CHART — 100% Stacked horizontal bar chart
+
+Title: "GPU Kernel Breakdown by Model"
+
+Each model is one bar, broken into segments:
+
+┌──────┬───────┬───────┬─────────────┬───────────┬─────────┬───────┐
+│      │ GEMM  │ LSTM  │ Beam Search │ Attention │ RMSNorm │ Other │
+├──────┼───────┼───────┼─────────────┼───────────┼─────────┼───────┤
+│ fast │ 30.8% │ 27.5% │ 14.8%       │ 0%        │ 0%      │ 26.9% │
+├──────┼───────┼───────┼─────────────┼───────────┼─────────┼───────┤
+│ hac  │ 15.0% │ 68.0% │ 2.1%        │ 0%        │ 0%      │ 14.9% │
+├──────┼───────┼───────┼─────────────┼───────────┼─────────┼───────┤
+│ sup  │ 43.6% │ 0%    │ 8.5%        │ 10.4%     │ 17.1%   │ 20.4% │
+└──────┴───────┴───────┴─────────────┴───────────┴─────────┴───────┘
+
+Color scheme:
+- GEMM: red
+- LSTM: blue
+- Beam Search: orange
+- Attention: purple
+- RMSNorm: green
+- Other: light grey
+
+Add a small label inside or beside each segment showing the %. Add model architecture label next to each bar: fast → "(LSTM, FP16)", hac → "(LSTM large, FP16)", sup → "(Transformer, FP8)"
+
+---
+RIGHT CHART — Vertical bar chart, log scale
+
+Title: "GPU Speedup vs CPU (same model)"
+
+┌───────┬─────────┐
+│ Model │ Speedup │
+├───────┼─────────┤
+│ fast  │ 28.6×   │
+├───────┼─────────┤
+│ hac   │ 107×    │
+├───────┼─────────┤
+│ sup   │ ~3,000× │
+└───────┴─────────┘
+
+- Use log scale on Y axis — the 3,000× sup bar would dwarf everything on linear scale
+- Color bars: fast=blue, hac=orange, sup=red
+- Label each bar with the speedup value on top
+- Add a note below sup bar: "CPU falls back to FP32 — no native FP8 on Xeon"
+- Wall times as secondary labels under model names: fast=33.9s, hac=55.0s, sup=4m 26s
+
+---
+Bottom caption:
+CPU blocked in cudaStreamSynchronize: 96–98% across all models — GPU always drives the pipeline
+Source: nsys 2025.1.3 | Luna L40S | Dorado v1.4.0
+
+---
+Clean, minimal, research presentation style. Dark text on white background.
+
+slide 4 database choices .... how we used 8 gb, 16 gb and 103 gb database their names... what do they contain taxonomy of...
+Create a slide titled "Kraken2 Database Hierarchy — Accuracy vs Cache Pressure"
+
+Subtitle: 6 databases tested — from ultra-targeted (6 genomes) to gold-standard (all of RefSeq + fungi/protozoa) | reads_hac, 32T, Luna
+
+---
+Layout: One wide table + one callout box below
+
+---
+MAIN TABLE — 6 rows, color-coded by behavioral class
+
+┌──────────────────┬─────────────────┬──────────────────────────────────────────────┬─────────────────────────┬───────────────┐
+│     Database     │ Hash Table Size │                   Contents                   │ Classification Accuracy │ LLC Miss Rate │
+├──────────────────┼─────────────────┼──────────────────────────────────────────────┼─────────────────────────┼───────────────┤
+│ sample_targeted  │ 50 MB           │ 6 reference genomes (exact sample match)     │ 84.80%                  │ 14.64%        │
+├──────────────────┼─────────────────┼──────────────────────────────────────────────┼─────────────────────────┼───────────────┤
+│ eskape_650mb     │ 142 MB          │ ESKAPE pathogens only (1,149 assemblies)     │ 65.28%                  │ 30.53%        │
+├──────────────────┼─────────────────┼──────────────────────────────────────────────┼─────────────────────────┼───────────────┤
+│ eskape_human_4gb │ 3.8 GB          │ ESKAPE + human genome (GRCh38)               │ 66.13%                  │ 59.03%        │
+├──────────────────┼─────────────────┼──────────────────────────────────────────────┼─────────────────────────┼───────────────┤
+│ standard_8gb     │ 7.6 GB          │ Bacteria + archaea + viral + plasmid + human │ 95.77%                  │ 82.90%        │
+├──────────────────┼─────────────────┼──────────────────────────────────────────────┼─────────────────────────┼───────────────┤
+│ standard_16gb    │ 15 GB           │ Same as above, larger cap                    │ 97.77%                  │ 85.03%        │
+├──────────────────┼─────────────────┼──────────────────────────────────────────────┼─────────────────────────┼───────────────┤
+│ pluspf_103gb     │ 103.4 GB        │ Standard + protozoa + fungi (full RefSeq)    │ 98.86%                  │ 91.13%        │
+└──────────────────┴─────────────────┴──────────────────────────────────────────────┴─────────────────────────┴───────────────┘
+
+Color-code rows by behavioral class:
+- sample_targeted → green background (fits in 210 MB LLC — pre-cliff)
+- eskape_650mb + eskape_human_4gb → yellow background (bandwidth-saturated)
+- standard_8gb + standard_16gb + pluspf_103gb → red/orange background (Amdahl-limited, DRAM-bound)
+
+Add a small legend: 🟢 Pre-cliff | 🟡 Bandwidth-saturated | 🔴 Amdahl-limited
+
+---
+CALLOUT BOX below the table:
+
+"As database grows: accuracy ↑ (more organisms to match) but LLC miss rate ↑ (more DRAM accesses per k-mer lookup). The 50 MB → 142 MB step crosses the cache cliff — LLC miss rate jumps from 15% to 31%."
+
+Luna LLC = 210 MB. Every database beyond sample_targeted exceeds effective cache capacity.
+
+---
+Clean, minimal, research presentation style.
+Create a slide titled "Custom 50 MB DB vs Gold-Standard 103 GB DB — Same Sample, Different Picture"
+
+Subtitle: reads_hac, 32T, Luna | 104,918 reads total
+
+Layout: Two visuals side by side
+
+---
+LEFT — Stacked bar chart: Classified vs Unclassified
+
+Title: "Classification Rate"
+
+Two bars side by side:
+
+┌──────────────┬─────────────────────────┬───────────────────────┐
+│              │ sample_targeted (50 MB) │ pluspf_103gb (103 GB) │
+├──────────────┼─────────────────────────┼───────────────────────┤
+│ Classified   │ 84.80%                  │ 98.86%                │
+├──────────────┼─────────────────────────┼───────────────────────┤
+│ Unclassified │ 15.20%                  │ 1.14%                 │
+└──────────────┴─────────────────────────┴───────────────────────┘
+
+- Classified = green, Unclassified = grey
+- Label the percentages inside each segment
+- Keep bars tall and dramatic to show the gap
+
+---
+RIGHT — Grouped horizontal bar chart: Species breakdown (% of all reads)
+
+Title: "Species Composition"
+
+┌──────────────────┬────────────────┬───────────┐
+│     Species      │    50 MB DB    │ 103 GB DB │
+├──────────────────┼────────────────┼───────────┤
+│ P. aeruginosa    │ 52.50%         │ 41.58%    │
+├──────────────────┼────────────────┼───────────┤
+│ E. coli          │ 21.79%         │ 20.60%    │
+├──────────────────┼────────────────┼───────────┤
+│ K. pneumoniae    │ 9.92%          │ 9.22%     │
+│ E. coli          │ 21.79%         │ 20.60%    │
+├──────────────────┼────────────────┼───────────┤
+│ K. pneumoniae    │ 9.92%          │ 9.22%     │
+├──────────────────┼────────────────┼───────────┤
+│ A. baumannii     │ 0% (not in DB) │ 0.33%     │
+├──────────────────┼────────────────┼───────────┤
+│ Other classified │ 0.59%          │ 26.86%    │
+├──────────────────┼────────────────┼───────────┤
+│ Unclassified     │ 15.20%         │ 1.14%     │
+└──────────────────┴────────────────┴───────────┘
+
+- Each species is a pair of bars (50 MB in blue, 103 GB in dark green)
+- Highlight A. baumannii row in red — this species is completely invisible to the 50 MB DB
+- Add a red callout on A. baumannii: "ESKAPE pathogen — absent from custom DB (NCBI genome suppressed)"
+
+---
+Bottom callout box:
+
+"The 50 MB custom DB correctly identifies the 3 dominant pathogens but misses 15% of reads and cannot detect A. baumannii. The 103 GB gold-standard confirms the same top-3 proportions, adds A. baumannii, and reveals a 27% microbial long tail invisible to narrow databases."
+
+---
+Clean minimal research style. Dark text on white.
+
+slide 5 thread scaling set of slides 5a,5b,5c for luna, orion and lab desktop... table showing time, ipc, cache miss rate instrutions etc so 3 tables differently 
+maybe few graphs seperate seperate or in single 
+---
+Slide 5a — Luna Thread Scaling (Gamma Prompt)
+
+Create a slide titled "Thread Scaling — Luna (Xeon Platinum 8468, 96c)"
+
+Subtitle: reads_hac · numactl --cpunodebind=0 --membind=0 · 6 databases
+
+Layout: LEFT half = line chart, RIGHT half = summary table
+
+--- LEFT: Line Chart ---
+Title: "Speedup vs Thread Count"
+X-axis (log2 scale): Thread count — 1, 2, 4, 8, 16, 32, 64, 96
+Y-axis: Speedup over 1T (linear scale, 0–25×)
+
+Plot SIX lines with these exact data points:
+
+Line 1 — "50 MB (pre-cliff)" — DARK GREEN
+1×=1.00, 2×=1.98, 4×=3.89, 8×=7.52, 16×=13.90, 32×=21.26★, 64×=20.83, 96×=17.85
+
+Line 2 — "142 MB (bandwidth-sat.)" — BLUE
+1×=1.00, 2×=1.97, 4×=3.85, 8×=7.37, 16×=13.45, 32×=21.03, 64×=21.96★, 96×=18.88
+
+Line 3 — "3.8 GB (bandwidth-sat.)" — ORANGE
+1×=1.00, 2×=1.87, 4×=3.33, 8×=5.43, 16×=7.93, 32×=10.02, 64×=10.57★, 96×=10.12
+
+Line 4 — "7.6 GB (Amdahl-limited)" — RED
+1×=1.00, 2×=1.59, 4×=2.26, 8×=2.87, 16×=3.29, 32×=3.47★, 64×=3.39, 96×=3.28
+
+Line 5 — "15 GB (Amdahl-limited)" — DARK RED
+1×=1.00, 2×=1.51, 4×=2.04, 8×=2.49, 16×=2.79, 32×=2.93★, 64×=2.90, 96×=2.85
+
+Line 6 — "103 GB (DRAM-saturated)" — GREY
+1×=1.00, 2×=1.28, 4×=1.47, 8×=1.60, 16×=1.67, 32×=1.71, 64×=1.71, 96×=1.72★
+
+(★ = peak for that DB)
+
+Add a thin dashed grey diagonal for "Ideal linear" from (1, 1.00) to (32, 32.00).
+Add a vertical dashed black line at thread count 32, labelled "32T sweet spot".
+
+--- RIGHT: Summary Table ---
+Title: "Key Metrics at 1T and 32T (reads_hac)"
+
+Columns: Database | 1T Time (s) | 32T Time (s) | Peak Speedup | LLC Miss% | IPC (1T)
+
+Rows:
+| 50 MB sample_targeted | 19.7 | 0.93 | 21.3× @32T | 10.2% | 1.78 |
+| 142 MB eskape_650mb | 22.0 | 1.05 | 22.0× @64T | 30.7% | 1.47 |
+| 3.8 GB eskape_human_4gb | 29.8 | 2.98 | 10.6× @64T | 56.9% | 1.25 |
+| 7.6 GB standard_8gb | 16.8 | 4.83 | 3.5× @32T | 76.6% | 2.11 |
+| 15 GB standard_16gb | 23.9 | 8.15 | 2.9× @32T | 80.2% | 1.86 |
+| 103 GB pluspf_103gb | 96.9 | 56.8 | 1.72× @96T | 90.5% | 1.00 |
+
+Color the 50 MB row green. Color the 3.8 GB, 7.6 GB, 15 GB rows amber-to-red (gradient). Color the 103 GB row dark red.
+
+Bottom caption: "IPC collapses below 1.0 at 103 GB 96T (IPC=0.90) — more stall cycles than executed instructions. LLC Miss% rises with thread count on all DBs due to concurrent DRAM pressure."
+
+---
+Slide 5b — Orion Thread Scaling (Gamma Prompt)
+
+Create a slide titled "Thread Scaling — Orion (Jetson AGX Orin, 12c ARM)"
+
+Subtitle: reads_hac · sudo perf · 5 databases (103 GB DB does not fit 64 GB RAM)
+
+Layout: LEFT half = line chart, RIGHT half = summary table
+
+--- LEFT: Line Chart ---
+Title: "Speedup vs Thread Count"
+X-axis: Thread count — 1, 2, 4, 6, 8, 10, 12 (evenly spaced, NOT log scale — Orion step is +2 not ×2)
+Y-axis: Speedup over 1T (linear scale, 0–14×)
+
+Plot FIVE lines:
+
+Line 1 — "50 MB (post-cliff on Orion)" — GREEN
+1×=1.00, 2×=2.03, 4×=4.02, 6×=5.97, 8×=7.91, 10×=9.64, 12×=11.44★
+
+Line 2 — "142 MB" — BLUE
+1×=1.00, 2×=2.02, 4×=3.97, 6×=5.91, 8×=7.82, 10×=9.58, 12×=11.34★
+
+Line 3 — "3.8 GB" — ORANGE
+1×=1.00, 2×=1.98, 4×=3.75, 6×=5.37, 8×=6.89, 10×=8.18, 12×=9.39★
+
+Line 4 — "7.6 GB (Amdahl floor: 2.35s DB load)" — RED
+1×=1.00, 2×=1.91, 4×=3.14, 6×=4.02, 8×=4.65, 10×=5.16, 12×=5.54★
+
+Line 5 — "15 GB (Amdahl floor: 4.23s DB load)" — DARK RED
+1×=1.00, 2×=1.76, 4×=2.78, 6×=3.42, 8×=3.87, 10×=4.22, 12×=4.50★
+
+Add a thin dashed diagonal "Ideal linear" from (1, 1.00) to (12, 12.00).
+
+Important annotation: Add a text callout box near lines 1 and 2 (which are nearly identical): "50 MB and 142 MB lines overlap — on Orion BOTH are post-cliff (SLC = 6 MB). DB size doesn't change miss rate once past the cliff."
+
+--- RIGHT: Summary Table ---
+Title: "Key Metrics — Orion (reads_hac)"
+
+Columns: Database | 1T Time (s) | 12T Time (s) | Peak Speedup | LLC Miss% (1T) | IPC (1T)
+
+Rows:
+| 50 MB sample_targeted | 47.5 | 4.15 | 11.4× @12T | 78.9% | 1.00 |
+| 142 MB eskape_650mb | 47.1 | 4.15 | 11.3× @12T | 80.8% | 0.93 |
+| 3.8 GB eskape_human_4gb | 45.8 | 4.88 | 9.4× @12T | 77.3% | 1.07 |
+| 7.6 GB standard_8gb | 21.2 | 3.82 | 5.5× @12T | 68.2% | 2.24 |
+| 15 GB standard_16gb | 28.4 | 6.32 | 4.5× @12T | 71.4% | 1.92 |
+
+Color 50 MB and 142 MB rows the same green (no visible difference on this machine). Color 3.8 GB amber. Color 7.6 GB and 15 GB red.
+
+Add a separate callout box below the table:
+"Why is standard_8gb FASTER than 50 MB at 1T on Orion?
+(21.2s vs 47.5s) — different k-mer lookup pattern: standard DB terminates lookups earlier with more successful matches. IPC 2.24 vs 1.00. All DBs are post-cliff on Orion — but classification efficiency, not DB size, drives wall time."
+
+Bottom caption: "Orion SLC = 6 MB — every DB in this experiment is post-cliff. The 50× LLC gap vs Luna (6 MB vs 210 MB) makes the 50 MB DB behave as a large DB on ARM."
+
+---
+Slide 5c — Lab Desktop
+
+No data available yet (RESULTS.md shows all Lab Desktop runs as TBD). Two options:
+
+Option A — skip 5c entirely, present only 5a + 5b, note Lab Desktop pending.
+
+Option B — add a placeholder slide:
+
+Create a slide titled "Thread Scaling — Lab Desktop (Pending)"
+
+Subtitle: Runs blocked — databases not yet transferred from Luna
+
+Show a single centered text box:
+
+"Lab Desktop thread scaling runs are queued.
+Once rsync transfer of databases completes, the same 5-database × 8-thread protocol will be applied.
+Results will fill this slide before final submission."
+
+Below, add a small hardware info box:
+"Machine: Lab Desktop (specs TBD — confirm cores, LLC size, RAM before running)"
+
+---
+Which option do you prefer for 5c? And once you paste 5a/5b into Gamma, let me know how they look and I'll move on to slides 6 (Luna vs Orion cache cliff grouped bar) and 7 (NUMA free win).
+slide 6 additional experiment of huge pod 5(basically merger of all pod5)  vs a small pod5 file 
+I have everything. Here's what the data shows:
+
+Key findings from the 3 new commits:
+- Dorado throughput (sp/s) is bit-for-bit identical whether running 104k or 1.87M reads — GPU is always saturated
+- Kraken2: 17.85× more reads → only 2.52× more wall time at 32T (50 MB DB) — parallelism absorbs the increase
+- LLC miss rate is database-determined, not read-count-determined: same 13% (50MB) and 73-75% (103GB) regardless of input size
+- nsys profiles were skipped on merged — single-file profiles already captured the kernel breakdown
+
+---
+Slide 6 — Gamma Prompt
+
+Create a slide titled "Full Dataset Validation: 1.87M Reads vs Single Pod5"
+
+Subtitle: All 16 FBE pod5 files merged → 1,865,971 reads · Luna L40S · 2026-06-29
+
+Layout: THREE sections stacked or in columns
+
+---
+
+SECTION 1 (TOP) — Dorado GPU Throughput: Constant Regardless of Input Size
+
+Title: "GPU Throughput Is Input-Size-Invariant"
+
+Show a side-by-side grouped bar chart with 3 model groups (fast, hac, sup).
+Each group has 2 bars: "Single pod5 (104,918 reads)" vs "Merged all 16 (1,865,971 reads)"
+Y-axis: Throughput (signal samples/second)
+
+Data:
+| Model | Single pod5 | Merged all 16 |
+|-------|-------------|---------------|
+| fast  | 2.35×10⁸ sp/s  | 2.345×10⁸ sp/s |
+| hac   | 2.03×10⁸ sp/s  | 2.114×10⁸ sp/s |
+| sup   | 1.979×10⁷ sp/s | 1.979×10⁷ sp/s |
+
+Color the two bars in each group the same (single = light shade, merged = dark shade of same color).
+Add a large annotation across the top: "Throughput differs by < 1% — L40S GPU always maximally utilized"
+
+Below the chart show a small wall time table:
+| Model | Single wall time | Merged wall time | Input scale factor |
+|-------|-----------------|-----------------|-------------------|
+| fast  | 33.9s           | 5m 43.5s (343.5s) | 17.85× more reads |
+| hac   | 55.0s           | 6m 21.1s (381.1s) | 17.85× more reads |
+| sup   | 4m 26s (266s)   | 67m 50.8s (4070.8s) | 17.85× more reads |
+
+---
+
+SECTION 2 (MIDDLE) — Kraken2: Sub-Linear Scaling With Read Count
+
+Title: "32-Thread Parallelism Absorbs 17.85× More Reads"
+
+Show a two-panel comparison table with color coding.
+
+Left panel header: "50 MB DB (sample_targeted — fits in LLC)"
+| Model | Wall time | LLC miss% | Classified% |
+|-------|-----------|-----------|-------------|
+| Single hac (104,918 reads) | 4.41s | 14.64% | 84.80% |
+| Merged fast (1,865,971 reads) | 11.11s | 12.60% | 80.67% |
+| Merged hac (1,865,971 reads) | 11.10s | 13.11% | 84.73% |
+| Merged sup (1,865,971 reads) | 12.18s | 12.26% | 85.46% |
+
+Color single row grey (reference). Color fast row blue, hac row green, sup row dark green.
+
+Right panel header: "103 GB DB (pluspf — DRAM-bound)"
+| Model | Wall time (warm) | LLC miss% | Classified% |
+|-------|-----------------|-----------|-------------|
+| Single hac (104,918 reads) | 56.76s | 91.13% | 98.86% |
+| Merged fast (1,865,971 reads) | 89.24s | 75.44% | 96.53% |
+| Merged hac (1,865,971 reads) | 79.97s | 73.73% | 98.83% |
+| Merged sup (1,865,971 reads) | 77.31s | 73.27% | 99.32% |
+
+Color same way as left panel.
+
+---
+
+SECTION 3 (BOTTOM) — Three Callout Boxes Side by Side
+
+Box 1 (GREEN — confirmed):
+"GPU throughput invariant
+L40S processes signal at constant rate: 2.35×10⁸ sp/s (fast) regardless of whether input is 104k or 1.87M reads. Single-file benchmarks are fully representative."
+
+Box 2 (BLUE — key finding):
+"Kraken2 scales sub-linearly
+17.85× more reads → only 2.52× more time (50 MB DB). 32-thread parallelism absorbs the input growth. Per-read cost is NOT constant — it decreases as thread utilization increases."
+
+Box 3 (AMBER — cache behavior):
+"LLC miss rate is DB-driven, not read-driven
+50 MB DB: 13% miss rate (same at 104k and 1.87M reads)
+103 GB DB: 73-75% miss rate (same pattern)
+Cache behavior is determined by database structure, not dataset size."
+
+---
+
+Bottom caption (small text):
+"Single pod5 baseline = pod5_10 (FBE01990_24778b97_03e50f91_10.pod5). Merged = all 16 pod5 files via dorado directory input (pod5 merge v0.3.39 skipped — corrupted zstd blocks). 25 reads in pod5_9 skipped due to pre-existing disk corruption (0.001%)."
+
+---
+A note on the nsys section in the file: The merged_pod5_profiling.md has ??? placeholders for the nsys GPU kernel breakdown — those profiles were intentionally skipped since the single-file profiles already gave us the kernel proportions. If Gamma asks about GPU kernel breakdown, redirect to slide 3 (Dorado GPU profiling) which has the full nsys data from pod5_10. The key new result from slide 6 is the throughput invariance and Kraken2 sub-linear scaling, not new kernel structure.
+
+slide 7 additional experiment dorado cpu vs gpu run time scaling  if possible all 3 fast, hac, sup
+All the data is in dorado_profiling.md. This was partially in slide 3 (kernel breakdown + one speedup bar) but slide 7 can go deeper — the full CPU vs Orion GPU vs Luna GPU comparison across all 3 models with the scaling story. Here's what we have:
+
+┌─────────────────────────┬───────────────┬──────────────────┬────────────────┐
+│                         │     fast      │       hac        │      sup       │
+├─────────────────────────┼───────────────┼──────────────────┼────────────────┤
+│ Luna GPU                │ 33.9s         │ 55.0s            │ 4m 26s (266s)  │
+├─────────────────────────┼───────────────┼──────────────────┼────────────────┤
+│ Orion GPU               │ 6m 44s (404s) │ ~1 day (est.)    │ not run        │
+├─────────────────────────┼───────────────┼──────────────────┼────────────────┤
+│ Luna CPU                │ 9m 40s (580s) │ 43m 26s (2,606s) │ ~9 days (est.) │
+├─────────────────────────┼───────────────┼──────────────────┼────────────────┤
+│ Luna GPU speedup vs CPU │ 28.6×         │ 107×             │ ~3,000×        │
+└─────────────────────────┴───────────────┴──────────────────┴────────────────┘
+
+The key story: as model accuracy increases (fast→hac→sup), the GPU advantage compounds exponentially — CPU gets 1340× slower total, GPU only 7.85× slower.
+
+---
+Slide 7 — Gamma Prompt
+
+Create a slide titled "Dorado Basecalling: CPU vs GPU Runtime Scaling"
+
+Subtitle: Input: pod5_10 (104,918 reads) · Luna 2× L40S · dorado v1.4.0 · models dna_r10.4.1_e8.2_400bps_v5.2.0
+
+Layout: TOP = log-scale bar chart spanning full width | BOTTOM = two panels (table + callouts)
+
+---
+
+TOP SECTION — Bar Chart (full width)
+
+Title: "Wall Time by Model and Device (log scale)"
+
+X-axis: Three groups — "fast (LSTM FP16)", "hac (LSTM large FP16)", "sup (Transformer FP8)"
+Y-axis: Wall time in seconds — LOG SCALE from 10 to 10,000,000
+         Label key tick marks: 10s, 1min (60s), 10min (600s), 1hr (3,600s), 1day (86,400s), 9 days (777,600s)
+
+Three bars per group, colored:
+  - DARK RED  = "Luna CPU (96 cores)"
+  - ORANGE    = "Orion GPU (Ampere iGPU, batch=64)"
+  - GREEN     = "Luna GPU (2× L40S, Ada Lovelace)"
+
+Bar values (in seconds):
+Group 1 — fast:
+  CPU  = 580s  (9m 40s)
+  Orion = 404s (6m 44s)
+  Luna GPU = 33.9s
+
+Group 2 — hac:
+  CPU  = 2,606s  (43m 26s)  ← measured
+  Orion = ~86,400s (1 day)  ← estimated, mark with asterisk *
+  Luna GPU = 55.0s
+
+Group 3 — sup:
+  CPU  = ~777,600s (~9 days)  ← estimated, mark with double asterisk **
+  Orion = not run (N/A bar — show as grey hatched with label "not run")
+  Luna GPU = 266s (4m 26s)
+
+Add speedup annotations floating above each Luna GPU bar:
+  fast: "28.6× vs CPU"
+  hac:  "107× vs CPU"
+  sup:  "~3,000× vs CPU **"
+
+Add a large annotation on the chart: "GPU advantage COMPOUNDS with model complexity"
+Draw a bracket showing fast→sup on the CPU bars labelled "CPU: 1,340× slower" and on GPU bars "GPU: 7.85× slower"
+
+---
+
+BOTTOM LEFT — Scaling Table
+
+Title: "Model-to-Model Slowdown"
+
+| Step | Luna GPU | Luna CPU | CPU penalty growth |
+|------|----------|----------|-------------------|
+| fast → hac | 1.62× slower | 4.5× slower | 2.8× larger penalty |
+| hac → sup  | 4.84× slower | ~298× slower | ~62× larger penalty |
+| fast → sup (total) | 7.85× slower | ~1,340× slower | 171× larger penalty |
+
+Color the CPU penalty growth column red with bold numbers.
+
+Below the table, a note box:
+"Batch sizes: fast GPU=320, hac GPU=2,944, sup GPU=96 (VRAM-limited by Transformer size).
+ Orion GPU capped at batch=64 across all models (unified memory constraint)."
+
+---
+
+BOTTOM RIGHT — Three Callout Boxes
+
+Box 1 (RED — CPU):
+"Why SUP CPU takes ~9 days:
+SUP uses FP8 precision (fp8_e4m3) — natively accelerated by Ada Lovelace tensor cores.
+No CPU architecture supports FP8. Xeon Platinum 8468 falls back to FP32 for every FP8 op.
+Fused GPU kernels (mm_swiglu<fp8> = matmul + SwiGLU in one pass) split into separate CPU operations.
+Result: the GPU→CPU penalty compounds on every architectural improvement."
+
+Box 2 (ORANGE — Orion):
+"Why Orion GPU lags Luna for hac/sup:
+Ampere iGPU (2048 cores) vs Ada Lovelace (18,176 CUDA + 568 tensor cores).
+Batch size capped at 64 (OOM at default) — underutilizes GPU.
+HAC ~1 day on Orion vs 55s on Luna: 1,570× slower for same GPU tier comparison."
+
+Box 3 (GREEN — Luna GPU):
+"Clinical implication:
+SUP model gives 99.3% classification accuracy (vs 84.7% for fast on 50 MB DB).
+On CPU: achieving SUP quality takes ~9 days per run.
+On Luna L40S: 4m 26s.
+GPU is not optional for clinical-grade nanopore diagnostics."
+
+---
+
+Bottom caption (small text):
+"* Orion hac ETA from dorado progress bar at 0% before SSH disconnect — estimate only.
+** SUP CPU: progress bar showed 9d:01h:14m:10s remaining after 12 min — cancelled. Estimate used.
+All Luna GPU runs: cuda:0 + cuda:1 (both L40S active). Throughput: fast=2.35×10⁸ sp/s, hac=2.03×10⁸ sp/s, sup=1.98×10⁷ sp/s."
+
+---
+Two things to note for when you paste this:
+
+1. The ~3,000× estimate for sup is explicitly flagged as estimated (from cancelled CPU run). Don't present it as a measured number — Gamma's caption handles this.
+2. Slide 3 (kernel breakdown) vs Slide 7 (CPU/GPU scaling) — these are complementary: slide 3 shows what the GPU is doing internally, slide 7 shows why the GPU is non-negotiable. No overlap if your audience sees them in order.
+
+slide 8 additional experiment can we do 32 bit hast table entry to 16 bit somehow?
+---
+Slide 8 — Gamma Prompt
+
+Create a slide titled "Cell-Width Reduction: Can We Halve the Hash Table?"
+
+Subtitle: Modified Kraken2 source — CompactHashCell16 + CompactHashCell24 added · ESKAPE 6-genome DB · 1,872,777 reads
+
+Layout: LEFT column (60%) = main data | RIGHT column (40%) = FP mechanism + verdict
+
+---
+
+LEFT — SECTION 1: DB Size vs Cell Width
+
+Title: "Exact 2× size reduction — no other change"
+
+Show a horizontal bar chart or table:
+
+| Cell width | key bits / val bits | hash.k2d size | vs 32-bit |
+|------------|---------------------|---------------|-----------|
+| 32-bit (current) | 26 / 6 | 48.80 MB | 1.00× (baseline) |
+| 24-bit | 18 / 6 | 36.60 MB | 0.75× — 25% smaller |
+| 16-bit | 10 / 6 | 24.40 MB | 0.50× — HALF the size |
+
+Color 32-bit grey, 24-bit amber, 16-bit green.
+Add annotation: "value_bits=6 auto-derived from 35 taxonomy nodes. Size = capacity × cell_bytes exactly."
+
+---
+
+LEFT — SECTION 2: The Accuracy Problem and Solution
+
+Title: "16-bit works — but ONLY with a confidence threshold"
+
+Show a two-panel table side by side:
+
+Panel A — "No threshold (-T 0): 16-bit floods with false positives"
+| Model | 32-bit | 24-bit | 16-bit |
+|-------|--------|--------|--------|
+| fast  | 67.70% | 68.15% (+0.45%) | 88.82% (+21.1%) ← FP FLOOD |
+| hac   | 73.10% | 73.43% (+0.33%) | 90.39% (+17.3%) ← FP FLOOD |
+| sup   | 73.85% | 74.14% (+0.29%) | 90.37% (+16.5%) ← FP FLOOD |
+Color the 16-bit column red.
+
+Panel B — "With threshold (-T 0.05): fully converged"
+| Model | 32-bit | 24-bit | 16-bit |
+|-------|--------|--------|--------|
+| fast  | 53.65% | 53.65% (Δ=0) | 54.27% (+0.62%) |
+| hac   | 61.47% | 61.47% (Δ=0) | 61.76% (+0.29%) |
+| sup   | 62.45% | 62.45% (Δ=0) | 62.78% (+0.33%) |
+Color 24-bit column green (identical). Color 16-bit column amber (close).
+
+Add arrow between panels: "Add -T 0.05 →" with annotation "+21% FP collapses to +0.3-0.6%"
+
+---
+
+RIGHT — SECTION 3: The False Positive Proof
+
+Title: "Cross-phylum inflation proves hash collisions"
+
+Show a table (reads out of 1,872,777):
+
+| Species | 32-bit reads | 16-bit reads | Inflation |
+|---------|-------------|-------------|-----------|
+| P. aeruginosa | 983,897 | 1,061,599 | ×1.08 |
+| K. pneumoniae | 260,236 | 303,565 | ×1.17 |
+| E. cloacae | 116,195 | 194,795 | ×1.68 |
+| A. baumannii | 1,617 | 40,301 | ×25 ← |
+| S. aureus | 902 | 23,877 | ×26 ← |
+| E. faecium | 3 | 21,355 | ×7,118 ← |
+| Unclassified | 504,031 | 187,981 | −316,050 |
+
+Color the E. faecium and S. aureus rows red (bright). Color A. baumannii amber.
+Add red callout box: "E. faecium ×7,118 — this species shares ZERO 31-mers with the Gram-negative bacteria dominating this sample. Pure hash collision proof. All 316k 'new' reads come directly from Unclassified."
+
+Below: small explanation box:
+"Why: key_bits=10 → 1/1024 FP per minimizer lookup. Long reads carry hundreds of minimizers → multiple spurious hits accumulate. -T 0.05 filters them: spurious hits are a tiny fraction of any read's total minimizer set."
+
+---
+
+RIGHT — SECTION 4: Verdict
+
+Title: "The size-vs-safety dial"
+
+Show a 3-row verdict table:
+
+| Width | Size | Threshold? | Drop-in? | Verdict |
+|-------|------|-----------|----------|---------|
+| 32-bit | 48.80 MB | not needed | — | Current baseline |
+| 24-bit | 36.60 MB | not needed | ✓ YES | Best trade-off: 25% smaller, zero change in workflow |
+| 16-bit | 24.40 MB | -T ≥ 0.05 required | with flag | 50% smaller, clinically equivalent after threshold |
+
+Color 24-bit row green. Color 16-bit row amber. Add a callout:
+"Cache impact: 16-bit ESKAPE DB (24.4 MB) sits deeper inside Luna's 210 MB LLC — every k-mer lookup stays in cache. 32-bit (48.80 MB) already pre-cliff; 16-bit improves further."
+
+---
