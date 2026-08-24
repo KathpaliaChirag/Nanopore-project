@@ -41,4 +41,28 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 
 ## Log
 
-*(empty — first entry goes here once S1/B1 work actually starts on Luna)*
+### 2026-08-25 02:39 — Housekeeping: reorganized Luna home into ~/chirag_K/
+**Command:**
+```bash
+mkdir -p ~/chirag_K
+mv ~/AccuracyDrift ~/chirag_K/AccuracyDrift        && ln -s ~/chirag_K/AccuracyDrift ~/AccuracyDrift
+mv ~/data           ~/chirag_K/data                 && ln -s ~/chirag_K/data ~/data
+mv ~/tools          ~/chirag_K/tools                && ln -s ~/chirag_K/tools ~/tools
+mv ~/results        ~/chirag_K/results              && ln -s ~/chirag_K/results ~/results
+mv ~/scripts        ~/chirag_K/scripts              && ln -s ~/chirag_K/scripts ~/scripts
+mv ~/Documents      ~/chirag_K/Documents            && ln -s ~/chirag_K/Documents ~/Documents
+mv ~/matmul         ~/chirag_K/matmul               && ln -s ~/chirag_K/matmul ~/matmul
+mv ~/matmul_gpu     ~/chirag_K/matmul_gpu           && ln -s ~/chirag_K/matmul_gpu ~/matmul_gpu
+mv ~/perf.data      ~/chirag_K/perf.data            && ln -s ~/chirag_K/perf.data ~/perf.data
+mv ~/kraken_runs_small.tar.gz ~/chirag_K/kraken_runs_small.tar.gz && ln -s ~/chirag_K/kraken_runs_small.tar.gz ~/kraken_runs_small.tar.gz
+mv ~/runs_txt_only.tar.gz     ~/chirag_K/runs_txt_only.tar.gz     && ln -s ~/chirag_K/runs_txt_only.tar.gz ~/runs_txt_only.tar.gz
+mv ~/cuda-keyring_1.1-1_all.deb ~/chirag_K/cuda-keyring_1.1-1_all.deb && ln -s ~/chirag_K/cuda-keyring_1.1-1_all.deb ~/cuda-keyring_1.1-1_all.deb
+mv ~/headers.txt    ~/chirag_K/headers.txt          && ln -s ~/chirag_K/headers.txt ~/headers.txt
+mv ~/mapped.txt     ~/chirag_K/mapped.txt           && ln -s ~/chirag_K/mapped.txt ~/mapped.txt
+mv "$HOME/dna_r10.4.1_e8.2_400bps_fast@v5.2.0" ~/chirag_K/ && ln -s "$HOME/chirag_K/dna_r10.4.1_e8.2_400bps_fast@v5.2.0" "$HOME/dna_r10.4.1_e8.2_400bps_fast@v5.2.0"
+mv "$HOME/dna_r10.4.1_e8.2_400bps_hac@v5.2.0"  ~/chirag_K/ && ln -s "$HOME/chirag_K/dna_r10.4.1_e8.2_400bps_hac@v5.2.0" "$HOME/dna_r10.4.1_e8.2_400bps_hac@v5.2.0"
+mv "$HOME/dna_r10.4.1_e8.2_400bps_sup@v5.2.0"  ~/chirag_K/ && ln -s "$HOME/chirag_K/dna_r10.4.1_e8.2_400bps_sup@v5.2.0" "$HOME/dna_r10.4.1_e8.2_400bps_sup@v5.2.0"
+```
+**Why:** Luna's `student` account is shared with at least one labmate (`rohit`); before starting the fresh-clone + benchmark work for this paper push, moved everything that's ours into one folder for clarity, without breaking any existing path. Chose move+symlink over a full move specifically so every hardcoded path in CLAUDE.md/week5plan.md/scripts (`~/tools/...`, `~/AccuracyDrift/databases/...`, `~/data/basecalled/...`) keeps working unchanged.
+**Input → Output:** each `mv` relocates one top-level item into `~/chirag_K/`; each `ln -s` immediately after recreates the old name as a symlink pointing into the new location, so every existing absolute-path reference still resolves to the same file, just via one extra hop.
+**Result:** all 16 items moved successfully — `ls -la ~` confirms every symlink resolves correctly into `~/chirag_K/...`. `rohit/`, `snap/`, and `iitd-login.py` deliberately left untouched (not ours / needed at top level). `du -sh` beforehand measured our footprint at ~312G total (AccuracyDrift 143G, data 111G, results 52G, tools 5.7G, rest <1G combined) out of 750G used / 938G disk. Surfaced several previously-hidden dotfile directories worth checking for cleanup: 4× `.tmp_pod5_v3_v4_migration_*`, `.temp_dorado_model-e5a4d564d3600e14`, `.debug`, `snn` — sizes not yet checked, nothing deleted yet.
