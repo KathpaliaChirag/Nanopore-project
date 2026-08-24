@@ -18,6 +18,10 @@ reports/                    <- status reports at the whole-project level: SUMMER
 planning/                   <- weekly plans, idea catalogs, and standalone research notes: plan_2026-07-25.md,
                                 mtpweekNplan.md / mtpweekN.md, idea_week2.md, week3_*.md, week4plan.md.
 presentations/               <- root-level slide decks and presentation source material (week3_deck.html, JUNE.md.txt).
+plan_paper/                  <- created 2026-08-24: where the actual Sept 13 paper-push build work happens
+                                (cache/bitmask/cell-width code and data as it's produced) plus command_log.md,
+                                the running receipt of every command actually run - planning/weekNplan.md is
+                                the plan, plan_paper/command_log.md is what really happened.
 dorado-kraken-research/      <- CURRENT FOCUS (as of 2026-07-25): Dorado (GPU basecaller) + Kraken2 (CPU
                                 k-mer classifier) profiling and optimisation, now extending into two thesis
                                 directions per Kolin sir - see "Project purpose (current)" below.
