@@ -116,3 +116,44 @@ grep -n "MMK" src/classify.cc
 **Why:** user explicitly chose to build on current upstream (v2.17.1) instead of the v2.1.3 pin week5plan.md had planned, after being shown the tradeoff (breaks comparability with the existing 4.405s baseline and the cell-width report, since v2.1.4 rewrote the FASTA/Q parser in the exact hot path this project profiles). Decision made knowingly, not a default.
 **Input → Output:** `git fetch --tags` pulls any new tags from upstream; `git tag --sort=-creatordate` lists them newest-first, confirming `v2.17.1` really is the latest release (not just trusting earlier research); `git checkout v2.17.1` moves the same clone's HEAD to that tag.
 **Result:** confirmed `v2.17.1` is genuinely the latest tag (`v2.17.1`, `v2.17`, `v2.1.6`, `v2.1.5`, `v2.14` in that order). Checked out clean — HEAD now at `5e2aa928d00b96d61f204d517437637863da1d8c`, dated 2025-11-24, matching the expected v2.17.1 release date. `grep -n "MMK"` still printed nothing. **Consequence:** S0's baseline needs to be re-measured on this tree before any S1-S3 number means anything — the old 4.405s figure was v2.1.3-specific.
+
+### 2026-08-25 20:15 — Built kraken2-fresh-bin, re-measured S0 as a 3-DB × 5-thread sweep
+**Command:**
+```bash
+./install_kraken2.sh ~/tools/kraken2-fresh-bin
+
+for db in sample_targeted standard_8gb pluspf_103gb; do
+  for t in 1 16 32 64 96; do
+    echo "=== DB=$db THREADS=$t ==="
+    perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+      numactl --cpunodebind=0 --membind=0 \
+      ~/tools/kraken2-fresh-bin/kraken2 --db ~/AccuracyDrift/databases/$db \
+      --threads $t --output /dev/null --report /dev/null \
+      ~/data/basecalled/hac/FBE01990_24778b97_03e50f91_15.fastq 2>&1
+    echo ""
+  done
+done | tee ~/s0_sweep_v2.17.1.txt
+```
+**Why:** week5plan.md Step 2's build, then a re-measurement of S0 on v2.17.1 (required — the old 4.405s number was v2.1.3-specific). User expanded scope from the plan's single 32T/sample_targeted number to a 3-DB × 5-thread sweep, 1 run per cell (not the plan's usual 5-run/CV/CI treatment — a deliberate, lighter-weight exploratory pass, not this week's final statistically-validated S0).
+**Input → Output:** `install_kraken2.sh` compiles the v2.17.1 tree into `~/tools/kraken2-fresh-bin/{kraken2,kraken2-build,kraken2-inspect,...}` (build was clean, only benign `-Wsign-compare`/unused-variable warnings, no errors). The sweep then runs the standard profiling command across all 15 (DB × thread-count) combinations against the same `_15.fastq` input, saving raw output to `~/s0_sweep_v2.17.1.txt`.
+**Result:** all 15 runs completed. Full table:
+
+| DB | Threads | Elapsed | Cache-miss % | LLC-miss % | IPC |
+|---|---|---|---|---|---|
+| sample_targeted (50MB) | 1 | 5.110s | 6.92% | 8.26% | 1.98 |
+| sample_targeted (50MB) | 16 | 0.556s | 13.66% | 12.21% | 1.85 |
+| sample_targeted (50MB) | 32 | 0.576s | 14.85% | 12.65% | 1.75 |
+| sample_targeted (50MB) | 64 | 0.569s | 15.38% | 13.07% | 1.57 |
+| sample_targeted (50MB) | 96 | 0.597s | 15.26% | 12.96% | 1.23 |
+| standard_8gb (7.6GB) | 1 | 7.208s | 88.85% | 88.22% | 1.82 |
+| standard_8gb (7.6GB) | 16 | 4.226s | 92.85% | 90.01% | 1.70 |
+| standard_8gb (7.6GB) | 32 | 4.233s | 93.18% | 90.47% | 1.65 |
+| standard_8gb (7.6GB) | 64 | 4.259s | 92.59% | 89.68% | 1.52 |
+| standard_8gb (7.6GB) | 96 | 4.318s | 92.32% | 89.27% | 1.30 |
+| pluspf_103gb (103.4GB) | 1 | 78.459s | 90.18% | 85.52% | 1.14 |
+| pluspf_103gb (103.4GB) | 16 | 54.511s | 95.35% | 93.85% | 1.09 |
+| pluspf_103gb (103.4GB) | 32 | 51.897s | 96.45% | 95.59% | 1.08 |
+| pluspf_103gb (103.4GB) | 64 | 51.814s | 96.43% | 95.55% | 1.07 |
+| pluspf_103gb (103.4GB) | 96 | 52.150s | 96.40% | 95.49% | 1.04 |
+
+The `sample_targeted` × 32T row (0.576s) is the direct v2.17.1 successor to the old v2.1.3 4.405s figure — that's this week's S0 anchor for S1-S3 comparisons at the plan's standard 32T config. 32T-64T holds up as the practical sweet spot across both larger DBs on v2.17.1 too (matches the original v2.1.3-era finding); 96T is measurably worse everywhere (IPC drops steadily with thread count past the sweet spot). `pluspf_103gb` at 1 thread pays a ~78s DB-load penalty vs ~52s at 32T+, since loading isn't thread-parallelized. **Caveat:** single run per cell, no CV/variance check — treat as directional, not a citable final number, until re-run with the plan's normal 5-run treatment if these need to go in the paper.
