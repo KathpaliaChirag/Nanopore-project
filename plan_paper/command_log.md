@@ -157,3 +157,15 @@ done | tee ~/s0_sweep_v2.17.1.txt
 | pluspf_103gb (103.4GB) | 96 | 52.150s | 96.40% | 95.49% | 1.04 |
 
 The `sample_targeted` × 32T row (0.576s) is the direct v2.17.1 successor to the old v2.1.3 4.405s figure — that's this week's S0 anchor for S1-S3 comparisons at the plan's standard 32T config. 32T-64T holds up as the practical sweet spot across both larger DBs on v2.17.1 too (matches the original v2.1.3-era finding); 96T is measurably worse everywhere (IPC drops steadily with thread count past the sweet spot). `pluspf_103gb` at 1 thread pays a ~78s DB-load penalty vs ~52s at 32T+, since loading isn't thread-parallelized. **Caveat:** single run per cell, no CV/variance check — treat as directional, not a citable final number, until re-run with the plan's normal 5-run treatment if these need to go in the paper.
+
+### 2026-08-25 — S1.1 investigation: located the Get() call site and existing cache behavior
+**Command:**
+```bash
+cd ~/tools/kraken2-src-fresh/src
+grep -n "\.Get(\|->Get(" classify.cc
+sed -n '760,820p' classify.cc
+sed -n '745,764p' classify.cc
+grep -n "omp parallel\|ClassifySequence\|ProcessFiles" classify.cc | head -20
+```
+**Why:** S1.1 needs a thread-local single-slot cache in front of `CompactHashTable::Get()` (96.24% of all LLC misses per this project's own profiling, despite being 0.65% of instructions). Before writing any code, needed to find the real call site, its surrounding types/loop structure, and confirm the calling function actually runs inside a persistent OpenMP worker thread — required for a `thread_local` variable to behave the way S1 needs (one real slot per worker thread across many reads, not something that resets or gets shared unexpectedly).
+**Result:** one call site, `classify.cc:803`, inside `ClassifySequence()` (line 757), called once per read (per mate, per translated-search frame). **Key finding: stock Kraken2 already has a same-adjacent-minimizer cache** — `last_minimizer`/`last_taxon`, function-local variables reset every call — that skips `Get()` only when the current minimizer is identical to the *immediately preceding* one. It has zero memory across reads (reset every `ClassifySequence` call) and zero memory once a different minimizer interrupts a repeat streak. Confirmed `ClassifySequence` is called (`classify.cc:563,568`) from inside `#pragma omp parallel` (`classify.cc:484`, in `ProcessFiles`) — each OpenMP worker thread does call it repeatedly across many reads, so a `thread_local` variable here is safe and meaningful. **S1.1's actual scope, now well-defined:** promote `last_minimizer`/`last_taxon` from function-local to `thread_local` storage at file scope, remove the per-call reset — same comparison logic, but now remembers across reads/mates/frames on the same thread instead of just the immediately-previous minimizer.
