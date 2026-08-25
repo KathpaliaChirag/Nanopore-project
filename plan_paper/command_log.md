@@ -182,3 +182,16 @@ grep -n "omp parallel\|ClassifySequence\|ProcessFiles" classify.cc | head -20
 **Result (controlled):** all cells came back with low CV% (mostly <2%, worst case 4.66%, all within the plan's ≤5% "trust the mean" threshold) — this data is trustworthy. **The page-cache artifact vanished**: `pluspf_103gb` T=1 is now S0=62.03s vs S1=61.95s (0.1% difference, noise). **`standard_8gb`'s earlier LLC-miss "improvement" also washed out** — now flat between S0/S1 at every thread count (differences under 0.7pp, no consistent direction). **Honest conclusion: on `standard_8gb` and `pluspf_103gb` (the two DBs where `Get()` is genuinely expensive, 88-96% cache-miss rate), S1.1 produces no measurable difference** — LLC-miss% statistically flat, elapsed time within ~2% either way, all noise-level. `sample_targeted` shows a real, low-CV 5-13% wall-clock speedup at 16T-96T, but with no corresponding change in cache-miss metrics (under 0.3pp) — the cause is unclear and not claimed to be a caching effect.
 
 **Why this is still a useful result, not a failed step:** a single cache slot's odds of matching the *next* lookup shrink toward zero as the number of distinct minimizers in the database grows into the millions (`standard_8gb`/`pluspf_103gb`) — this is real evidence, not assumption, that S1's one-slot design has a real ceiling, and gives S2 (sir's required 4-way associative cache, 4 remembered slots instead of 1) a concrete, evidenced reason to exist as the next step rather than a redundant one.
+
+### 2026-08-25 — S1.1/S1.2 committed and tagged in kraken2-src-fresh; ledger updated
+**Command:**
+```bash
+cd ~/tools/kraken2-src-fresh
+git config user.name "Chirag Kathpalia"      # local to this repo only - shared Luna account
+git config user.email "chiragkathpalia1@gmail.com"
+git add src/classify.cc
+git commit -m "S1.1: promote same-adjacent-minimizer cache to thread_local"
+git tag safe/S1.2
+```
+**Why:** `kraken2-src-fresh` is its own git repo (separate history from this Nanopore-project repo) — the patch had only existed as an uncommitted working-tree edit until now. The plan's own fallback framework calls for a real, tagged commit per Measured sub-step so there's always a findable "last known-good state" to return to, not just a file backup.
+**Result:** first commit attempt failed ("Author identity unknown" — no git identity configured on this account yet); the `git tag safe/S1.2` line right after it still ran anyway (not `&&`-chained), tagging the *wrong* commit (the pre-patch `v2.17.1` checkout, `5e2aa928...`). Caught via `git log -1 safe/S1.2` before it could cause confusion later. Fixed: set `user.name`/`user.email` locally (not `--global`, since `student` is a shared account), re-ran the commit successfully (`fbf993d9ee204850622a2365af52f6db4e870e8f`), deleted the stale tag, re-tagged `safe/S1.2` pointing at the real commit, verified with `git log -1 safe/S1.2 --format='%H %s'`. `planning/week4plan.md`'s safe-zone ledger updated: S1/S1.1/S1.2 all marked 🔵 done, with the real commit hash and the honest S1.2 result (no measurable benefit on `standard_8gb`/`pluspf_103gb`, unexplained modest speedup on `sample_targeted` only) recorded in the ledger cell, pointing back to this log for full detail.

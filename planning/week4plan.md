@@ -406,9 +406,9 @@ Every row below gets its commit hash filled in the moment that sub-step's push h
 | Step | Type | What it is | Safe-zone commit | Status |
 |---|---|---|---|---|
 | **S0** | Top-level | Clean baseline | *(already on record — 4.405s)* | 🔵 done |
-| **S1** | Top-level | Single-slot cache | *(see sub-steps)* | ⬜ not started |
-| ↳ S1.1 | Design | Implement the slot | _fill in_ | ⬜ not started |
-| ↳ S1.2 | Measured | Benchmark | _fill in_ | ⬜ not started |
+| **S1** | Top-level | Single-slot cache | *(see sub-steps)* | 🔵 done |
+| ↳ S1.1 | Design | Implement the slot | `fbf993d` on `v2.17.1` (kraken2-src-fresh) | 🔵 done |
+| ↳ S1.2 | Measured | Benchmark | `fbf993d` (`safe/S1.2`) — no measurable diff vs S0 on `standard_8gb`/`pluspf_103gb` (3-run avg, CV<5%); modest unexplained speedup on `sample_targeted` only. Full data: `plan_paper/command_log.md` | 🔵 done |
 | **S2** | Top-level | 4-way set-associative | *(see sub-steps)* | ⬜ not started |
 | ↳ S2.1 | Design | Set-index function | _fill in_ | ⬜ not started |
 | ↳ S2.2 | Design | 4-way compare-and-select | _fill in_ | ⬜ not started |
