@@ -102,3 +102,17 @@ grep -n "MMK" src/classify.cc
 **Why:** week5plan.md's Fresh Build Step 2 — a genuinely clean Kraken2 tree, separate from the already-patched `~/tools/kraken2-src`, pinned to v2.1.3 to stay comparable with the existing 4.405s baseline and the cell-width report's numbers.
 **Input → Output:** clones upstream Kraken2's full git history into `~/tools/kraken2-src-fresh` (resolves through the `~/tools` symlink into `~/chirag_K/tools/kraken2-src-fresh`), then moves that tree's HEAD to the exact `v2.1.3` release tag.
 **Result:** clone succeeded on the first retry-loop attempt (no timeout hit this time). `git checkout v2.1.3` landed at commit `8f82a7ded7816c7ceed5086598b2979f80c970d8`, dated 2023-06-06, recorded in `kraken2-src-fresh/PROVENANCE.txt`. `grep -n "MMK" src/classify.cc` printed nothing — tree confirmed clean, no leftover patch code.
+
+### 2026-08-25 19:45 — Switched fresh clone to latest (v2.17.1), reversing the v2.1.3 plan
+**Command:**
+```bash
+git fetch --tags
+git tag --sort=-creatordate | head -5
+git checkout v2.17.1
+git log -1 --format='%H %ci' > PROVENANCE.txt
+cat PROVENANCE.txt
+grep -n "MMK" src/classify.cc
+```
+**Why:** user explicitly chose to build on current upstream (v2.17.1) instead of the v2.1.3 pin week5plan.md had planned, after being shown the tradeoff (breaks comparability with the existing 4.405s baseline and the cell-width report, since v2.1.4 rewrote the FASTA/Q parser in the exact hot path this project profiles). Decision made knowingly, not a default.
+**Input → Output:** `git fetch --tags` pulls any new tags from upstream; `git tag --sort=-creatordate` lists them newest-first, confirming `v2.17.1` really is the latest release (not just trusting earlier research); `git checkout v2.17.1` moves the same clone's HEAD to that tag.
+**Result:** confirmed `v2.17.1` is genuinely the latest tag (`v2.17.1`, `v2.17`, `v2.1.6`, `v2.1.5`, `v2.14` in that order). Checked out clean — HEAD now at `5e2aa928d00b96d61f204d517437637863da1d8c`, dated 2025-11-24, matching the expected v2.17.1 release date. `grep -n "MMK"` still printed nothing. **Consequence:** S0's baseline needs to be re-measured on this tree before any S1-S3 number means anything — the old 4.405s figure was v2.1.3-specific.

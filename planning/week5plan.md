@@ -42,7 +42,7 @@ Build order is still the same strict chain from week4plan.md's own flowchart: S0
 Do this first because it's the cheapest possible sanity check on the whole cache-check code path before sir's actual baseline (S2) goes in on top of it.
 
 - **S1.1 (Design).** Add a thread-local key+result slot ahead of the big hash table, with check-then-overwrite logic on every lookup. Before calling this done: verify the slot is genuinely per-thread — a race or a stale cross-thread hit here corrupts every measurement downstream of it, so fix it before S1.2 runs a single benchmark.
-- **S1.2 (Measured).** Run the standard profiling command (same `perf stat` + `numactl --cpunodebind=0 --membind=0` + `kraken2 --threads 32` invocation week4plan.md's Step 0 used) against S1.1's build. Log the result next to the existing 4.405s baseline.
+- **S1.2 (Measured).** Run the standard profiling command (same `perf stat` + `numactl --cpunodebind=0 --membind=0` + `kraken2 --threads 32` invocation week4plan.md's Step 0 used) against S1.1's build. Log the result next to the freshly re-measured S0 baseline on `v2.17.1` (see "S0 had to be re-measured after all," below — the old 4.405s number was v2.1.3-specific and no longer applies).
   - **If S1 is stuck:** skip straight to S2.1 and log S1 as "not measured" in the ledger. S2 does not depend on S1 landing — this is week4plan.md's own explicit carve-out, not an improvised shortcut.
 
 ### S2 — 4-way set-associative (4 sub-steps, 🟡 SIR ASKED — his literal baseline)
@@ -83,21 +83,22 @@ Worth flagging now anyway, before S4 is live work: **S4's own fallback in week4p
 
 Nothing about S4 needs to be built, decided, or even fully re-read this week. This is a one-paragraph flag, not a task.
 
-### S1-S3 do not mean rebuilding S0
+### S0 had to be re-measured after all — here's why
 
-If this week's fresh-clone effort (see below) gets read as "start over," push back on that reading directly: **S0 is done.** It's in the safe-zone ledger already — `*(already on record — 4.405s)*`, 🔵 done, not `_fill in_` like every other row. week4plan.md's own Step 0 section describes it as "no code touched yet" — the unmodified-Kraken2 measurement, not a step S1-S3 need to redo.
+The original reasoning here was "S0 is done, don't rebuild it" — true as long as S1-S3 stayed on `v2.1.3`, since the existing `*(already on record — 4.405s)*` figure was measured on that exact version. That assumption broke on 2026-08-25: partway through this week's execution, the decision was made to build the fresh clone against **current upstream (`v2.17.1`) instead of `v2.1.3`** (see "Fresh Build + Test Matrix" below for the full reasoning and tradeoff). `v2.1.4` rewrote the FASTA/Q parser (kseq) in the middle of Kraken2's ingestion path, so the 4.405s number cannot be assumed to still hold on `v2.17.1` — it needs re-measuring, not reused.
 
-What S1-S3 reuse from S0, unchanged:
-- **The comparison anchor.** 4.405s is still the number every S1-S3 benchmark logs against.
-- **The profiling command itself.** Same invocation, same DB, same thread count — deliberately unchanged so every step in this plan stays comparable to every other one.
-- **The fallback framework, the safe-zone/tag discipline, the 5-run/CV/CI treatment.** None of that is tied to a specific source tree.
+**What this actually changes:** one extra required step, not a bigger rewrite. Before S1.2 logs its first benchmark, run the exact same standard profiling command from week4plan.md's Step 0 — unchanged invocation, same `sample_targeted` DB, same thread count, same 5-run/CV/CI treatment — against the freshly-built `kraken2-fresh-bin` binary on `v2.17.1`, and log that result as this week's real S0 anchor. Call it out explicitly as re-measured (not the old 4.405s) wherever it's cited, so nobody downstream mistakes it for a v2.1.3 number.
+
+What S1-S3 still reuse from the original S0 unchanged, despite the version switch:
+- **The profiling command itself.** Same invocation, same DB, same thread count — the number changes, the method doesn't.
+- **The fallback framework, the safe-zone/tag discipline, the 5-run/CV/CI treatment.** None of that is tied to a specific source tree or Kraken2 version.
 
 What genuinely does need a clean slate: **only the source tree the new cache code gets written into**, and only because `~/tools/kraken2-src` already carries an applied optimization patch, including a thread-local k-mer cache installed directly in `classify.cc`. Writing S1's thread-local single-slot cache on top of a tree that already has a different thread-local cache wired into the same hot path would confound the two — any S1/S2/S3 number measured there would reflect old-patch-plus-new-cache, not the new cache alone, breaking the "one change per step" discipline the whole fallback framework depends on.
 
 ### Where S1 attaches to the fresh clone
 
 1. **S1's code goes into the fresh clone, not `~/tools/kraken2-src`.** Confirm it's clean (`grep -n "MMK" src/classify.cc` should come back empty), then start S1.1 there.
-2. **Pin the clone to the `v2.1.3` tag** — the 4.405s baseline was measured on v2.1.3, and every other historical number in this repo (cell-width report, 2026-08-03 patch remeasurement) was too. See "Fresh Build + Test Matrix" below for the exact clone/checkout commands and the full reasoning for pinning v2.1.3 over current upstream.
+2. **Pinned to current upstream (`v2.17.1`), not `v2.1.3`.** week5plan.md originally planned to pin v2.1.3 for comparability with the existing 4.405s baseline and cell-width report; that decision was explicitly reversed on 2026-08-25 in favor of building on latest. See "Fresh Build + Test Matrix" below for the exact commands, the full tradeoff, and the consequence (S0 needed re-measuring on the new version).
 
 > [!WARNING]
 > The clone itself needs Luna's proxy/tmux setup active first — without it, `git clone` against GitHub hangs rather than failing outright.
@@ -170,16 +171,20 @@ grep -i proxy ~/.bashrc
 curl -sI https://github.com
 ```
 
-### Step 2 — Fresh clone, into a third directory, pinned to v2.1.3
+### Step 2 — Fresh clone, into a third directory, pinned to current upstream (v2.17.1)
 
-Decision: **pin `v2.1.3`**, not `master` and not current stable. As of today (2026-08-23), v2.1.3 is three years old and five releases behind upstream — current is **v2.17.1, released 2025-11-24**. That gap isn't cosmetic: **v2.1.4 (2025-02-17) replaced the FASTA/Q parser with kseq**, a rewrite of the ingestion path this project's own patch work sits directly downstream of (this project already found a single I/O flag, `-M`, swings wall-clock 12-14x on large DBs, so parser-level changes are not a safe-to-ignore category here). Pin anyway. The 4.405s baseline, the cell-width report's 1,728-run cross-hardware sweep, and the 2026-08-03 patch remeasurement (48 cells) are all built against v2.1.3, and `kraken2_opt_v1.patch` itself was hand-written against v2.1.3's `classify.cc`; re-baselining now would put a question mark over every existing number in the repo and turn re-applying the patch into a second engineering effort three weeks from the deadline. What this week's S1-S3/B1 numbers need is internal comparability against that existing chain, not currency with upstream — so pin `v2.1.3`, and treat the five-release gap as a disclosed tradeoff (see open question 5), not an oversight.
+**Original decision (superseded 2026-08-25):** this section originally planned to pin `v2.1.3` for comparability with the existing 4.405s baseline, the cell-width report's 1,728-run sweep, and the 2026-08-03 patch remeasurement — all measured on that version, with `v2.1.4`'s FASTA/Q parser rewrite (kseq) flagged as a real risk to re-baselining. That reasoning was sound and is preserved here for context, but the user explicitly chose to build on current upstream instead, after being shown the tradeoff. **Actual decision: pin `v2.17.1`** (confirmed the real latest tag live via `git tag --sort=-creatordate`, not assumed from prior research).
+
+**Consequence, paid immediately:** S0 needed re-measuring on this version before any S1 number means anything — see "S0 had to be re-measured after all" in the Track A section above. The existing cell-width report and 2026-08-03 patch remeasurement remain v2.1.3-only results; this fresh clone and everything built on it going forward is v2.17.1. Open question 5 below covers whether the paper needs to address this version split explicitly.
 
 ```bash
 mkdir -p ~/tools
 cd ~/tools
 git clone https://github.com/DerrickWood/kraken2.git kraken2-src-fresh
 cd kraken2-src-fresh
-git checkout v2.1.3
+git fetch --tags
+git tag --sort=-creatordate | head -5   # confirm the real latest tag live, don't assume
+git checkout v2.17.1
 git log -1 --format='%H %ci' > ~/tools/kraken2-src-fresh/PROVENANCE.txt
 cat ~/tools/kraken2-src-fresh/PROVENANCE.txt
 
@@ -187,6 +192,13 @@ grep -n "MMK" src/classify.cc
 # expect: no output. If it matches, this isn't actually a fresh tree — stop and investigate.
 
 ./install_kraken2.sh ~/tools/kraken2-fresh-bin
+
+# re-measure S0 on this version before S1.2 runs — same standard profiling command as week4plan.md's Step 0:
+perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
+  numactl --cpunodebind=0 --membind=0 \
+  ~/tools/kraken2-fresh-bin/kraken2 --db ~/AccuracyDrift/databases/sample_targeted \
+  --threads 32 --output /dev/null --report /dev/null \
+  ~/data/basecalled/hac/FBE01990_24778b97_03e50f91_15.fastq
 ```
 
 Binary lives at `~/tools/kraken2-fresh-bin/kraken2` — not `~/tools/kraken2/` or `~/tools/kraken2-pg/`.
@@ -278,7 +290,7 @@ Rule 4 matters most this week: **blocked steps get swapped, not stalled on.** Wi
 2. **Does sir know `eskape_650mb` and `eskape_human_4gb` are gone, and does the bitmask cell need them rebuilt to validate against?** The bitmask cell is framed around the ESKAPE panel; if it needs the real ESKAPE DBs rather than the surviving general-purpose ones, that's a multi-hour rebuild that already hit a hard genome-download ceiling once — needs scheduling, not late discovery.
 3. **Does the Interleaved Bloom Filter prior art change how the bitmask cell should be scoped or framed in the paper?** The differentiation is defensible but changes the related-work framing and possibly the abstract's novelty claim — sir should see this before a full draft exists.
 4. **Does week4plan.md's week 4→10 schedule need explicit re-negotiation now, given the Sept 13 date — and specifically, should S5 (Track A, organism-blocked partitioning) and B1b (Track B, bucket placement) be cut?** Per the rebuttal above, the schedule was paced against "no calendar deadline" and already runs past Sept 13 even without slippage. S5 and B1b are the concrete candidates on the table, not an abstract "does the schedule need help" — week4plan.md's own fallback framework already names them first-to-cut under time pressure ("if it slips... cut S5's and B1b's sub-steps first"), and this week is the first real data point on whether that pressure has actually arrived. This plan isn't recommending the cut — this week's ledger stays S1-S3 and B1 — it's making explicit that these two steps specifically are what's on the table if compression turns out to be needed. Whether to cut S5/B1b, compress elsewhere, or move the target instead is sir's decision.
-5. **Does the paper submission need an explicit version-caveat noting results are measured against Kraken2 v2.1.3, not current v2.17.1?** The gap is five releases (v2.1.3 → v2.17.1, three years to nine months), and it includes a parser rewrite (v2.1.4, kseq) touching the ingestion path adjacent to this project's own patch work — large enough that a reviewer familiar with Kraken2 could reasonably ask why the baseline is three years stale. Pinning v2.1.3 this week is still the right call for internal comparability (see the fresh-build section above), but whether the paper needs a footnote disclosing the version gap — or a spot-check confirming v2.17.1 doesn't move the baseline materially — is a submission-readiness call for sir to make with the Sept 13 date in view.
+5. **Does the paper submission need an explicit version-caveat now that the fresh cache/hashing work (v2.17.1) and the already-published cell-width report (v2.1.3) sit on different Kraken2 versions?** The plan originally intended to pin v2.1.3 specifically to avoid this split; that decision was reversed on 2026-08-25 in favor of building on current upstream instead. The gap between the two versions is five releases (v2.1.3 → v2.17.1, three years to nine months) and includes a parser rewrite (v2.1.4, kseq) touching the ingestion path — large enough that a reviewer familiar with Kraken2 could reasonably ask whether the cell-width numbers still hold on the version everything else is measured against. Whether the paper needs a footnote disclosing the split, or whether the cell-width results should be spot-checked against v2.17.1 before Sept 13, is a submission-readiness call for sir to make.
 
 ### What Wednesday actually needs to show
 
