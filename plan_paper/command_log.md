@@ -66,3 +66,39 @@ mv "$HOME/dna_r10.4.1_e8.2_400bps_sup@v5.2.0"  ~/chirag_K/ && ln -s "$HOME/chira
 **Why:** Luna's `student` account is shared with at least one labmate (`rohit`); before starting the fresh-clone + benchmark work for this paper push, moved everything that's ours into one folder for clarity, without breaking any existing path. Chose move+symlink over a full move specifically so every hardcoded path in CLAUDE.md/week5plan.md/scripts (`~/tools/...`, `~/AccuracyDrift/databases/...`, `~/data/basecalled/...`) keeps working unchanged.
 **Input → Output:** each `mv` relocates one top-level item into `~/chirag_K/`; each `ln -s` immediately after recreates the old name as a symlink pointing into the new location, so every existing absolute-path reference still resolves to the same file, just via one extra hop.
 **Result:** all 16 items moved successfully — `ls -la ~` confirms every symlink resolves correctly into `~/chirag_K/...`. `rohit/`, `snap/`, and `iitd-login.py` deliberately left untouched (not ours / needed at top level). `du -sh` beforehand measured our footprint at ~312G total (AccuracyDrift 143G, data 111G, results 52G, tools 5.7G, rest <1G combined) out of 750G used / 938G disk. Surfaced several previously-hidden dotfile directories worth checking for cleanup: 4× `.tmp_pod5_v3_v4_migration_*`, `.temp_dorado_model-e5a4d564d3600e14`, `.debug`, `snn` — sizes not yet checked, nothing deleted yet.
+
+### 2026-08-25 04:36 — Luna proxy login troubleshooting (fresh-build Step 1)
+**Command:**
+```bash
+tmux new -s <session>
+unset http_proxy https_proxy HTTP_proxy HTTPS_proxy   # inside the tmux pane, before login
+python3 ~/iitd-login.py -d
+# then, back in the normal shell:
+export HTTP_proxy=http://proxy62.iitd.ac.in:3128
+export HTTPS_proxy=http://proxy62.iitd.ac.in:3128
+export https_proxy=http://proxy62.iitd.ac.in:3128
+export http_proxy=http://proxy62.iitd.ac.in:3128
+```
+**Why:** week5plan.md's Fresh Build Step 1 — needed working outbound internet before `git clone` would work.
+**Result:** two real problems found and fixed, not user error alone:
+1. The four proxy `export` lines are already baked into `~/.bashrc` from an earlier session, so every *new* shell (including a fresh tmux pane) auto-loads them at startup. This meant `env -u http_proxy ... python3 ~/iitd-login.py -d` wasn't actually running login proxy-free — the login request looped back through the proxy to itself, which the login CGI correctly rejects ("You can't login from a proxy server ip..."). Fixed by explicit `unset` of all four vars inside the shell before running login, not just `env -u` on the one child process.
+2. Once login genuinely succeeded, the authenticated session only stays alive for **~100 seconds**, then expires for ~100 seconds before the daemon (`-d` flag) auto-relogs — so roughly half the time, any request will hang/timeout through no fault of the command itself. Worked around by retrying the actual operation (not just a connectivity probe) in a loop with a short sleep, until one attempt lands in a live window, rather than trying to time it manually. Worth flagging to whoever maintains `iitd-login.py`/the proxy if this keeps happening — a ~100s session lifetime is unusually short.
+
+### 2026-08-25 19:32 — Fresh clone of Kraken2, pinned to v2.1.3 (fresh-build Step 2)
+**Command:**
+```bash
+cd ~/tools
+for i in $(seq 1 30); do
+  rm -rf kraken2-src-fresh
+  git clone https://github.com/DerrickWood/kraken2.git kraken2-src-fresh && break
+  sleep 5
+done
+cd kraken2-src-fresh
+git checkout v2.1.3
+git log -1 --format='%H %ci' > PROVENANCE.txt
+cat PROVENANCE.txt
+grep -n "MMK" src/classify.cc
+```
+**Why:** week5plan.md's Fresh Build Step 2 — a genuinely clean Kraken2 tree, separate from the already-patched `~/tools/kraken2-src`, pinned to v2.1.3 to stay comparable with the existing 4.405s baseline and the cell-width report's numbers.
+**Input → Output:** clones upstream Kraken2's full git history into `~/tools/kraken2-src-fresh` (resolves through the `~/tools` symlink into `~/chirag_K/tools/kraken2-src-fresh`), then moves that tree's HEAD to the exact `v2.1.3` release tag.
+**Result:** clone succeeded on the first retry-loop attempt (no timeout hit this time). `git checkout v2.1.3` landed at commit `8f82a7ded7816c7ceed5086598b2979f80c970d8`, dated 2023-06-06, recorded in `kraken2-src-fresh/PROVENANCE.txt`. `grep -n "MMK" src/classify.cc` printed nothing — tree confirmed clean, no leftover patch code.
