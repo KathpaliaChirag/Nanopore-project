@@ -1,0 +1,40 @@
+Captured output of: diff classify.cc.pre-s1.1.bak classify.cc
+(run on Luna, ~/tools/kraken2-src-fresh/src, 2026-08-25, immediately after
+plan_paper/scripts/s1_patch.py). This is the `diff` command's default
+output format, not a unified diff - it documents exactly what changed, but
+is not meant to be applied with `patch`. To actually apply this change on
+a fresh checkout, run s1_patch.py against the real classify.cc instead.
+
+756a757,766
+> // S1.1 - thread-local single-slot minimizer cache. One copy per OS thread
+> // (each OpenMP worker gets its own), surviving across every read/mate/frame
+> // that thread processes - unlike the old last_minimizer/last_taxon pair
+> // below, which used to be local to one ClassifySequence call and forgot
+> // everything the moment that call returned. Safe to reuse this broadly
+> // because hash->Get() always returns the same answer for the same
+> // minimizer - a cached answer from one read is still correct for the next.
+> static thread_local uint64_t s1_last_minimizer = UINT64_MAX;
+> static thread_local taxid_t s1_last_taxon = TAXID_MAX;
+>
+787,788d796
+<       uint64_t last_minimizer = UINT64_MAX;
+<       taxid_t last_taxon = TAXID_MAX;
+795c803
+<           if (*minimizer_ptr != last_minimizer) {
+---
+>           if (*minimizer_ptr != s1_last_minimizer) {
+804,805c812,813
+<             last_taxon = taxon;
+<             last_minimizer = *minimizer_ptr;
+---
+>             s1_last_taxon = taxon;
+>             s1_last_minimizer = *minimizer_ptr;
+817c825
+<             taxon = last_taxon;
+---
+>             taxon = s1_last_taxon;
+
+Verified untouched (a different thing entirely - a MinimizerScanner method
+call, not our variable - checked specifically because a careless blind
+rename would have mangled it):
+820:                curr_taxon_counts[taxon].add_kmer(scanner.last_minimizer());
