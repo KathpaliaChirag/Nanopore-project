@@ -22,6 +22,13 @@ plan_paper/                  <- created 2026-08-24: where the actual Sept 13 pap
                                 (cache/bitmask/cell-width code and data as it's produced) plus command_log.md,
                                 the running receipt of every command actually run - planning/weekNplan.md is
                                 the plan, plan_paper/command_log.md is what really happened.
+  README.md                   <- fresh-system setup guide: Luna prereqs, clone/patch/build order, how to run
+                                 the benchmark scripts, known gaps.
+  patches/                     <- captured diff output per patch (S1.1, S2), for review - not patch-applyable;
+                                 the real reproduction path is scripts/.
+  scripts/                     <- the actual runnable patch-application (s*_patch.py) and benchmark
+                                 (compare_*.py, build_size_variants.sh) scripts, committed as real files
+                                 (added 2026-08-26 - previously only existed as command_log.md code blocks).
 dorado-kraken-research/      <- CURRENT FOCUS (as of 2026-07-25): Dorado (GPU basecaller) + Kraken2 (CPU
                                 k-mer classifier) profiling and optimisation, now extending into two thesis
                                 directions per Kolin sir - see "Project purpose (current)" below.
