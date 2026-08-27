@@ -30,21 +30,29 @@ new_sig = '''// S2-STANDALONE TEST VARIANT (2026-08-26) - built from the ORIGINA
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+
+// Size constants declared FIRST this time, specifically so S2PrintStats
+// below can print them directly - the binary now labels its own
+// configuration in every run's output, so a size-variant build can never
+// be mistaken for a different one again (this bit us with the git tag
+// mixup earlier in the session - same root cause, "trust the label, not
+// the artifact itself" - fixed the same way: make the artifact self-describing).
+static const size_t S2_NUM_SETS = 4096;   // same size as the original S2 - fair comparison
+static const size_t S2_WAYS = 4;
+static const uint64_t S2_EMPTY_TAG = UINT64_MAX;
+
 static std::atomic<uint64_t> s2_hits{0};
 static std::atomic<uint64_t> s2_misses{0};
 static void S2PrintStats() {
   uint64_t hits = s2_hits.load(), misses = s2_misses.load();
   uint64_t total = hits + misses;
-  fprintf(stderr, "[S2-STANDALONE] hits=%llu misses=%llu total=%llu hit_rate=%.4f%%\\n",
+  fprintf(stderr, "[S2-STANDALONE] size=%zu ways=%zu hits=%llu misses=%llu total=%llu hit_rate=%.4f%%\\n",
+          S2_NUM_SETS, S2_WAYS,
           (unsigned long long)hits, (unsigned long long)misses, (unsigned long long)total,
           total ? (100.0 * hits / total) : 0.0);
 }
 struct S2StatsRegistrar { S2StatsRegistrar() { atexit(S2PrintStats); } };
 static S2StatsRegistrar s2_stats_registrar;
-
-static const size_t S2_NUM_SETS = 4096;   // same size as the original S2 - fair comparison
-static const size_t S2_WAYS = 4;
-static const uint64_t S2_EMPTY_TAG = UINT64_MAX;
 
 struct S2Entry {
   uint64_t tag = S2_EMPTY_TAG;

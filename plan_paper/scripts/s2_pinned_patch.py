@@ -39,21 +39,25 @@ new_sig = '''// S2-PINNED TEST VARIANT (2026-08-26) - same standalone wiring as
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
+
+// Size constants first, so S2PrintStats can print them - the binary now
+// labels its own configuration in every run's output.
+static const size_t S2_NUM_SETS = 4096;   // same size as S2-standalone - isolates the eviction-policy variable
+static const size_t S2_WAYS = 4;
+static const uint64_t S2_EMPTY_TAG = UINT64_MAX;
+
 static std::atomic<uint64_t> s2_hits{0};
 static std::atomic<uint64_t> s2_misses{0};
 static void S2PrintStats() {
   uint64_t hits = s2_hits.load(), misses = s2_misses.load();
   uint64_t total = hits + misses;
-  fprintf(stderr, "[S2-PINNED] hits=%llu misses=%llu total=%llu hit_rate=%.4f%%\\n",
+  fprintf(stderr, "[S2-PINNED] size=%zu ways=%zu hits=%llu misses=%llu total=%llu hit_rate=%.4f%%\\n",
+          S2_NUM_SETS, S2_WAYS,
           (unsigned long long)hits, (unsigned long long)misses, (unsigned long long)total,
           total ? (100.0 * hits / total) : 0.0);
 }
 struct S2StatsRegistrar { S2StatsRegistrar() { atexit(S2PrintStats); } };
 static S2StatsRegistrar s2_stats_registrar;
-
-static const size_t S2_NUM_SETS = 4096;   // same size as S2-standalone - isolates the eviction-policy variable
-static const size_t S2_WAYS = 4;
-static const uint64_t S2_EMPTY_TAG = UINT64_MAX;
 
 struct S2Entry {
   uint64_t tag = S2_EMPTY_TAG;
