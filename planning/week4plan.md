@@ -409,11 +409,11 @@ Every row below gets its commit hash filled in the moment that sub-step's push h
 | **S1** | Top-level | Single-slot cache | *(see sub-steps)* | 🔵 done |
 | ↳ S1.1 | Design | Implement the slot | `fbf993d` on `v2.17.1` (kraken2-src-fresh) | 🔵 done |
 | ↳ S1.2 | Measured | Benchmark | `fbf993d` (`safe/S1.2`) — no measurable diff vs S0 on `standard_8gb`/`pluspf_103gb` (3-run avg, CV<5%); modest unexplained speedup on `sample_targeted` only. Full data: `plan_paper/command_log.md` | 🔵 done |
-| **S2** | Top-level | 4-way set-associative | *(see sub-steps)* | ⬜ not started |
-| ↳ S2.1 | Design | Set-index function | _fill in_ | ⬜ not started |
-| ↳ S2.2 | Design | 4-way compare-and-select | _fill in_ | ⬜ not started |
-| ↳ S2.3 | Design | Per-set replacement rule | _fill in_ | ⬜ not started |
-| ↳ S2.4 | Measured | Benchmark | _fill in_ | ⬜ not started |
+| **S2** | Top-level | 4-way set-associative | `75f908e` on `v2.17.1` (kraken2-src-fresh), `safe/S2.4` | 🔴 known bug — see below |
+| ↳ S2.1 | Design | Set-index function | `75f908e` | 🔵 done |
+| ↳ S2.2 | Design | 4-way compare-and-select | `75f908e` — **audit found (2026-08-26) the cache is wired inside S1's adjacent-minimizer gate, not standalone in front of `hash->Get()`** as the baseline is supposed to be. Fix pending. Full detail: `plan_paper/verification_report_2026-08-26.md` Q1. | 🔵 done, integration bug pending fix |
+| ↳ S2.3 | Design | Per-set replacement rule (round-robin) | `75f908e` | 🔵 done |
+| ↳ S2.4 | Measured | Benchmark | `75f908e` — 3-run avg, no measurable diff vs S0/S1 on `standard_8gb`/`pluspf_103gb`. **Result currently untrusted** — the nesting bug above means this may be measuring a starved residual lookup stream, not a standalone 4-way cache. Re-measure after the wiring fix. | 🔴 needs re-measurement after fix |
 | **S3** | Top-level | LLC-topology sizing | *(see sub-steps)* | ⬜ not started |
 | ↳ S3.1 | Design | Detect LLC topology | _fill in_ | ⬜ not started |
 | ↳ S3.2 | Design | Collect/synthesize access trace | _fill in_ | ⬜ not started |

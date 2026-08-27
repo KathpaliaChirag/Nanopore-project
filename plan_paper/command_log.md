@@ -210,3 +210,26 @@ git tag safe/S1.2
 **Why:** user asked whether S2's placeholder size (4,096 sets) might just be too small for Luna's real working set — a reasonable hypothesis, since S2's own comment said "size is a placeholder, S3 tunes it properly." Rather than build S3's full topology-detection/trace-simulation machinery on a guess, tested the hypothesis cheaply first: built 3 more S2 binaries at 65,536 / 1,048,576 / 4,194,304 sets (16×/256×/1024× the original) and re-ran the full validated methodology (3 DBs × 5 threads × 6 binaries, 3 interleaved runs each — `/tmp/compare_sizes_full.py`, saved to `~/s2_size_sweep_full.txt`).
 **Result — the opposite of "too small," and clearer than expected:** performance is flat and unremarkable from S0 through 65,536 sets, then falls off a cliff. Worst case: `sample_targeted` at 96 threads, `S2-4194304` — **12.51s vs a 0.56s baseline (22× slower)**, LLC-miss rate jumping from ~13% to **85%**. The effect scales with thread count (worse at 96T than at 16T), which points directly at the cause: this cache is `thread_local` — every thread gets its own private, freshly-zeroed copy. At 4,194,304 sets × 4 ways × 16 bytes ≈ 256MB *per thread*; at 96 threads that's ~24GB of brand-new memory touched on every single process run, before any actual classification happens. That memory-initialization/page-fault cost, not cache behavior, is almost certainly what dominates at the largest sizes — this is a different failure mode than "cache too small," and a real methodological finding for S3: sizing has a hard ceiling that has nothing to do with hit-rate math, driven purely by per-thread allocation cost. Full interactive chart + tables published: https://claude.ai/code/artifact/096bb2bd-fa61-45cd-a90e-2fe9721dab82 (some cells — `standard_8gb` T=1/S0, `pluspf_103gb` T=96/S0 — exceeded the 5% CV threshold and are flagged as noisy, not trusted).
 **Implication for S3:** LLC-topology-aware sizing isn't just "bigger within budget" — it needs to account for *per-thread* multiplication (size × ways × bytes × thread count), not just fitting one copy in the LLC. A size that's fine for 1 thread can be catastrophic at 96.
+
+### 2026-08-26 — Independent verification audit: found S2 is nested inside S1's gate, not standalone
+**Command:** 5-agent/3-round `/goal`-triggered audit run from a fresh session, per `plan_paper/verification_audit_brief.md`. Full report: `plan_paper/verification_report_2026-08-26.md`.
+**Result — critical finding:** `S2Lookup`/`S2Insert` are called inside the existing `if (*minimizer_ptr != s1_last_minimizer)` block, not standalone in front of `hash->Get()`. When a minimizer matches the immediately-preceding one, execution takes the `else { taxon = s1_last_taxon; }` branch entirely — **S2 never sees that lookup.** S2 only ever receives the residual stream that already failed S1's filter, not the full lookup stream "sir's baseline" framing implies. Every S2 "no benefit" conclusion measured so far is therefore untrusted until re-measured with this fixed.
+**Other confirmed findings:** no hit/miss instrumentation exists inside `S2Lookup` (external proxies only — wall-clock, `perf stat` LLC-miss% — can't distinguish "cache rarely hits" from "cache never hits due to a bug"); classification-output correctness was never checked (`--output /dev/null` throughout); the memory-init cliff diagnosis is confirmed as the leading hypothesis but likely a two-mechanism story (fixed per-thread init cost + a smaller DB-size-dependent effect); the v2.1.3→v2.17.1 version-switch risk is broader than logged (`kraken2-build`'s own hash-construction logic across 5 releases was never checked, only the parser); this is the second consecutive week missing its own explicit target; `week4plan.md`'s ledger was stale (fixed in the next entry below).
+**Action taken:** committed and tagged S2 on Luna immediately per the audit's #1 recommendation (data safety, independent of the bug) — see next entry.
+
+### 2026-08-26 — S2 committed + tagged on Luna (with known bug documented in the commit message)
+**Command:**
+```bash
+cd ~/tools/kraken2-src-fresh
+git add src/classify.cc
+git commit -m "S2.1-S2.3: 4-way set-associative cache (4,096 sets)
+
+Known issue, flagged by independent audit 2026-08-26: S2Lookup/S2Insert
+are nested inside S1's adjacent-minimizer gate, not standalone in front
+of hash->Get() - fix pending (see plan_paper/verification_report_2026-08-26.md, Q1)."
+git tag safe/S2.4
+git log -1 safe/S2.4 --format='%H %s'
+```
+**Why:** S2 had been sitting uncommitted on a shared Luna account (`student`) with an already-documented data-loss precedent (two ESKAPE databases lost, root cause unresolved) — audit's #1 recommendation, unconditional on resolving anything else. Committing with the bug documented in the message means nobody (including future us) mistakes this for a clean baseline.
+**Result:** committed as `75f908e46ea9242e7b34bf4be88a05233f78920c`, tagged `safe/S2.4`. `planning/week4plan.md`'s stale ledger (S2 rows still showed `⬜ not started` despite S2.1-S2.4 being implemented and measured) fixed to reflect the real commit hash and the honest, bug-flagged status.
+**Next:** rewire S2 to check every lookup (not just the residual stream after S1's filter), add hit/miss counters, run a real `--output` correctness diff against S0, then re-measure.
