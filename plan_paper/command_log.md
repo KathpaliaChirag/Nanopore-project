@@ -243,3 +243,19 @@ git log -1 safe/S2.4 --format='%H %s'
 - **A new, self-inflicted artifact found and diagnosed, not attributed to the cache design**: `sample_targeted`/`S2-standalone` runs ~3x slower than everything else at 16T-96T (e.g. 1.84s vs a 0.55s baseline), with elevated LLC-miss% (15-16% vs 13%). Root cause: the hit/miss counters are global `std::atomic` variables, incremented via `fetch_add` on every single lookup from every thread — classic cache-line contention that scales badly with thread count. This overhead is invisible on `standard_8gb`/`pluspf_103gb` (where each `Get()` call is already slow/memory-bound, dwarfing the contention cost) but dominates on `sample_targeted` (where `Get()` is fast enough that the counter contention becomes the largest cost). **`sample_targeted`'s `S2-standalone` elapsed-time numbers from this run should not be trusted as telling us anything about the cache** — fixing this would require `thread_local` counters aggregated once at exit, not global atomics.
 - Side observation: `sample_targeted` and `pluspf_103gb` share an identical hit rate (0.1412%) while `standard_8gb` differs (0.4032%) — likely because the two former DBs were built with matching k-mer/minimizer parameters while `standard_8gb`'s differ, producing a different minimizer stream from the same input reads.
 **Audit checklist status:** items 2 (rewire) and 3 (instrumentation) from `verification_report_2026-08-26.md`'s pre-S3.4 checklist are done. Item 4 (real `--output` correctness diff) is still outstanding.
+
+### 2026-08-26 — S2 correctness-verified: real classification output identical to S0
+**Command:**
+```bash
+mkdir -p ~/correctness_check
+~/tools/kraken2-fresh-bin-s0/kraken2 --db ~/AccuracyDrift/databases/sample_targeted \
+  --threads 1 --output ~/correctness_check/s0_output.txt --report ~/correctness_check/s0_report.txt \
+  ~/data/basecalled/hac/FBE01990_24778b97_03e50f91_15.fastq
+~/tools/kraken2-fresh-bin-s2/kraken2 --db ~/AccuracyDrift/databases/sample_targeted \
+  --threads 1 --output ~/correctness_check/s2_output.txt --report ~/correctness_check/s2_report.txt \
+  ~/data/basecalled/hac/FBE01990_24778b97_03e50f91_15.fastq
+diff ~/correctness_check/s0_output.txt ~/correctness_check/s2_output.txt && echo "IDENTICAL"
+diff ~/correctness_check/s0_report.txt ~/correctness_check/s2_report.txt && echo "REPORT IDENTICAL TOO"
+```
+**Why:** the one remaining gap on the audit's pre-S3.4 checklist (Q2/Q5) — every prior benchmark used `--output /dev/null`, so classification correctness (not just performance) had never actually been checked. Real (single-threaded, to remove any scheduling-order confound) `--output`/`--report` files from `kraken2-fresh-bin-s0` (unpatched) and `kraken2-fresh-bin-s2` (the currently-committed nested S2, `75f908e`/`safe/S2.4`) diffed directly against each other.
+**Result:** both `diff`s came back completely empty — **classification output and the summary report are byte-for-byte identical between S0 and S2.** The cache never changes which species a read gets called as; it only changes whether a lookup goes through the hash table or the cache. Combined with the earlier standalone test (which showed the nesting bug doesn't meaningfully affect the performance conclusion either), **S2 is now fully verified: correct and honestly measured.** Audit checklist items 2, 3, and 4 are all closed. Remaining: item 6 (pre-touch/page-faults experiment for the memory-init cliff, relevant before finalizing S3's sizing formula) and updating `week4plan.md`'s ledger to drop the now-resolved "known bug" framing.
