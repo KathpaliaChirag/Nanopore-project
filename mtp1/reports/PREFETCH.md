@@ -341,21 +341,129 @@ Off by default, so the binary behaves exactly like stock unless `-B` is given.
 
 ## 8. Limits of this measurement
 
-- **One input file.** All timings are pod5_2. Correctness was checked on
-  pod5_15 as well, but the 12% figure is single-file.
-- **One database.** `eskape_32bit_fork`, 32-bit cells. The 24-bit database has a
-  different memory profile and has not been tested with `-B`.
+- **One input file.** All timings are pod5_2. Correctness was checked on all 16
+  pod5 files, but the speedup figures are single-file.
+- **Two databases.** `eskape_32bit_fork` (32-bit cells) and `eskape_24bit`
+  (3-byte cells) — see §10. Both give ~19-20%. The 16- and 20-bit databases are
+  untested with `-B`.
 - **One machine.** i7-11700, 8 cores / 16 threads, 16 MB L3, `powersave`
-  governor. This box has shown bimodal timing behaviour; interleaved reps and
-  the `sd` column are how that was controlled for.
+  governor. This box is bimodal: the same binary measured 1.850 s and 2.898 s in
+  one batch of 20 runs while executing instruction counts within 0.09% of each
+  other. The cooldown protocol (§6) is what controls for it; the `sd` column is
+  how to check it worked.
 - **Not merged.** `kraken2_bin/` and `kraken2/src/` are untouched. This lives in
   `scratch_lookaside/`.
 
 ## 9. What to try next
 
-1. **Confirm across the other pod5 files** and on the 24-bit database.
+1. **Confirm across the other pod5 files.** The 24-bit database is done (§10);
+   all timings are still from pod5_2 alone.
 2. **Trim the 17% instruction overhead.** If the buffering cost came down, more
    of the 13% improvement over `-B 1` would survive against stock.
 3. **Combine with `-M 4000000`** (measured −26.7% on its own). The two attack
    different costs — prefetch overlaps latency, `-M` removes accesses by making
    the database L3-resident — so they should compose.
+
+---
+
+## 10. The same sweep on the 24-bit database
+
+Run identically — `-B` 1–32 plus stock, cooldown protocol, same six perf events,
+same workload — against `eskape_24bit` instead of `eskape_32bit_fork`.
+99 runs, **0 crashes**, temperature 60–68 °C, spreads 0.002–0.022 s.
+`clsfd%` is 84.27 on every row.
+
+Raw perf output: `result/prefetch24/perf/` (99 files).
+Plain-text table: `result/prefetch24/TABLE.txt`.
+
+### Why this database is different
+
+| | eskape_32bit_fork | eskape_24bit |
+|---|---:|---:|
+| size | 46.5 MB | **34.9 MB** |
+| 4 KB pages | 11,914 | **8,935** |
+| cell | 4 bytes, naturally aligned | **3 bytes, unaligned** |
+
+Smaller table means less memory pressure. Unaligned 3-byte cells mean every
+access goes through packed accessors that assemble the value byte by byte, so
+more instructions. The two effects pull in opposite directions.
+
+### Results
+
+| `-B` | clsfd% | elapsed | sd | cache-refs | cache-misses | cm% | LLC-loads | LLC-ld-miss | llc% | instructions | IPC | cycles | cyc/lk |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| **stock** | 84.27 | 2.309 | 0.005 | 730,574,199 | 430,699,867 | 58.95 | 239,070,040 | 136,437,017 | 57.07 | 163,721,448,664 | 1.10 | 149,391,553,561 | 930.1 |
+| `1` | 84.27 | 2.451 | 0.004 | 758,089,404 | 444,142,892 | 58.59 | 80,875,450 | 30,076,318 | 37.19 | 191,967,277,466 | 1.20 | 160,242,393,773 | 997.6 |
+| `2` | 84.27 | 2.296 | 0.003 | 755,228,718 | 445,065,223 | 58.93 | 77,853,973 | 27,810,470 | 35.72 | 187,052,535,575 | 1.25 | 150,267,730,693 | 935.5 |
+| `3` | 84.27 | 2.211 | 0.009 | 739,342,134 | 438,090,160 | 59.26 | 74,685,600 | 26,318,173 | 35.26 | 185,373,501,640 | 1.28 | 144,479,519,284 | 899.5 |
+| `4` | 84.27 | 2.122 | 0.013 | 715,443,742 | 424,452,516 | 59.33 | 72,459,826 | 26,276,597 | 36.27 | 184,545,050,961 | 1.32 | 139,323,221,276 | 867.4 |
+| `5` | 84.27 | 2.087 | 0.006 | 688,981,379 | 408,177,276 | 59.24 | 70,930,319 | 26,343,701 | 37.15 | 184,055,373,694 | 1.34 | 137,164,307,443 | 853.9 |
+| `6` | 84.27 | 2.057 | 0.013 | 676,115,624 | 399,125,468 | 59.03 | 71,495,985 | 26,562,989 | 37.17 | 183,707,606,699 | 1.36 | 134,956,370,735 | 840.2 |
+| `7` | 84.27 | 2.013 | 0.011 | 659,286,966 | 389,554,088 | 59.09 | 69,662,061 | 26,615,131 | 38.21 | 183,463,473,758 | 1.38 | 132,713,246,880 | 826.2 |
+| `8` | 84.27 | 2.001 | 0.008 | 653,210,069 | 384,435,704 | 58.85 | 70,897,665 | 26,785,148 | 37.79 | 183,322,724,394 | 1.39 | 131,730,165,220 | 820.1 |
+| `9` | 84.27 | 1.986 | 0.014 | 649,767,122 | 383,311,955 | 58.99 | 69,680,316 | 26,780,142 | 38.45 | 183,117,045,038 | 1.41 | 130,073,290,835 | 809.8 |
+| `10` | 84.27 | 1.963 | 0.015 | 647,932,784 | 381,483,070 | 58.88 | 70,387,442 | 26,796,203 | 38.09 | 183,008,183,685 | 1.42 | 128,756,566,545 | 801.6 |
+| `11` | 84.27 | 1.973 | 0.021 | 643,404,668 | 378,781,208 | 58.87 | 70,324,710 | 26,982,995 | 38.39 | 182,975,058,569 | 1.41 | 129,710,897,083 | 807.5 |
+| `12` | 84.27 | 1.950 | 0.004 | 644,013,378 | 379,055,902 | 58.86 | 70,708,914 | 26,949,761 | 38.17 | 182,865,429,283 | 1.43 | 127,703,283,784 | 795.0 |
+| `13` | 84.27 | 1.934 | 0.013 | 644,072,625 | 379,482,580 | 58.92 | 69,611,632 | 26,942,247 | 38.71 | 182,788,028,854 | 1.44 | 126,488,326,338 | 787.5 |
+| `14` | 84.27 | 1.945 | 0.007 | 641,934,324 | 377,795,172 | 58.85 | 70,741,047 | 27,043,123 | 38.25 | 182,756,412,181 | 1.44 | 127,525,552,672 | 793.9 |
+| `15` | 84.27 | 1.928 | 0.006 | 640,774,305 | 377,610,699 | 58.93 | 69,647,087 | 27,026,600 | 38.81 | 182,699,384,515 | 1.45 | 125,931,409,326 | 784.0 |
+| `16` | 84.27 | 1.933 | 0.022 | 641,063,675 | 376,818,149 | 58.78 | 70,585,664 | 27,085,183 | 38.41 | 182,661,023,334 | 1.44 | 126,545,533,352 | 787.8 |
+| `17` | 84.27 | 1.906 | 0.005 | 638,135,699 | 376,867,948 | 59.06 | 68,857,585 | 27,084,065 | 39.35 | 182,626,373,406 | 1.46 | 125,193,030,756 | 779.4 |
+| `18` | 84.27 | 1.907 | 0.005 | 640,638,335 | 376,757,451 | 58.81 | 70,569,315 | 27,083,168 | 38.44 | 182,589,874,117 | 1.46 | 124,897,519,714 | 777.6 |
+| `19` | 84.27 | 1.908 | 0.006 | 639,575,015 | 376,413,083 | 58.85 | 70,517,585 | 27,206,761 | 38.59 | 182,596,293,082 | 1.46 | 125,049,522,382 | 778.5 |
+| `20` | 84.27 | 1.903 | 0.010 | 640,255,776 | 377,073,435 | 58.89 | 69,795,504 | 27,221,135 | 39.01 | 182,516,792,294 | 1.47 | 124,211,350,443 | 773.3 |
+| `21` | 84.27 | 1.905 | 0.010 | 636,633,362 | 375,193,438 | 58.94 | 69,492,533 | 27,255,529 | 39.25 | 182,550,416,673 | 1.46 | 125,091,648,873 | 778.8 |
+| `22` | 84.27 | 1.897 | 0.004 | 637,832,974 | 375,588,973 | 58.89 | 70,426,592 | 27,293,976 | 38.76 | 182,497,857,513 | 1.47 | 124,385,809,942 | 774.4 |
+| `23` | 84.27 | 1.897 | 0.006 | 636,299,912 | 375,323,052 | 58.99 | 69,847,750 | 27,294,149 | 39.09 | 182,446,408,657 | 1.47 | 124,037,000,338 | 772.2 |
+| `24` | 84.27 | 1.892 | 0.005 | 635,973,310 | 374,451,221 | 58.88 | 70,939,350 | 27,320,121 | 38.55 | 182,452,955,596 | 1.47 | 124,347,271,243 | 774.1 |
+| `25` | 84.27 | 1.897 | 0.002 | 636,051,910 | 374,451,429 | 58.87 | 70,794,544 | 27,324,024 | 38.69 | 182,479,735,532 | 1.47 | 124,405,847,362 | 774.5 |
+| `26` | 84.27 | 1.893 | 0.010 | 635,603,567 | 374,748,747 | 58.96 | 69,980,894 | 27,373,173 | 39.14 | 182,424,799,806 | 1.47 | 123,847,968,227 | 771.0 |
+| `27` | 84.27 | 1.880 | 0.012 | 637,089,881 | 375,391,360 | 58.92 | 69,315,509 | 27,329,289 | 39.43 | 182,358,834,628 | 1.48 | 122,794,704,261 | 764.5 |
+| `28` | 84.27 | 1.887 | 0.007 | 636,227,762 | 374,865,960 | 58.92 | 69,319,033 | 27,396,950 | 39.53 | 182,372,607,654 | 1.48 | 123,508,860,927 | 768.9 |
+| `29` | 84.27 | 1.885 | 0.002 | 634,242,118 | 373,129,821 | 58.83 | 71,095,338 | 27,444,361 | 38.62 | 182,393,516,867 | 1.47 | 123,758,414,753 | 770.5 |
+| `30` | 84.27 | 1.880 | 0.011 | 634,313,776 | 374,499,290 | 59.04 | 68,384,494 | 27,376,673 | 40.03 | 182,329,080,165 | 1.49 | 122,987,044,575 | 765.7 |
+| `31` | 84.27 | 1.876 | 0.007 | 635,628,834 | 374,312,501 | 58.89 | 70,442,592 | 27,383,819 | 38.95 | 182,336,150,774 | 1.48 | 123,025,690,626 | 765.9 |
+| `32` | 84.27 | 1.880 | 0.007 | 633,346,127 | 373,280,638 | 58.94 | 69,901,541 | 27,431,777 | 39.25 | 182,334,434,333 | 1.48 | 123,151,257,461 | 766.7 |
+
+### What it shows
+
+**Prefetch works just as well on the smaller database.** stock 2.309 s →
+`-B 31` at 1.876 s = **−18.8%**, against −20.3% on 32-bit.
+
+That refutes a hypothesis stated before the run: that a smaller table would leave
+less latency for prefetch to hide, so the gain would shrink noticeably. It did
+not. At 34.9 MB the table is still more than twice the 16 MB L3, so it remains
+just as memory-bound. Prefetch's value tracks whether the working set exceeds
+L3 — not by how much.
+
+**The 24-bit database genuinely reduces memory traffic.** This is the first thing
+measured in this project that moves `cache-misses` at all:
+
+| | 32-bit | 24-bit | change |
+|---|---:|---:|---|
+| stock `cache-misses` | 454.9 M | **430.7 M** | −5.3% |
+| stock `cm%` | 62.24% | **58.95%** | −3.3 pp |
+| stock `LLC-ld-miss` | 152.5 M | **136.4 M** | −10.5% |
+| best `cache-misses` | 399.4 M | **373.3 M** | −6.5% |
+
+Prefetching never moved `cm%` because it re-routes traffic rather than removing
+it. A smaller table removes it. That is the whole distinction.
+
+**But the saving is handed straight back in instructions.** 163.7 G vs 158.0 G at
+stock, 182.3 G vs 176.0 G at the best setting — about **+3.6%**, all of it from
+unaligned 3-byte cell access. The two databases therefore finish within 5 ms of
+each other (1.876 s vs 1.871 s) despite 24-bit doing measurably less memory work.
+
+### The implication
+
+The 24-bit database is a working demonstration of the only mechanism that
+actually reduces the miss rate — **make the table smaller** — and also of why
+narrowing the *cell* is the wrong way to do it. The memory win is real and the
+instruction cost cancels it.
+
+That is the argument for `-M` subsampling instead: it shrinks the table by
+sampling fewer minimizers while keeping the 4-byte naturally-aligned cell, so it
+should capture the memory saving without paying the unaligned-access tax. It was
+measured at **−26.7%** standalone and has still never been tested together with
+`-B`.
