@@ -348,3 +348,37 @@ diff ~/correctness_check/s0_report.txt ~/correctness_check/s3_formula_report.txt
 # then 16T/32T/96T sanity runs against the same DB/fastq
 ```
 **Result:** byte-identical output/report vs. S0 at T=1 (now sized at 262,144 sets under the new formula — much larger than the old 4,096 default, expected and correct, since fewer threads means more LLC budget per thread). Crash-free and classification-consistent (`25,645`/`30,378` every time) at 16T (16,384 sets), 32T (8,192 sets), and 96T (4,096 sets) — confirming the formula both computes sane values and shrinks correctly as thread count rises, with no correctness regression at any tested T. **S3.1/S3.2's formula is implemented and verified.** Committed and tagged as `safe/S3.1-S3.2` (`f686002`). Still open: S3.2's real empirical sweep of `f` against benchmark hit-rate data (today's 0.25 is a placeholder), and S3.3's pre-touch experiment for the separate slowdown cliff at ≥1,048,576 sets.
+
+**Command (S3.3 — zero-sentinel + calloc, for the separate slowdown cliff):** `plan_paper/scripts/s3_3_zero_sentinel_calloc_patch.py`, applied against the S3.1/S3.2-patched `classify.cc`:
+```bash
+cp classify.cc classify.cc.pre-s3.3.bak
+python3 /tmp/s3_3_zero_sentinel_calloc_patch.py        # "patched OK"
+diff classify.cc.pre-s3.3.bak classify.cc              # confirmed only the intended hunks changed
+cd .. && ./install_kraken2.sh ~/tools/kraken2-fresh-bin-s2 && cd src
+```
+**Why this patch:** `S2Entry`'s sentinels (`tag=UINT64_MAX`, `taxon=TAXID_MAX`) forced a real constructor loop to eagerly write every entry on allocation, defeating the OS's normal lazy-zero-page optimization regardless of where the array lived — this, not the array's storage location, is what caused the ≥1,048,576-set slowdown cliff. Fix: `S2_EMPTY_TAG` changed to `0`, `S2Entry`'s default member initializers removed (making it trivially constructible), and the allocator switched from `new[]` to `calloc` via a custom `free()`-based `unique_ptr` deleter (`S2FreeDeleter`) — for allocations above glibc's ~128KB mmap threshold (true for every size in `[4096, 262144]`, even the smallest), `calloc`'s backing pages are OS-zero-filled for free, never eagerly touched. A real minimizer of exactly `0` is handled as a permanent, harmless cache-miss special case in `S2Lookup`/`S2Insert` (never cached, always falls through to `hash->Get()`; correctness is unaffected). `S3_MAX_SETS` deliberately left at 262,144 in this patch, not raised.
+
+**Verification, in order:** (1) a standalone compile-and-run harness, isolated from the full Kraken2 codebase (not just a text diff) — confirmed freshly-`calloc`'d memory reads as empty before any insert, insert/lookup round-trips correctly, the minimizer==0 edge case never corrupts state, `sizeof(S2Entry)` unchanged at 16 bytes, zero compiler warnings under `-Wall -std=c++11`. (2) On Luna: byte-identical `--output`/`--report` vs. S0 at the default 4,096 sets. (3) Crash-free and classification-consistent at 16T/32T/96T.
+
+**Proving the actual slowdown-cliff fix — a temporary forced-4,194,304-set build (same technique as every prior size test), and a real, honest correction to the record:**
+```bash
+cp classify.cc.s3.3-4096.bak classify.cc   # (real state already patched with S3.3)
+sed -i "s/static const size_t S3_MAX_SETS = 262144;/static const size_t S3_MAX_SETS = 4194304;/" classify.cc
+sed -i "s/static const size_t S3_MIN_SETS = 4096;/static const size_t S3_MIN_SETS = 4194304;/" classify.cc
+cd .. && ./install_kraken2.sh ~/tools/kraken2-fresh-bin-s3-3-4194304 && cd src
+# separately, from classify.cc.pre-s3.3.bak (S3.0+S3.1/S3.2 but WITHOUT S3.3), same sed, built as
+# kraken2-fresh-bin-s3-2-old-4194304 - isolates S3.3 as the only variable, unlike the original
+# 2026-08-26 binary which also lacked S3.0's heap fix and S3.1/S3.2's formula
+```
+Correctness re-confirmed at this forced size: byte-identical `--output`/`--report` vs. S0.
+
+Then an interleaved (old→new→old→new) same-session comparison at `sample_targeted`/96T/4,194,304 sets, `perf stat` on both binaries:
+
+| | Wall-clock | Cache-miss | sys time |
+|---|---|---|---|
+| OLD (S3.0+S3.1/S3.2, no S3.3), 2 runs | 1.181s / 1.184s | 41.72% / 43.15% | 4.85s / 5.32s |
+| NEW (+S3.3), 2 runs | 0.609s / 0.619s | 14.69% / 14.75% | 0.75s / 0.97s |
+
+**Real finding, tightly reproducible across both runs of each:** S3.3 delivers a genuine, real **~2× wall-clock and ~3× cache-miss improvement** on top of S3.0+S3.1/S3.2. **But this corrects the original 2026-08-26 framing, not just extends it:** today's "OLD" baseline (~1.18s) is nowhere near the originally-logged 12.51s/85%-LLC-miss, because that measurement was taken on the *pre-S3.0* binary — a `thread_local` **static array** embedded directly in glibc's TLS block, not a heap-allocated array. **S3.0's heap-pointer fix alone already eliminated the vast majority of the originally-measured slowdown** — a giant static-TLS array apparently has its own, more severe per-thread-creation cost (likely glibc copying a full TLS initialization template into every new thread) distinct from and worse than plain eager-write cost. The dramatically elevated `sys` time on the OLD-here run (4.85–5.32s vs. 0.75–0.97s) — kernel time, consistent with page-fault servicing — independently corroborates this. **Honest framing for any write-up: S3.0 was the dominant fix for both the crash and most of the slowdown; S3.3 is a smaller, still-real, still-worth-keeping additional win, not an independently-comparable second fix stacking to the original 22×.**
+
+**S3.3 is done, verified, and committed+tagged on Luna as `safe/S3.3` (`b8c1ee0`).** S3 (sizing) is now feature-complete per this week's scope: S3.0 (crash fix) + S3.1/S3.2 (LLC-topology-aware, thread-scaled formula) + S3.3 (residual-slowdown fix). Still open: S3.2's empirical sweep of `f` (currently 0.25, a placeholder) and S3.4's full DB×thread-count benchmark of the final wired-up formula against plain S2 — next up, per the user's suggestion, as a proper orchestration script (matching this project's `compare_*.py` convention) rather than by-hand runs, covering all 3 DBs and a fuller thread-count sweep.
