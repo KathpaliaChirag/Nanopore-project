@@ -277,3 +277,52 @@ diff ~/correctness_check/s0_report.txt ~/correctness_check/s2_report.txt && echo
 | 262,144 | 1.4229% | 1.4843% | +4.3% |
 
 **Real finding: pinning's relative advantage over round-robin shrinks as capacity grows** — smart eviction matters most when capacity is severely constrained (protecting the few useful entries counts for a lot), and matters progressively less as there's simply more room for everything anyway. Given capacity can't grow arbitrarily (both the slowdown cliff at 1M+ and now this crash ceiling at 262K+ under multi-threading), this makes S4's eviction work *more* valuable, not less — it's the lever that matters most in exactly the constrained-capacity regime S3 will likely have to operate in. Hit rate also scales sub-linearly and consistently with capacity across both eviction policies (roughly doubling from 4,096→65,536, then a smaller jump to 262,144) — a clean, sensible trend, not noise. `sample_targeted` and `pluspf_103gb` continue to show identical hit rates to each other (consistent with the earlier finding that they share minimizer-scheme parameters), distinct from `standard_8gb`. Full raw data: `~/pinning_experiment_full.txt` on Luna.
+
+### 2026-08-30 — P.0/P.1 pre-checks confirm the crash mechanism and the real per-socket LLC, then S3.0 lands and fixes the crash
+**Why:** per `plan_paper/s3_s4_debate_report_2026-08-27.md`'s Q1/Q2, two cheap measurements were recommended before writing any code — confirm the static-TLS/stack-budget theory for the 262,144-set crash, and confirm Luna's real per-socket L3 size instead of continuing to assume the spec-sheet-derived 105MB. User confirmed sequencing: finish S3+S4 (Track A) completely before starting any Track B work.
+
+**Command (P.0):**
+```bash
+ulimit -s
+ulimit -a
+numactl --cpunodebind=0 --membind=0 ~/tools/kraken2-fresh-bin-s2-standalone-262144/kraken2 \
+  --db ~/AccuracyDrift/databases/sample_targeted --threads 16 \
+  --output /dev/null --report /dev/null ~/data/basecalled/hac/FBE01990_24778b97_03e50f91_15.fastq
+```
+**Result:** `ulimit -s` = 8192 KB (8MB default stack per thread) vs. the crashing array's confirmed 16MB footprint at 262,144 sets — the array is **twice the size of a thread's entire default stack budget**, before any guard-page arithmetic. `ulimit -a` shows every relevant limit (`max memory size`, `virtual memory`, `data seg size`) as `unlimited` — no cgroup/ulimit memory cap exists on the `student` account, ruling out the one alternative theory raised in the debate report. The crash itself reproduced cleanly: `Segmentation fault (core dumped)`, `EXIT CODE: 139`, no glibc error text — consistent with a thread faulting into its own guard page from stack exhaustion, not an allocator refusing a request. All three checks converge on the same mechanism.
+
+**Command (P.1):**
+```bash
+lscpu -e
+lscpu | grep -iE "l3|numa|socket"
+```
+**Result:** `lscpu -e` shows a strict 1:1 NODE↔SOCKET mapping (every NODE 0 CPU is SOCKET 0, every NODE 1 CPU is SOCKET 1, 96 logical CPUs per node = 48 cores × 2 SMT threads) and a single shared L3 index per socket — two independent structural confirmations that Sub-NUMA Clustering is **not** enabled. `lscpu` confirms `L3 cache: 210 MiB (2 instances)` directly — **105 MiB per socket**, exactly matching the spec-sheet calculation every prior benchmark implicitly assumed, now confirmed on the real machine instead of assumed.
+
+**Command (S3.0 — the fix):** `plan_paper/scripts/s3_0_heap_fix_patch.py`, applied against the currently-committed `classify.cc` (`75f908e`/`safe/S2.4`) from `~/tools/kraken2-src-fresh/src`:
+```bash
+cp classify.cc classify.cc.pre-s3.0.bak
+python3 /tmp/s3_0_heap_fix_patch.py        # "patched OK"
+diff classify.cc.pre-s3.0.bak classify.cc  # confirmed only the intended 4 hunks changed
+cd .. && ./install_kraken2.sh ~/tools/kraken2-fresh-bin-s2 && cd src   # default 4,096-set rebuild
+```
+**Why this patch:** converts `s2_cache`/`s2_next_way` from file-scope `thread_local` arrays (placed in glibc's static TLS block, competing directly with each new thread's stack budget per P.0's confirmed mechanism) to `thread_local unique_ptr`s pointing at heap-allocated arrays, lazily initialized per thread via a new `S2EnsureInit()` helper. Required flattening `S2Lookup`/`S2Insert`'s indexing from 2D (`s2_cache[set_idx][way]`) to 1D (`s2_cache[set_idx * S2_WAYS + way]`) since `unique_ptr<S2Entry[]>` isn't a 2D array. Deliberately scoped to the crash only — does **not** address the separate slowdown cliff at ≥1,048,576 sets (the eager first-touch cost of writing non-zero sentinels into every entry), which stays open per the debate report's Q1.
+
+**Correctness check:**
+```bash
+~/tools/kraken2-fresh-bin-s2/kraken2 --db ~/AccuracyDrift/databases/sample_targeted \
+  --threads 1 --output ~/correctness_check/s2_heapfix_output.txt --report ~/correctness_check/s2_heapfix_report.txt \
+  ~/data/basecalled/hac/FBE01990_24778b97_03e50f91_15.fastq
+diff ~/correctness_check/s0_output.txt ~/correctness_check/s2_heapfix_output.txt   # OUTPUT IDENTICAL
+diff ~/correctness_check/s0_report.txt ~/correctness_check/s2_heapfix_report.txt   # REPORT IDENTICAL
+```
+**Result:** both diffs empty — classification output and report are byte-for-byte identical to the S0 (no-cache) reference at the default 4,096-set config. The 2D→1D indexing change introduced no correctness regression.
+
+**Crash-fix confirmation (temporary 262,144-set build, same technique as the 2026-08-26 size-sweep binaries):**
+```bash
+cp classify.cc classify.cc.s3.0-4096.bak
+sed -i "s/static const size_t S2_NUM_SETS = 4096;/static const size_t S2_NUM_SETS = 262144;/" classify.cc
+cd .. && ./install_kraken2.sh ~/tools/kraken2-fresh-bin-s3-0-262144 && cd src
+# then re-ran the P.0 crash-reproduction command at 16T, 32T, and 96T against this binary
+cp classify.cc.s3.0-4096.bak classify.cc   # restored to the real, permanent (4,096-set, heap-fixed) state
+```
+**Result:** **crash-free at every thread count tested** — 16T (0.511s), 32T (0.500s), 96T (0.515s), all exit code 0, all reporting the identical 25,645/30,378 classified — where the pre-fix binary segfaulted (exit 139) at every one of these thread counts on 2026-08-26. **S3.0 is done: the crash is fixed, correctness is unchanged, and the fix is isolated from the still-open slowdown cliff.** `classify.cc` restored to its permanent state on Luna; commit+tag as `safe/S3.0` on `~/tools/kraken2-src-fresh` queued as the next step. Next after that: S3.1 wires today's confirmed 105MB/socket into the real sizing formula.
