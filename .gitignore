@@ -24,5 +24,9 @@
 # mtp1/stale/)
 !mtp1/stale/to_be_erased_2026-08-30.txt
 
+# Allow the built lookaside/prefetch classify binaries (67 MB, rebuildable
+# from mtp1/scripts/kraken2_prefetch.patch, kept as-is on request)
+!mtp1/scratch_lookaside/bin/*
+
 # Allow .gitignore itself
 !.gitignore
