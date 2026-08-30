@@ -20,5 +20,9 @@
 # mtp1/reports/CHANGELOG.md and mtp1/reports/PREFETCH.md)
 !mtp1/scripts/kraken2_prefetch.patch
 
+# Allow the stale-files record (cleanup manifest kept for reference, see
+# mtp1/stale/)
+!mtp1/stale/to_be_erased_2026-08-30.txt
+
 # Allow .gitignore itself
 !.gitignore

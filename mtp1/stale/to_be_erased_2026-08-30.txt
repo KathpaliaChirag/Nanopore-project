@@ -1,0 +1,437 @@
+# to_be_erased  -- cleanup candidates for /home/dell/summer
+# generated 2026-08-30 by analysis of the whole tree
+#
+# FORMAT: every line that is NOT a comment is a path that is safe to delete.
+# Review-first items are left COMMENTED so they cannot be removed by accident.
+#
+# To act on the safe list:
+#     cd /home/dell/summer && grep -v '^#' to_be_erased | tr -d '\r' | xargs -d'\n' rm -f
+# To preview the total first:
+#     grep -v '^#' to_be_erased | tr -d '\n' >/dev/null; grep -v '^#' to_be_erased | xargs -d'\n' du -ch 2>/dev/null | tail -1
+#
+#==========================================================================
+# SECTION 1 - per-read classification output   328 files, 21G
+#==========================================================================
+# These are kraken2's per-read call streams. They are 100.0% of result/ by
+# size; every report, perf file, log and summary in result/ together is 10 MB.
+# Each is regenerable by re-running the classify command in the matching
+# *_log.txt. The scientific content (taxon abundances, FP counts, timings)
+# lives in the *_report.txt and *_perf.txt files, which are NOT listed here.
+#
+result/run_system/reads_sup_standard_16gb_16T_run2_output.txt
+result/run_system/reads_sup_standard_16gb_2T_run3_output.txt
+result/run_system/reads_sup_standard_16gb_4T_run3_output.txt
+result/run_system/reads_sup_standard_16gb_2T_run1_output.txt
+result/run_system/reads_sup_standard_16gb_4T_run2_output.txt
+result/run_system/reads_sup_standard_16gb_16T_run1_output.txt
+result/run_system/reads_sup_standard_16gb_16T_run3_output.txt
+result/run_system/reads_sup_standard_16gb_8T_run2_output.txt
+result/run_system/reads_sup_standard_16gb_1T_run3_output.txt
+result/run_system/reads_sup_standard_16gb_8T_run3_output.txt
+result/run_system/reads_sup_standard_16gb_8T_run1_output.txt
+result/run_system/reads_sup_standard_16gb_2T_run2_output.txt
+result/run_system/reads_sup_standard_16gb_4T_run1_output.txt
+result/run_system/reads_sup_standard_16gb_1T_run2_output.txt
+result/run_system/reads_sup_standard_16gb_1T_run1_output.txt
+result/run_system/reads_hac_standard_16gb_2T_run3_output.txt
+result/run_system/reads_hac_standard_16gb_8T_run3_output.txt
+result/run_system/reads_hac_standard_16gb_2T_run1_output.txt
+result/run_system/reads_hac_standard_16gb_16T_run1_output.txt
+result/run_system/reads_hac_standard_16gb_2T_run2_output.txt
+result/run_system/reads_hac_standard_16gb_4T_run3_output.txt
+result/run_system/reads_hac_standard_16gb_8T_run1_output.txt
+result/run_system/reads_hac_standard_16gb_8T_run2_output.txt
+result/run_system/reads_hac_standard_16gb_1T_run1_output.txt
+result/run_system/reads_hac_standard_16gb_16T_run2_output.txt
+result/run_system/reads_hac_standard_16gb_1T_run3_output.txt
+result/run_system/reads_hac_standard_16gb_1T_run2_output.txt
+result/run_system/reads_hac_standard_16gb_4T_run1_output.txt
+result/run_system/reads_hac_standard_16gb_4T_run2_output.txt
+result/run_system/reads_hac_standard_16gb_16T_run3_output.txt
+result/run_system/reads_sup_standard_8gb_16T_run1_output.txt
+result/run_system/reads_sup_standard_8gb_16T_run2_output.txt
+result/run_system/reads_sup_standard_8gb_16T_run3_output.txt
+result/run_system/reads_sup_standard_8gb_2T_run1_output.txt
+result/run_system/reads_sup_standard_8gb_4T_run2_output.txt
+result/run_system/reads_sup_standard_8gb_8T_run3_output.txt
+result/run_system/reads_sup_standard_8gb_2T_run2_output.txt
+result/run_system/reads_sup_standard_8gb_1T_run2_output.txt
+result/run_system/reads_sup_standard_8gb_8T_run1_output.txt
+result/run_system/reads_sup_standard_8gb_4T_run1_output.txt
+result/run_system/reads_sup_standard_8gb_1T_run1_output.txt
+result/run_system/reads_sup_standard_8gb_2T_run3_output.txt
+result/run_system/reads_sup_standard_8gb_4T_run3_output.txt
+result/run_system/reads_sup_standard_8gb_8T_run2_output.txt
+result/run_system/reads_sup_standard_8gb_1T_run3_output.txt
+result/run_system/reads_hac_standard_8gb_16T_run1_output.txt
+result/run_system/reads_hac_standard_8gb_8T_run2_output.txt
+result/run_system/reads_hac_standard_8gb_4T_run2_output.txt
+result/run_system/reads_hac_standard_8gb_2T_run1_output.txt
+result/run_system/reads_hac_standard_8gb_1T_run2_output.txt
+result/run_system/reads_hac_standard_8gb_16T_run3_output.txt
+result/run_system/reads_hac_standard_8gb_16T_run2_output.txt
+result/run_system/reads_hac_standard_8gb_4T_run3_output.txt
+result/run_system/reads_hac_standard_8gb_2T_run3_output.txt
+result/run_system/reads_hac_standard_8gb_8T_run1_output.txt
+result/run_system/reads_hac_standard_8gb_1T_run3_output.txt
+result/run_system/reads_hac_standard_8gb_4T_run1_output.txt
+result/run_system/reads_hac_standard_8gb_1T_run1_output.txt
+result/run_system/reads_hac_standard_8gb_8T_run3_output.txt
+result/run_system/reads_hac_standard_8gb_2T_run2_output.txt
+result/run_system/reads_sup_eskape_human_4gb_1T_run2_output.txt
+result/run_system/reads_sup_eskape_human_4gb_16T_run1_output.txt
+result/run_system/reads_sup_eskape_human_4gb_16T_run2_output.txt
+result/run_system/reads_sup_eskape_human_4gb_2T_run2_output.txt
+result/run_system/reads_sup_eskape_human_4gb_4T_run3_output.txt
+result/run_system/reads_sup_eskape_human_4gb_2T_run1_output.txt
+result/run_system/reads_sup_eskape_human_4gb_8T_run1_output.txt
+result/run_system/reads_sup_eskape_human_4gb_8T_run2_output.txt
+result/run_system/reads_sup_eskape_human_4gb_4T_run1_output.txt
+result/run_system/reads_sup_eskape_human_4gb_8T_run3_output.txt
+result/run_system/reads_sup_eskape_human_4gb_1T_run1_output.txt
+result/run_system/reads_sup_eskape_human_4gb_16T_run3_output.txt
+result/run_system/reads_sup_eskape_human_4gb_1T_run3_output.txt
+result/run_system/reads_sup_eskape_human_4gb_2T_run3_output.txt
+result/run_system/reads_sup_eskape_human_4gb_4T_run2_output.txt
+result/run_system/reads_hac_eskape_human_4gb_8T_run1_output.txt
+result/run_system/reads_hac_eskape_human_4gb_1T_run3_output.txt
+result/run_system/reads_hac_eskape_human_4gb_16T_run2_output.txt
+result/run_system/reads_hac_eskape_human_4gb_1T_run1_output.txt
+result/run_system/reads_hac_eskape_human_4gb_8T_run3_output.txt
+result/run_system/reads_hac_eskape_human_4gb_2T_run1_output.txt
+result/run_system/reads_hac_eskape_human_4gb_2T_run2_output.txt
+result/run_system/reads_hac_eskape_human_4gb_8T_run2_output.txt
+result/run_system/reads_hac_eskape_human_4gb_16T_run1_output.txt
+result/run_system/reads_hac_eskape_human_4gb_4T_run1_output.txt
+result/run_system/reads_hac_eskape_human_4gb_16T_run3_output.txt
+result/run_system/reads_hac_eskape_human_4gb_1T_run2_output.txt
+result/run_system/reads_hac_eskape_human_4gb_4T_run2_output.txt
+result/run_system/reads_hac_eskape_human_4gb_4T_run3_output.txt
+result/run_system/reads_hac_eskape_human_4gb_2T_run3_output.txt
+result/run_system/reads_fast_standard_16gb_1T_run3_output.txt
+result/run_system/reads_fast_standard_16gb_8T_run3_output.txt
+result/run_system/reads_fast_standard_16gb_16T_run3_output.txt
+result/run_system/reads_fast_standard_16gb_2T_run1_output.txt
+result/run_system/reads_fast_standard_16gb_1T_run1_output.txt
+result/run_system/reads_fast_standard_16gb_8T_run1_output.txt
+result/run_system/reads_fast_standard_16gb_4T_run2_output.txt
+result/run_system/reads_fast_standard_16gb_1T_run2_output.txt
+result/run_system/reads_fast_standard_16gb_16T_run1_output.txt
+result/run_system/reads_fast_standard_16gb_4T_run1_output.txt
+result/run_system/warmup_standard_16gb_output.txt
+result/run_system/reads_fast_standard_16gb_2T_run2_output.txt
+result/run_system/reads_fast_standard_16gb_4T_run3_output.txt
+result/run_system/reads_fast_standard_16gb_2T_run3_output.txt
+result/run_system/reads_fast_standard_16gb_8T_run2_output.txt
+result/run_system/reads_fast_standard_16gb_16T_run2_output.txt
+result/run1_50MB/reads_hac_sample_targeted_2T_run2_output.txt
+result/run1_50MB/reads_hac_sample_targeted_1T_run1_output.txt
+result/run1_50MB/reads_hac_sample_targeted_2T_run1_output.txt
+result/run1_50MB/reads_hac_sample_targeted_16T_run3_output.txt
+result/run1_50MB/reads_hac_sample_targeted_4T_run2_output.txt
+result/run1_50MB/reads_hac_sample_targeted_8T_run1_output.txt
+result/run1_50MB/reads_hac_sample_targeted_1T_run2_output.txt
+result/run1_50MB/reads_hac_sample_targeted_1T_run3_output.txt
+result/run1_50MB/reads_hac_sample_targeted_4T_run3_output.txt
+result/run1_50MB/reads_hac_sample_targeted_8T_run3_output.txt
+result/run1_50MB/reads_hac_sample_targeted_16T_run2_output.txt
+result/run1_50MB/reads_hac_sample_targeted_4T_run1_output.txt
+result/run1_50MB/reads_hac_sample_targeted_16T_run1_output.txt
+result/run1_50MB/reads_hac_sample_targeted_8T_run2_output.txt
+result/run1_50MB/reads_hac_sample_targeted_2T_run3_output.txt
+result/target_51MB_demo/reads_fast_output.txt
+result/run1_50MB/reads_sup_sample_targeted_8T_run3_output.txt
+result/run1_50MB/reads_sup_sample_targeted_1T_run1_output.txt
+result/run1_50MB/reads_sup_sample_targeted_1T_run3_output.txt
+result/run1_50MB/reads_sup_sample_targeted_4T_run2_output.txt
+result/run1_50MB/reads_sup_sample_targeted_16T_run3_output.txt
+result/run1_50MB/reads_sup_sample_targeted_2T_run1_output.txt
+result/run1_50MB/reads_sup_sample_targeted_8T_run1_output.txt
+result/run1_50MB/reads_sup_sample_targeted_2T_run3_output.txt
+result/run1_50MB/reads_sup_sample_targeted_4T_run1_output.txt
+result/run1_50MB/reads_sup_sample_targeted_16T_run1_output.txt
+result/run1_50MB/reads_sup_sample_targeted_1T_run2_output.txt
+result/run1_50MB/reads_sup_sample_targeted_2T_run2_output.txt
+result/run1_50MB/reads_sup_sample_targeted_16T_run2_output.txt
+result/run1_50MB/reads_sup_sample_targeted_8T_run2_output.txt
+result/run1_50MB/reads_sup_sample_targeted_4T_run3_output.txt
+result/run1_50MB/reads_fast_sample_targeted_2T_run1_output.txt
+result/run1_50MB/reads_fast_sample_targeted_8T_run1_output.txt
+result/run1_50MB/reads_fast_sample_targeted_8T_run2_output.txt
+result/run1_50MB/reads_fast_sample_targeted_8T_run3_output.txt
+result/run1_50MB/warmup_sample_targeted_output.txt
+result/run1_50MB/reads_fast_sample_targeted_16T_run3_output.txt
+result/run1_50MB/reads_fast_sample_targeted_1T_run2_output.txt
+result/run1_50MB/reads_fast_sample_targeted_1T_run3_output.txt
+result/run1_50MB/reads_fast_sample_targeted_4T_run1_output.txt
+result/run1_50MB/reads_fast_sample_targeted_1T_run1_output.txt
+result/run1_50MB/reads_fast_sample_targeted_4T_run3_output.txt
+result/run1_50MB/reads_fast_sample_targeted_2T_run2_output.txt
+result/run1_50MB/reads_fast_sample_targeted_16T_run1_output.txt
+result/run1_50MB/reads_fast_sample_targeted_2T_run3_output.txt
+result/run1_50MB/reads_fast_sample_targeted_4T_run2_output.txt
+result/run1_50MB/reads_fast_sample_targeted_16T_run2_output.txt
+result/target_6/DEMO_reads_fast_16T_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_2_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_2_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_3_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_3_output.txt
+result/run_system/warmup_eskape_human_4gb_output.txt
+result/run_system/reads_fast_eskape_human_4gb_16T_run2_output.txt
+result/run_system/reads_fast_eskape_human_4gb_2T_run2_output.txt
+result/run_system/reads_fast_eskape_human_4gb_16T_run3_output.txt
+result/run_system/reads_fast_eskape_human_4gb_8T_run2_output.txt
+result/run_system/reads_fast_eskape_human_4gb_8T_run3_output.txt
+result/run_system/reads_fast_eskape_human_4gb_1T_run2_output.txt
+result/run_system/reads_fast_eskape_human_4gb_2T_run3_output.txt
+result/run_system/reads_fast_eskape_human_4gb_8T_run1_output.txt
+result/run_system/reads_fast_eskape_human_4gb_16T_run1_output.txt
+result/run_system/reads_fast_eskape_human_4gb_4T_run1_output.txt
+result/run_system/reads_fast_eskape_human_4gb_1T_run1_output.txt
+result/run_system/reads_fast_eskape_human_4gb_2T_run1_output.txt
+result/run_system/reads_fast_eskape_human_4gb_1T_run3_output.txt
+result/run_system/reads_fast_eskape_human_4gb_4T_run2_output.txt
+result/run_system/reads_fast_eskape_human_4gb_4T_run3_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_1_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_1_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_4_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_4_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_2_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_2_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_2_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_2_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_5_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_5_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_6_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_6_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_3_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_3_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_3_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_3_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_0_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_0_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_8_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_8_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_7_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_7_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_1_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_1_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_1_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_1_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_11_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_11_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_4_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_4_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_4_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_4_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_5_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_5_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_5_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_5_output.txt
+result/run_system/reads_fast_standard_8gb_4T_run3_output.txt
+result/run_system/reads_fast_standard_8gb_8T_run2_output.txt
+result/run_system/reads_fast_standard_8gb_2T_run2_output.txt
+result/run_system/warmup_standard_8gb_output.txt
+result/run_system/reads_fast_standard_8gb_4T_run1_output.txt
+result/run_system/reads_fast_standard_8gb_16T_run1_output.txt
+result/run_system/reads_fast_standard_8gb_1T_run1_output.txt
+result/run_system/reads_fast_standard_8gb_1T_run3_output.txt
+result/run_system/reads_fast_standard_8gb_1T_run2_output.txt
+result/run_system/reads_fast_standard_8gb_8T_run1_output.txt
+result/run_system/reads_fast_standard_8gb_2T_run1_output.txt
+result/run_system/reads_fast_standard_8gb_4T_run2_output.txt
+result/run_system/reads_fast_standard_8gb_16T_run3_output.txt
+result/run_system/reads_fast_standard_8gb_2T_run3_output.txt
+result/run_system/reads_fast_standard_8gb_16T_run2_output.txt
+result/run_system/reads_fast_standard_8gb_8T_run3_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_6_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_6_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_6_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_6_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_0_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_0_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_0_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_0_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_9_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_10_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_9_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_10_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_8_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_8_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_8_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_8_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_7_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_7_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_7_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_7_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_12_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_12_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_11_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_11_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_11_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_11_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_13_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_13_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_9_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_9_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_9_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_9_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_10_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_10_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_10_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_10_output.txt
+result/run_system/reads_fast_eskape_650mb_1T_run3_output.txt
+result/run_system/reads_fast_eskape_650mb_4T_run2_output.txt
+result/run_system/reads_fast_eskape_650mb_2T_run3_output.txt
+result/run_system/reads_fast_eskape_650mb_4T_run1_output.txt
+result/run_system/reads_fast_eskape_650mb_2T_run1_output.txt
+result/run_system/reads_fast_eskape_650mb_2T_run2_output.txt
+result/run_system/reads_fast_eskape_650mb_16T_run2_output.txt
+result/run_system/reads_fast_eskape_650mb_8T_run3_output.txt
+result/run_system/reads_fast_eskape_650mb_4T_run3_output.txt
+result/run_system/reads_fast_eskape_650mb_16T_run1_output.txt
+result/run_system/warmup_eskape_650mb_output.txt
+result/run_system/reads_fast_eskape_650mb_1T_run1_output.txt
+result/run_system/reads_fast_eskape_650mb_16T_run3_output.txt
+result/run_system/reads_fast_eskape_650mb_1T_run2_output.txt
+result/run_system/reads_fast_eskape_650mb_8T_run1_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_12_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_12_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_12_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_12_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_14_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_14_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_13_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_13_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_13_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_13_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_14_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_14_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_14_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_14_output.txt
+result/run_system/reads_hac_eskape_650mb_16T_run1_output.txt
+result/run_system/reads_hac_eskape_650mb_2T_run2_output.txt
+result/run_system/reads_hac_eskape_650mb_16T_run3_output.txt
+result/run_system/reads_hac_eskape_650mb_1T_run2_output.txt
+result/run_system/reads_hac_eskape_650mb_1T_run3_output.txt
+result/run_system/reads_hac_eskape_650mb_16T_run2_output.txt
+result/run_system/reads_hac_eskape_650mb_1T_run1_output.txt
+result/run_system/reads_hac_eskape_650mb_4T_run2_output.txt
+result/run_system/reads_hac_eskape_650mb_4T_run1_output.txt
+result/run_system/reads_hac_eskape_650mb_2T_run1_output.txt
+result/run_system/reads_hac_eskape_650mb_2T_run3_output.txt
+result/run_system/reads_hac_eskape_650mb_8T_run2_output.txt
+result/run_system/reads_hac_eskape_650mb_8T_run3_output.txt
+result/run_system/reads_hac_eskape_650mb_4T_run3_output.txt
+result/run_system/reads_hac_eskape_650mb_8T_run1_output.txt
+result/run_system/reads_fast_eskape_650mb_8T_run2_output.txt
+result/run_system/reads_sup_eskape_650mb_4T_run1_output.txt
+result/run_system/reads_sup_eskape_650mb_4T_run2_output.txt
+result/run_system/reads_sup_eskape_650mb_4T_run3_output.txt
+result/run_system/reads_sup_eskape_650mb_16T_run1_output.txt
+result/run_system/reads_sup_eskape_650mb_16T_run2_output.txt
+result/run_system/reads_sup_eskape_650mb_16T_run3_output.txt
+result/run_system/reads_sup_eskape_650mb_2T_run2_output.txt
+result/run_system/reads_sup_eskape_650mb_8T_run3_output.txt
+result/run_system/reads_sup_eskape_650mb_2T_run1_output.txt
+result/run_system/reads_sup_eskape_650mb_1T_run3_output.txt
+result/run_system/reads_sup_eskape_650mb_1T_run1_output.txt
+result/run_system/reads_sup_eskape_650mb_8T_run2_output.txt
+result/run_system/reads_sup_eskape_650mb_1T_run2_output.txt
+result/run_system/reads_sup_eskape_650mb_2T_run3_output.txt
+result/run_system/reads_sup_eskape_650mb_8T_run1_output.txt
+result/cellsize_sweep/eskape_16bit_T0_pod5_15_output.txt
+result/cellsize_sweep/eskape_16bit_T0p05_pod5_15_output.txt
+result/cellsize_sweep/eskape_24bit_T0_pod5_15_output.txt
+result/cellsize_sweep/eskape_24bit_T0p05_pod5_15_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0_pod5_15_output.txt
+result/cellsize_sweep/eskape_32bit_stock_T0p05_pod5_15_output.txt
+
+#==========================================================================
+# SECTION 2 - today's regenerable intermediates   19 files, 805M
+#==========================================================================
+# Frequency profiles rebuild in ~60 s:
+#   classify_la -H .. -t .. -o .. -p 1 -g 2 -W <out.prof> <reads.fastq>
+# The .out/.rep files are scratch comparison copies from correctness checks.
+# NOT listed (keep): the .tsv measurement data, bin/, src/, the *.log files.
+#
+scratch_lookaside/out/pod5_2.prof
+scratch_lookaside/out/pod5_15.prof
+scratch_lookaside/out/pod5_2_8M.prof
+scratch_lookaside/out/b.out
+scratch_lookaside/out/b.rep
+scratch_lookaside/out/n.out
+scratch_lookaside/out/n.rep
+scratch_lookaside/out/s.out
+scratch_lookaside/out/s.rep
+scratch_lookaside/out/s1.out
+scratch_lookaside/out/s1.rep
+scratch_lookaside/out/s16.out
+scratch_lookaside/out/s16.rep
+scratch_lookaside/out/tiny.fastq
+scratch_lookaside/out/tiny2.fastq
+scratch_lookaside/out/x.out
+scratch_lookaside/out/x.rep
+scratch_lookaside/out/y.out
+scratch_lookaside/out/y.rep
+
+#==========================================================================
+# SECTION 3 - REVIEW FIRST  (commented out: NOT deleted by the command above)
+#==========================================================================
+#  [DONE 2026-08-30] databases/standard_16gb - DELETED (15G). Was a prebuilt
+#          download, not a local build; manifest kept in archive/deleted_db_manifests.txt
+#     8G  databases/standard_8gb
+#          same; superseded by standard_16gb unless you still compare the two
+#     4G  databases/eskape_human_4gb
+#          ESKAPE+human; not referenced by any 2026-08 work
+#   690M  databases/sample_targeted
+#          used by result/run1_50MB (Jun 13)
+#   141M  databases/eskape_650mb
+#          used by result/run_system
+#    27M  databases/eskape_cs
+#          superseded by the eskape_16/20/24/32bit set
+#    49M  databases/target_51MB
+#          used by result/target_51MB_demo
+#    47M  archive/databases/eskape_32bit_stock
+#          the 2.1.2-built DB, deliberately archived as a reference point
+#    36M  kraken2_laptop
+#          DIFFERENT fork (git bb1162f vs kraken2 7c0eb91); build_db.cc/.h and compact_hash.h differ and merge.cc is absent - NOT a duplicate, check before removing
+#    12M  kraken2_laptop_bin
+#          binaries for the above
+#    14M  kraken2_bin_fork.bak
+#          backup of kraken2_bin; all 4 binaries differ from current
+#     2G  basecalling
+#          reads_fast/hac/sup fastq - the basecalled source reads
+#    53M  scratch_lookaside/bin
+#          12 built classify variants from today
+#     7K  scripts/kraken2_fork_cellsize.patch
+#          STALE: superseded by kraken2_cellsize_v2.patch (no 20-bit, no build_db.h fix)
+#    13K  scripts/__pycache__
+#          python bytecode cache
+
+#==========================================================================
+# SECTION 4 - DO NOT DELETE
+#==========================================================================
+# kraken2/                                   the working source tree (fork, git 7c0eb91)
+# kraken2_bin/                               the baseline binaries every measurement compares against
+# databases/eskape_32bit_fork/               THE project benchmark baseline
+# databases/eskape_16bit/                    cell-size study
+# databases/eskape_20bit/                    cell-size study
+# databases/eskape_24bit/                    cell-size study
+# perpod5/                                   the 16 nanopore read files - primary input data
+# result/*/*_report.txt                      taxon abundances - the actual results
+# result/*/*_perf.txt                        perf counters
+# result/*/*_log.txt                         the exact commands, needed to regenerate section 1
+# result/*/*summary*.md                      written analyses
+# result/perf_threadsweep/                   7 MB, no output.txt at all - all analysis
+# CACHE_TABLE_ANALYSIS.md                    945-line analysis
+# CELLWIDTH_DB_BUILD.md                      partner build/repro spec
+# LOOKASIDE_TABLE_PROMPT.md                  implementation prompt
+# scripts/kraken2_cellsize_v2.patch          the cell-size restore point
+# scripts/kraken2_lookaside.patch            todays lookaside patch
+# scratch_lookaside/out/*.tsv                todays raw measurement data behind every table
+# scratch_lookaside/src/                     todays patched source
+# run_experiment.sh                          the benchmark driver
+
+# SUMMARY: section 1 = 21G, section 2 = 805M, total safe = 21G
+# Tree was 63G at generation; 41G after the two standard_* databases were removed.
