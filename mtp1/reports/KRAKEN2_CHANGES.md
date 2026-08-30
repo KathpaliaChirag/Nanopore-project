@@ -222,7 +222,7 @@ refactor, verified byte-identical.
 
 The cache works — up to 26.2% of lookups avoid DRAM — and the program still gets
 slower, because the probe cost grows faster than the memory saving. Full numbers
-in `result/run_sweep/REPORT.md` and `LOOKASIDE_REPORT.md`.
+in `../results/lookaside_sweep/REPORT.md` and `LOOKASIDE_REPORT.md`.
 
 ---
 

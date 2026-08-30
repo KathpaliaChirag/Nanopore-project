@@ -9,8 +9,8 @@ Newest first. Plain words. Every entry says **what** changed, **why**, and
 
 **What:** Swept `-B` through every value from 1 to 32, three interleaved runs
 each (99 runs), recording plain `perf stat` counters for each. Raw files:
-`result/prefetch/perf/` (99 files). Full 33-row table:
-`result/prefetch/TABLE.txt`.
+`../results/prefetch/perf/` (99 files). Full 33-row table:
+`../results/prefetch/TABLE.txt`.
 
 **Measured values** (no comparisons - these are the raw figures):
 
@@ -221,7 +221,7 @@ touched. Found and fixed four things.
 
 2. **Three documents contained commands that no longer run.** The reproduce
    snippets in `LOOKASIDE_REPORT.md`, `CACHE_TABLE_ANALYSIS.md` and
-   `result/run_sweep/REPORT.md` all used `-A` and `-Z`, which we deleted earlier
+   `../results/lookaside_sweep/REPORT.md` all used `-A` and `-Z`, which we deleted earlier
    today. Each now carries a note saying so, rather than looking runnable.
 
 3. **`scripts/kraken2_lookaside.patch` is stale.** Confirmed: zero references to
@@ -259,7 +259,7 @@ pre-computed profile handed to it.
 - We can no longer measure the **oracle ceiling** — that was `-A`. That was the
   number showing the best a perfect cache could ever do (29.54%).
 - Both were measurement instruments, not features. The results they produced are
-  already written down in `LOOKASIDE_REPORT.md` and `result/run_sweep/REPORT.md`.
+  already written down in `LOOKASIDE_REPORT.md` and `../results/lookaside_sweep/REPORT.md`.
 
 **Loose end:** `-W` still exists. It writes a frequency profile — but nothing
 reads those files any more, because `-A` is gone. It should probably be removed
@@ -329,7 +329,7 @@ bigger slower one, like a real CPU cache.
 **What it means:** Measured all 60 combinations. **All 60 are slower than plain
 kraken2**, from +3.7% to +28%. The tables do work — up to 26.2% of lookups are
 answered without touching main memory — but the extra checking costs more than
-the memory it saves. Full numbers in `result/run_sweep/REPORT.md`.
+the memory it saves. Full numbers in `../results/lookaside_sweep/REPORT.md`.
 
 ---
 

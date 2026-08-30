@@ -5,7 +5,7 @@ looks up minimizers in batches, starting several memory fetches before waiting
 for any of them.
 
 Binary: `scratch_lookaside/bin/classify_prefetch`
-Measurements: `result/prefetch/` (99 raw perf files + `TABLE.txt`)
+Measurements: `../results/prefetch/` (99 raw perf files + `TABLE.txt`)
 
 ---
 
@@ -198,7 +198,7 @@ Mean of 3 interleaved reps; `sd` is the standard deviation of those 3 times.
 | `29` | 84.26 | 2.553 | 0.006 | 79,200,878 | 22,592,668 | 28.53 | 1.49 | 0.141 | 1096.7 | 736.0 |
 | `32` | 84.26 | 2.561 | 0.015 | 80,446,021 | 22,656,315 | 28.16 | 1.49 | 0.141 | 1096.5 | 735.9 |
 
-Full 33 rows: `result/prefetch/TABLE.txt`.
+Full 33 rows: `../results/prefetch/TABLE.txt`.
 
 ### What the numbers say
 

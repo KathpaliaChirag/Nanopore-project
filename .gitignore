@@ -13,12 +13,12 @@
 
 # Allow the centrifuge pod5 sweep's raw perf captures and classification counts
 # (0.7 MB total; kept so every figure in centrifuge_pod5_report.md is reproducible)
-!mtp1/result/centrifuge_pod5/raw/*
-!mtp1/result/centrifuge_pod5/class/*
+!mtp1/results/centrifuge_pod5/raw/*
+!mtp1/results/centrifuge_pod5/class/*
 
 # Allow the kraken2 software-prefetch patch (reproduces the -B results in
-# mtp1/updates/CHANGELOG.md and mtp1/PREFETCH.md)
-!mtp1/updates/scripts/kraken2_prefetch.patch
+# mtp1/reports/CHANGELOG.md and mtp1/reports/PREFETCH.md)
+!mtp1/scripts/kraken2_prefetch.patch
 
 # Allow .gitignore itself
 !.gitignore
