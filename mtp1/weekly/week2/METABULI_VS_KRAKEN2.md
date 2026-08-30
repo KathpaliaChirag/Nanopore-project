@@ -19,6 +19,17 @@ One quirk that matters a lot below: several *different* codons can produce the *
 
 Because codons are read in fixed groups of 3, *where you start counting* matters — there are 3 possible starting points, called **reading frames**. Codons never overlap and never slide: codon 2 always starts exactly 3 letters after codon 1, locked to wherever you started. Keep this in mind — it's the single most important fact in this whole document.
 
+> [!IMPORTANT]
+> **A common mix-up worth correcting here.** Take `ATGCAT` (6 letters). It's tempting to generate codons the way you'd generate DNA k-mers — sliding one letter at a time: `ATG → TGC → GCA → CAT`. That's wrong. Sliding by 1 letter is how k-mers work (§3 below), not codons.
+>
+> Codons come from **3 separate, independent attempts**, each locked to one starting point and jumping 3 letters at a time — never overlapping within an attempt:
+> ```
+> Frame 0 (start at letter 1):  [ATG][CAT]                    → codons: ATG, CAT
+> Frame 1 (start at letter 2): A[TGC](AT left over, discarded) → codon:  TGC
+> Frame 2 (start at letter 3): AT[GCA](T left over, discarded) → codon:  GCA
+> ```
+> Same 4 codon texts either way, but a completely different shape: 3 separate chains, not 1 sliding list. This is exactly why a single indel behaves so differently for codons than for k-mers — see §6. If codons slid by 1 like k-mers do, they'd self-heal near an error the same easy way Kraken2's windows do; because they instead jump by 3 from one fixed start, a single dropped letter throws off *every* codon after it in that frame, and recovering means discarding the whole attempt and restarting from a different offset.
+
 ## 2. Reads, and why they sometimes have errors
 
 A **read** is the sequencer's output for one strand of DNA. This project uses **Nanopore sequencing**, where DNA threads through a tiny pore and the machine guesses each letter from an electrical signal. That guess is sometimes wrong: a letter can be misread (**substitution**), skipped (**deletion**), or an extra one can appear (**insertion**). Deletions and insertions together are called **indels**. An indel doesn't damage the letters around it — it just shifts everything downstream by one position relative to where it should be.
