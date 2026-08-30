@@ -1,23 +1,4 @@
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cd ~/Desktop/summer_project && git pull origin hobbbit 2>/dev/null || true",
-            "statusMessage": "Syncing memory repo (hobbbit)..."
-          },
-          {
-            "type": "command",
-            "command": "python3 -c \"\nimport json, os\np = os.path.expanduser('~/Desktop/summer_project')\ncache = 'JUNK/CACHE FILES TO REVIEW:\\n  ~/.nsys-symbols       — CUDA symbol cache (NOT YET CREATED)\\n  ~/results/nsight/     — nsys profiling output (NOT YET CREATED)\\n  /opt/kraken2-build/   — Kraken-2 -pg build (NOT YET CREATED)'\ntry: idx = open(p+'/index.md').read()\nexcept: idx = '(index.md not found)'\ntry: ds = ''.join(open(p+'/daily_summary.md').readlines()[-40:])\nexcept: ds = '(daily_summary.md not found)'\nmsg = cache + '\\n\\n=== MEMORY RECAP ===\\n\\n=== index.md ===\\n' + idx + '\\n=== daily_summary.md (recent) ===\\n' + ds\nprint(json.dumps({'systemMessage': msg}))\n\"",
-            "statusMessage": "Loading session context..."
-          }
-        ]
-      }
-    ]
-  },
   "permissions": {
     "allow": [
       "Bash(curl -s https://api.github.com/repos/nanoporetech/dorado/releases/latest)",
@@ -45,7 +26,83 @@
       "Bash(python -c ' *)",
       "Bash(python *)",
       "Bash(rm -rf .temp_dorado_model-*)",
-      "Bash(rm -rf .tmp_pod5_v3_v4_migration_*)"
+      "Bash(rm -rf .tmp_pod5_v3_v4_migration_*)",
+      "Bash(grep -v '^#\\\\|^$' /home/sauron-hobbbit/Desktop/summer_project/results/pfz_batch1/ch4_perf_record/exp10_naive_report.txt)",
+      "Bash(perf stat *)",
+      "Bash(OMP_NUM_THREADS=8 perf stat ./matmul_omp)",
+      "Bash(perf list *)",
+      "Bash(git clone *)",
+      "Bash(perf record *)",
+      "Bash(../flamegraph/FlameGraph/flamegraph.pl)",
+      "Bash(grep -v \"^$\")",
+      "Bash(mkdir -p /home/sauron-hobbbit/Desktop/summer_project/results/pfz_batch1/ch5_perf_advanced)",
+      "Bash(perf diff *)",
+      "Bash(perf mem *)",
+      "Read(//sys/devices/ibs_op/format/**)",
+      "Read(//sys/devices/ibs_op/**)",
+      "Bash(perf c2c *)",
+      "Bash(perf bench *)",
+      "Bash(make doubles *)",
+      "Bash(make matmul_blas *)",
+      "Bash(sudo perf stat -e ibs_op/cnt_ctl=1/ -a ./matmul_naive)",
+      "Bash(chmod +x /home/sauron-hobbbit/Desktop/summer_project/results/pfz_batch1/src/run_all_experiments.sh)",
+      "Bash(bash run_all_experiments.sh)",
+      "Bash(cd *)",
+      "Bash(make clean *)",
+      "Bash(make all *)",
+      "Bash(grep -v '\\\\.c$\\\\|\\\\.sh$')",
+      "Bash(time ./matmul_naive)",
+      "Bash(time ./matmul_tiled_prefetch)",
+      "Bash(time ./matmul_transposed)",
+      "Bash(time ./matmul_strassen)",
+      "Bash(chmod +x /home/sauron-hobbbit/Desktop/summer_project/results/pfz_batch1/src/run_ch3_paramN.sh)",
+      "Bash(sed -i -E 's/^#define N [0-9]+$/#define N 2048/' matmul_naive.c matmul_tiled_prefetch.c matmul_transposed.c)",
+      "Bash(make matmul_naive matmul_tiled_prefetch matmul_transposed)",
+      "Bash(bash run_ch3_paramN.sh 2048)",
+      "Bash(python3)",
+      "Bash(grep -n \"^## Phase 2[bc]\\\\|^---$\" /home/sauron-hobbbit/Desktop/summer_project/report.md)",
+      "Bash(cp /tmp/phase2b.md /home/sauron-hobbbit/Desktop/summer_project/matrix_mul/report_n1024.md)",
+      "Bash(sed -i '1s|^## Phase 2b — Matmul 21-Variant CH3 \\(perf stat\\) Sweep$|# Matrix Multiplication — N=1024 — CH3 \\(perf stat\\) Sweep|' /home/sauron-hobbbit/Desktop/summer_project/matrix_mul/report_n1024.md)",
+      "Bash(python3 -c \"import matplotlib; print\\(matplotlib.__version__\\)\")",
+      "Bash(python3 -c \"import numpy; print\\(numpy.__version__\\)\")",
+      "Bash(pip3 install *)",
+      "Bash(python3 -c \"import matplotlib, numpy; print\\('OK', matplotlib.__version__, numpy.__version__\\)\")",
+      "Bash(apt list *)",
+      "Bash(python3 -m pip --version)",
+      "Bash(sudo -n apt-get install -y python3-matplotlib python3-numpy)",
+      "Bash(python3 *)",
+      "Bash(chmod +x *)",
+      "Bash(git -C /home/sauron-hobbbit/Desktop/summer_project add report.md results/dorado/run_and_profile.sh results/dorado/watch_gpu.sh results/dorado/prof/fast_gpu.log results/dorado/prof/hac_gpu.log results/dorado/prof/fast_time.txt results/dorado/prof/hac_time.txt results/dorado/prof/gpu_profile_report.md results/dorado/prof/run_output.log)",
+      "Bash(git -C /home/sauron-hobbbit/Desktop/summer_project status)",
+      "Bash(mkdir *)",
+      "Artifact",
+      "Bash(awk '{ print length\\($0\\), $0 }' /tmp/claude-1000/-home-sauron-hobbbit-Desktop-summer-project/3b0bb899-39f4-4701-97cb-cbeeb75a1de4/scratchpad/resume/draft_v0.txt)",
+      "Bash(awk '{ print length\\($0\\), $0 }' /tmp/claude-1000/-home-sauron-hobbbit-Desktop-summer-project/3b0bb899-39f4-4701-97cb-cbeeb75a1de4/scratchpad/resume/v1_bullets.txt)",
+      "Bash(awk { print length\\($0\\), $0 } *)",
+      "Bash(awk '{ print length\\($0\\), $0 }' /tmp/claude-1000/-home-sauron-hobbbit-Desktop-summer-project/3b0bb899-39f4-4701-97cb-cbeeb75a1de4/scratchpad/resume/draft_v3_candidates.txt)",
+      "Bash(awk '{print length\\($0\\), $0}')",
+      "Bash(awk '{ print length\\($0\\), $0 }' /tmp/claude-1000/-home-sauron-hobbbit-Desktop-summer-project/3b0bb899-39f4-4701-97cb-cbeeb75a1de4/scratchpad/resume/draft_v3.txt)",
+      "Bash(awk '{ print length\\($0\\), $0 }' /tmp/claude-1000/-home-sauron-hobbbit-Desktop-summer-project/3b0bb899-39f4-4701-97cb-cbeeb75a1de4/scratchpad/resume/v4_candidate.txt)",
+      "Bash(awk '{ print length\\($0\\), $0 }' /tmp/claude-1000/-home-sauron-hobbbit-Desktop-summer-project/3b0bb899-39f4-4701-97cb-cbeeb75a1de4/scratchpad/resume/final_v4.txt)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd ~/Desktop/summer_project && git pull origin hobbbit 2>/dev/null || true",
+            "statusMessage": "Syncing memory repo (hobbbit)..."
+          },
+          {
+            "type": "command",
+            "command": "python3 -c \"\nimport json, os\np = os.path.expanduser('~/Desktop/summer_project')\ncache = 'JUNK/CACHE FILES TO REVIEW:\\n  ~/.nsys-symbols       — CUDA symbol cache (NOT YET CREATED)\\n  ~/results/nsight/     — nsys profiling output (NOT YET CREATED)\\n  /opt/kraken2-build/   — Kraken-2 -pg build (NOT YET CREATED)'\ntry: idx = open(p+'/index.md').read()\nexcept: idx = '(index.md not found)'\ntry: ds = ''.join(open(p+'/daily_summary.md').readlines()[-40:])\nexcept: ds = '(daily_summary.md not found)'\nmsg = cache + '\\n\\n=== MEMORY RECAP ===\\n\\n=== index.md ===\\n' + idx + '\\n=== daily_summary.md (recent) ===\\n' + ds\nprint(json.dumps({'systemMessage': msg}))\n\"",
+            "statusMessage": "Loading session context..."
+          }
+        ]
+      }
     ]
   }
 }
