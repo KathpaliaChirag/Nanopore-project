@@ -325,4 +325,26 @@ cd .. && ./install_kraken2.sh ~/tools/kraken2-fresh-bin-s3-0-262144 && cd src
 # then re-ran the P.0 crash-reproduction command at 16T, 32T, and 96T against this binary
 cp classify.cc.s3.0-4096.bak classify.cc   # restored to the real, permanent (4,096-set, heap-fixed) state
 ```
-**Result:** **crash-free at every thread count tested** — 16T (0.511s), 32T (0.500s), 96T (0.515s), all exit code 0, all reporting the identical 25,645/30,378 classified — where the pre-fix binary segfaulted (exit 139) at every one of these thread counts on 2026-08-26. **S3.0 is done: the crash is fixed, correctness is unchanged, and the fix is isolated from the still-open slowdown cliff.** `classify.cc` restored to its permanent state on Luna; commit+tag as `safe/S3.0` on `~/tools/kraken2-src-fresh` queued as the next step. Next after that: S3.1 wires today's confirmed 105MB/socket into the real sizing formula.
+**Result:** **crash-free at every thread count tested** — 16T (0.511s), 32T (0.500s), 96T (0.515s), all exit code 0, all reporting the identical 25,645/30,378 classified — where the pre-fix binary segfaulted (exit 139) at every one of these thread counts on 2026-08-26. **S3.0 is done: the crash is fixed, correctness is unchanged, and the fix is isolated from the still-open slowdown cliff.** Committed and tagged on `~/tools/kraken2-src-fresh` as `safe/S3.0` (`c2981a7`, detached HEAD off `v2.17.1`, same tag-checkpoint pattern as `safe/S1.2`→`safe/S2.4` — this repo has never used a branch for real checkpoints, tags are the intentional persistence mechanism).
+
+**Command (S3.1/S3.2 — the sizing formula):** `plan_paper/scripts/s3_1_s3_2_sizing_formula_patch.py`, applied against the S3.0-patched `classify.cc`:
+```bash
+cp classify.cc classify.cc.pre-s3.1-3.2.bak
+python3 /tmp/s3_1_s3_2_sizing_formula_patch.py        # "patched OK"
+diff classify.cc.pre-s3.1-3.2.bak classify.cc          # confirmed only the intended hunks changed
+cd .. && ./install_kraken2.sh ~/tools/kraken2-fresh-bin-s2 && cd src
+```
+**Why this patch:** replaces the hardcoded `S2_NUM_SETS = 4096` with `N_sets(T) = floor_pow2(f × 105MiB / (4 ways × 16B × T))`, clamped to `[4096, 262144]`, computed once per thread inside `S2EnsureInit()` via a new `S3ComputeNumSets()` helper. `LLC_per_socket = 105MiB` uses today's `lscpu`-confirmed number directly (no longer the spec-sheet-derived assumption). `T` is read live via `omp_get_num_threads()` from inside the active classification parallel region — `Options.num_threads` is passed to `omp_set_num_threads()` before that region starts (`classify.cc:270`), so this correctly reflects `--threads N` without threading `opts` through `S2Lookup`/`S2Insert`'s signatures. `f = 0.25` is an interim placeholder, **not yet empirically resolved** — chosen because it lands at exactly 262,144 sets (S3.0's confirmed ceiling) at T=1 and exactly 4,096 sets (this project's long-validated size) at T=96, a sane range, not a claim that 0.25 is correct. `S2SetIndex`'s bitmask changed from the removed compile-time constant to the new `thread_local s2_num_sets` variable.
+
+**A paste-corruption near-miss, worth logging:** the first attempt to get this ~130-line script onto Luna via a raw heredoc paste got silently scrambled mid-transit (several lines merged into one garbled line) — caught before running anything by inspecting the pasted terminal output, not by a build failure. Recovered by base64-encoding the script into a 97-line, special-character-free block, heredoc'ing *that* instead, decoding locally, and verifying the decoded file's SHA-256 against the hash of the file actually committed to GitHub before running it. The patch itself was also dry-run locally against a reconstructed copy of the live file before ever being sent to Luna. Worth repeating for any future patch of comparable length.
+
+**Correctness + crash/consistency check:**
+```bash
+~/tools/kraken2-fresh-bin-s2/kraken2 --db ~/AccuracyDrift/databases/sample_targeted \
+  --threads 1 --output ~/correctness_check/s3_formula_output.txt --report ~/correctness_check/s3_formula_report.txt \
+  ~/data/basecalled/hac/FBE01990_24778b97_03e50f91_15.fastq
+diff ~/correctness_check/s0_output.txt ~/correctness_check/s3_formula_output.txt   # OUTPUT IDENTICAL
+diff ~/correctness_check/s0_report.txt ~/correctness_check/s3_formula_report.txt   # REPORT IDENTICAL
+# then 16T/32T/96T sanity runs against the same DB/fastq
+```
+**Result:** byte-identical output/report vs. S0 at T=1 (now sized at 262,144 sets under the new formula — much larger than the old 4,096 default, expected and correct, since fewer threads means more LLC budget per thread). Crash-free and classification-consistent (`25,645`/`30,378` every time) at 16T (16,384 sets), 32T (8,192 sets), and 96T (4,096 sets) — confirming the formula both computes sane values and shrinks correctly as thread count rises, with no correctness regression at any tested T. **S3.1/S3.2's formula is implemented and verified.** Committed and tagged as `safe/S3.1-S3.2` (`f686002`). Still open: S3.2's real empirical sweep of `f` against benchmark hit-rate data (today's 0.25 is a placeholder), and S3.3's pre-touch experiment for the separate slowdown cliff at ≥1,048,576 sets.
