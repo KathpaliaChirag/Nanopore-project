@@ -16,5 +16,9 @@
 !mtp1/result/centrifuge_pod5/raw/*
 !mtp1/result/centrifuge_pod5/class/*
 
+# Allow the kraken2 software-prefetch patch (reproduces the -B results in
+# mtp1/updates/CHANGELOG.md and mtp1/PREFETCH.md)
+!mtp1/updates/scripts/kraken2_prefetch.patch
+
 # Allow .gitignore itself
 !.gitignore

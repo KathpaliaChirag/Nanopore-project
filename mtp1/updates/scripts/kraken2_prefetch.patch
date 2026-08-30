@@ -1,0 +1,240 @@
+# kraken2 software prefetch: batched minimizer lookups (-B)
+#
+# WHAT
+#   Splits the classification inner loop into two passes. Pass 1 scans B
+#   minimizers, hashes each once, and issues __builtin_prefetch for the hash
+#   table line it will land on -- without waiting. Pass 2 resolves them in the
+#   original order, by which time the lines have arrived. The same memory
+#   accesses happen; they simply overlap instead of queueing.
+#
+#   New flag:  -B NUM   batch size, 1..64.  Default 1 = the stock code path.
+#
+# APPLIES TO
+#   This project's FORKED tree (kraken2/src, git 7c0eb91, which already carries
+#   the 16/20/24/40-bit cell-size work) -- NOT upstream kraken2 2.17.1.
+#
+#     cd kraken2 && patch -p1 < ../scripts/kraken2_prefetch.patch
+#
+# MEASURED (pod5_2, 151591 reads / 499.98 Mbp / 160,625,038 lookups,
+#           eskape_32bit_fork, -p 16 -g 2 -T 0, mean of 3 interleaved reps)
+#   stock   2.893 s   IPC 1.13   0.938 DRAM accesses/lookup
+#   -B 4    2.572 s   IPC 1.35   0.142   (nearly all the memory benefit)
+#   -B 29   2.553 s   IPC 1.49   0.141   -11.77% vs stock, best measured
+#   Curve is flat by 32. Instructions rise ~11%; cycles fall ~15%.
+#
+# CORRECTNESS
+#   Output file AND report byte-identical to stock kraken2_bin/classify at
+#   -B 1/8/16/32 x -p 1/16 x pod5_15/pod5_2 -- 16 of 16 exact.
+#
+# FRAGILE DEPENDENCY -- read before editing
+#   In pass 2, add_kmer() uses the captured pf[i].min instead of
+#   scanner.last_minimizer(), because the scanner has advanced past the batch.
+#   That substitution is only valid because NextMinimizer() returns
+#   &last_minimizer_ (mmscanner.cc:146,156,188). If upstream ever changes what
+#   NextMinimizer() returns, this breaks SILENTLY -- wrong report counts, no
+#   compile error. Same reason scanner.is_ambiguous() is captured per entry.
+#
+# DELIBERATELY UNCHANGED
+#   The depth-1 last_minimizer/last_taxon skip; minimizer_hit_groups++ and its
+#   position; hit_counts; taxa.push_back ordering; the quick_mode goto.
+#   (An earlier patch in this project moved that increment and silently changed
+#   hit-group counts at frame boundaries.)
+#
+--- a/src/kv_store.h
++++ b/src/kv_store.h
+@@ -29,6 +29,11 @@
+ class KeyValueStore {
+   public:
+   virtual hvalue_t Get(hkey_t key) const = 0;
++  // Look up with a hash the caller already computed, and start the memory
++  // fetch for that hash without waiting for it. Together these let a caller
++  // issue several lookups before consuming any of them.
++  virtual hvalue_t GetWithHash(hkey_t key, uint64_t hc) const = 0;
++  virtual void Prefetch(uint64_t hc) const = 0;
+   virtual ~KeyValueStore() {}
+ 
+   // static CellType GetKVCellType(std::string &filename);
+--- a/src/compact_hash.h
++++ b/src/compact_hash.h
+@@ -208,6 +208,8 @@
+   ~CompactHashTable();
+ 
+   hvalue_t Get(hkey_t key) const;
++  hvalue_t GetWithHash(hkey_t key, uint64_t hc) const;
++  void Prefetch(uint64_t hc) const;
+   bool FindIndex(hkey_t key, size_t *idx) const;
+ 
+   // How CompareAndSet works:
+@@ -353,7 +355,18 @@
+ 
+ template<typename Cell>
+ hvalue_t CompactHashTable<Cell>::Get(hkey_t key) const {
+-  uint64_t hc = MurmurHash3(key);
++  return GetWithHash(key, MurmurHash3(key));
++}
++
++// Start fetching the cache line this hash will land on. Returns immediately;
++// the load completes in the background while the caller does other work.
++template<typename Cell>
++void CompactHashTable<Cell>::Prefetch(uint64_t hc) const {
++  __builtin_prefetch(&table_[hc % capacity_], 0, 3);
++}
++
++template<typename Cell>
++hvalue_t CompactHashTable<Cell>::GetWithHash(hkey_t key, uint64_t hc) const {
+   uint64_t compacted_key = hc >> (64 - key_bits_);
+   size_t idx = hc % capacity_;
+   size_t first_idx = idx;
+--- a/src/classify.cc
++++ b/src/classify.cc
+@@ -34,6 +34,23 @@
+ static const taxid_t READING_FRAME_BORDER_TAXON = TAXID_MAX - 1;
+ static const taxid_t AMBIGUOUS_SPAN_TAXON = TAXID_MAX - 2;
+ 
++// ---- batched lookup with software prefetch (-B) ----------------------------
++// The stock loop resolves one minimizer at a time, so every DRAM access waits
++// for the previous one: measured memory-level parallelism is 1.24 of the ~12
++// the core can sustain, leaving ~187 of 868 cycles per lookup exposed to
++// latency. Batching does not avoid a single memory access -- it overlaps them.
++// Pass 1 hashes B minimizers and issues a prefetch for each; pass 2 resolves
++// them in the original order, by which time the lines are in flight or arrived.
++// -B 1 restores the stock one-at-a-time path exactly.
++static int la_batch = 1;
++struct PfSlot {
++  uint64_t min;     // the minimizer
++  uint64_t hc;      // MurmurHash3(min), computed once in pass 1
++  bool     amb;     // scanner.is_ambiguous() AT THE TIME THIS WAS SCANNED --
++                    // scanner state moves on during pass 1, so it is captured
++};
++static const int PF_MAX = 64;
++
+ // template <typename Cell>
+ // using IndexData = std::tuple<IndexOptions, Taxonomy, CompactHashTable<Cell> *>;
+ 
+@@ -830,45 +847,66 @@
+       }
+       uint64_t last_minimizer = UINT64_MAX;
+       taxid_t last_taxon = TAXID_MAX;
+-      while ((minimizer_ptr = scanner.NextMinimizer()) != nullptr) {
+-        taxid_t taxon;
+-        if (scanner.is_ambiguous()) {
+-          taxon = AMBIGUOUS_SPAN_TAXON;
++      PfSlot pf[PF_MAX];
++      bool frame_done = false;
++      while (! frame_done) {
++        // ---- pass 1: scan a batch, hash it, and start the memory fetches ----
++        int n_pf = 0;
++        while (n_pf < la_batch) {
++          minimizer_ptr = scanner.NextMinimizer();
++          if (minimizer_ptr == nullptr) { frame_done = true; break; }
++          pf[n_pf].min = *minimizer_ptr;
++          pf[n_pf].amb = scanner.is_ambiguous();
++          if (! pf[n_pf].amb) {
++            pf[n_pf].hc = MurmurHash3(pf[n_pf].min);
++            hash->Prefetch(pf[n_pf].hc);
++          }
++          n_pf++;
+         }
+-        else {
+-          if (*minimizer_ptr != last_minimizer) {
+-            bool skip_lookup = false;
+-            if (idx_opts.minimum_acceptable_hash_value) {
+-              if (MurmurHash3(*minimizer_ptr) < idx_opts.minimum_acceptable_hash_value)
+-                skip_lookup = true;
++        // ---- pass 2: resolve in the original order ----
++        for (int pf_i = 0; pf_i < n_pf; pf_i++) {
++          taxid_t taxon;
++          if (pf[pf_i].amb) {
++            taxon = AMBIGUOUS_SPAN_TAXON;
++          }
++          else {
++            if (pf[pf_i].min != last_minimizer) {
++              bool skip_lookup = false;
++              if (idx_opts.minimum_acceptable_hash_value) {
++                if (pf[pf_i].hc < idx_opts.minimum_acceptable_hash_value)
++                  skip_lookup = true;
++              }
++              taxon = 0;
++              if (! skip_lookup)
++                taxon = hash->GetWithHash(pf[pf_i].min, pf[pf_i].hc);
++              last_taxon = taxon;
++              last_minimizer = pf[pf_i].min;
++              // Increment this only if (a) we have DB hit and
++              // (b) minimizer != last minimizer
++              if (taxon) {
++                minimizer_hit_groups++;
++                // New minimizer should trigger registering minimizer in RC/HLL
++                if (!opts.report_filename.empty()) {
++                  // NextMinimizer() returns &last_minimizer_, so the scanner's
++                  // last_minimizer() equals the value we captured -- but the
++                  // scanner has since advanced, so use the captured one.
++                  curr_taxon_counts[taxon].add_kmer(pf[pf_i].min);
++                }
++              }
++            }
++            else {
++              taxon = last_taxon;
+             }
+-            taxon = 0;
+-            if (! skip_lookup)
+-              taxon = hash->Get(*minimizer_ptr);
+-            last_taxon = taxon;
+-            last_minimizer = *minimizer_ptr;
+-            // Increment this only if (a) we have DB hit and
+-            // (b) minimizer != last minimizer
+             if (taxon) {
+-              minimizer_hit_groups++;
+-              // New minimizer should trigger registering minimizer in RC/HLL
+-              if (!opts.report_filename.empty()) {
+-                curr_taxon_counts[taxon].add_kmer(scanner.last_minimizer());
++              if (opts.quick_mode && minimizer_hit_groups >= opts.minimum_hit_groups) {
++                call = taxon;
++                goto finished_searching;  // need to break 3 loops here
+               }
++              hit_counts[taxon]++;
+             }
+           }
+-          else {
+-            taxon = last_taxon;
+-          }
+-          if (taxon) {
+-            if (opts.quick_mode && minimizer_hit_groups >= opts.minimum_hit_groups) {
+-              call = taxon;
+-              goto finished_searching;  // need to break 3 loops here
+-            }
+-            hit_counts[taxon]++;
+-          }
++          taxa.push_back(taxon);
+         }
+-        taxa.push_back(taxon);
+       }
+       if (opts.use_translated_search && frame_idx != 5)
+         taxa.push_back(READING_FRAME_BORDER_TAXON);
+@@ -1063,11 +1101,16 @@
+ void ParseCommandLine(int argc, char **argv, Options &opts) {
+   int opt;
+ 
+-  while ((opt = getopt(argc, argv, "h?H:t:o:T:p:R:C:U:O:Q:g:nmzqPSMKD")) != -1) {
++  while ((opt = getopt(argc, argv, "h?H:t:o:T:p:R:C:U:O:Q:g:B:nmzqPSMKD")) != -1) {
+     switch (opt) {
+       case 'h' : case '?' :
+         usage(0);
+         break;
++      case 'B' :
++        la_batch = atoi(optarg);
++        if (la_batch < 1 || la_batch > PF_MAX)
++          errx(EX_USAGE, "-B expects a batch size between 1 and %d", PF_MAX);
++        break;
+       case 'H' :
+         opts.index_filename = optarg;
+         break;
+@@ -1180,6 +1223,8 @@
+        << "  -U filename      Filename/format to have unclassified sequences" << endl
+        << "  -O filename      Output file for normal Kraken output" << endl
+        << "  -K               In comb. w/ -R, provide minimizer information in report" << endl
+-       << "  -D               Start a daemon, this options is intended to be used with wrappers" << std::endl;
++       << "  -D               Start a daemon, this options is intended to be used with wrappers" << endl
++       << "  -B NUM           Batch NUM minimizers and prefetch their hash-table" << endl
++       << "                   lines before resolving them (def. 1 = stock path)" << std::endl;
+   exit(exit_code);
+ }
