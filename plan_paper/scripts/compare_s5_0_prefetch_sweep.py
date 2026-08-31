@@ -1,8 +1,17 @@
-# S5.0 - controlled -B sweep on the DBs/thread counts that actually
-# matter (2026-08-31), per plan_paper/track_a_pivot_debate_2026-08-30.md
-# Q3's recommendation: standard_8gb and pluspf_103gb (88-96% LLC-miss,
-# the real bottleneck regime) at 32T/96T - NOT sample_targeted, which is
-# small/fast and was only used for the earlier correctness check.
+# S5.0 - controlled -B sweep across the FULL DB x thread-count grid,
+# same as S3.4's compare_s3_final.py (2026-08-31). Widened from an
+# earlier 2-DB/2-thread draft after reconsidering: prefetching's benefit
+# depends on the core's spare memory-level-parallelism slots (~12
+# outstanding requests), which many threads compete for at high T - the
+# effect could plausibly be LARGEST at low T (less contention for that
+# shared capacity) and smallest at 32T/96T, i.e. the opposite of where a
+# narrower sweep would have looked. Full grid catches that either way.
+#
+# B values (1, 4, 8, 16, 32) match Suthar's own tested points
+# (mtp1/reports/PREFETCH.md) so results are comparable to his curve
+# shape, plus 1 as the true stock-equivalent baseline (verified byte-
+# identical to S0 on 2026-08-31) - his sweep didn't need a separate
+# baseline column since -B 1 was already his stock comparator too.
 #
 # Calls `classify` directly, not the `kraken2` wrapper - the wrapper's
 # Getopt::Long option list has no idea what -B is (confirmed the hard way
@@ -16,13 +25,10 @@
 # every B value once before repeating, so a page-cache-warmth or thermal
 # drift confound can't land on one B value more than another.
 #
-# B=1 IS the baseline - it's the exact stock one-at-a-time path (verified
-# byte-identical vs S0 on 2026-08-31), so no separate reference binary is
-# needed; the sweep across B values is itself the comparison.
-#
 # Requires kraken2-fresh-bin-s5-0/classify (built from the safe/S5.0-
-# prefetch tag). Run inside tmux - the full grid is 2 DBs x 2 thread
-# counts x 6 B values x 3 reps = 72 runs.
+# prefetch tag). Run inside tmux - the full grid is 3 DBs x 6 thread
+# counts x 5 B values x 3 reps = 270 runs, comparable in scale to S3.4's
+# 162-run sweep (~80-90 min) but larger - expect a few hours, unattended.
 #
 #   tmux new -s s5sweep
 #   python3 /tmp/compare_s5_0_prefetch_sweep.py | tee ~/s5_0_prefetch_sweep.txt
@@ -34,9 +40,9 @@ FASTQ = "/home/student/data/basecalled/hac/FBE01990_24778b97_03e50f91_15.fastq"
 DBDIR = "/home/student/AccuracyDrift/databases"
 CLASSIFY = "/home/student/tools/kraken2-fresh-bin-s5-0/classify"
 
-DBS = ["standard_8gb", "pluspf_103gb"]
-THREADS = [32, 96]
-B_VALUES = [1, 4, 8, 16, 32, 64]
+DBS = ["sample_targeted", "standard_8gb", "pluspf_103gb"]
+THREADS = [1, 8, 16, 32, 64, 96]
+B_VALUES = [1, 4, 8, 16, 32]
 RUNS = 3
 
 def run_once(db, threads, b):
