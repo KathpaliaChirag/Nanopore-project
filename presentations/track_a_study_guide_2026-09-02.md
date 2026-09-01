@@ -1022,6 +1022,40 @@ We'd previously believed this meant "a complete, working double-hashing implemen
 
 ---
 
+## Scorecard — what actually sped things up, vs. what didn't
+
+Stated plainly, separate from the stage-by-stage narrative above: of everything built in S1–S5, which levers produced a **measured wall-clock win** on the databases and thread counts that actually matter for a bigger machine (`standard_8gb`, `pluspf_103gb`, at production thread counts 32–96T) — and which didn't.
+
+### What worked — real, verified effects
+
+| Lever | Real effect | Caveat |
+|---|---|---|
+| S3.0 heap-pointer fix | Crash eliminated, 16–96T | A stability win, not a speed win |
+| S4.0 hash-mix (MurmurHash3) | 8.9× hit-rate jump (0.40%→3.58%) | Internal cache-quality win only — see below |
+| S3.3 zero-sentinel + calloc | ~2× wall-clock / ~3× cache-miss | Only at a forced 4,194,304-set config the real sizing formula never reaches at any realistic thread count |
+| S1 thread_local extension | +5–13% wall-clock | `sample_targeted` only — not the bottleneck DB, and the mechanism is unexplained |
+
+### What didn't — null and reversed results, on the databases that matter
+
+| Lever | Result on `standard_8gb`/`pluspf_103gb`, 32–96T |
+|---|---|
+| S1 (1-slot cache) | Null — flat wall-clock, flat LLC-miss |
+| S2 (4-way cache) | Null — hit rate 0.14–0.40%, far too low to move time |
+| S3.4 full benchmark | Null everywhere — explained: the bugs S3 fixed and the formula's real operating range never overlap |
+| S4.0 hash-mix, end-to-end | Null despite the 8.9× internal hit-rate win — extra hits are still only ~3% of the lookup stream |
+| S2's "eviction win" (+25.2%) | **Reversed** to −3.9% once the hash bug was fixed — not a real effect at all, an artifact of the broken hash |
+
+### Bottom line, as of today
+
+> [!IMPORTANT]
+> **Zero measured wall-clock speedup, on the two large databases that matter, at real production thread counts, from anything in S1 through S4.**
+
+Every lever tested so far on the big databases has landed as null, or — in one case — reversed once a bug was fixed. That's a real, diagnosed negative result with a mechanism behind each null, not a shrug: we know *why* S1 didn't help (single-slot ceiling), *why* S2 didn't help (capacity), *why* S3 didn't help (the formula never reaches the sizes its bugs lived in), and *why* S4's hash fix didn't move wall-clock despite an 8.9× internal win (still too small a slice of the lookup stream).
+
+The one untested lever that specifically targets the actual bottleneck — making the expensive lookup itself faster, rather than trying to avoid it — is **S5 (prefetch-batching)**. It's built, merged carefully, and has zero Luna numbers as of today. It is the single highest-expected-value item left on the list.
+
+---
+
 ## Master Q&A bank — cross-cutting questions likely to come up
 
 **"Walk me through the whole thing in two minutes."**
