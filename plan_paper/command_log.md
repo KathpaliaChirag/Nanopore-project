@@ -413,3 +413,23 @@ Then an interleaved (old→new→old→new) same-session comparison at `sample_t
 **The 2026-08-26 pinning result was an artifact of the broken hash distribution, not a real property of the eviction problem.** "Protect proven-useful entries" looked like a big win specifically because round-robin was performing catastrophically in a handful of massively overloaded sets — once load is evenly spread, round-robin's baseline is already reasonable, and pinning has nothing obvious left to rescue (it may even mildly hurt, letting a one-hit-wonder squat on a slot indefinitely). **S4.1's saturating-counter design, a direct refinement of the same "protect proven-useful entries" idea, needs to be re-examined before any further implementation** — the empirical foundation it was built on no longer holds on a correctly-functioning cache. Kicking this to a fresh research pass rather than continuing to build on a disproven assumption.
 
 A note for pipeline hygiene worth keeping: a shell chaining bug (`A || B && C` parses as `(A || B) && C`, not `A || (B && C)`) caused `s2_pinned_patch.py` to be accidentally invoked twice in building the pinned+hashmix binary. No harm resulted — these patch scripts write to disk only once, at the very end, after every assert passes, so the second (failing) invocation's `AssertionError` aborted before any write — but verified directly (`grep -c "struct S2Entry"` == 1, no duplication) before trusting the resulting binary, rather than assuming the failure was harmless.
+
+### 2026-09-02 — S1 re-measured at exactly T=1/32/96 (trimmed sweep, for the presentation deck's grouped chart)
+
+**Command:** `compare_s0_s1.py`'s exact interleaved 3-run methodology, with `THREADS` trimmed from `[1, 16, 32, 64, 96]` to `[1, 32, 96]` (saved as `~/compare_s0_s1_1_32_96.py` on Luna, not re-committed to the repo separately — same script, narrower list) to match the S0 baseline chart's thread-count granularity for the presentation deck. Run via SSH (paramiko) inside a detached `tmux` session (`s1sweep`), saved to `~/s0_s1_1_32_96_compare.txt`.
+**Why:** the original 2026-08-25 S0-vs-S1 comparison (see "S1.2 measured" above) only ever printed a prose summary — ranges and one exact pair (`pluspf_103gb` T=1) — never a full per-cell table. CK asked for the same grouped T1/T32/T96 chart style as the S0 baseline slide; building that honestly required the real numbers, not the summary.
+**Result — all 9 cells low-CV (worst case 3.91%, `sample_targeted` T=32/S0; everything else under 1.3%), trustworthy:**
+
+| DB | T | S0 elapsed | S1 elapsed | &Delta; elapsed | S0 LLC-miss% | S1 LLC-miss% | &Delta; LLC-miss (pp) |
+|---|---|---|---|---|---|---|---|
+| sample_targeted | 1 | 5.0815s | 5.0289s | **&minus;1.04%** | 7.87% | 7.67% | &minus;0.20 |
+| sample_targeted | 32 | 0.5662s | 0.5005s | **&minus;11.61%** | 12.83% | 12.80% | &minus;0.03 |
+| sample_targeted | 96 | 0.5932s | 0.5530s | **&minus;6.78%** | 13.02% | 13.27% | +0.25 |
+| standard_8gb | 1 | 7.6066s | 7.5834s | &minus;0.31% | 87.16% | 87.20% | +0.04 |
+| standard_8gb | 32 | 4.6482s | 4.5492s | &minus;2.13% | 88.60% | 88.61% | +0.01 |
+| standard_8gb | 96 | 4.6743s | 4.5915s | &minus;1.77% | 88.27% | 88.43% | +0.16 |
+| pluspf_103gb | 1 | 61.5360s | 61.5177s | &minus;0.03% | 95.17% | 95.17% | 0.00 |
+| pluspf_103gb | 32 | 51.6831s | 51.7716s | +0.17% | 95.35% | 95.11% | &minus;0.24 |
+| pluspf_103gb | 96 | 51.8874s | 51.8508s | &minus;0.07% | 95.15% | 95.27% | +0.12 |
+
+Confirms the 2026-08-25 prose summary with real numbers: `sample_targeted` shows a real, consistent, low-CV speedup at every thread count (&minus;1% to &minus;12%, not flat 5-13% — T=1 is noticeably smaller than T=32/96). `standard_8gb` and `pluspf_103gb` are flat within noise at every cell (elapsed within &plusmn;2.2%, LLC-miss within &plusmn;0.25pp, no consistent direction). No new finding — this run exists to replace ranges/summary with real per-cell numbers for the deck.
