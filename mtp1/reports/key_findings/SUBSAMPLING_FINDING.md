@@ -11,23 +11,10 @@ and it cannot be turned off.
 | Date | 2026-09-01 |
 | Workload | `results/merged_pod5_profiling/merged_fast.fastq` — 1,871,478 reads / 6047.42 Mbp |
 | Machine | i7-11700, 8C/16T, 16 MB L3, 31 GB RAM, `powersave` |
-| Cause | `-M` subsampling baked into the downloaded database (§7), not anything about its size |
-| Skip rate | **89.62%** of hash-table lookups, predicted exactly by `opts.k2d`'s stored threshold (§3, §4) |
 | Instrumented build | `scratch_probe/` (`scratch_lookaside/` untouched) |
 | Raw data | `result/seedcmp/` (9 perf files + `meta.txt`) |
 
-**Contents**
-
-- **Part I — The anomaly** · §1 the anomaly · §2 method
-- **Part II — Where the lookups go** · §3 where the minimizers go
-- **Part III — The mechanism** · §4 where the threshold comes from (flag & capacities, build time, query time, why a hash, deriving it, the hash function itself, worked example)
-- **Part IV — Cost accounting** · §5 cost model
-- **Part V — Context** · §6 two hypotheses this killed · §7 provenance · §8 implications · §9 next step
-- **Part VI — Practical** · §10 reproduction · §11 limits
-
 ---
-
-# Part I — The anomaly
 
 ## 1. The anomaly
 
@@ -76,8 +63,6 @@ Interleaving matters. Earlier sweeps in this project ran each configuration as a
 consecutive block, which let the box's warm-up masquerade as a treatment effect.
 With only three configurations and the comparison between them being the entire
 result, round-robin ordering was used so thermal drift hits all three equally.
-
-# Part II — Where the lookups go
 
 ## 3. Where the minimizers go
 
@@ -181,8 +166,6 @@ across iterations, so reordering would break runs apart differently, shift
 Both remove memory traffic; only `-M` removes information. That the duplicate skip
 is identical across all three databases (430.57 M, varying by 0.002%) is what
 isolates `-M` as the sole cause of the speed difference.
-
-# Part III — The mechanism
 
 ## 4. Where the threshold comes from
 
@@ -313,109 +296,22 @@ at build time, when 89.6% of the library was discarded.
 For a database with threshold 0, the `if` is false and the check is bypassed
 entirely — every candidate goes to memory, because every one *might* be present.
 
-### The hash function itself
+### Worked example
 
-`kraken2/src/kv_store.h:67` — the whole thing:
+Treating `MurmurHash3(minimizer)` as a number in [0, 1), the threshold sits at
+0.8962:
 
-```c
-uint64_t inline MurmurHash3(hkey_t key) {
-  uint64_t k = (uint64_t) key;
-  k ^= k >> 33;
-  k *= 0xff51afd7ed558ccd;
-  k ^= k >> 33;
-  k *= 0xc4ceb9fe1a85ec53;
-  k ^= k >> 33;
-  return k;
-}
-```
+| minimizer | hash | ESKAPE (thr. 0) | standard_8gb (thr. 0.8962) |
+|---|---:|---|---|
+| `ACGTT…A` | 0.1043 | look up → DRAM | *skip* — not stored |
+| `GGCAT…C` | 0.4471 | look up → DRAM | *skip* |
+| `TTACG…G` | 0.6698 | look up → DRAM | *skip* |
+| `CAGTT…T` | 0.8107 | look up → DRAM | *skip* |
+| `GATCC…A` | 0.9134 | look up → DRAM | **look up → DRAM** |
+| `ACCGT…G` | 0.2250 | look up → DRAM | *skip* |
+| `TGCAA…C` | 0.9776 | look up → DRAM | **look up → DRAM** |
 
-Despite the name this is not full MurmurHash3; it is **`fmix64`, MurmurHash3's
-finalizer** (the avalanche step). Kraken2 uses it alone because its input is
-already a fixed 64-bit integer, not a byte stream.
-
-**The input is already a number.** An l-mer is 2 bits per base
-(`mmscanner.cc:42-45`): `A=00 C=01 G=10 T=11`. A 31-mer is therefore 62 bits:
-
-```
-A  C  G  T  T  G  C  A  A  G  G  C ...
-00 01 10 11 11 10 01 00 00 10 10 01 ...  =  502,444,362,787,516,835
-```
-
-No string hashing happens.
-
-**What each step does:**
-
-| step | purpose |
-|---|---|
-| `k ^= k >> 33` | mixes the high half into the low half |
-| `k *= 0xff51afd7ed558ccd` | multiplication propagates bits **upward** |
-| `k ^= k >> 33` | pushes that influence back **downward** |
-| `k *= 0xc4ceb9fe1a85ec53` | second, different constant |
-| `k ^= k >> 33` | final mix |
-
-Multiplication alone only carries influence upward; XOR-shift only downward.
-Alternating them gives every input bit a route to every output bit, and the two
-constants were found by search to maximise that spread. **Flipping one base
-changes about half the output bits** — that uniformity is what makes "hash >= T"
-a fair sample.
-
-**It is a bijection.** XOR-shift and multiplication by an odd constant are both
-invertible on 64-bit integers, so this is a *permutation* of the 64-bit space:
-distinct minimizers always get distinct hashes, with no collisions at this stage.
-(Table collisions arise later, when `hc % capacity_` folds 2^64 values into
-12.2 M slots.)
-
-**It is deterministic and stateless.** No seed, no table, no randomness. The same
-l-mer gives the same value on any machine, in any year, in `build_db` and in
-`classify` alike — which is precisely why the same test can be applied twice and
-be guaranteed to agree.
-
-**One hash, three uses:**
-
-```c
-uint64_t hc = MurmurHash3(minimizer);
-
-hc < minimum_acceptable_hash_value    // 1. the -M subsampling test
-hc % capacity_                        // 2. the table slot
-hc >> (64 - key_bits_)                // 3. the stored fingerprint
-```
-
-Low bits pick the slot, high bits form the fingerprint — safe only because
-avalanche makes all 64 bits equally well mixed. This reuse is also what the
-prefetch work exploits: `Get()` recomputed the hash, so splitting it into
-`Prefetch(hc)` + `GetWithHash(key, hc)` saved one `MurmurHash3` per minimizer.
-
-### Worked example — real computed values
-
-> An earlier draft of this report used **illustrative** hash values (0.1043,
-> 0.4471, ...) invented to show the rule. They are replaced here by values
-> computed from the actual `fmix64` implementation and the actual 2-bit encoding.
-> The snippet in §10 reproduces them.
-
-```
-threshold T = 0xe5703cec83cdd800   (normalised 0.8962)
-```
-
-| l-mer (l=31) | 2-bit encoding | MurmurHash3 | norm | ESKAPE | std8gb |
-|---|---:|---|---:|---|---|
-| `ACGTTGCAAGGCTTACGATCCGATTACGGAT` | 502444362787516835 | `0xf1bd73b9d57192ea` | **0.9443** | look up | **look up** |
-| `GGCATTACGGATCCGTTAACGGCATTACGGA` | 2971365126523403368 | `0xd75963f5bc4f1b7f` | 0.8412 | look up | *skip* |
-| `TTACGGATCCGTTAACGGCATTACGGATCCG` | 4352965367899646166 | `0x7d0162450e043383` | 0.4883 | look up | *skip* |
-| `CAGTTGGCCAATTCCGGAATTCCGGAATTCC` | 1367494452758028533 | `0x25c888f968b01b2e` | 0.1476 | look up | *skip* |
-| `GATCCGATTACGGATCCGATTACGGATCCGA` | 2547051273152209752 | `0x29ea115d575c9c14` | 0.1637 | look up | *skip* |
-| `ACCGTTAACGGCCATTACGGATCCGTTAACG` | 413234212927008518 | `0xc9d98904d9530d16` | 0.7885 | look up | *skip* |
-| `TGCAAGGCCTTAACGGATCCGTTAACGGCCA` | 4110202091676305044 | `0x2f63d57905621f91` | 0.1851 | look up | *skip* |
-
-**1 of 7 survives.** Close to the expected 10.4%, but with n = 7 that is
-coincidence, not confirmation — the measured rate over 206 M real lookups was
-10.38%.
-
-Note row 2: `0.8412` is above the middle of the range but still below 0.8962, so
-it is discarded. The cut is at 89.62%, not 50%.
-
-At scale: **206,485,766 lookups vs 21,436,003.**
-
-# Part IV — Cost accounting
+7 lookups vs 2. At scale: 206,485,766 vs 21,436,003.
 
 ## 5. Cost model
 
@@ -497,8 +393,6 @@ cycles saved by -M skips      −735,766,848,398
 predicted std8 cycles        1,071,654,521,259
 measured  std8 cycles        1,071,651,995,188     diff +0.0%
 ```
-
-# Part V — Context
 
 ## 6. Two hypotheses this killed
 
@@ -598,8 +492,6 @@ accuracy cost on identical content, and composes directly with the existing
 prefetch results. It is the same single-variable method that settled the seed
 question here, and it is cheap: ~7 minutes per build.
 
-# Part VI — Practical
-
 ## 10. Reproduction
 
 ```bash
@@ -610,25 +502,11 @@ v=struct.unpack('<8Q',open('databases/<DB>/opts.k2d','rb').read())
 print(f'k={v[0]} l={v[1]} seed=0x{v[2]:016x} toggle=0x{v[3]:016x}')
 print(f'min_acceptable_hash_value=0x{v[5]:016x} -> skips {100*v[5]/2**64:.2f}% of lookups')"
 
-# 2. reproduce the hash for any l-mer
-python3 -c "
-M=(1<<64)-1
-def murmur(k):
-    k&=M
-    k^=k>>33; k=(k*0xff51afd7ed558ccd)&M
-    k^=k>>33; k=(k*0xc4ceb9fe1a85ec53)&M
-    k^=k>>33; return k
-E={'A':0,'C':1,'G':2,'T':3}
-s='ACGTTGCAAGGCTTACGATCCGATTACGGAT'
-k=0
-for c in s: k=(k<<2)|E[c]
-print(s, k, hex(murmur(k)), murmur(k)/2**64)"
-
-# 3. instrumented counts
+# 2. instrumented counts
 ./scratch_probe/classify -H $D/hash.k2d -t $D/taxo.k2d -o $D/opts.k2d \
     -p 16 -g 2 -T 0 subset.fastq 2>&1 >/dev/null | grep PROBESTAT
 
-# 4. the interleaved timing comparison
+# 3. the interleaved timing comparison
 bash /home/dell/.claude/jobs/a307ba6a/tmp/seedcmp.sh
 ```
 
