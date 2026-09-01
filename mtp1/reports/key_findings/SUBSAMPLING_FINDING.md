@@ -94,6 +94,79 @@ min_acceptable_hash_value = 0xe5703cec83cdd800 = 89.62% of 2^64
 measured                    185,041,869 / 206,477,872 = 89.62%
 ```
 
+### The two kinds of skip — and which one affects the vote
+
+The tree above contains two different skips. They reduce lookups by similar
+amounts but are not the same kind of thing, and conflating them would misread the
+whole result.
+
+**Duplicate skip — a depth-1 memoisation. Free, and present on every database.**
+
+```c
+if (pf[pf_i].min != last_minimizer) {
+  taxon = hash->GetWithHash(...);   // query the table
+  last_taxon = taxon;                // remember the answer
+  last_minimizer = pf[pf_i].min;
+}
+else {
+  taxon = last_taxon;                // same as previous minimizer: reuse
+}
+```
+
+It fires only when the **immediately preceding** minimizer was identical — not
+"seen anywhere before". That is common because minimizers come from a sliding
+window: consecutive windows usually select the same ℓ-mer, so the scanner emits
+long runs of one value. Measured here: **430,567,213 / 637,052,979 = 67.6%**.
+
+The table is read-only during classification, so the same minimizer must yield the
+same taxon. Reusing the answer is exactly equivalent to querying again.
+
+**Duplicates still vote.** The vote is cast *outside* the branch:
+
+```c
+    else {
+      taxon = last_taxon;            // duplicate path
+    }
+    if (taxon) {                     // ← OUTSIDE the if/else
+      hit_counts[taxon]++;           // ← EVERY minimizer votes
+    }
+  }
+  taxa.push_back(taxon);             // ← EVERY minimizer recorded
+```
+
+`ResolveTree` scores each taxon by summing `hit_counts` over its root-to-leaf
+ancestry, takes the maximum, breaks ties by LCA, then walks up the tree until the
+confidence threshold is met. Its input is `hit_counts`, which includes every
+duplicate. **So the duplicate skip changes the lookup count and nothing else.**
+
+Two counters deliberately *do* exclude duplicates, because they live inside the
+`if` branch:
+
+| counter | counts | why |
+|---|---|---|
+| `hit_counts[taxon]` | **every** minimizer | the vote — abundance should reflect how much of the read matched |
+| `minimizer_hit_groups` | **distinct runs** | the `-g` threshold: how many *separate* places matched, so one long run cannot fake several independent hits |
+| `add_kmer` (HLL) | **distinct** minimizers | the report's distinct-k-mer estimate |
+
+With `-g 2`, `minimizer_hit_groups` gates whether a read is classified at all, and
+it is the one counter that must not see duplicates. This is also why the prefetch
+loop split had to preserve minimizer order exactly: `last_minimizer` carries state
+across iterations, so reordering would break runs apart differently, shift
+`minimizer_hit_groups`, and silently reclassify reads.
+
+**`-M` skip — an approximation. Only on subsampled databases.**
+
+| | duplicate skip | `-M` skip |
+|---|---|---|
+| present on | **all** databases | only subsampled ones |
+| result | **identical** — reuses a known-correct answer | `taxon = 0`, treated as a miss |
+| affects the vote? | **no** | **yes** — those minimizers never vote |
+| is it an approximation? | no | **yes**, made at build time |
+
+Both remove memory traffic; only `-M` removes information. That the duplicate skip
+is identical across all three databases (430.57 M, varying by 0.002%) is what
+isolates `-M` as the sole cause of the speed difference.
+
 ## 4. Where the threshold comes from
 
 ### It is set at build time
