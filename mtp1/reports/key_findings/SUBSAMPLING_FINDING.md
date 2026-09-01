@@ -169,6 +169,20 @@ isolates `-M` as the sole cause of the speed difference.
 
 ## 4. Where the threshold comes from
 
+### The flag, and the two capacities
+
+```bash
+build_db -M 2000000000 ...        # maximum_capacity, in CELLS
+```
+
+`kraken2-build --max-db-size 8` converts GB to cells: 8 GB / 4 bytes =
+2,000,000,000. Two capacities are in play:
+
+| | | |
+|---|---|---|
+| `opts.capacity` | what the library **needs** | from `estimate_capacity`, or `-c` |
+| `opts.maximum_capacity` | what you will **allow** | from `-M` |
+
 ### It is set at build time
 
 `kraken2/src/build_db.cc:78`:
@@ -215,6 +229,61 @@ if (idx_opts.minimum_acceptable_hash_value) {
 (`classify.cc:1174`) — an unrelated flag that happens to share the letter with
 `build_db`'s maximum-capacity flag. This name collision is why the behaviour is
 invisible from the command line.
+
+### The same test runs at build time
+
+The threshold is not only a query-time filter. `build_db.h:209` applies it while
+deciding what to store:
+
+```c
+while ((minimizer_ptr = scanner.NextMinimizer())) {
+  if (scanner.is_ambiguous())
+    continue;
+  if (min_clear_hash_value && MurmurHash3(*minimizer_ptr) < min_clear_hash_value)
+    continue;                        // <- DISCARDED, never enters the table
+  ...
+  hash.CompareAndSet(*minimizer_ptr, new_taxid, &existing_taxid);
+}
+```
+
+and again at `build_db.h:254` in the capacity-estimation pass, so the estimate and
+the contents agree. **89.62% of the library was discarded here.**
+
+The build-side and query-side tests are byte-for-byte the same comparison:
+
+```
+BUILD:   MurmurHash3(min) <  min_clear_hash_value          -> do not store
+QUERY:   MurmurHash3(min) <  minimum_acceptable_hash_value  -> do not look up
+```
+
+Same hash function, same operator, same constant — carried between them in
+`opts.k2d`.
+
+### Why a hash rather than a random sample
+
+The selection has to be **deterministic** (the same minimizer must get the same
+verdict at build time and at query time, months apart, on a different machine),
+**stateless** (no list of "which ones I kept" to store or consult), and **uniform**
+(an unbiased sample of k-mer space, not clustered).
+
+`MurmurHash3` gives all three, and the hash is *already computed* for the table
+index, so the test costs one comparison against a constant. A random sample would
+require recording the kept set — which is precisely the thing that did not fit.
+
+### Deriving the threshold
+
+`MurmurHash3` output is uniform over [0, 2^64), so `hash >= T` selects exactly
+(2^64 - T)/2^64 of all minimizers. Setting that equal to the fraction that fits:
+
+```
+frac = maximum_capacity / capacity = 2,000,000,000 / 19,275,968,731 = 0.103756
+T    = (1 - frac) * UINT64_MAX
+     = 0.896244 * 18446744073709551615
+     = 0xe5703cec83cdd800          <- matches the stored value exactly
+```
+
+Verified in both directions: the stored threshold recovers frac = 0.103756, and
+frac regenerates the stored threshold bit for bit.
 
 ### The skips are correctness, not a shortcut
 
@@ -269,6 +338,28 @@ not to latency, so this is a genuine consistency check.
 | fork | 820,997,437,744 | 178,880,098,812 | **0.218** | 986,423,931,913 | 1,690,613,559,505 | **1.714** |
 | spaced | 820,966,050,917 | 178,873,260,206 | 0.218 | 1,025,625,269,187 | 1,749,931,176,702 | 1.706 |
 | std8 | 85,230,589,346 | 18,570,163,003 | 0.218 | 986,421,405,842 | 1,690,611,323,251 | **1.714** |
+
+**What this table does and does not prove.** The arithmetic is exact — each row's
+lookup and other columns sum to the measured totals to the unit. But two of its
+apparent regularities are forced, not observed:
+
+- **"lookup IPC 0.218" is identical on every row by definition.** It equals
+  `INS_PER / CYC_PER` = 92.58 / 424.91, the ratio of the two fitted constants. It
+  is a restatement of the fit, not a measurement.
+- **fork and std8 having identical "other" columns is forced.** The constants were
+  solved from exactly that pair, so subtracting `lookups x CYC_PER` guarantees
+  equal residuals. This is algebra.
+- **`spaced` is a weaker check than it first appears.** Its lookup count is within
+  0.004% of fork's, so any timing difference between them lands in "other"
+  automatically. Only the *magnitude* is informative: +59.3 G instructions over
+  5.96 G scanned minimizers = **+9.95 instructions per scanned minimizer**, a
+  plausible cost for applying a spaced-seed mask per minimizer. That is a
+  plausibility check, not a validation of the model.
+
+The decomposition is therefore **illustrative** — a way to see where the time sits
+once you accept the per-lookup cost. It is not independent evidence for it. The
+evidence for the finding is in §3 and §4: directly counted lookups, and a
+threshold that predicts the observed skip rate to four significant figures.
 
 Share of runtime in the lookup path:
 
@@ -423,11 +514,16 @@ bash /home/dell/.claude/jobs/a307ba6a/tmp/seedcmp.sh
 
 - **Counts come from a 200,000-read subset** scaled ×9.357, assuming the rest of
   the file behaves the same.
-- **The fork↔std8 residual match in §5 is partly circular** — the per-lookup cost
-  was solved from those two points, so their "other" columns are forced to agree.
-  The genuine validation is `spaced`, a third point the model was *not* fitted to,
-  whose extra work lands in the "other" bucket at the magnitude the mechanism
-  predicts.
+- **§5's decomposition is illustrative, not evidential.** The per-lookup cost was
+  solved from the fork/std8 pair, so their matching "other" columns are forced;
+  "lookup IPC 0.218" is likewise just the ratio of the two fitted constants.
+  `spaced` is a weaker check than first described — its lookup count matches
+  fork's, so its difference lands in "other" automatically, and only the
+  magnitude (+9.95 instructions per scanned minimizer) is a plausibility check.
+  **The finding does not rest on the model.** It rests on §3's directly counted
+  lookups and §4's threshold arithmetic. The one genuinely independent check on
+  the model is 424.91 cycles / 2.27 DRAM accesses = 187 cycles per access, which
+  matches this machine's memory latency and was not fitted to it.
 - **The model is linear in lookups.** It ignores that `std8`'s surviving lookups
   have shorter probe chains (4.45 vs 6.27), a difference absorbed into the fitted
   constant.
