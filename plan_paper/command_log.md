@@ -433,3 +433,26 @@ A note for pipeline hygiene worth keeping: a shell chaining bug (`A || B && C` p
 | pluspf_103gb | 96 | 51.8874s | 51.8508s | &minus;0.07% | 95.15% | 95.27% | +0.12 |
 
 Confirms the 2026-08-25 prose summary with real numbers: `sample_targeted` shows a real, consistent, low-CV speedup at every thread count (&minus;1% to &minus;12%, not flat 5-13% — T=1 is noticeably smaller than T=32/96). `standard_8gb` and `pluspf_103gb` are flat within noise at every cell (elapsed within &plusmn;2.2%, LLC-miss within &plusmn;0.25pp, no consistent direction). No new finding — this run exists to replace ranges/summary with real per-cell numbers for the deck.
+
+### 2026-09-02 — S2-LRU: true recency-stamp eviction + a 4/8/16/32/64-way associativity sweep
+
+**Why:** CK asked whether LRU eviction (not S2's round-robin, not S4.1's abandoned "protect on first hit" pinning) would perform better, and whether raising associativity closes the capacity gap. New patch scripts written: `s2_lru_patch.py` (4-way, per-entry `last_used` logical-clock stamp, evict the minimum on insert — true LRU, not a one-bit heuristic), plus `s2_lru_8way_patch.py`/`s2_lru_16way_patch.py`/`s2_lru_32way_patch.py`/`s2_lru_64way_patch.py` (identical eviction logic, `S2_WAYS` raised 4→8→16→32→64 at the same 4,096 sets: 16,384 → 32,768 → 65,536 → 131,072 → 262,144 entries, ~256KB → ~4MB/thread). All five built on top of the S4.0b hash-mix fix (not the old broken hash — S4.0 already showed eviction-policy comparisons on the broken hash are misleading), same standalone wiring/instrumentation as `s2_pinned_patch.py`, so results are directly comparable to the documented round-robin (3.5758%) and pinned (3.4367%) hit rates.
+
+**Command:** 3-run interleaved comparison (all 6 binaries run once per round, 3 rounds — not blocked), `standard_8gb`, T=1, same fastq, same methodology as every prior eviction-policy test.
+
+**Result — all 6 variants low-CV (worst case 0.48%), trustworthy:**
+
+| Variant | Entries | Elapsed(avg) | CV% | LLC-miss% | Hit rate | vs round-robin (elapsed) |
+|---|---|---|---|---|---|---|
+| round-robin (4-way, S2's shipped policy) | 16,384 | 7.6520s | 0.48% | 85.90% | 3.5758% | baseline |
+| LRU (4-way) | 16,384 | 7.6213s | 0.13% | 85.21% | 3.6370% | **&minus;0.40%** |
+| LRU (8-way) | 32,768 | 7.6666s | 0.11% | 82.67% | 6.2164% | +0.19% |
+| LRU (16-way) | 65,536 | 7.7208s | 0.33% | 77.30% | 10.6504% | +0.90% |
+| LRU (32-way) | 131,072 | 7.8066s | 0.31% | 68.60% | 17.6806% | +2.02% |
+| LRU (64-way) | 262,144 | 7.9476s | 0.12% | 54.79% | 27.7462% | +3.86% |
+
+**Two real, opposite-direction findings:**
+1. **LRU is a real, small, reproducible win over round-robin at the same capacity** (4-way): hit rate +1.7% relative (3.5758%→3.6370%), and the only config in the whole sweep that's actually *faster* than the round-robin baseline (&minus;0.40% elapsed, low CV on both sides — a genuine effect, not noise).
+2. **Associativity keeps buying real hit-rate/LLC-miss improvement all the way to 64-way** (3.58%→27.75% hit rate, LLC-miss 85.9%→54.8% — both monotonic, both far outside CV noise) **but wall-clock gets monotonically *worse* as ways increase**, crossing from a real win (4-way, &minus;0.40%) to a real, low-CV loss by 64-way (+3.86%). **More cache, better hit rate, slower program** — the opposite of what the hit-rate/LLC-miss numbers alone would suggest.
+
+**Why, likely (not yet directly instrumented):** two costs that scale with `S2_WAYS` and aren't visible in the hit-rate/LLC-miss metrics: (1) `S2Lookup` linearly scans every way in a set on every lookup, including on a miss (which is 72-96% of lookups even at 64-way) — at 64 ways that's up to 16× more tag comparisons per lookup than at 4-way; (2) `S2_NUM_SETS × S2_WAYS` scales the per-thread array from 256KB (4-way) to 4MB (64-way) — the same memory-touch/allocation cost that produced S2's original 22× cliff at large sizes, on a smaller scale here. Both are plausible, neither is confirmed — would need a per-lookup cycle-count breakdown (or the pre-touch/page-fault instrumentation from the S3 cliff work) to say which dominates. Not investigated further this session.
