@@ -456,3 +456,26 @@ Confirms the 2026-08-25 prose summary with real numbers: `sample_targeted` shows
 2. **Associativity keeps buying real hit-rate/LLC-miss improvement all the way to 64-way** (3.58%→27.75% hit rate, LLC-miss 85.9%→54.8% — both monotonic, both far outside CV noise) **but wall-clock gets monotonically *worse* as ways increase**, crossing from a real win (4-way, &minus;0.40%) to a real, low-CV loss by 64-way (+3.86%). **More cache, better hit rate, slower program** — the opposite of what the hit-rate/LLC-miss numbers alone would suggest.
 
 **Why, likely (not yet directly instrumented):** two costs that scale with `S2_WAYS` and aren't visible in the hit-rate/LLC-miss metrics: (1) `S2Lookup` linearly scans every way in a set on every lookup, including on a miss (which is 72-96% of lookups even at 64-way) — at 64 ways that's up to 16× more tag comparisons per lookup than at 4-way; (2) `S2_NUM_SETS × S2_WAYS` scales the per-thread array from 256KB (4-way) to 4MB (64-way) — the same memory-touch/allocation cost that produced S2's original 22× cliff at large sizes, on a smaller scale here. Both are plausible, neither is confirmed — would need a per-lookup cycle-count breakdown (or the pre-touch/page-fault instrumentation from the S3 cliff work) to say which dominates. Not investigated further this session.
+
+### 2026-09-02 — Full grid: does "more cache, slower program" hold across every DB and thread count?
+
+**Why:** CK asked whether the `standard_8gb`/T=1 result generalizes, or is an artifact of that one config — this project's own precedent (S1, S4.0) is that a single-DB/single-thread result routinely fails to generalize, so a full 3-DB × T=1/32/96 re-run (same 6 binaries, same 3-run interleaved methodology) was needed before trusting the earlier finding as general.
+
+**Command:** `lru_full_grid_sweep.py`, 6 binaries × 3 DBs × 3 thread counts × 3 interleaved runs = 162 kraken2 invocations, run via SSH inside `tmux` on Luna.
+
+**Result — all 54 cells low-CV (worst case 5.04%, one `sample_targeted`/T96/LRU-32way cell; the overwhelming majority under 1%), trustworthy. The pattern is real but strongly DB- and thread-dependent, not uniform:**
+
+| DB | T=1 (%vsRR @ 64-way) | T=32 (%vsRR @ 64-way) | T=96 (%vsRR @ 64-way) |
+|---|---|---|---|
+| `sample_targeted` | **+80.12%** | +11.05% | +21.54% |
+| `standard_8gb` | +4.37% | +3.79% | +6.85% |
+| `pluspf_103gb` | +6.38% | &minus;0.06% | +0.67% |
+
+**Three real findings, not one:**
+1. **The effect is dramatically worse on the small DB, especially single-threaded**: `sample_targeted` at T=1 loses **80%** of its wall-clock time at 64-way — a completely different scale from the ~4-7% seen on `standard_8gb`. Low CV (0.13-0.41%) across all 6 configs at that cell, so this is real, not noise.
+2. **`standard_8gb` shows the same modest, consistent 3.79-6.85% penalty at 64-way regardless of thread count** — the single-DB/T=1 result from earlier this session (+3.86% at a slightly different capacity point) was representative of this DB, at least in direction and rough magnitude.
+3. **On the biggest DB (`pluspf_103gb`), the penalty is real but small at T=1 (+6.38%) and vanishes into noise at production thread counts** (T=32: &minus;0.06%, T=96: +0.67% — both well within the &le;0.6% CV band). At the thread counts that actually matter for a real deployment, higher associativity costs nothing extra on the largest, most memory-bound database.
+
+**Secondary, unexplained observation:** `sample_targeted` at T=32/T=96, LLC-miss% for LRU-64way (33.01%/31.39%) is *higher* than round-robin's baseline (13.61%/13.29%) — the opposite direction from every other cell in the grid, where LLC-miss falls monotonically with associativity. Also non-monotonic within that row (LRU-32way's 9.62%/8.02% LLC-miss sits above LRU-16way's 7.10%/6.73%). Plausible cause: at 64-way the per-thread array is 4MB; at 32 or 96 threads sharing a socket's LLC, that many concurrent 4MB private arrays may itself pressure the LLC in a way that doesn't happen at T=1. Not instrumented or confirmed this session — flagged for a future occupancy/contention pass, not claimed as explained.
+
+**Answer to the original question:** no, the `standard_8gb`/T=1 result does **not** generalize uniformly — it understates the effect on small databases (especially single-threaded) and overstates it for the biggest database at real production thread counts, where the penalty disappears into noise.
