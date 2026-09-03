@@ -1,31 +1,27 @@
-# S2-LRU-4WAY-SIMD (2026-09-04) - hardware-realistic parallel-comparator variant,
-# item (ii) from research_brief_associativity_case_study_2026-09-02.md ("SIMD/SoA
-# redesign"), explicitly deferred that cycle, revived as a lower-priority backlog
-# item per CK on 2026-09-04 alongside the Sniper/TEJAS simulator track (item 4 of
-# week7plan.md, which stays the active priority - this is NOT scheduled this week).
+# CHIRAG 04-09-26 :: real N-way caches check every way at once, with parallel
+# comparators. s2_lru_4way_noatomics_patch.py's S2Lookup/S2Insert don't - they
+# run `for (way = 0; way < S2_WAYS; way++)`, checking one tag at a time, on
+# every call, including misses. so a software loop's wall-clock scales with N
+# even though real hardware's mostly doesn't. this patch swaps that AoS
+# (array-of-structs) scan for a SoA (structure-of-arrays) layout: a 1-byte
+# fingerprint per way, packed per set, compared in one SSE2 _mm_cmpeq_epi8
+# instead of walked one at a time. only the full 64-bit tag gets checked for a
+# fingerprint match, so O(1) SIMD compare on a miss instead of O(ways) branches.
+# no atomics, same control-variant pattern as every other noatomics S2 binary.
 #
-# WHY THIS EXISTS: s2_lru_4way_noatomics_patch.py's S2Lookup/S2Insert do a plain
-# `for (way = 0; way < S2_WAYS; way++)` sequential scan over an array-of-structs,
-# comparing tags one at a time on every call including misses. Real N-way
-# set-associative hardware caches fire all N ways' tag comparators in parallel, so
-# lookup latency doesn't scale with N the way this software loop's wall-clock does.
-# CK's hypothesis (2026-09-04): this sequential-scan cost is a confound sitting on
-# top of the allocation/first-touch cost the 2026-09-02 debate already locked as
-# the dominant explanation for "more ways, worse wall-clock" - not a replacement
-# for that diagnosis, an additional one.
+# this is item (ii) from research_brief_associativity_case_study_2026-09-02.md
+# ("SIMD/SoA redesign"), dropped that cycle, revived as a lower-priority backlog
+# item on 2026-09-04 alongside the Sniper/TEJAS simulator track (week7plan.md
+# item 4, which stays the active priority - this is not scheduled this week).
 #
-# WHAT THIS DOES: switches from AoS (S2Entry{tag, taxon, last_used} per slot) to a
-# Structure-of-Arrays layout with a separate 1-byte fingerprint array per set,
-# informed by the SwissTable/F14/vectorized-hash-table technique cited in the
-# research brief. Lookup compares all 4 fingerprints in one SSE2 _mm_cmpeq_epi8,
-# builds a match mask, and only chases the full 64-bit tag for candidate hits -
-# O(1) SIMD compare on a miss instead of O(ways) sequential branches. No atomics
-# (control variant, matches every other noatomics S2 binary in this sweep).
+# hypothesis this tests: the sequential scan is a confound sitting on top of the
+# allocation/first-touch cost the 2026-09-02 debate already locked in as the
+# dominant explanation for "more ways, worse wall-clock". not a replacement for
+# that diagnosis, an additional one.
 #
-# STATUS: written, NOT built, NOT benchmarked. Needs a real run on Luna (same
-# install pattern as every other S2 variant) before any number from this goes near
-# the paper. Only 4-way is implemented here - 8/16/32/64-way would need either a
-# second 128-bit compare (8-way fits one XMM register exactly) or AVX2 for 32/64.
+# status: written, not built, not benchmarked. needs a real run on Luna before
+# any number from this goes near the paper. only 4-way is implemented here -
+# 8-way fits one XMM register exactly, 16/32/64-way would need AVX2.
 
 path = "classify.cc"
 with open(path) as f:
@@ -40,19 +36,19 @@ old_sig = '''taxid_t ClassifySequence(Sequence &dna, Sequence &dna2, ostringstre
                          taxon_counters_t &curr_taxon_counts)
 {'''
 
-new_sig = '''// S2-LRU-4WAY-SIMD VARIANT (2026-09-04) - SoA fingerprint array + SSE2 parallel
-// tag-candidate compare, replacing the sequential AoS scan. No atomics.
+new_sig = '''// CHIRAG 04-09-26 :: SoA fingerprint array + SSE2 parallel tag-candidate
+// compare, replacing S2's sequential AoS scan. No atomics (control variant).
 #include <emmintrin.h>
 
 static const size_t S2_NUM_SETS = 4096;
 static const size_t S2_WAYS = 4;
 static const uint64_t S2_EMPTY_TAG = UINT64_MAX;
 
-// Fingerprints padded to 16 bytes/set so each set's fingerprint row loads into
-// one XMM register with _mm_load_si128; only the first S2_WAYS bytes are
-// meaningful, the rest are don't-care (correctness comes from the full 64-bit
-// tag check below, a fingerprint collision on padding just costs a wasted
-// candidate check, never a wrong answer).
+// CHIRAG 04-09-26 :: fingerprints padded to 16 bytes/set so one XMM register
+// (_mm_load_si128) covers a whole set in one load. Only the first S2_WAYS
+// bytes mean anything - a fingerprint collision on the padding just costs a
+// wasted candidate check below, the full 64-bit tag check catches it, so it
+// never produces a wrong answer.
 struct alignas(16) S2FpRow {
   uint8_t fp[16] = {0};
 };
@@ -138,7 +134,8 @@ old_lookup = '''            taxon = 0;
 
 new_lookup = '''            taxon = 0;
             if (! skip_lookup) {
-              // S2-LRU-4WAY-SIMD - same wiring, SoA fingerprint lookup.
+              // CHIRAG 04-09-26 :: same wiring as the other S2 variants,
+              // SoA fingerprint lookup underneath.
               if (! S2Lookup(*minimizer_ptr, &taxon)) {
                 taxon = hash->Get(*minimizer_ptr);
                 S2Insert(*minimizer_ptr, taxon);

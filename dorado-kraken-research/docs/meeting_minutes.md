@@ -505,30 +505,33 @@ Kicked off a 4-agent parallel research pass same day to start answering item 2�
 
 ## Meeting 12 — 2026-09-04
 
-**Attendees:** Kolin sir (via message, not the standing Wednesday slot — 2026-09-04 is a Friday), Chirag K
-**Format:** Update — direction change on methodology *(no entry exists for the standing 2026-08-26 or 2026-09-02 Wednesday slots either; flagging the gap rather than silently skipping past it, same as Meeting 11's note)*
+**Attendees:** Kolin sir (via message, not the standing Wednesday slot: 2026-09-04 is a Friday), Chirag K
+**Format:** Update on methodology. No entry exists for the standing 2026-08-26 or 2026-09-02 Wednesday slots either. Flagging the gap instead of skipping past it, same as Meeting 11's note.
 
 ### Topics covered
 
-1. **Go simulator-based for the associativity/eviction case study, not further real-hardware iteration**
-   - Sir named two specific tools: **Sniper** and **TEJAS** (ChampSim was independently investigated same day but not named by sir — stays a documented fallback, not substituted in without checking).
-   - Directly reopens the associativity case study's SIMD/SoA question, which the 2026-09-02 debate had explicitly dropped for that cycle — a simulator removes the real-hardware confounds (atomics contention, per-thread first-touch/allocation cost) by construction, which is what made the SIMD rewrite unnecessary to answer the "is associativity a real win" question cleanly.
-   - Locked same day (5-agent/3-round debate, `plan_paper/research_brief_simulator_selection_2026-09-04.md`): default **Sniper** (execution-driven, no per-variant trace step, better-maintained, ~60-65% confidence, not a clean win), **TEJAS** as documented fallback (tighter validation against more recent hardware, but needs Prof. Sarangi's group for a smooth start).
+1. **Switch to simulator-based work for the associativity/eviction case study.**
+   Real-hardware iteration stops here. Sir named two specific tools, Sniper and TEJAS (ChampSim got looked at the same day but sir didn't name it, so it stays a documented fallback, not a swap-in without checking first).
 
-2. **Reframing away from the Sept 13 deadline, same day**
-   - CK: this is real research, publishable next semester too — optimize for the right answer, not the fastest one.
-   - Changes item 4's specifics: **TEJAS over Sniper** becomes the preference if Prof. Sarangi's group access lands fast (contact them, no rush to skip that step), **full cache hierarchy over single-level** (single-level kept only as a fast sanity check first), and a **realistically-sized simulation window** rather than the smallest workable proxy.
-   - New thread added: empirically reverse-engineer the real hardware (Luna/Orion) cache replacement policy via a tool like CacheQuery, since it's currently only inferable from older-chip papers.
+   This reopens the SIMD/SoA question from the associativity case study, the one the 2026-09-02 debate explicitly dropped that cycle. Here's why a simulator changes the calculus: a simulator has no real thread creation, no real atomics, no real first-touch cost. Those confounds don't exist there by construction, so a simulator answers "does associativity actually help" more cleanly than a hand-rewritten cache ever could on real hardware.
 
-3. **CK's own second hypothesis on the associativity story, same day (not from sir, logged here for continuity)**
-   - The real S2 implementation's `S2Lookup`/`S2Insert` (`plan_paper/scripts/s2_lru_4way_noatomics_patch.py`) scan ways sequentially in software, unlike real hardware's parallel tag comparators — a second, additive confound on top of the already-locked allocation-cost explanation.
-   - Logged as a lower-priority backlog item (item 5 in `planning/week7plan.md`), explicitly **below** the Sniper/TEJAS simulator track, which stays the active priority. A first-cut implementation (`plan_paper/scripts/s2_lru_4way_simd_patch.py`, SoA fingerprint array + SSE2 parallel compare) is written but not built or benchmarked.
+   Locked the same day, 5-agent/3-round debate (`plan_paper/research_brief_simulator_selection_2026-09-04.md`): default to Sniper (execution-driven, no per-variant trace step needed, better-maintained, ~60-65% confidence, not a clean win). TEJAS stays the documented fallback: tighter validation against more recent hardware, but it needs Prof. Sarangi's group for a smooth start.
+
+2. **Drop the Sept 13 deadline framing, same day.**
+   CK's call: this is real research, publishable next semester too, so optimize for the right answer, not the fastest one. That changes item 4's specifics three ways: TEJAS becomes the preference over Sniper if access to Prof. Sarangi's group lands fast (worth contacting them, no need to rush past that step); a full cache hierarchy replaces single-level (single-level stays only as a fast sanity check first); and the simulation window gets sized realistically instead of shrunk to the smallest workable proxy.
+
+   One new thread came out of this: reverse-engineer the real hardware's (Luna/Orion) cache replacement policy empirically, with a tool like CacheQuery, since right now it's only inferable from older-chip papers.
+
+3. **CK's second hypothesis on the associativity story** (not from sir, logged here for continuity).
+   The real S2 implementation's `S2Lookup`/`S2Insert` (`plan_paper/scripts/s2_lru_4way_noatomics_patch.py`) scans ways sequentially in software. Real hardware checks all ways at once, with parallel comparators. That sequential scan is a second confound sitting on top of the allocation-cost effect the 2026-09-02 debate already locked in as dominant.
+
+   Logged as a lower-priority backlog item, item 5 in `planning/week7plan.md`, ranked below the Sniper/TEJAS track, which stays the active priority. A first-cut implementation exists (`plan_paper/scripts/s2_lru_4way_simd_patch.py`: SoA fingerprint array plus SSE2 parallel compare), written but not built or benchmarked.
 
 ### Action items
-- Ask sir whether fast access to Prof. Sarangi's group (TEJAS) can be arranged — if it lands within a day, switch from Sniper; if not, proceed with Sniper without waiting
-- Build + validate the chosen simulator on Luna against a stock example first
-- Run/trace the 6 existing S2 binaries (4/8/16/32/64-way + round-robin, noatomics preferred) under the simulator, small explicitly-bounded instruction window (full kraken2 not feasible at simulator throughput)
-- Carried over, unscheduled this week: build + benchmark `s2_lru_4way_simd_patch.py` on Luna, compare against the noatomics AoS variants — logged as item 5, deferred behind the simulator track
+- Ask sir whether fast access to Prof. Sarangi's group (TEJAS) can be arranged. If it lands within a day, switch from Sniper. If not, go Sniper and don't wait.
+- Build and validate the chosen simulator on Luna against a stock example first.
+- Run or trace the 6 existing S2 binaries (4/8/16/32/64-way plus round-robin, noatomics preferred) under the simulator, using a small, explicitly-bounded instruction window (a full kraken2 run isn't feasible at simulator throughput).
+- Carried over, not scheduled this week: build and benchmark `s2_lru_4way_simd_patch.py` on Luna and compare it against the noatomics AoS variants. Logged as item 5, deferred behind the simulator track.
 
 ### Next meeting
-Not confirmed — next standing Wednesday slot is 2026-09-09, per the cadence set at Meeting 9.
+Not confirmed. The next standing Wednesday slot is 2026-09-09, per the cadence set at Meeting 9.
