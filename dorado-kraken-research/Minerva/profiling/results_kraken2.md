@@ -1,16 +1,17 @@
-# Minerva — Kraken-2 Profiling Results
+# Minerva: Kraken-2 profiling results
 
-> Server: minerva | OS: Ubuntu 22.04.4 LTS | CPU: 2× Xeon Gold 6330 (112 logical CPUs) | RAM: 251 GB
-> DB: k2_standard_08gb (8 GB) | Input: barcode02.fastq (687 MB, 104,829 reads)
-> Binary: ~/kraken2-build-pg/classify (built with -pg -g)
+Server: minerva | OS: Ubuntu 22.04.4 LTS | CPU: 2x Xeon Gold 6330 (112 logical CPUs) | RAM: 251 GB
+DB: k2_standard_08gb (8 GB) | Input: barcode02.fastq (687 MB, 104,829 reads)
+Binary: ~/kraken2-build-pg/classify (built with -pg -g)
 
-**NOTE: Minerva AccuracyDrift runs not yet started (disk was full as of 2026-05-28; verify disk status before starting — see Minerva/to_do_by_sudo.md Check 2).**
+> [!NOTE]
+> Minerva AccuracyDrift runs have not started yet (disk was full as of 2026-05-28; verify disk status before starting, see Minerva/to_do_by_sudo.md Check 2).
 
 WSL2 baselines for comparison: cache miss rate 34.24%, IPC 0.55 (AMD uProf), 67% in `CompactHashTable::Get()` (gprof).
 
 ---
 
-## 3.1 perf stat — Hardware Counters
+## 3.1 perf stat: hardware counters
 
 **Command run:**
 ```bash
@@ -30,14 +31,14 @@ pv ~/barcode02.fastq | perf stat \
 |---|---|---|
 | cache miss rate | 34.24% | |
 | LLC-load-misses | `<not supported>` | |
-| LLC miss rate (LLC-load-misses / LLC-loads) | — | |
+| LLC miss rate (LLC-load-misses / LLC-loads) | - | |
 | IPC (instructions / cycles) | unreliable | |
-| branch miss rate | — | |
+| branch miss rate | - | |
 | total runtime | 105.87 s | |
 
 ---
 
-## 3.2 perf record — Hotspot Functions
+## 3.2 perf record: hotspot functions
 
 **Top functions:**
 ```
@@ -48,7 +49,7 @@ Flame graph: `kraken2_flame.svg` (committed to repo)
 
 ---
 
-## 3.3 gprof — Flat Profile
+## 3.3 gprof: flat profile
 
 **Output:**
 ```
@@ -65,7 +66,7 @@ Total runtime: _____ seconds
 
 ---
 
-## 3.4 Intel VTune — CPI Waterfall + Memory Stall
+## 3.4 Intel VTune: CPI waterfall + memory stall
 
 **Command run:**
 ```bash
@@ -87,7 +88,7 @@ vtune -report summary -result-dir ~/vtune_mem
 
 ---
 
-## 3.5 LIKWID — Memory Bandwidth
+## 3.5 LIKWID: memory bandwidth
 
 **Output:**
 ```
@@ -102,7 +103,7 @@ vtune -report summary -result-dir ~/vtune_mem
 
 ---
 
-## 3.6 gperftools/pprof — Sampling Profile
+## 3.6 gperftools/pprof: sampling profile
 
 **Top functions:**
 ```
@@ -113,7 +114,7 @@ Call graph SVG: `gperf_callgraph.svg`
 
 ---
 
-## 3.7 heaptrack — Heap Allocations
+## 3.7 heaptrack: heap allocations
 
 **Summary:**
 ```
@@ -128,7 +129,7 @@ Call graph SVG: `gperf_callgraph.svg`
 
 ---
 
-## 3.8 cachegrind — Per-Function LLC Miss Rates
+## 3.8 cachegrind: per-function LLC miss rates
 
 **Command run:**
 ```bash
@@ -138,10 +139,10 @@ cg_annotate --auto=yes ~/cg.out > ~/cachegrind_report.txt
 
 **Summary header:**
 ```
-[paste cachegrind summary here — first 80 lines of cachegrind_report.txt]
+[paste cachegrind summary here, first 80 lines of cachegrind_report.txt]
 ```
 
-**Key function — CompactHashTable::Get():**
+**Key function, `CompactHashTable::Get()`:**
 
 | Counter | Value | Meaning |
 |---|---|---|
@@ -152,7 +153,7 @@ cg_annotate --auto=yes ~/cg.out > ~/cachegrind_report.txt
 
 ---
 
-## 3.9 perf mem — Memory Latency (optional)
+## 3.9 perf mem: memory latency (optional)
 
 **Output:**
 ```
@@ -161,13 +162,13 @@ cg_annotate --auto=yes ~/cg.out > ~/cachegrind_report.txt
 
 ---
 
-## Cross-Tool Summary
+## Cross-tool summary
 
 | Tool | Key Finding | Confirms |
 |---|---|---|
 | perf stat | | Memory-bound: IPC ~0.5 |
 | perf record | | `CompactHashTable::Get()` hotspot |
-| gprof | | 67% in Get() — hardware-independent |
-| VTune | | CPI waterfall — memory stall % |
+| gprof | | 67% in Get(), hardware-independent |
+| VTune | | CPI waterfall, memory stall % |
 | LIKWID | | Memory BW vs ceiling |
 | cachegrind | | DLmr count for Get() |

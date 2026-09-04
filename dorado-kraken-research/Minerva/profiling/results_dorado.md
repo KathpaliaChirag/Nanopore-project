@@ -1,18 +1,19 @@
-# Minerva — Dorado GPU Profiling Results
+# Minerva: Dorado GPU profiling results
 
-> Server: minerva | GPU: 2× NVIDIA A40 (45 GB VRAM each) | CUDA: 12.9 | Driver: 575.64.03
-> Dorado: 1.4.0 | Model: fast + hac comparison
-> Pod5 file: [fill in path]
+Server: minerva | GPU: 2x NVIDIA A40 (45 GB VRAM each) | CUDA: 12.9 | Driver: 575.64.03
+Dorado: 1.4.0 | Model: fast + hac comparison
+Pod5 file: [fill in path]
 
-**NOTE: Minerva AccuracyDrift runs not yet started (disk was full as of 2026-05-28; verify disk status before starting — see Minerva/to_do_by_sudo.md Check 2).**
+> [!NOTE]
+> Minerva AccuracyDrift runs have not started yet (disk was full as of 2026-05-28; verify disk status before starting, see Minerva/to_do_by_sudo.md Check 2).
 
 WSL2 baselines: 82% GEMM, `cudaStreamSynchronize` = 98.9% of CUDA API time (GTX 1650).
 
-**Prerequisite check:** confirm pod5 file path on Minerva before running.
+**Prerequisite check:** confirm the pod5 file path on Minerva before running.
 
 ---
 
-## 4.2 nsys — GPU Timeline (fast model)
+## 4.2 nsys: GPU timeline (fast model)
 
 **Command run:**
 ```bash
@@ -36,7 +37,7 @@ nsys profile --output ~/results/dorado_fast_profile --trace cuda,nvtx --stats tr
 
 ---
 
-## 4.3 ncu — Per-Kernel Metrics on A40
+## 4.3 ncu: per-kernel metrics on the A40
 
 **Command run:**
 ```bash
@@ -60,7 +61,7 @@ ncu --metrics sm__throughput...,dram__throughput...,sm__warps_active... \
 
 ---
 
-## 4.4 DCGM — Power + Thermal During Run
+## 4.4 DCGM: power + thermal during the run
 
 **Output:**
 ```
@@ -77,7 +78,7 @@ ncu --metrics sm__throughput...,dram__throughput...,sm__warps_active... \
 
 ---
 
-## 4.5 fast vs hac Comparison (nsys)
+## 4.5 fast vs. hac comparison (nsys)
 
 **hac model stats:**
 ```
@@ -91,7 +92,7 @@ ncu --metrics sm__throughput...,dram__throughput...,sm__warps_active... \
 | Top kernel | | |
 | SM throughput % (ncu) | | |
 
-**Conclusion:** Same GEMM bottleneck? Yes / No — [fill in]
+**Conclusion:** same GEMM bottleneck? Yes / No, [fill in]
 
 ---
 

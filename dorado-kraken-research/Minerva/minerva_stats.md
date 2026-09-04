@@ -1,8 +1,8 @@
-# Minerva — Server Specifications & Diagnostics
+# Minerva: server specifications and diagnostics
 
-> Last updated: 2026-05-27
-> Captured by: chayanika (sudo account)
-> Server name: minerva | OS: Ubuntu 22.04.4 LTS
+Last updated: 2026-05-27
+Captured by: chayanika (sudo account)
+Server name: minerva | OS: Ubuntu 22.04.4 LTS
 
 ---
 
@@ -12,7 +12,7 @@
 ```bash
 lscpu | grep -E "Model name|Socket|Core|Thread|CPU\(s\)"
 ```
-**What it does:** Reads CPU architecture info from the kernel — model, socket count, cores, threads.
+**What it does:** reads CPU architecture info from the kernel: model, socket count, cores, threads.
 
 **Output (Minerva):**
 ```
@@ -24,16 +24,16 @@ Socket(s):            2
 ```
 
 | Property             | Value                           |
-|----------------------|---------------------------------|
+|-----------------------|----------------------------------|
 | Model                | Intel Xeon Gold 6330 @ 2.00 GHz |
 | Sockets              | 2                               |
-| Cores per socket     | 28                              |
-| Total physical cores | 56                              |
+| Cores per socket     | 28                               |
+| Total physical cores | 56                               |
 | Threads per core     | 2 (Hyper-Threading enabled)     |
-| Total logical CPUs   | 112                             |
+| Total logical CPUs   | 112                              |
 | NUMA nodes           | 2 (node0: even, node1: odd)     |
-| Architecture         | x86_64                          |
-| L3 Cache             | ~66 MB total (42 MB per socket × 2 sockets; Xeon Gold 6330) |
+| Architecture         | x86_64                           |
+| L3 Cache             | ~66 MB total (42 MB per socket x 2 sockets; Xeon Gold 6330) |
 
 ---
 
@@ -43,7 +43,7 @@ Socket(s):            2
 ```bash
 free -h
 ```
-**What it does:** Shows total, used, and available RAM and swap in human-readable units.
+**What it does:** shows total, used, and available RAM and swap in human-readable units.
 
 **Output (Minerva):**
 ```
@@ -62,7 +62,7 @@ Swap:           59Gi   1.5Gi   58Gi
 | Swap Total  | 59 GB  |
 | Swap Used   | 1.5 GB |
 
-> `available` is what actually matters — RAM that can be given to a new process right now.
+`available` is the number that actually matters here, since it's the RAM that can go to a new process right now.
 
 ---
 
@@ -72,7 +72,7 @@ Swap:           59Gi   1.5Gi   58Gi
 ```bash
 nvidia-smi
 ```
-**What it does:** Queries the NVIDIA driver for GPU model, VRAM usage, temperature, power draw, and running processes.
+**What it does:** queries the NVIDIA driver for GPU model, VRAM usage, temperature, power draw, and running processes.
 
 **Output (Minerva):**
 ```
@@ -82,24 +82,24 @@ GPU  Name        VRAM Used / Total     GPU-Util  Temp   Power
 1    NVIDIA A40   14MiB / 46068MiB      0%       29C    22W / 300W
 ```
 
-| Property       | GPU 0            | GPU 1            |
-|----------------|------------------|------------------|
-| Model          | NVIDIA A40       | NVIDIA A40       |
+| Property       | GPU 0             | GPU 1             |
+|-----------------|--------------------|---------------------|
+| Model          | NVIDIA A40         | NVIDIA A40         |
 | VRAM           | ~45 GB (46068 MiB) | ~45 GB (46068 MiB) |
-| Total VRAM     | ~90 GB combined  | —                |
-| Power Cap      | 300W             | 300W             |
-| CUDA Version   | 12.9             | 12.9             |
-| Driver Version | 575.64.03        | 575.64.03        |
+| Total VRAM     | ~90 GB combined    | -                   |
+| Power Cap      | 300W               | 300W               |
+| CUDA Version   | 12.9               | 12.9               |
+| Driver Version | 575.64.03          | 575.64.03          |
 
 ---
 
-## Storage — Partitions
+## Storage: partitions
 
 **Command:**
 ```bash
 df -h
 ```
-**What it does:** Shows disk space per partition — total size, used, free, and mount point.
+**What it does:** shows disk space per partition: total size, used, free, and mount point.
 
 **Output (Minerva):**
 ```
@@ -111,22 +111,23 @@ tmpfs            26G  4.0M   26G     1%  /run
 ```
 
 | Filesystem | Size  | Used  | Available | Use% | Mount Point |
-|------------|-------|-------|-----------|------|-------------|
-| /dev/sda3  | 3.4T  | 3.2T  | 9.1G      | 100% | / (root)    |
-| /dev/sda1  | 4.7G  | 6.1M  | 4.7G      | 1%   | /boot/efi   |
-| tmpfs      | 126G  | ~0    | 126G      | ~0%  | /dev/shm    |
+|------------|-------|-------|------------|------|-------------|
+| /dev/sda3  | 3.4T  | 3.2T  | 9.1G       | 100% | / (root)    |
+| /dev/sda1  | 4.7G  | 6.1M  | 4.7G       | 1%   | /boot/efi   |
+| tmpfs      | 126G  | ~0    | 126G       | ~0%  | /dev/shm    |
 
-> **WARNING: Root partition is at 100%. Space being cleared by admin (2026-05-27).**
+> [!WARNING]
+> Root partition is at 100%. Space is being cleared by admin (2026-05-27).
 
 ---
 
-## Storage — Per User
+## Storage: per user
 
 **Command:**
 ```bash
 sudo du -sh /home/*/ 2>/dev/null
 ```
-**What it does:** `du` = disk usage. `-s` = summary (one total per folder, not every subfolder). `-h` = human readable. Shows how much each user's home folder is occupying.
+**What it does:** `du` means disk usage. `-s` gives a summary, one total per folder instead of every subfolder. `-h` makes it human readable. Together they show how much each user's home folder occupies.
 
 **Output (Minerva, 2026-05-27):**
 ```
@@ -148,34 +149,34 @@ sudo du -sh /home/*/ 2>/dev/null
 ```
 
 | User      | Usage  | Notes                        |
-|-----------|--------|------------------------------|
-| chayanika | 1.8 TB | Admin account — largest user |
-| srikanta  | 1.3 TB | Second largest               |
-| nikki     | 67 GB  |                              |
-| vijay     | 57 GB  |                              |
-| srijan    | 56 GB  |                              |
-| harshit   | 20 GB  |                              |
-| kolin     | 7.3 GB |                              |
-| sharath   | 1.1 GB |                              |
-| shashank  | 1.1 GB |                              |
-| hakima    | 219 MB |                              |
-| dell      | 106 MB |                              |
+|-----------|--------|--------------------------------|
+| chayanika | 1.8 TB | Admin account, largest user  |
+| srikanta  | 1.3 TB | Second largest                |
+| nikki     | 67 GB  |                                |
+| vijay     | 57 GB  |                                |
+| srijan    | 56 GB  |                                |
+| harshit   | 20 GB  |                                |
+| kolin     | 7.3 GB |                                |
+| sharath   | 1.1 GB |                                |
+| shashank  | 1.1 GB |                                |
+| hakima    | 219 MB |                                |
+| dell      | 106 MB |                                |
 | chirag    | 664 KB | Near-empty (new account)     |
 | rishabh   | 676 KB | Near-empty (new account)     |
 | CK        | 16 KB  | Near-empty (new account)     |
 | rohit     | 16 KB  | Near-empty (new account)     |
 
-> chayanika + srikanta = ~3.1 TB out of 3.2 TB used. These two are the primary cause of full disk.
+chayanika and srikanta together account for ~3.1 TB out of the 3.2 TB used, so these two are the primary cause of the full disk.
 
 ---
 
-## Operating System
+## Operating system
 
 **Command:**
 ```bash
 uname -a && cat /etc/os-release | head -5
 ```
-**What it does:** `uname -a` prints kernel version and architecture. `os-release` has the distro name and version.
+**What it does:** `uname -a` prints the kernel version and architecture. `os-release` has the distro name and version.
 
 **Output (Minerva):**
 ```
@@ -187,65 +188,65 @@ VERSION="22.04.4 LTS (Jammy Jellyfish)"
 ```
 
 | Property  | Value                          |
-|-----------|--------------------------------|
-| OS        | Ubuntu 22.04.4 LTS             |
-| Codename  | Jammy Jellyfish                |
-| Kernel    | 6.8.0-65-generic               |
-| Arch      | x86_64                         |
+|-----------|----------------------------------|
+| OS        | Ubuntu 22.04.4 LTS              |
+| Codename  | Jammy Jellyfish                 |
+| Kernel    | 6.8.0-65-generic                |
+| Arch      | x86_64                          |
 
 ---
 
-## Users on the System
+## Users on the system
 
 **Command:**
 ```bash
 awk -F: '$3 >= 1000 && $3 < 65534 {print $1, $3, $6}' /etc/passwd
 ```
-**What it does:** Reads `/etc/passwd` and prints only human users (UID 1000+), showing username, UID, and home directory.
+**What it does:** reads `/etc/passwd` and prints only human users (UID 1000+), showing username, UID, and home directory.
 
 **Known users (2026-05-27):**
 chayanika, chirag, CK, dell, hakima, harshit, kolin, nikki, rishabh, rohit, sharath, shashank, srijan, srikanta, vijay
 
 ---
 
-## Who is Currently Logged In
+## Who is currently logged in
 
 **Command:**
 ```bash
 w
 ```
-**What it does:** Shows who is logged in, from where, and what they are running right now.
+**What it does:** shows who is logged in, from where, and what they are running right now.
 
 ---
 
-## Running Processes (Top Memory Users)
+## Running processes (top memory users)
 
 **Command:**
 ```bash
 ps aux --sort=-%mem | head -15
 ```
-**What it does:** Lists all running processes sorted by memory usage, highest first. Good for seeing if a job is running or something is hogging RAM.
+**What it does:** lists all running processes sorted by memory usage, highest first. Useful for checking if a job is running or something is hogging RAM.
 
 ---
 
-## Profiling Tool Inventory
+## Profiling tool inventory
 
-> Audited: 2026-05-27
+Audited: 2026-05-27
 
-### Already Installed and Working
+### Already installed and working
 
 | Tool | Version | Use |
 |---|---|---|
 | perf | 6.8.12 | Hardware counters, call graphs, flame graphs |
 | gprof | GNU Binutils 2.38 | Function-level % time and call counts |
 | ncu (Nsight Compute) | 2021.3.1.0 | Per-kernel GPU metrics |
-| nvprof | 2021 | Legacy CUDA profiler — deprecated on CUDA 12, skip |
+| nvprof | 2021 | Legacy CUDA profiler, deprecated on CUDA 12, skip |
 | g++ | 11.4.0 | Build tool |
 | linux-tools-6.8.0-65-generic | kernel-matched | perf kernel support |
 
-**perf_event_paranoid:** was 4 (blocks all hardware counters for non-root). Set to 1 via sudo — allows hardware events for regular users. Persisted in `/etc/sysctl.d/99-perf.conf`.
+**perf_event_paranoid:** was 4, which blocks all hardware counters for non-root. Set to 1 via sudo, so regular users can now use hardware events. Persisted in `/etc/sysctl.d/99-perf.conf`.
 
-### Installed, PATH Was Broken (fixed)
+### Installed, PATH was broken (fixed)
 
 | Tool | Path | Fix applied |
 |---|---|---|
@@ -255,36 +256,36 @@ ps aux --sort=-%mem | head -15
 
 | Action | Command | Status |
 |---|---|---|
-| perf_event_paranoid → 1 | `sudo sysctl -w kernel.perf_event_paranoid=1` | Done |
+| perf_event_paranoid to 1 | `sudo sysctl -w kernel.perf_event_paranoid=1` | Done |
 | nsys PATH fix | `/etc/profile.d/nsys.sh` | Done |
 | LIKWID msr module | `sudo modprobe msr` + `/etc/modules` | Pending (after LIKWID install) |
-| VTune | standalone `.sh` installer → `/opt/intel/vtune/` | Pending |
+| VTune | standalone `.sh` installer -> `/opt/intel/vtune/` | Pending |
 | DCGM | `sudo dpkg -i dcgm.deb` + systemctl | Pending |
 
 VTune env (after install): sourced via `/etc/profile.d/vtune.sh`
 
-### Installed per user (conda or source — no sudo needed)
+### Installed per user (conda or source, no sudo needed)
 
 | Tool | Install method | What it gives |
 |---|---|---|
 | valgrind | `conda install -c conda-forge valgrind` | cachegrind (per-function LLC miss rates), massif (heap) |
-| heaptrack | `conda install -c conda-forge heaptrack` | Heap allocation tracking — allocation hotspots |
+| heaptrack | `conda install -c conda-forge heaptrack` | Heap allocation tracking, allocation hotspots |
 | gperftools/pprof | `conda install -c conda-forge gperftools` | Low-overhead CPU + heap sampling |
 | LIKWID | source build (`make PREFIX=$HOME/local install`) | Hardware counter access, memory bandwidth per NUMA node |
 | FlameGraph | `git clone` | SVG call graph from perf record output |
 
-See `Minerva/install_tools.md` for full per-user install commands.
+See `Minerva/install_tools.md` for the full per-user install commands.
 
-### Not Installed (not needed for our scope)
+### Not installed (not needed for our scope)
 
 | Tool | Reason |
 |---|---|
-| nvprof | Officially deprecated on CUDA 12 — use ncu instead |
+| nvprof | Officially deprecated on CUDA 12, use ncu instead |
 | Score-P / TAU | HPC tracing frameworks, overkill |
 
 ---
 
-## Quick Full Re-check (Run All at Once)
+## Quick full re-check (run all at once)
 
 ```bash
 echo "=== CPU ===" && lscpu | grep -E "Model name|Socket|Core|Thread|CPU\(s\)"

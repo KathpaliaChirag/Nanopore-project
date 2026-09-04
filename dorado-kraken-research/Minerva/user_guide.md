@@ -1,31 +1,30 @@
-# Minerva — User Management Guide
+# Minerva: user management guide
 
-> System: Ubuntu 22.04.4 LTS | Server: minerva
-> Maintained by: chayanika (sudo account)
+System: Ubuntu 22.04.4 LTS | Server: minerva
+Maintained by: chayanika (sudo account)
 
 ---
 
 ## Overview
 
-This guide covers creating and managing user accounts on Minerva.
-All admin commands require the sudo account (`chayanika`).
+This guide covers creating and managing user accounts on Minerva. All admin commands require the sudo account (`chayanika`).
 
 ---
 
-## Creating a New User (With Sudo — Admin Only)
+## Creating a new user (with sudo, admin only)
 
-### Step 1: Create the user with a home directory
+### Step 1: create the user with a home directory
 
 ```bash
 sudo useradd -m -s /bin/bash <username>
 ```
 
 | Flag | What it does                                      |
-|------|---------------------------------------------------|
+|------|-----------------------------------------------------|
 | `-m` | Creates a home directory at `/home/<username>`    |
 | `-s /bin/bash` | Sets bash as the default shell          |
 
-### Step 2: Set a password
+### Step 2: set a password
 
 ```bash
 sudo passwd <username>
@@ -33,7 +32,7 @@ sudo passwd <username>
 
 You will be prompted to enter and confirm the password.
 
-### Step 3: Lock down the home directory
+### Step 3: lock down the home directory
 
 ```bash
 sudo chmod 700 /home/<username>
@@ -41,11 +40,11 @@ sudo chown -R <username>:<username> /home/<username>
 ```
 
 | Command  | What it does                                                   |
-|----------|----------------------------------------------------------------|
-| `chmod 700` | Only owner can read/write/enter — no access for others    |
+|----------|-------------------------------------------------------------------|
+| `chmod 700` | Only owner can read/write/enter, no access for others    |
 | `chown`  | Ensures the user owns all files in their home folder           |
 
-### Step 4: Verify the account
+### Step 4: verify the account
 
 ```bash
 getent passwd <username>       # confirm user exists
@@ -53,7 +52,7 @@ id <username>                  # show UID, GID, groups
 sudo -l -U <username>          # confirm no sudo access
 ```
 
-### Step 5 (Optional): Force password change on first login
+### Step 5 (optional): force a password change on first login
 
 ```bash
 sudo chage -d 0 <username>
@@ -61,7 +60,7 @@ sudo chage -d 0 <username>
 
 ---
 
-## Creating All 4 Lab Users (Batch)
+## Creating all 4 lab users (batch)
 
 ```bash
 for user in user1 user2 user3 user4; do
@@ -74,10 +73,10 @@ done
 
 ---
 
-## What "No Sudo" Means in Practice
+## What "no sudo" means in practice
 
 | Action                          | Without Sudo | Notes                              |
-|---------------------------------|--------------|------------------------------------|
+|-----------------------------------|--------------|--------------------------------------|
 | System-wide package install     | No           | Can't use `sudo apt install`       |
 | Install in home dir (`~/local`) | Yes          | Fully allowed, no impact on others |
 | Use conda/miniconda             | Yes          | Installs in home dir               |
@@ -87,9 +86,9 @@ done
 
 ---
 
-## Installing Tools Without Sudo (User Side)
+## Installing tools without sudo (user side)
 
-### Option A: Install from source into home dir
+### Option A: install from source into the home dir
 
 ```bash
 mkdir -p ~/local
@@ -103,7 +102,7 @@ echo 'export PATH=$HOME/local/bin:$PATH' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### Option B: Conda (recommended for most tools)
+### Option B: conda (recommended for most tools)
 
 ```bash
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
@@ -111,7 +110,7 @@ bash Miniconda3-latest-Linux-x86_64.sh    # installs to ~/miniconda3
 conda install -c conda-forge valgrind
 ```
 
-### Option C: Admin installs system-wide (once, for everyone)
+### Option C: admin installs system-wide (once, for everyone)
 
 ```bash
 sudo apt install valgrind -y
@@ -119,13 +118,14 @@ sudo apt install valgrind -y
 
 ---
 
-## Removing a User
+## Removing a user
 
 ```bash
 sudo userdel -r <username>     # deletes user AND their home directory
 ```
 
-> **Warning:** `-r` permanently deletes `/home/<username>`. Back up first if needed.
+> [!WARNING]
+> `-r` permanently deletes `/home/<username>`. Back up first if needed.
 
 Without `-r`:
 ```bash
@@ -134,12 +134,12 @@ sudo userdel <username>        # removes account but keeps home directory
 
 ---
 
-## Checking User Info
+## Checking user info
 
 | Command                        | What it shows                            |
-|--------------------------------|------------------------------------------|
+|-----------------------------------|---------------------------------------------|
 | `getent passwd`                | All users on the system                  |
-| `getent passwd <username>`     | Single user — UID, GID, home, shell      |
+| `getent passwd <username>`     | Single user: UID, GID, home, shell      |
 | `id <username>`                | UID, primary group, all groups           |
 | `groups <username>`            | Groups the user belongs to               |
 | `sudo -l -U <username>`        | What sudo commands (if any) they can run |
@@ -148,9 +148,9 @@ sudo userdel <username>        # removes account but keeps home directory
 
 ---
 
-## Granting Access to Specific Shared Folders
+## Granting access to specific shared folders
 
-If a user needs access to a shared project folder:
+If a user needs access to a shared project folder, create a group for it, add the user to that group, then hand the group ownership of the folder:
 
 ```bash
 # Create a shared group
@@ -168,9 +168,9 @@ sudo chmod 770 /home/shared_project    # group can read/write, others cannot
 
 ---
 
-## GPU Access
+## GPU access
 
-By default users can submit GPU jobs. To check GPU availability:
+By default users can submit GPU jobs. Check GPU availability with:
 
 ```bash
 nvidia-smi                     # as any user
@@ -185,15 +185,15 @@ sinfo                          # see node/GPU availability
 
 ---
 
-## Important Notes
+## Important notes
 
-- Root disk (`/dev/sda3`) is at **100% capacity** as of 2026-05-27. See `minerva_stats.md`.
+- The root disk (`/dev/sda3`) is at **100% capacity** as of 2026-05-27. See `minerva_stats.md`.
 - Users should store large datasets in designated scratch/data directories, not home dirs.
-- Warn users: home dir has no automatic backup unless configured separately.
+- Warn users: the home dir has no automatic backup unless configured separately.
 
 ---
 
-## Quick Reference
+## Quick reference
 
 ```bash
 # Create user

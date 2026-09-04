@@ -1,7 +1,6 @@
-# Minerva — Tool Installs
+# Minerva: tool installs
 
-> perf_event_paranoid=1  | nsys PATH fix  | sudo apt NOT allowed
-> Sudo still usable for non-apt commands (dpkg, modprobe, chmod, etc.)
+perf_event_paranoid is set to 1, the nsys PATH is fixed, and `sudo apt` is not allowed on this box. sudo still works for non-apt commands (dpkg, modprobe, chmod, etc.), so that's the install path below.
 
 ---
 
