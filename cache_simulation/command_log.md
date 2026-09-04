@@ -239,3 +239,29 @@ done
 
 L1d/L2 geometry happens to match Sniper's shipped default config exactly (coincidence, not by
 design); L1i and L3 associativity differ from the default and needed this real read.
+
+---
+
+### [12]-[13] Learn Sniper's config format from real examples
+
+**Why:** rather than guess `.cfg` key names, read `base.cfg` (the shared per-cache-level template:
+`cache_size`, `associativity`, `cache_block_size`, `replacement_policy`, `shared_cores`, etc.) and
+`gainestown.cfg` (a real Xeon config, showing how a per-machine file `#include`s a base topology
+then overrides specific sections - `l3_cache`, `dram`, `network` - while leaving L1/L2 to whatever
+the included base already sets).
+
+```bash
+cd ~/cache_simulation/snipersim/config
+ls
+cat base.cfg | head -20
+grep -n -A 30 "^\[perf_model/l1_dcache\]\|^\[perf_model/l1_icache\]\|^\[perf_model/l2_cache\]\|^\[perf_model/l3_cache\]" *.cfg
+cat gainestown.cfg
+```
+
+**Result:** confirmed format. key fields per cache section: `cache_size` (KB), `associativity`,
+`cache_block_size`, `replacement_policy`, `shared_cores` (how many cores share this level - this is
+how a machine-wide LLC gets encoded, not per-core). `gainestown.cfg` pattern: `#include nehalem`
+pulls in a base topology, then overrides `[perf_model/l3_cache]`, `[perf_model/dram]`, `[network]`
+with machine-specific real numbers, `[perf_model/core] frequency = 2.66` for clock speed.
+`luna.cfg` will follow the same pattern: include a base, override L1/L2/L3 with the real sysfs
+numbers from step 11, `shared_cores` set to reflect a 96-core-per-socket LLC.
