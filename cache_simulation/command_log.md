@@ -265,3 +265,40 @@ pulls in a base topology, then overrides `[perf_model/l3_cache]`, `[perf_model/d
 with machine-specific real numbers, `[perf_model/core] frequency = 2.66` for clock speed.
 `luna.cfg` will follow the same pattern: include a base, override L1/L2/L3 with the real sysfs
 numbers from step 11, `shared_cores` set to reflect a 96-core-per-socket LLC.
+
+---
+
+### [15] Get real clock frequency
+
+**Why:** the last missing real number for `luna.cfg`'s `[perf_model/core] frequency` field.
+
+```bash
+lscpu | grep -i "MHz\|model name"
+```
+
+**Result:** Intel Xeon Platinum 8468 (Sapphire Rapids). `lscpu` gives min/max turbo range
+(800/3800 MHz), neither of which is the right value - existing Sniper machine configs
+(`gainestown.cfg`) use the documented **base** clock, not turbo. used **2.1 GHz**, the 8468's
+published Intel base-clock spec - flagged in the config as a looked-up spec value, not something
+read off the running hardware like the cache geometry.
+
+---
+
+### [16] Write `luna.cfg`
+
+**Why:** assembled from steps 11-15's real numbers, following the `nehalem.cfg`/`gainestown.cfg`
+inheritance pattern from steps 12-14. written first into the repo (`cache_simulation/configs/luna.cfg`)
+so it's version-controlled, then mirrored onto Luna itself.
+
+**What's real (sysfs-measured, step 11) vs. not:** L1i/L1d/L2/L3 size, associativity, block size are
+real. L3 `data_access_time`/`tags_access_time` are placeholders (sysfs exposes geometry, not
+latency) carried from `beckton.cfg`'s similarly-sized LLC - need a real membench/pointer-chase
+measurement later. `replacement_policy = lru` for L3 is Sniper's standard default, not verified -
+project memory already flags this exact machine's real LLC policy as an undocumented adaptive
+bimodal scheme, only reverse-engineered through Skylake-gen chips, not confirmed for Sapphire
+Rapids. `[perf_model/dram]` section and the core timing model itself (`interval_timer`, branch
+predictor) are inherited from Sniper's stock "nehalem" core model, since Sniper ships no
+Sapphire-Rapids/Golden-Cove core model - only the cache hierarchy is asserted as this-machine-real.
+
+file committed to repo at `cache_simulation/configs/luna.cfg`. next: mirror onto Luna at
+`~/cache_simulation/snipersim/config/luna.cfg` and smoke-test with it.
