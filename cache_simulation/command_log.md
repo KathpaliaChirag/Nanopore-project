@@ -208,3 +208,34 @@ geometry - that's a config file to point at once we reach the actual associativi
 something this smoke test was meant to set.
 
 **Status: build verified working end-to-end.**
+
+---
+
+### [11] Read Luna's real cache geometry from sysfs
+
+**Why:** project memory flags generic vendor-spec-sheet associativity claims as a repeated citation
+trap on this exact silicon (e.g. the retracted Orion "8-way L2" claim) - Linux's own
+`/sys/devices/system/cpu/cpu0/cache/index*/` exposes the kernel's read of the real hardware
+topology, authoritative for *this* machine specifically, not a generic SKU spec sheet. sizes were
+already known from `lscpu` but associativity ("ways") was not, for any level.
+
+```bash
+for i in 0 1 2 3; do
+  echo "--- index$i ---"
+  for f in size ways_of_associativity number_of_sets coherency_line_size shared_cpu_list; do
+    echo "$f: $(cat /sys/devices/system/cpu/cpu0/cache/index$i/$f 2>/dev/null)"
+  done
+done
+```
+
+**Result - real, hardware-read cache geometry:**
+
+| Level | Size | Ways | Sets | Line |
+|---|---|---|---|---|
+| L1d | 48K | 12-way | 64 | 64B |
+| L1i | 32K | 8-way | 64 | 64B |
+| L2 (private/core) | 2048K | 16-way | 2048 | 64B |
+| L3/LLC (shared, 96 cores/socket) | 107520K (~105MB) | 15-way | 114688 | 64B |
+
+L1d/L2 geometry happens to match Sniper's shipped default config exactly (coincidence, not by
+design); L1i and L3 associativity differ from the default and needed this real read.
