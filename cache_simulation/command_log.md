@@ -302,3 +302,56 @@ Sapphire-Rapids/Golden-Cove core model - only the cache hierarchy is asserted as
 
 file committed to repo at `cache_simulation/configs/luna.cfg`. next: mirror onto Luna at
 `~/cache_simulation/snipersim/config/luna.cfg` and smoke-test with it.
+
+---
+
+### [17] Mirror luna.cfg onto Luna
+
+pasted the file content directly via heredoc (Luna has no clone of this GitHub repo set up -
+separate from the `kraken2-src-fresh` checkout used elsewhere). Verified via `wc -l` (47 lines) and
+`tail -5` matching the source file - a self-referential `diff` check in the same command was a
+mistake (nested heredoc doesn't expand that way) and can be ignored, it wasn't testing anything.
+
+---
+
+### [18]-[21] Debugging: three bugs found getting `-c luna` to actually apply
+
+**Bug 1 - wrong invocation syntax.** First attempt: `-c config/luna.cfg`. Silently fell back to
+defaults with no error (identical output to the very first no-config smoke test) - `run-sniper
+--help` showed the real syntax is `-c <name[.cfg]>`, resolved by basename from `config/`
+internally, not a path.
+
+**Bug 2 - two separate `-c` flags don't merge.** Fixed to `-c luna` but paired with a second,
+separate `-caddress_translation_schemes/baseline` flag (copied from the original README smoke
+test) - still identical default output. `-c` takes a **comma-joined list in one flag**
+(`-c name1,name2,...`), not multiple `-c` invocations; the second flag was silently replacing the
+first entirely.
+
+**Bug 3 - load order matters, and the "default" chain isn't what luna.cfg was built on.** Fixed to
+`-c luna,address_translation_schemes/baseline` (single flag, comma-joined) - this time got a real
+error: `Configuration value general/enable_userspace_mimicos not found`, but also confirmed
+`Core 0 at 2.10 GHz` in the output, proving `luna.cfg` *was* now loading. Root cause, found by
+reading `run-sniper`'s source and the actual include chain:
+- `run-sniper` always auto-prepends `-c config/base.cfg` - that was never the missing piece.
+- `address_translation_schemes/baseline.cfg` is the real "full system" config: it `#include`s
+  `common_configs/base_system_sniperspace.cfg` (sets `enable_userspace_mimicos` and other required
+  generals), `core_configs/meteor_lake_pcore.cfg` (a 2023 Redwood Cove P-core model - **not**
+  `nehalem`, which is what `luna.cfg` was originally built on), MMU/pagetable/DRAM configs.
+- with `luna,address_translation_schemes/baseline` in that order, `baseline`'s
+  `meteor_lake_pcore.cfg` loaded **after** `luna.cfg` and silently clobbered our cache overrides -
+  explains why L1-I kept showing 16-way (meteor's default) instead of our real 8-way across every
+  earlier attempt.
+- separately: `meteor_lake_pcore.cfg` sets `[perf_model/cache] levels = 2` and models the LLC as
+  **NUCA** (distributed per-core mesh slices), not a flat `[perf_model/l3_cache]` - the
+  `l3_cache` section `luna.cfg` originally wrote was dead code in this chain, never read at all.
+
+**Fix applied:** rewrote `luna.cfg` as a pure override layer (no `#include`, meant to load *after*
+`address_translation_schemes/baseline` via `-c address_translation_schemes/baseline,luna`).
+Rebuilt on `meteor_lake_pcore` instead of `nehalem` - L1d/L2 already matched Luna's real numbers
+exactly by coincidence, only L1i and the NUCA LLC slice needed overriding. Real 107520 KB total
+LLC / 96 real cores per socket = exactly 1120 KB/core slice (clean division), associativity 15
+carried from the sysfs aggregate reading (assumed uniform per slice - not independently verified,
+since sysfs only exposes the logical whole-cache view). NUCA latency/bandwidth left at
+`meteor_lake_pcore`'s own placeholders (still not real, just no worse than the beckton-derived
+guess the old l3_cache section had). committed, next: re-test with the corrected file and
+invocation order.
