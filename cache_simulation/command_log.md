@@ -120,4 +120,32 @@ for pkg in automake build-essential cmake libboost-dev libsqlite3-dev zlib1g-dev
 done
 ```
 
+**Result:** no passwordless sudo (password prompt required, not a permissions block - fine since CK
+runs these interactively). gcc/g++ 11.4.0 (>=5 requirement met). i386 foreign arch already
+registered. missing: `automake`, `libboost-dev`, `libsqlite3-dev`, `libbz2-dev`, `libdb++-dev`.
+already present: `build-essential`, `cmake`, `zlib1g-dev`.
+
+---
+
+### [7] Install missing build dependencies
+
+**Why:** installs the packages step 6 found missing. added three i386 runtime libs
+(`libc6:i386`, `libncurses5:i386`, `libstdc++6:i386`) not covered by the step-6 check, since Sniper
+links against Intel Pin (32-bit-capable even on a 64-bit target) - skipping these tends to surface
+as a cryptic linker/runtime error deep into the build rather than a clear missing-package message
+now. this is a machine-wide `apt install` on a shared account, not scoped to just `student`'s home.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y automake libboost-dev libsqlite3-dev libbz2-dev libdb++-dev libc6:i386 libncurses5:i386 libstdc++6:i386
+```
+
+**Result:** clean install, no errors. 18 new packages (incl. transitive deps: `libboost1.74-dev`,
+`libdb5.3++-dev`, `autoconf`, `m4`, `libtinfo5:i386`, `libgpm2:i386`). `libc6:i386` was already the
+newest version.
+
+---
+
+### [8] Build Sniper
+
 **Status:** awaiting result.
