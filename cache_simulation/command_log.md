@@ -148,4 +148,33 @@ newest version.
 
 ### [8] Build Sniper
 
-**Status:** awaiting result.
+**Why:** actual compile - `make` runs the `all` target: `dependencies` step first (downloads the
+Intel Pin toolkit over the network via the proxy), then compiles the simulator. run inside the
+`cache_sim` tmux session (already open) so an SSH drop mid-build doesn't kill it, output teed to a
+log file for post-mortem if it failed.
+
+```bash
+cd ~/cache_simulation/snipersim
+make 2>&1 | tee build.log
+```
+
+**Result:** `[SUCCESS]` - full build completed clean (dependencies, standalone lib, pin-frontend,
+sift lib, all linked) with no errors in the tail output.
+
+---
+
+### [9] Disk space check (shared machine)
+
+**Why:** Sniper builds + later trace-based simulation runs (SIFT trace files, run outputs) can eat
+disk fast, and this is shared across several accounts - checking headroom now before a big run
+fills the disk and breaks everyone, not just this work. `sudo` needed on the per-user `du` or it
+hits permission-denied on other users' homes and gives an incomplete total.
+
+```bash
+df -h /home
+sudo du -sh /home/*/ 2>/dev/null | sort -rh
+```
+
+**Result:** `/` (938G total) at 85% used, **138G free**. per-user: `chayanika` 401G, `student`
+(this account) 324G, `dell` 63M, `vijay` 16M, `kolin` 720K. flagged as tight headroom - worth
+watching once trace generation starts, not blocking yet.
