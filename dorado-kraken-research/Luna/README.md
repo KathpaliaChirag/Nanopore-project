@@ -1,28 +1,32 @@
-# Luna — Knowledge Base
+# Luna - knowledge base
 
-Luna is a Dell R760 server at IIT Delhi used for profiling and running Nanopore bioinformatics pipelines.
+Luna is a Dell R760 server at IIT Delhi. You'll use it for profiling and running Nanopore bioinformatics pipelines.
 Login: `student@luna.cse.iitd.ac.in`
-Internet: IITD proxy via `python3 ~/iitd-login.py -d` in a tmux session.
+Internet needs the IITD proxy: run `python3 ~/iitd-login.py -d` inside a tmux session.
 
 ---
 
 ## Files in this folder
 
+Everything below lives in this folder so you know where to look before hunting through the rest of the repo.
+
 | File | Purpose |
 |---|---|
-| bash_history.md | Every command run on Luna, with explanations and status |
-| luna_stats.md | Hardware specs, storage, GPU, perf counter status, tool inventory |
-| install_tools.md | Installation commands for all tools |
+| bash_history.md | every command run on Luna, with explanations and status |
+| luna_stats.md | hardware specs, storage, GPU, perf counter status, tool inventory |
+| install_tools.md | installation commands for all tools |
 | user_guide.md | SSH login, internet setup, first steps for new users |
-| user_management.md | Adding users, giving sudo, copying tools to new accounts |
+| user_management.md | adding users, giving sudo, copying tools to new accounts |
 | profiling/plan.md | 4-phase profiling plan: matmul, Kraken2, Dorado, AMX |
 | profiling/results_kraken2.md | Kraken2 profiling results |
 | profiling/results_dorado.md | Dorado GPU profiling results |
-| profiling/results_matmul_luna.md | Matrix multiply benchmark results on Luna |
+| profiling/results_matmul_luna.md | matrix multiply benchmark results on Luna |
 
 ---
 
-## Hardware Summary
+## Hardware summary
+
+You need these numbers before interpreting any profiling result on Luna, since cache and DRAM behavior only make sense against the real topology.
 
 | Property | Value |
 |---|---|
@@ -37,7 +41,7 @@ Internet: IITD proxy via `python3 ~/iitd-login.py -d` in a tmux session.
 
 ---
 
-## Tools Installed (as of 2026-05-29)
+## Tools installed (as of 2026-05-29)
 
 | Tool | Path | Version |
 |---|---|---|
@@ -46,11 +50,11 @@ Internet: IITD proxy via `python3 ~/iitd-login.py -d` in a tmux session.
 | kraken2 | ~/tools/kraken2/kraken2 | 2.1.3 |
 | dorado | ~/tools/dorado/bin/dorado | 1.4.0 |
 | flamegraph.pl | ~/tools/FlameGraph/flamegraph.pl | latest |
-| numactl | /usr/bin/numactl | — |
+| numactl | /usr/bin/numactl | - |
 | valgrind | /usr/bin/valgrind | 3.18.1 |
-| gperftools | apt | — |
+| gperftools | apt | - |
 
-nsys/ncu/nvcc not yet confirmed in PATH — need `find /usr /opt -name nsys`.
+nsys/ncu/nvcc aren't confirmed in PATH yet - still need to run `find /usr /opt -name nsys`.
 
 ---
 
@@ -63,7 +67,7 @@ nsys/ncu/nvcc not yet confirmed in PATH — need `find /usr /opt -name nsys`.
 
 ---
 
-## Directory Structure on Luna
+## Directory structure on Luna
 
 ```
 ~/
@@ -86,8 +90,8 @@ nsys/ncu/nvcc not yet confirmed in PATH — need `find /usr /opt -name nsys`.
 
 ---
 
-## Current Status
+## Current status
 
-- All tools installed and verified working
+- all tools installed and verified working
 - pod5 file and kraken2 database in place
-- Next: Dorado basecalling run, then Kraken2 classification, then profiling
+- next: Dorado basecalling run, then Kraken2 classification, then profiling
