@@ -178,3 +178,33 @@ sudo du -sh /home/*/ 2>/dev/null | sort -rh
 **Result:** `/` (938G total) at 85% used, **138G free**. per-user: `chayanika` 401G, `student`
 (this account) 324G, `dell` 63M, `vijay` 16M, `kolin` 720K. flagged as tight headroom - worth
 watching once trace generation starts, not blocking yet.
+
+---
+
+### [10] Smoke test - fast-forward and detailed mode on `/bin/true`
+
+**Why:** a clean `make` doesn't guarantee the simulator actually runs correctly. these are the two
+commands from Sniper's own README, verified by the maintainers. `/bin/true` is the smallest
+possible target (does nothing, exits immediately) - the point is isolating "does the harness itself
+work" from "is the workload configured right", before touching any real workload.
+
+```bash
+cd ~/cache_simulation/snipersim
+./run-sniper -n 1 --fast-forward -d /tmp/sniper-smoke-$$ -caddress_translation_schemes/baseline -- /bin/true
+./run-sniper -n 1 -d /tmp/sniper-smoke-$$-detailed -caddress_translation_schemes/baseline -- /bin/true
+```
+
+**Result:** both exit 0. fast-forward mode skips the timing model entirely (its printed
+`166684.00 IPC` is not a real number, ignore it) - it just confirms the harness boots, builds the
+memory hierarchy, runs the trace, and exits clean. detailed mode is the meaningful one: interval
+core model actually engaged, produced a physically believable `0.66 IPC` / `0.3M cycles`, and the
+internal memory-model sanity check (`74 unique VA->PA mappings, 0 violations detected`,
+`1983 unique data cache lines accessed`) confirms address translation and cache-line tracking
+stayed consistent through a real run.
+
+**Note for later:** the cache hierarchy printed (L1-I 64 sets/16-way, L1-D 64 sets/12-way, L2 2048
+sets/16-way) is Sniper's shipped default config, not yet set to model Luna's or Orion's real cache
+geometry - that's a config file to point at once we reach the actual associativity study, not
+something this smoke test was meant to set.
+
+**Status: build verified working end-to-end.**
