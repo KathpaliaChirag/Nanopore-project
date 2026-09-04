@@ -1,0 +1,123 @@
+# command_log.md
+
+running receipt of every command actually run for the cache_simulation track, in order.
+mirrors the pattern used in `plan_paper/command_log.md`. machine: Luna (`student@dell-R760`) unless noted.
+
+---
+
+### [1] Persistent, internet-connected tmux session
+
+**Why:** Luna has no direct internet - `iitd-login.py` authenticates through the IITD proxy and
+sends a heartbeat every ~100s to keep the session alive. running it inside tmux means it survives
+an SSH disconnect. the login handshake itself needs the proxy vars unset (direct access), which is
+why the login command starts with `env -u http_proxy ...` even though step 2 sets those vars globally
+for everything else.
+
+```bash
+tmux new -s cache_sim
+env -u http_proxy -u https_proxy -u HTTP_proxy -u HTTPS_proxy python3 ~/iitd-login.py -d
+# entered kerberos ID + password, detached with Ctrl+B, D
+```
+
+**Status:** done - authenticated, heartbeat running.
+
+---
+
+### [2] Set proxy env vars for all other tools
+
+**Why:** `iitd-login.py` only authenticates the proxy server itself - every other tool (git, pip,
+apt, curl, wget) needs `http_proxy`/`https_proxy` (and the uppercase variants some tools check
+instead) actually set to route traffic through it, or they'll try direct access and fail/hang on
+a machine with no direct route.
+
+```bash
+echo 'export http_proxy=http://proxy61.iitd.ac.in:3128' >> ~/.bashrc
+echo 'export https_proxy=http://proxy61.iitd.ac.in:3128' >> ~/.bashrc
+echo 'export HTTP_proxy=http://proxy61.iitd.ac.in:3128' >> ~/.bashrc
+echo 'export HTTPS_proxy=http://proxy61.iitd.ac.in:3128' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Status:** done.
+
+---
+
+### [3] Verify proxy works, create cache_simulation folder
+
+**Why:** confirm the shell actually uses the proxy (separate from the login script authenticating
+it) before building anything on top of it - avoids a confusing hang/timeout later if a tool silently
+ignored the env vars or the login session had already expired.
+
+```bash
+wget -q --spider http://google.com && echo "internet OK" || echo "internet FAILED"
+mkdir -p ~/cache_simulation
+cd ~/cache_simulation
+pwd
+```
+
+**Result:** `internet OK`, folder created at `/home/student/cache_simulation`.
+
+---
+
+### [4] Clone Sniper, confirm "latest version"
+
+**Why:** Sniper ships as source, no package manager install. cloned to inspect its own build docs
+before guessing dependencies. checked for release tags first since "latest version" could mean
+either latest tagged release or latest commit on `master` - repo turned out to have **no tags**,
+so `master` HEAD *is* the latest version by definition here.
+
+```bash
+cd ~/cache_simulation
+git clone https://github.com/snipersim/snipersim.git
+cd snipersim
+git tag --sort=-creatordate | head -10
+git log -1 --format="%H %ci"
+```
+
+**Result:** no tags exist. HEAD = `56505e42fd98bca863fac181e769bd3c98d2bb3`, dated 2026-05-23.
+cloned into `/home/student/cache_simulation/snipersim`.
+
+---
+
+### [5] Read build docs, extract real dependency list
+
+**Why:** `COMPILATION` turned out to document building *target apps to run under* Sniper, not
+Sniper itself. `Makefile`/`Makefile.config` are the real build entry point (requires GCC >= 5).
+`docker/Dockerfile*` gave the maintainers' own dependency list per Ubuntu version - more reliable
+than guessing package names from the manual.
+
+```bash
+cat README.md | head -60
+cat COMPILATION | head -80
+cat Makefile | head -40
+cat Makefile.config | head -60
+find docker -iname "Dockerfile*" -exec cat {} \;
+```
+
+**Result - dependency list (Ubuntu 22.04/24.04 lines, closest match to Luna):**
+`python3 python3-dev python3-venv screen tmux binutils libc6:i386 libncurses5:i386 libstdc++6:i386`
+(needs i386 arch added: `dpkg --add-architecture i386`),
+`automake build-essential cmake curl wget libboost-dev libsqlite3-dev zlib1g-dev libbz2-dev libdb++-dev`.
+RISC-V toolchain deps and helper utils (gdb, gfortran, git, g++, vim) also listed but not required
+for a pure x86 build.
+
+---
+
+### [6] Environment check before installing anything (sudo, existing packages)
+
+**Why:** Luna is a shared account (`student`) - `apt-get install` needs sudo, and installing i386
+architecture support system-wide affects the whole shared machine, not just this user. checking
+what's already installed and whether sudo actually works before touching packages, rather than
+blindly running the full Docker install list.
+
+```bash
+sudo -n true 2>&1 && echo "HAVE SUDO" || echo "NO PASSWORDLESS SUDO"
+gcc --version | head -1
+g++ --version | head -1
+dpkg --print-foreign-architectures
+for pkg in automake build-essential cmake libboost-dev libsqlite3-dev zlib1g-dev libbz2-dev libdb++-dev; do
+  dpkg -s "$pkg" >/dev/null 2>&1 && echo "$pkg: installed" || echo "$pkg: MISSING"
+done
+```
+
+**Status:** awaiting result.
