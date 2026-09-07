@@ -397,3 +397,56 @@ as real as the sysfs-measured numbers.
 
 **Status:** `luna.cfg` corrected (1120 -> 1125 KB), invocation corrected (two separate `-c` flags,
 baseline first). next: re-test on Luna with both fixes applied together.
+
+---
+
+### [25] Retest with both fixes - new bug: SIGSEGV in CacheSet::find
+
+```bash
+./run-sniper -c address_translation_schemes/baseline -c luna -n 1 -d /tmp/sniper-luna-smoke8-$$ -- /bin/true
+```
+
+**Result:** cache creation now correct and matches real numbers exactly (`nuca-cache 1200 sets,
+15-way`, `L1-I 8-way`, `L1-D 12-way`, `L2 16-way`) - the invocation/config-loading bugs are fully
+resolved. But crashed with `SIGSEGV` inside `cache_set.cc:CacheSet::find`, called from
+`cache.cc:Cache::peekSingleLine`, called from `dram_directory_cntlr.cc:handleMsgFromL2Cache` - a
+real memory-access bug during simulation, not a config-loading problem.
+
+---
+
+### [26] SSH access granted for direct inspection
+
+CK generated a dedicated ed25519 keypair (`claude-code-luna-inspect`) locally and added the public
+half to `~/.ssh/authorized_keys` on Luna - grants login only, easily revocable by removing the line.
+CK still runs all substantive/build/rerun commands; direct SSH is for read-only source inspection
+only, to cut round-trip time on debugging.
+
+---
+
+### [27] Root cause of the SIGSEGV, found via direct source inspection
+
+Initial hypothesis (non-power-of-2 `num_sets` requires `address_hash != mask`) was checked against
+`cache_base.cc`'s actual `parseAddressHash`/hash enum and ruled out - our NUCA section inherits
+`address_hash = "xor_mod"` from `meteor_lake_pcore.cfg`, not `mask`, so the `HASH_MASK`-specific
+assert doesn't even apply.
+
+Real bug, found in `common/core/memory_subsystem/cache/cache_base.cc`'s `splitAddress()`,
+`HASH_XOR_MOD` case:
+
+```cpp
+UInt64 si = block_num % m_num_sets;
+UInt64 ti = (block_num >> m_log_num_sets) % m_num_sets;
+set_index = (si ^ ti);
+```
+
+`si` and `ti` are each `< m_num_sets`, but **XOR of two values only stays within `[0, m_num_sets)`
+when `m_num_sets` is a power of 2** - for our 1200-set NUCA slice (not a power of 2), `si ^ ti` can
+exceed 1200, producing an out-of-bounds `set_index` that indexes past the real sets array -
+exactly the `CacheSet::find` segfault. `HASH_MASK` and `HASH_PRIME_DIS` have the same power-of-2
+dependency (both use `m_log_num_sets` as a bit-shift); only plain-modulo hashes (`HASH_MOD`,
+`HASH_MER_MOD`) are safe for an arbitrary set count.
+
+**Fix:** added `address_hash = mod` explicitly to `luna.cfg`'s `[perf_model/nuca]` section only
+(our sole non-power-of-2 cache - L1i/L1d/L2 keep the inherited `xor_mod` since their set counts,
+64/64/2048, are already powers of 2 and unaffected by this bug). Preserves the real 1125KB/1200-set
+numbers rather than distorting them further to force a power-of-2 count. committed, next: retest.
