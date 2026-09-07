@@ -355,3 +355,45 @@ since sysfs only exposes the logical whole-cache view). NUCA latency/bandwidth l
 `meteor_lake_pcore`'s own placeholders (still not real, just no worse than the beckton-derived
 guess the old l3_cache section had). committed, next: re-test with the corrected file and
 invocation order.
+
+---
+
+### [22]-[24] Bug 2/3 correction, real cache-size validation bug, final working invocation
+
+**Correction to Bug 2/3 above:** the `-c name1,name2` comma-joined single-flag theory was itself
+wrong, found by reading `run-sniper`'s actual argument parser (`grep`'d for the `-c` handling
+block). The real logic:
+- `-c key=value` -> a sniper-option override
+- `-c obj:name` or **any `-c` value containing a comma** -> routed to `make_hetero_config()`, which
+  assigns **different configs to different cores** in a heterogeneous multi-core setup - NOT
+  general file-chaining. our `luna,address_translation_schemes/baseline` was silently
+  misinterpreted as a heterogeneous-core request the whole time, which is why it kept behaving
+  strangely regardless of comma order.
+- a **plain name with no comma** -> appended to a `configfiles` list via `configfiles.extend(...)`
+
+So **separate `-c` flags DO chain correctly** (later files override earlier on conflicting keys) -
+the comma-list "fix" in step 20 was the actual bug, not a fix. Correct form:
+`-c address_translation_schemes/baseline -c luna` (two separate flags, baseline first).
+
+```bash
+grep -n "config_list\|configs.append\|split(',')\|'-c'\|args.config\|def.*config" ~/cache_simulation/snipersim/run-sniper
+sed -n '230,270p' ~/cache_simulation/snipersim/run-sniper
+```
+
+**Retest with corrected invocation surfaced a real, separate bug:**
+
+```bash
+./run-sniper -c address_translation_schemes/baseline -c luna -n 1 -d /tmp/sniper-luna-smoke7-$$ -- /bin/true
+```
+
+Result: `*ERROR* Invalid cache configuration: size(1120 Kb) != sets(1194) * associativity(15) *
+block_size(64)`, process killed by SIGABRT. Sniper strictly validates `size = sets * associativity
+* block_size` and aborts rather than rounding - our NUCA per-core slice target (1120 KB, from
+107520/96) doesn't factor evenly at 15-way/64B (needs a fractional 1194.67 sets). **Fix:** rounded
+to the nearest value that does divide evenly - **1125 KB** (1200 sets exactly), a further 0.45%
+deviation on top of the already-approximate even-split-across-cores assumption. Documented both
+approximation layers explicitly in `luna.cfg`'s comments rather than presenting 1125 as if it were
+as real as the sysfs-measured numbers.
+
+**Status:** `luna.cfg` corrected (1120 -> 1125 KB), invocation corrected (two separate `-c` flags,
+baseline first). next: re-test on Luna with both fixes applied together.
