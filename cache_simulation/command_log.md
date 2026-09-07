@@ -587,3 +587,23 @@ instructions, throughput amortizes much higher: **227.8 KIPS** actual vs. ~32 KI
 machine config, and a real traced workload are all now working end to end. Next decision: how to
 scale this into an actual comparative experiment (multiple S2 cache-design binaries, thread counts,
 larger/more representative workload sizes) for the thesis work itself.
+
+---
+
+### [38] First real comparative experiment: noatomics associativity sweep
+
+**Why this specific comparison:** `ls ~/chirag_K/tools/kraken2-fresh-bin-s2-*` showed the
+`lru-noatomics-{4,8,16,32,64}way` binaries are already built - contrary to
+[[project_associativity_case_study_brief_sept2026]]'s note that they'd "never been built or
+benchmarked" (that memory is now stale/superseded). This is exactly the highest-value comparison
+that research brief identified: the *original* associativity sweep (more ways = worse wall-clock)
+was contaminated by an atomics-contention confound; these noatomics binaries isolate real
+associativity effects from that confound. Verified `lru-noatomics-4way`'s `classify` binary works
+identically to baseline (exit 0, 7/10 classified) before batch-running.
+
+**Batch script** (`~/cache_simulation/run_associativity_sweep.sh`): runs `baseline` +
+5 noatomics widths through Sniper detailed mode sequentially, same tiny 10-read workload, same
+`luna.cfg` real cache config, parses each run's instruction count/cycles/IPC/unique-cache-lines/
+elapsed-time into `results_associativity_sweep/summary.txt`. Launched via `nohup`+`disown`
+(PID 3952699), ~11 min estimated (6 runs x ~110s each, based on the single baseline run's actual
+time). next: check results.
