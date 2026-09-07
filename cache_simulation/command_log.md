@@ -539,3 +539,23 @@ clean `[SNIPER] End`. This is a genuine, non-trivial instruction count - the rea
 **Feasibility estimate for detailed mode:** fast-forward ran at ~5958 KIPS; earlier detailed-mode
 smoke tests ran at ~32 KIPS. Extrapolating: `25.1M / 32K ≈ 784s (~13 min)` for a full detailed-mode
 run of this same tiny workload - long but tractable for a first real experiment. next: run it.
+
+---
+
+### [36] First real detailed-mode run - launched in background
+
+```bash
+nohup ./run-sniper -c address_translation_schemes/baseline -c luna -n 1 \
+  -d /home/student/cache_simulation/results_classify_detailed -- \
+  /home/student/chirag_K/tools/kraken2-fresh-bin-s2-baseline/classify \
+  -H .../hash.k2d -t .../taxo.k2d -o .../opts.k2d -p 1 -T 0 -O ... -Q 0 -R ... -g 2 \
+  tiny_10reads.fastq > detailed_run.log 2>&1 < /dev/null &
+disown
+```
+
+**Why background:** the ~13 minute estimate exceeds a reasonable synchronous wait; `nohup`+`disown`
+means it survives an SSH disconnect same as the tmux session does. PID `3950949`, output to
+`~/cache_simulation/detailed_run.log`. This is the first real detailed-mode (cycle-timing-accurate)
+simulation of an actual kraken2 workload against Luna's real cache hierarchy - not yet an
+associativity comparison (that needs multiple S2 binary variants run the same way), just proving a
+full real run completes and produces sane stats.
