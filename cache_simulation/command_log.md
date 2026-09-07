@@ -470,3 +470,72 @@ correctly loaded via `-c address_translation_schemes/baseline -c luna`.
 **Workflow note:** from this point, CK granted direct SSH access (step 26) to run commands, not
 just inspect - narrating each command/why/output here same as before, still committing+pushing
 after every step.
+
+---
+
+### [29]-[35] First real workload attempt: tracing kraken2's S2 baseline binary
+
+**Goal:** trace a real kraken2 classify run through Sniper (not just `/bin/true`), scoped to a tiny
+synthetic workload first per CK's explicit choice, to prove the pipeline works before any real
+associativity/eviction experiment. Chose `sample_targeted` DB (50MB `hash.k2d`) since it's the same
+DB the real associativity sweep already used on native hardware - future Sniper numbers are
+directly comparable to real measurements CK already has.
+
+**[29] Created a tiny workload:** `head -40` (10 FASTQ reads) of a real basecalled file into
+`~/cache_simulation/workloads/tiny_10reads.fastq` (20K).
+
+**[30] Native sanity check** (isolate "does the workload work" from "does Sniper handle it"):
+```bash
+~/chirag_K/tools/kraken2-fresh-bin-s2-baseline/kraken2 --db .../sample_targeted --threads 1 \
+  --output ... --report ... tiny_10reads.fastq
+```
+Result: exit 0, 7/10 classified, 51ms.
+
+**[31] First Sniper fast-forward attempt with the same command - failed silently.** Reported only
+`0.2M instructions` (identical to the trivial `/bin/true` baseline) and produced no output files -
+kraken2 never actually ran, no error surfaced through the normal log.
+
+**[32] Verbose mode (`-v`) revealed the real mechanism:** `run-sniper` calls a `record-trace` tool
+which launches Intel **SDE** (Software Development Emulator, Pin-family instruction-level
+instrumentation) on the target. Running SDE directly (bypassing Sniper's wrapper) surfaced the
+real error: `zfstream.cc:182: cvifstream::cvifstream(...): assertion "this->stream != NULL" failed`.
+
+**[33] Isolated the cause via elimination:**
+- `kraken2 --help` (zero real file access) under SDE hit the **exact same crash** - ruled out
+  DB/fastq file access as the trigger; failure is at process-start time.
+- grepped kraken2's own source tree for `cvifstream`/`zfstream` - **not found**, ruling out a
+  kraken2-side bug.
+- `ldd` on the `kraken2` binary returned `not a dynamic executable` - the real tell.
+- `file` on the binary confirmed it: **`kraken2: Perl script text executable`.**
+
+**Root cause: `kraken2` is a Perl wrapper, not a compiled program.** The command users normally run
+parses arguments in Perl then `exec`s the real compiled classifier as a subprocess. SDE/Sniper only
+instruments compiled x86 machine code - pointing it at a Perl script meant it was instrumenting the
+Perl interpreter's own startup, not kraken2, explaining every symptom (crash regardless of args,
+"not a dynamic executable", near-zero simulated instructions).
+
+**[34] Found the real binary and its exact invocation:**
+```bash
+file ~/chirag_K/tools/kraken2-fresh-bin-s2-baseline/*   # "classify" = real ELF, dynamically linked
+strace -f -s 1000 -e trace=execve -o /tmp/strace_full.txt <kraken2 wrapper command>
+grep classify /tmp/strace_full.txt
+```
+The Perl wrapper's friendly flags (`--db`, `--threads`, `--output`, `--report`) translate to
+`classify`'s low-level flags: `-H <hash.k2d> -t <taxo.k2d> -o <opts.k2d> -p <threads> -T 0
+-O <output> -Q 0 -R <report> -g 2 <fastq>`.
+
+**[35] Verified the real binary directly, then through Sniper fast-forward:**
+```bash
+/home/student/chirag_K/tools/kraken2-fresh-bin-s2-baseline/classify \
+  -H .../sample_targeted/hash.k2d -t .../taxo.k2d -o .../opts.k2d \
+  -p 1 -T 0 -O ... -Q 0 -R ... -g 2 tiny_10reads.fastq
+./run-sniper -c address_translation_schemes/baseline -c luna -n 1 --fast-forward -d ... -- <same classify command>
+```
+
+**Result: success.** Native run: exit 0, matches earlier. Sniper fast-forward: `25.1M instructions,
+25.0M cycles, 1.01 IPC`, correct classification output (7/10 classified, matching native exactly),
+clean `[SNIPER] End`. This is a genuine, non-trivial instruction count - the real pipeline works.
+
+**Feasibility estimate for detailed mode:** fast-forward ran at ~5958 KIPS; earlier detailed-mode
+smoke tests ran at ~32 KIPS. Extrapolating: `25.1M / 32K ≈ 784s (~13 min)` for a full detailed-mode
+run of this same tiny workload - long but tractable for a first real experiment. next: run it.
