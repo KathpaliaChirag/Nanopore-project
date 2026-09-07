@@ -559,3 +559,31 @@ means it survives an SSH disconnect same as the tmux session does. PID `3950949`
 simulation of an actual kraken2 workload against Luna's real cache hierarchy - not yet an
 associativity comparison (that needs multiple S2 binary variants run the same way), just proving a
 full real run completes and produces sane stats.
+
+Run used `-n 1` (single simulated core, matching `classify -p 1` single-threaded) - deliberately
+the simplest case to validate the whole pipeline before adding thread-count complexity. Scaling to
+multiple simulated cores later won't be "free" even though Luna has 96 real cores - project memory
+already found Sniper simulating more target cores doesn't scale with host parallelism (16 target
+cores only ran ~4x faster than 1, not 16x, since the simulator itself is the bottleneck).
+
+---
+
+### [37] Detailed-mode run completed - full results
+
+**Result: completed in 113.63s** (much faster than the ~784s/13min estimate - that estimate came
+from the trivial `/bin/true` test where fixed per-run overhead dominated; with more real
+instructions, throughput amortizes much higher: **227.8 KIPS** actual vs. ~32 KIPS estimated).
+
+- **25.1M instructions, 14.3M cycles, IPC = 1.76** - a real, physically plausible number (vs. the
+  meaningless inflated/trivial numbers from `/bin/true` tests)
+- Classification output correct: 7/10 classified, matching the native run and the earlier
+  fast-forward run exactly
+- MMU sanity check clean: 3146 unique VA->PA / PA->VA mappings, 0 violations
+- **51,558 unique data cache lines accessed** - first real cache-footprint number from an actual
+  workload run against Luna's real, sysfs-measured cache hierarchy
+- Clean `[SNIPER] End`, no errors
+
+**Status: first real, correctness-verified, detailed-mode simulation complete.** Toolchain, real
+machine config, and a real traced workload are all now working end to end. Next decision: how to
+scale this into an actual comparative experiment (multiple S2 cache-design binaries, thread counts,
+larger/more representative workload sizes) for the thesis work itself.
