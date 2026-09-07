@@ -450,3 +450,23 @@ dependency (both use `m_log_num_sets` as a bit-shift); only plain-modulo hashes 
 (our sole non-power-of-2 cache - L1i/L1d/L2 keep the inherited `xor_mod` since their set counts,
 64/64/2048, are already powers of 2 and unaffected by this bug). Preserves the real 1125KB/1200-set
 numbers rather than distorting them further to force a power-of-2 count. committed, next: retest.
+
+---
+
+### [28] Retest with the hash fix - clean run
+
+```bash
+./run-sniper -c address_translation_schemes/baseline -c luna -n 1 -d /tmp/sniper-luna-smoke9-$$ -- /bin/true
+```
+
+**Result: clean end-to-end run.** `1.09 IPC` (real, believable detailed-mode number, no crash),
+`[SNIPER] End` reached normally, MMU sanity check clean (74 unique VA->PA/PA->VA mappings, 0
+violations). `luna.cfg` is now fully working with Luna's real cache hierarchy - L1i 32K/8-way,
+L1d 48K/12-way, L2 2MB/16-way, LLC modeled as 96x 1125KB/15-way NUCA slices (`mod` hash) -
+correctly loaded via `-c address_translation_schemes/baseline -c luna`.
+
+**Status: luna.cfg complete and verified. Toolchain + real-machine cache config both done.**
+
+**Workflow note:** from this point, CK granted direct SSH access (step 26) to run commands, not
+just inspect - narrating each command/why/output here same as before, still committing+pushing
+after every step.
