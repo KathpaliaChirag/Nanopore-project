@@ -997,3 +997,47 @@ lines than 4-way/8-way at every DB size (e.g. 47,680 vs 8-way's 69,187 at 16GB) 
 lack of associativity means it can't hold as much live data, consistent with expected higher
 conflict-miss/thrashing behavior for a 1-way design, worth confirming once clean wall-clock timing
 is available to see if that thrashing shows up as a real cost.
+
+---
+
+### [54] 1-way and 8-way jobs fully complete (all 4 DB sizes) - full 5-variant picture
+
+Both jobs finished all 4 databases (wall-clock still excluded as unreliable - see step 53).
+Complete instructions/cycles/IPC/cache-lines table, all 5 variants:
+
+| DB | Variant | Instructions (M) | Cycles (M) | IPC | Cache lines |
+|---|---|---|---|---|---|
+| 50mb | S0 | 35.8 | 24.4 | 1.47 | 76,605 |
+| 50mb | 1way | 38.2 | 27.0 | 1.41 | 67,749 |
+| 50mb | 4way | 39.7 | 26.7 | 1.48 | 76,963 |
+| 50mb | 8way | 41.3 | 27.8 | 1.48 | 89,254 |
+| 50mb | 16way | 44.0 | 28.7 | 1.53 | 113,831 |
+| 8gb | S0 | 68.1 | 51.7 | 1.32 | 186,523 |
+| 8gb | 1way | 51.7 | 28.6 | 1.81 | 54,874 |
+| 8gb | 4way | 52.0 | 28.3 | 1.84 | 64,091 |
+| 8gb | 8way | 52.2 | 28.7 | 1.82 | 76,380 |
+| 8gb | 16way | 52.6 | 28.9 | 1.82 | 100,952 |
+| 16gb | S0 | 77.3 | 60.7 | 1.27 | 200,423 |
+| 16gb | 1way | 51.6 | 30.1 | 1.71 | 47,680 |
+| 16gb | 4way | 51.9 | 29.6 | 1.75 | 56,897 |
+| 16gb | 8way | 52.3 | 30.1 | 1.74 | 69,187 |
+| 16gb | 16way | 53.0 | 30.3 | 1.75 | 93,761 |
+| 103gb | S0 | 102.9 | 94.3 | 1.09 | 306,921 |
+| 103gb | 1way | 68.8 | 48.8 | 1.41 | 79,560 |
+| 103gb | 4way | 70.3 | 47.7 | 1.47 | 88,782 |
+| 103gb | 8way | 71.9 | 49.0 | 1.47 | 101,066 |
+| 103gb | 16way | 74.6 | 49.6 | 1.50 | 125,646 |
+
+**Nuance worth stating precisely, not oversimplified:** by raw instruction count, 1-way is
+sometimes lowest (e.g. 103gb: 68.8M vs 4-way's 70.3M) - but by **cycles**, 4-way is consistently the
+best or tied-best at every DB size (e.g. 103gb: 47.7M vs 1-way's 48.8M). 1-way's lower IPC across
+the board (1.27-1.81 range, always below the wider variants at the same DB) shows it does less
+total work but stalls more per instruction - consistent with direct-mapped's higher conflict-miss
+rate (any two colliding minimizers fight over one slot). 1-way also consistently touches noticeably
+*fewer* cache lines than 4/8/16-way at every DB size, since it can't hold as much live data at once.
+**Cycles-based verdict: 4-way remains the best or tied-best choice at every database size tested,**
+with 1-way a close but real second, and 8/16-way never actually winning on cycles anywhere in this
+table.
+
+readcount job still genuinely alive (322 min CPU time, still climbing) - clean re-run watcher not
+yet triggered.
