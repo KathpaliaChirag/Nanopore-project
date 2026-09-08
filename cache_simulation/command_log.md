@@ -1191,3 +1191,9 @@ speedup for 1-way/4-way over S0 matches earlier findings closely, a reassuring c
 **Status:** fair batch continuing (8gb/8way running now, then 8gb/16way, then all of 16gb and
 103gb - 12 more runs). Not regenerating charts or updating the artifact until this fully completes,
 per instruction.
+
+**Update:** 15/20 runs complete (50mb, 8gb, 16gb all done; 103gb's 5 runs remain, currently on
+16gb/16way per the last check but that DB's 5 rows are already in the summary - progress.log is
+slightly ahead of what's shown). Per-cycle rate holds steady across all three completed DB sizes
+(7.5-8.2 s/Mcycle) - still internally consistent. Still not touching charts/artifact until the
+remaining 103gb runs land.
