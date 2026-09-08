@@ -1131,3 +1131,42 @@ from before the cross-batch drift finding above - premature to call final. Delet
 files from the repo (`git rm -r cache_simulation/charts/`) rather than leave stale ones around.
 `cache_simulation/scripts/make_slide_charts.py` stays (reusable, just needs its hardcoded data
 dicts refreshed) - will regenerate once the fair batch's wall-clock data is in and verified.
+
+---
+
+### [58] Hardware cache-size comparison: desktop and Orion-sized configs (config-only)
+
+CK asked to also test the 50-read workload under smaller HARDWARE caches - a typical consumer
+desktop and Orion (edge device) sized caches - using the config-only approach (not real Orion
+hardware/DynamoRIO, which stays paused). Removed 2000-reads from the queue temporarily, then CK
+asked to re-add it at the very end, after this new comparison.
+
+**Built two new overlay configs**, same pattern as `luna.cfg`:
+
+`cache_simulation/configs/desktop.cfg` - AMD Ryzen 5 5600X (a real, well-documented mainstream
+desktop CPU, not an invented "typical" number): L1d/L1i 32KB/8-way, L2 512KB/8-way, L3 32MB/16-way
+shared across 6 cores (5461 KB/core NUCA slice). All values are AMD's real published spec.
+
+`cache_simulation/configs/orion_sizes.cfg` - Jetson AGX Orin sizes from prior project research:
+L1d/L1i 64KB, L2 256KB/core, SLC 4MB shared across 12 cores (342 KB/core NUCA slice).
+Associativity NOT independently verified for this SKU (flagged explicitly, same caveat already on
+record in project memory) - L1/L2 use ARM Cortex-A78AE TRM typical-config values (a real reference
+default, not a guess); SLC associativity is NVIDIA proprietary IP, kept at 16 as an explicit
+placeholder only.
+
+**Both are config-only, x86-core stand-ins** - they test hardware cache SIZE sensitivity using the
+same x86 binaries and `meteor_lake_pcore` core timing model as every other run, not Orion's real
+ARM microarchitecture. That distinction is written directly into both config files' headers so it
+can't get lost later.
+
+Smoke-tested both before committing to a full run - `/bin/true` fast-forward confirmed exact
+correct cache creation (desktop: 5461 sets/16-way NUCA, 64 sets/8-way L1i/L1d, 1024 sets/8-way L2;
+orion_sizes: 342 sets/16-way NUCA, 256 sets/4-way L1i/L1d, 512 sets/8-way L2), no errors.
+
+**Launched:** `run_hwsize_comparison.sh` (watcher PID 4051600) - S0 and 4-way, both new hw configs,
+50MB and 8GB DBs, 50-read workload (8 runs total). Chained to start after both the current 1way/8way
+clean job AND the fair batch finish.
+
+**Re-queued 2000-reads at the end of the whole chain** (new watcher PID 4051646, waits on all three
+jobs ahead of it). Full order now: 1way/8way clean (running) -> fair batch (queued) -> hwsize
+comparison (queued) -> 2000-reads (queued, last).
