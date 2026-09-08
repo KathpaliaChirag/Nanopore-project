@@ -607,3 +607,38 @@ identically to baseline (exit 0, 7/10 classified) before batch-running.
 elapsed-time into `results_associativity_sweep/summary.txt`. Launched via `nohup`+`disown`
 (PID 3952699), ~11 min estimated (6 runs x ~110s each, based on the single baseline run's actual
 time). next: check results.
+
+---
+
+### [39] Associativity sweep results
+
+All 6 runs completed clean. `results_associativity_sweep/summary.txt`:
+
+| Variant | Instructions (M) | Cycles (M) | IPC | Unique cache lines | Wall time (s) |
+|---|---|---|---|---|---|
+| baseline | 25.1 | 14.2 | 1.77 | 51,557 | 114.9 |
+| lru-noatomics-4way | 25.2 | 14.3 | 1.76 | 55,585 | 115.5 |
+| lru-noatomics-8way | 25.4 | 14.4 | 1.76 | 67,873 | 121.3 |
+| lru-noatomics-16way | 25.8 | 14.7 | 1.76 | 92,449 | 129.5 |
+| lru-noatomics-32way | 26.8 | 15.1 | 1.78 | 141,600 | 138.6 |
+| lru-noatomics-64way | 28.6 | 15.9 | 1.80 | 239,904 | 164.6 |
+
+**Finding, stated carefully:** instructions, cycles, and unique cache lines touched all rise
+**monotonically** with associativity (64-way touches ~4.7x more distinct cache lines than 4-way,
+executes ~13% more instructions) - **even with the atomics-contention confound fully removed**
+(these are the noatomics binaries). This does not reverse the original real-hardware finding
+(more ways = worse wall-clock, from the Sept 2 sweep) - it **reproduces it under cleaner
+conditions**, which is stronger evidence than the original real-hardware data alone: it shows the
+slowdown-with-more-ways pattern is not an atomics artifact.
+
+**More specific mechanism signal:** IPC stays essentially flat (1.76-1.80) across all widths - it
+does not degrade as ways increase. This is consistent with (not proof of) the Sept 2 debate's
+locked diagnosis that allocation/first-touch cost (touching a bigger per-set structure) dominates,
+not scan cost - if scan cost or cache-miss stalls were the driver, IPC would be expected to *drop*
+as ways increase; instead the slowdown shows up purely as *more total instructions executed*, with
+each instruction costing about the same. Worth stating as "consistent with, adds simulation-based
+evidence for" rather than "proves" - this is a 10-read synthetic workload, not yet a
+representative-scale experiment.
+
+**Status:** first real comparative cache-associativity experiment complete via Sniper. Data
+committed to repo alongside this log entry (see `cache_simulation/results/` for the raw summary).
