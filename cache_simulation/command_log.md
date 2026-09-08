@@ -867,3 +867,34 @@ overclaiming unbounded growth).
 
 readcount job (2000reads/S0) still running, verified alive again (91+ min CPU time, up from 63 min
 last check) - genuinely slow, not stalled.
+
+---
+
+### [50] Investigated why the read-count job is so slow: unrepresentative sample, not a bug
+
+2000reads/S0 still on its first run after 150+ min real CPU time (verified alive throughout via
+`ps`, steadily climbing - never actually stalled). Investigated whether the workload itself
+explains this, since read-count scaling alone (2000/50 = 40x) didn't predict this much slowdown.
+
+**Root cause: read-length composition, not read count.** Nanopore reads vary enormously in length,
+and `head -N` on a fastq file grabs whatever happens to be at the front - not a random sample.
+Measured directly:
+
+| Workload | Reads | Mean length | Total bases |
+|---|---|---|---|
+| 50reads.fastq (original) | 50 | 1,827 | 91,372 |
+| reads_fast_2000.fastq | 2,000 | 17,526 | 35,051,400 |
+| reads_fast_10000.fastq | 10,000 | 6,019 | 60,185,436 |
+| reads_fast.fastq (full file) | 104,832 | 3,411 (true average) | 357,616,061 |
+
+The 2000-read subset's mean (17,526) is **5.1x the file's true average** (3,411) - the front of the
+file happens to be unusually long-read-heavy (some individual reads run up to 496,132 bases).
+Total bases, not read count, is what drives classify cost (minimizer scanning is per-base) - by
+that measure the 2000-read run is processing far more real work than "2000 reads" suggests, which
+fully explains the extreme slowness without anything being broken.
+
+**Reframed expectation for the remaining jobs, by total bases rather than read count:** current
+2000-read run (35.1M bases, in progress) -> 10000-read run (60.2M bases, only ~1.7x more) -> full
+file (357.6M bases, ~5.9x more than the 10K run) - a much gentler progression than the raw
+52x/read-count jump to the full file would have suggested. Still a real, multi-stage long-running
+job, but not the runaway blowup the naive read-count math implied.
