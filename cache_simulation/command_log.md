@@ -1071,6 +1071,57 @@ evidence.
 **Correction:** CK clarified the 2000-read experiment itself was NOT meant to be dropped - only the
 10000-read/full-file tail chained behind it. Requeued it as a standalone job (not re-chained to
 10K/full-file), all 5 variants (S0/1way/4way/8way/16way) on the 2000-read workload, 50MB DB only.
-`run_2000reads_standalone.sh` (watcher PID 4048357) waits for the current 1way/8way clean re-run to
-finish first, so it doesn't reintroduce the contention problem step 55 just fixed. next: monitor
-clean re-run completion, then this job starts automatically.
+
+---
+
+### [56] Publication-quality figures built locally (not on Luna)
+
+CK asked for beautiful, paper-publishable charts, generated with Python on the local machine (not
+Luna). Installed matplotlib/numpy locally. Wrote `cache_simulation/scripts/make_slide_charts.py` -
+serif academic typography, 300 DPI, vector PDF + PNG both saved (PDF for LaTeX inclusion, `pdf.fonttype
+= 42` so fonts embed properly rather than as paths), standard single/double-column widths. Four
+figures from the complete, committed experiment data: width sweep (10-read), cycles by variant
+across all 4 DB sizes (small multiples), wall-clock speedup vs no-cache, memory footprint touched.
+Caught and fixed a real legibility bug on first render (x-axis labels overlapping in the 4-panel
+small-multiples layout) by reviewing the actual rendered PNG before finalizing, not just trusting
+the code - rotated labels 40 degrees, widened panel height. Committed to `cache_simulation/charts/`.
+
+---
+
+### [57] Orion edge-device idea, explored then paused; new confound found on Luna
+
+CK asked about simulating a smaller (edge-device / consumer-laptop) hardware cache, not just
+associativity. Confirmed Sniper's cache-config parameters go well beyond associativity -
+`replacement_policy` (including a built-in adaptive scheme, `mplru`, directly relevant to Thesis
+1's eviction-policy piece), `address_hash`, latency, prefetcher, `shared_cores`/topology, plus
+core-level frequency/branch-predictor/TLB/DRAM params.
+
+CK initially wanted to physically power on Orion and run the real DynamoRIO/ARM route (Sniper's
+x86 SDE frontend can't instrument ARM binaries directly - confirmed by reading `README.arm64`:
+ARM traces are recorded on the ARM board via DynamoRIO, then replayed on the x86 host with an ARM
+core config). Then chose the much simpler alternative: just override `cache_size` in a new Sniper
+config and re-run the existing x86 binaries - answers the "LLC-topology-aware sizing" thesis
+question directly, without new hardware. **Paused before building it** - CK asked to focus back on
+Luna first.
+
+**While reviewing the new 1way/8way clean-rerun data, found a second, different confound:** 1-way
+at 8GB just ran in 223s with cycles (28.6M) nearly identical to the earlier "clean sequential"
+4-way run's 28.3M cycles at 391.8s - same warning shape as the contention bug already caught once,
+but CPU contention is ruled out this time (verified via `ps`, nothing else running). Checked
+`free -h`: 280GB of OS page cache on Luna, easily enough to hold all four databases (126.5GB total)
+simultaneously. Computed seconds-per-million-simulated-cycles for both batches: the original
+S0/4way/16way sequential job ran consistently around ~14 s/Mcycle across all three variants (no
+internal unfairness), but this new batch runs at ~8 s/Mcycle - the **entire new batch**, not one
+variant, is running roughly 1.8x faster per simulated cycle than the original batch did hours
+earlier. Conclusion: **wall-clock is comparable within a single batch, but not across batches run
+at different times** (disk-cache warmth or other host conditions drift between sessions) -
+validates cycles as the metric to trust throughout, per the earlier decision.
+
+**Fix:** queued a single fresh batch running all 5 variants together
+(`run_final_fair_batch.sh`, watcher PID 4050075) so wall-clock is finally comparable end-to-end,
+one batch, one set of host conditions. Had to fix a scheduling bug of my own making: the 2000-read
+job (watcher PID 4048357) was queued on the same start condition as this new fair-batch job - both
+would have launched simultaneously once the current job finished, recreating the exact contention
+problem being fixed. Killed and requeued the 2000-read watcher (new PID 4050181) to wait for BOTH
+the current job AND the fair batch, keeping the whole chain strictly sequential: 1way/8way clean
+(running) -> final fair batch (queued) -> 2000-reads (queued).
