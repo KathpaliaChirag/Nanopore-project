@@ -644,3 +644,66 @@ representative-scale experiment.
 committed at `cache_simulation/measurements/associativity_sweep_2026-09-08_summary.csv` (not
 `results/` - that's repo-gitignored root-wide for large raw dumps; small summary tables belong in
 `measurements/` instead).
+
+---
+
+### [40] Identifying true "no associativity" (S0) - the earlier "baseline" binary was mislabeled
+
+CK asked for a proper proof-quality comparison of no-associativity vs 4-way vs 8-way. Before
+running it, checked what `kraken2-fresh-bin-s2-baseline` (used as "baseline" in the step 38-39
+sweep) actually is: `strings ... classify | grep s2_cache` found the `s2_cache` symbol present -
+**it already has an S2 cache compiled in, it is NOT a true no-cache reference point.** The real
+no-cache original is a separate source checkout: `kraken2-src-baseline/src/classify` - confirmed
+via source grep (`grep -c s2_cache classify.cc` = 0) and binary strings (no S2 symbols at all).
+This is the correct "S0" (true no-associativity) baseline going forward - the step 38-39 "baseline"
+row should be understood as "an S2 cache config", not "no cache".
+
+---
+
+### [41] Scaled-up workload, gauged timing, launched full comparison
+
+Created a 50-read workload (`workloads/50reads.fastq`, 5x the original 10-read sample) for a more
+statistically meaningful sample. Verified S0 binary works correctly (34/50 classified, consistent
+rate). Timed one S0 detailed run at 50 reads standalone first: **188.64s** - only ~1.6x longer than
+the 10-read run despite 5x more reads, confirming most of the fixed cost is DB load, not
+per-read classify work (~96s fixed/load cost + ~1.85s/read, derived from the 10-vs-50-read delta).
+
+CK then asked about testing large DBs ("the 4gb ones"). No ~4GB DB actually exists as a built
+index on Luna (`eskape_human_4gb_build.log` is a log only, never actually built) - real options are
+50MB (`sample_targeted`), 7.5GB (`standard_8gb`), 15GB (`standard_16gb`), 104GB (`pluspf_103gb`).
+Extrapolated from the fixed-cost measurement: if load cost scales ~linearly with DB size (default
+kraken2 behavior, no `-M`, eagerly reads the whole DB into RAM - CK explicitly wants default
+behavior tested, not `-M`), `standard_8gb` (~150x larger than `sample_targeted`) could take **~4
+hours to load alone**, per binary. CK's call: time is not a concern, proceed on both `sample_targeted`
+(50MB) and `standard_8gb` (~8GB) DBs, S0 vs 4-way vs 16-way, with live-updating output so progress
+can be checked without waiting for the whole batch.
+
+**Launched:** `~/cache_simulation/run_big_comparison.sh` (PID 4000205), 6 runs total (3 variants x
+2 DBs, small DB first for fast feedback). Appends one row to
+`results_big_comparison/live_summary.csv` after each run completes (instructions/cycles/IPC/unique
+cache lines, plus real **L1/L2/NUCA-LLC hit-rate percentages** pulled from each run's `sim.stats` -
+`L1-D.loads-where-data-{L1,L2,nuca-cache}` counts, giving an actual hardware-level hit-rate proof,
+not just instruction counts). Timestamped start/done events also logged to
+`results_big_comparison/progress.log`. next: monitor and report as rows land.
+
+---
+
+### [42] Second axis: real read-count scaling (reads_fast.fastq subsets)
+
+CK asked to also test with a real, larger read-count workload (initially referenced as "4GB pod5" /
+"1.04k reads" - clarified through investigation, not literally either). Found the actual file CK
+meant: `~/chirag_K/results/basecalling/reads_fast.fastq` (708MB, **104,832 reads**, already used in
+CK's prior real `perf`-based cache-miss profiling - a good apples-to-apples reference). Flagged the
+full-file cost (~54 hours just for classification, extrapolated from the ~1.85s/read fixed-cost
+measurement) before running it blind - CK chose to subsample instead: **2,000-read and 10,000-read
+subsets** (`head -8000`/`head -40000` lines respectively - real reads from the front of the file,
+not synthetic).
+
+**Launched:** `~/cache_simulation/run_readcount_comparison.sh` (PID 4000993), running in **parallel**
+with the DB-size job (independent experiments, Luna has 96 real cores, no reason to serialize).
+Same S0/4-way/16-way variants, same `sample_targeted` (50MB) DB - deliberately NOT combined with
+the 8GB DB axis, since combining both large-DB and large-read-count would multiply an already
+multi-hour job further. Same live-updating pattern:
+`results_readcount_comparison/live_summary.csv` (one row per completed run) and `progress.log`
+(timestamped start/done). Estimated ~3hrs (2000-read x3 variants) + ~15.5hrs (10000-read x3
+variants) ~= 18-19hrs total. next: monitor both jobs, report as they complete.
