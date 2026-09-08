@@ -1197,3 +1197,73 @@ per instruction.
 slightly ahead of what's shown). Per-cycle rate holds steady across all three completed DB sizes
 (7.5-8.2 s/Mcycle) - still internally consistent. Still not touching charts/artifact until the
 remaining 103gb runs land.
+
+---
+
+### [60] Fair batch complete (20/20) - and a bigger correction: wall-clock was never the right metric
+
+All 20 runs done, `ALL DONE` confirmed. Classification correctness re-verified at the widest gap
+(S0 vs 16-way at 103GB - identical output, diff empty). Per-cycle rate stayed consistent through
+103gb too (7.09-7.90 s/Mcycle range).
+
+**Computed the wall-clock speedup table from this genuinely fair batch - and got a different
+answer than the cycles-based verdict: 1-way comes out fastest on wall-clock at every DB size**,
+narrowly ahead of 4-way (e.g. 103gb: 1-way 346s vs 4-way 360s). This contradicted the established
+cycles-based finding, which was worth stopping to understand rather than just reporting both
+numbers side by side.
+
+**Root cause, and the actual correction:** `wallclock_s` in every one of these summaries is **how
+long Sniper itself took to compute the simulation** - real time spent by the simulation tool,
+which tracks roughly with instruction count (more instructions = more simulator work). It is
+**not** a measure of how fast kraken2 would run on real hardware. The metric that actually
+represents real-hardware time is **cycles**, converted through the core's clock frequency
+(cycles / 2.1GHz for Luna) - that is what a real chip would experience. 1-way has fewer
+instructions than 4-way at most DB sizes (e.g. 103gb: 68.8M vs 70.3M) which is why it simulates
+*faster* (less simulator work) even though 4-way is *cycle-for-cycle* the better design.
+
+**Recomputed real-hardware-equivalent speedup vs S0, from cycles (the correct metric):**
+
+| DB | 1-way | 4-way | 8-way | 16-way |
+|---|---|---|---|---|
+| 50MB | 0.90x | 0.91x | 0.88x | 0.85x |
+| 7.5GB | 1.81x | **1.83x** | 1.81x | 1.79x |
+| 16GB | 2.02x | **2.05x** | 2.02x | 2.00x |
+| 103GB | 1.93x | **1.97x** | 1.92x | 1.89x |
+
+**4-way wins or ties at every single database size** on this corrected metric - consistent with
+every earlier cycles-based finding in this log. The whole cross-batch wall-clock-drift investigation
+(steps 53-57) was a legitimate and correctly-diagnosed bug (Sniper's own simulation speed genuinely
+does drift between sessions), but fixing it was never actually necessary for the core proof, since
+cycles never had that contamination problem - this is exactly why cycles was flagged as the
+trustworthy metric from the start. Going forward: **report cycles-derived real-time-equivalent
+numbers as the headline metric, not Sniper's own `wallclock_s`/`elapsed_s` columns** - those
+describe simulator performance, not simulated program performance, and conflating the two is an
+easy, subtle mistake worth flagging clearly for anyone reading this log later.
+
+**Full final dataset (20 rows, fully verified):**
+
+| DB | Variant | Instructions (M) | Cycles (M) | IPC | Cache lines | Sim wall-clock (s, NOT real-HW time) |
+|---|---|---|---|---|---|---|
+| 50mb | S0 | 35.8 | 24.4 | 1.47 | 76,606 | 188 |
+| 50mb | 1way | 38.2 | 27.0 | 1.41 | 67,751 | 174 |
+| 50mb | 4way | 39.7 | 26.8 | 1.48 | 76,966 | 182 |
+| 50mb | 8way | 41.3 | 27.8 | 1.49 | 89,255 | 194 |
+| 50mb | 16way | 44.0 | 28.7 | 1.53 | 113,831 | 209 |
+| 8gb | S0 | 68.1 | 51.8 | 1.32 | 186,526 | 409 |
+| 8gb | 1way | 51.7 | 28.6 | 1.81 | 54,874 | 220 |
+| 8gb | 4way | 51.9 | 28.3 | 1.84 | 64,091 | 223 |
+| 8gb | 8way | 52.2 | 28.7 | 1.82 | 76,379 | 230 |
+| 8gb | 16way | 52.6 | 28.9 | 1.82 | 100,954 | 236 |
+| 16gb | S0 | 77.3 | 60.7 | 1.27 | 200,423 | 464 |
+| 16gb | 1way | 51.6 | 30.1 | 1.71 | 47,681 | 226 |
+| 16gb | 4way | 51.9 | 29.6 | 1.76 | 56,898 | 232 |
+| 16gb | 8way | 52.3 | 30.1 | 1.74 | 69,185 | 237 |
+| 16gb | 16way | 53.0 | 30.4 | 1.75 | 93,761 | 248 |
+| 103gb | S0 | 102.9 | 94.3 | 1.09 | 306,921 | 700 |
+| 103gb | 1way | 68.8 | 48.8 | 1.41 | 79,566 | 346 |
+| 103gb | 4way | 70.3 | 47.8 | 1.47 | 88,782 | 360 |
+| 103gb | 8way | 71.9 | 49.1 | 1.46 | 101,070 | 375 |
+| 103gb | 16way | 74.6 | 50.0 | 1.49 | 125,646 | 395 |
+
+**Status: this dataset is final and verified.** Next: regenerate charts using cycles-derived
+speedup (not sim wall-clock), update the published artifact.
