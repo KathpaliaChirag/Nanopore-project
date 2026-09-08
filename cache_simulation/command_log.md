@@ -1125,3 +1125,9 @@ would have launched simultaneously once the current job finished, recreating the
 problem being fixed. Killed and requeued the 2000-read watcher (new PID 4050181) to wait for BOTH
 the current job AND the fair batch, keeping the whole chain strictly sequential: 1way/8way clean
 (running) -> final fair batch (queued) -> 2000-reads (queued).
+
+**Correction:** CK flagged (correctly) that 2 of the 4 committed figures used wall-clock numbers
+from before the cross-batch drift finding above - premature to call final. Deleted all 4 chart
+files from the repo (`git rm -r cache_simulation/charts/`) rather than leave stale ones around.
+`cache_simulation/scripts/make_slide_charts.py` stays (reusable, just needs its hardcoded data
+dicts refreshed) - will regenerate once the fair batch's wall-clock data is in and verified.
