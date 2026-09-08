@@ -760,3 +760,30 @@ concern).
 same 50-read workload, running as a **third parallel job** alongside the DB-size and read-count
 jobs already in progress. Writes to `results_bigdb_comparison/live_summary.csv`. next: monitor all
 three jobs together.
+
+---
+
+### [45] DB-size job (results_big_comparison) complete - the case for 4-way
+
+All 6 runs done. Full table:
+
+| DB | Variant | Instructions (M) | Cycles (M) | IPC | Unique cache lines | Wall time (s) |
+|---|---|---|---|---|---|---|
+| 50mb | S0 | 35.8 | 24.4 | 1.47 | 76,605 | 188.7 |
+| 50mb | 4way | 39.7 | 26.7 | 1.48 | 76,963 | 204.4 |
+| 50mb | 16way | 44.0 | 28.7 | 1.53 | 113,831 | 360.3 |
+| 8gb | S0 | 68.1 | 51.7 | 1.32 | 186,523 | 748.3 |
+| 8gb | 4way | 52.0 | 28.3 | 1.84 | 64,091 | 391.8 |
+| 8gb | 16way | 52.6 | 28.9 | 1.82 | 100,952 | 410.3 |
+
+**The 4-way-is-the-sweet-spot case, quantified:** at 7.5GB scale, 4-way->16-way barely moves the
+needle (+1.2% instructions, +4.7% wall time) - the extra ways buy almost nothing once the cache is
+already intercepting most of the expensive raw-table probes. At 50MB scale, the same width increase
+is expensive (+10.8% instructions, **+76% wall time**, 204s->360s) - overhead with no corresponding
+payoff, since a small DB's direct probes are already cheap. **4-way sits at or near the optimum at
+both scales**: close to break-even where caching doesn't help much (50MB), and captures nearly all
+of the achievable win where it does (7.5GB), while 16-way's extra cost is either wasted (large DB)
+or actively harmful (small DB). This directly answers CK's original ask for a quantified case for
+4-way/8-way over both no-associativity and higher-associativity.
+
+**Status:** this job fully complete. Two jobs still running (readcount, bigdb-extended).
