@@ -952,3 +952,48 @@ here, not altering classification results, as expected.
 **Launched:** `~/cache_simulation/run_1way_dbsize.sh` (PID 4019763), same pattern as the 8-way job -
 across all 4 DBs, same 50-read workload. Writes to `results_1way_dbsize/live_summary.csv`. next:
 monitor both new jobs (8-way, 1-way), merge into the full comparison table once done.
+
+---
+
+### [53] Data-integrity catch: 1-way/8-way wall-clock contaminated by host contention
+
+Both jobs progressed through 50mb/8gb/16gb (103gb still running for each). Before reporting,
+noticed 1-way's 50MB wall-clock (454s) was *slower* than 8-way (341s) and 16-way (360s) at the same
+DB size - backwards from expected, since 1-way is structurally the simplest cache. Checked whether
+this was a real finding or a measurement problem: 1-way's **simulated** metrics (38.2M
+instructions, 27.0M cycles) are nearly identical to 4-way's (39.7M / 26.7M, ~1% apart) - a 1%
+difference in simulated cycles cannot produce a 122% difference in real wall-clock under normal
+conditions.
+
+**Root cause: these two jobs were launched while the read-count job (2000reads/S0) was still
+running**, and briefly overlapped each other too - so their wall-clock timings were recorded under
+2-3 concurrent Sniper simulations competing for real CPU on Luna. The original S0/4-way/16-way
+numbers in the published report ran strictly sequentially, one at a time, with no such contention.
+
+**Verdict:** instructions/cycles/IPC/cache-lines (Sniper's own internal simulated metrics) remain
+valid and comparable - they come from the simulator's internal model, not real-world scheduling.
+**Wall-clock time for the 1-way and 8-way DB-size runs is NOT comparable to the original sequential
+numbers and should not be reported as such.**
+
+**Fix, per CK's call:** report instructions/cycles/IPC now (valid), queue a clean isolated re-run
+for honest wall-clock. Wrote `~/cache_simulation/run_1way8way_clean_rerun.sh` (watcher PID 4029858)
+- polls for both `run_readcount_comparison.sh` and `run_fullfile_comparison.sh` to have no running
+instance (true single-job isolation, not just "readcount done"), then re-runs 1-way and 8-way alone
+across all 4 DBs. Writes to `results_1way8way_clean/live_summary.csv`.
+
+**Valid data so far (instructions/cycles/IPC only - wall-clock excluded as unreliable):**
+
+| DB | Variant | Instructions (M) | Cycles (M) | IPC | Cache lines |
+|---|---|---|---|---|---|
+| 50mb | 1way | 38.2 | 27.0 | 1.41 | 67,749 |
+| 50mb | 8way | 41.3 | 27.8 | 1.48 | 89,254 |
+| 8gb | 1way | 51.7 | 28.6 | 1.81 | 54,874 |
+| 8gb | 8way | 52.2 | 28.7 | 1.82 | 76,380 |
+| 16gb | 1way | 51.6 | 30.1 | 1.71 | 47,680 |
+| 16gb | 8way | 52.3 | 30.1 | 1.74 | 69,187 |
+
+Interesting real signal even from just instructions/cycles: 1-way touches noticeably *fewer* cache
+lines than 4-way/8-way at every DB size (e.g. 47,680 vs 8-way's 69,187 at 16GB) - direct-mapped's
+lack of associativity means it can't hold as much live data, consistent with expected higher
+conflict-miss/thrashing behavior for a 1-way design, worth confirming once clean wall-clock timing
+is available to see if that thrashing shows up as a real cost.
