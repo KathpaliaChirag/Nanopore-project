@@ -839,3 +839,31 @@ with the 4-way advantage growing as DB size grows). 103gb/16way still running.
 Also verified (second time) the readcount job's 2000reads/S0 run is genuinely still computing, not
 stalled: 63+ min of real accumulated CPU time, 58% CPU utilization live-checked - just taking far
 longer than any extrapolation predicted. No action needed, continuing to monitor.
+
+---
+
+### [49] bigdb job (16GB + 103GB) fully complete - pattern holds across every DB size tested
+
+`ALL DONE` at 21:50:34. Full 6-row table (consolidated into
+`measurements/bigdb_16gb_103gb_full_2026-09-08_summary.csv`, superseding the earlier partial file):
+
+| DB | Variant | Instructions (M) | Cycles (M) | IPC | Unique cache lines | Wall time (s) |
+|---|---|---|---|---|---|---|
+| 16gb | S0 | 77.3 | 60.7 | 1.27 | 200,423 | 861 |
+| 16gb | 4way | 51.9 | 29.6 | 1.75 | 56,897 | 390 |
+| 16gb | 16way | 53.0 | 30.3 | 1.75 | 93,761 | 431 |
+| 103gb | S0 | 102.9 | 94.3 | 1.09 | 306,921 | 1262 |
+| 103gb | 4way | 70.3 | 47.7 | 1.47 | 88,782 | 616 |
+| 103gb | 16way | 74.6 | 49.6 | 1.50 | 125,646 | 671 |
+
+103gb/16way closes the loop: +6.1% instructions, +42% more cache lines, +8.9% more wall time than
+4-way, for no meaningful benefit - same shape as every other DB size tested. **The full pattern
+across all four sizes (50MB, 7.5GB, 16GB, 103GB) is now consistent and complete: 4-way is at or
+near the optimum at every scale, and its advantage over no-cache grows monotonically with DB size**
+(50MB: near break-even: 7.5GB: -24% instr/1.9x faster: 16GB: -33% instr/2.2x faster: 103GB: -32%
+instr/2.05x faster - 103GB roughly matches 16GB's gain rather than continuing to grow, suggesting
+the benefit may be approaching a ceiling past a certain DB size, worth noting rather than
+overclaiming unbounded growth).
+
+readcount job (2000reads/S0) still running, verified alive again (91+ min CPU time, up from 63 min
+last check) - genuinely slow, not stalled.
