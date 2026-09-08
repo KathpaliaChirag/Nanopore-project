@@ -1064,7 +1064,13 @@ minus the wait condition, since the machine is now actually idle. Runs 1-way and
 the original sequential S0/4-way/16-way timings. next: monitor, expect well under an hour given no
 competing load.
 
-**Dropped from the plan (not run):** 2000-read, 10000-read, and full-file (104,832-read) real
-workload-scaling experiments - the proof-of-concept 10/50-read results and the 4-DB-size sweep
-remain the primary evidence; real read-count scaling can be revisited later if useful, not blocking
-the current thesis case.
+**Dropped from the plan (not run):** 10000-read and full-file (104,832-read) real workload-scaling
+experiments - the proof-of-concept 10/50-read results and the 4-DB-size sweep remain the primary
+evidence.
+
+**Correction:** CK clarified the 2000-read experiment itself was NOT meant to be dropped - only the
+10000-read/full-file tail chained behind it. Requeued it as a standalone job (not re-chained to
+10K/full-file), all 5 variants (S0/1way/4way/8way/16way) on the 2000-read workload, 50MB DB only.
+`run_2000reads_standalone.sh` (watcher PID 4048357) waits for the current 1way/8way clean re-run to
+finish first, so it doesn't reintroduce the contention problem step 55 just fixed. next: monitor
+clean re-run completion, then this job starts automatically.
