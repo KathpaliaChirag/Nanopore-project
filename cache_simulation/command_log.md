@@ -898,3 +898,19 @@ fully explains the extreme slowness without anything being broken.
 file (357.6M bases, ~5.9x more than the 10K run) - a much gentler progression than the raw
 52x/read-count jump to the full file would have suggested. Still a real, multi-stage long-running
 job, but not the runaway blowup the naive read-count math implied.
+
+---
+
+### [51] Fifth job: adding 8-way to the DB-size comparison
+
+CK asked to also test 8-way across all 4 DB sizes, and clarified an assumption about S0 worth
+recording precisely: **S0 is true no-cache, not "cache present but no associativity."**
+`kraken2-src-baseline/src/classify` has zero `s2_cache`-related code compiled in at all (verified
+via `strings`/source grep in step 40) - every lookup goes straight to the raw hash table, no
+intercepting structure whatsoever. Not a 1-way/direct-mapped cache - the complete absence of one.
+
+Current DB-size table only bracketed 4-way and 16-way, so the true optimum (is it 4-way or 8-way?)
+was never actually confirmed. Launched `~/cache_simulation/run_8way_dbsize.sh` (PID 4018464),
+`kraken2-fresh-bin-s2-lru-noatomics-8way/classify` across all 4 DBs, same 50-read workload as the
+original comparison for direct comparability. Writes to `results_8way_dbsize/live_summary.csv`.
+~25-30 min estimated based on similarly-scoped prior runs. next: monitor, merge into full table.
