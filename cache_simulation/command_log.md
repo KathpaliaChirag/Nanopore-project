@@ -914,3 +914,41 @@ was never actually confirmed. Launched `~/cache_simulation/run_8way_dbsize.sh` (
 `kraken2-fresh-bin-s2-lru-noatomics-8way/classify` across all 4 DBs, same 50-read workload as the
 original comparison for direct comparability. Writes to `results_8way_dbsize/live_summary.csv`.
 ~25-30 min estimated based on similarly-scoped prior runs. next: monitor, merge into full table.
+
+---
+
+### [52] Building a 1-way (direct-mapped) variant from scratch - no such binary existed
+
+CK asked to add 1-way associative as the missing lower bound between S0 (no cache) and 4-way.
+No `*-1way*` binary existed among the built variants - had to build one.
+
+**Hit two real problems finding the correct source base to patch:**
+1. Copied `kraken2-src-baseline` (the true no-cache reference) first - the 4-way patch script's
+   exact-text-match assertions failed (`signature not found exactly once`). Diagnosis: `baseline`'s
+   `classify.cc` has different line-wrapping than what the noatomics patch scripts expect - it's a
+   different source snapshot, not just "baseline + no patch."
+2. Copied `kraken2-src-fresh` instead (the actual base the other noatomics variants were built
+   from) - but its checked-out working tree is *dirty* with later uncommitted work (S4.0b/c, S5.0
+   prefetch patches), and even its clean `HEAD` commit already has S2 cache code baked into git
+   history (`grep -c s2_cache` = 8) - S1 through S5 were committed directly into this repo's
+   history, not applied as one-off patches each time. Found the real pristine base by walking
+   `git log -- src/classify.cc` back to `fbf993d` ("S1.1: promote same-adjacent-minimizer cache to
+   thread_local" - the first S-series commit) and checking its **parent** commit
+   (`5e2aa928d00b96d61f204d517437637863da1d8c`): zero `s2_cache` references, exact signature format
+   match. This is the correct base the noatomics patch scripts were actually designed against.
+
+**Built:** `kraken2-src-1way` = copy of `kraken2-src-fresh`, `classify.cc` reset to that pristine
+parent commit via `git checkout <sha> -- src/classify.cc`, patched with a new
+`s2_lru_1way_noatomics_patch.py` (identical structure to the 4-way script, `S2_WAYS = 1` - with one
+way per set the eviction loop naturally never executes, so every insert overwrites the set's single
+slot, which is exactly direct-mapped semantics - no special-casing needed). `make classify` built
+clean (only pre-existing benign sign-compare/unused-result warnings).
+
+**Verified correctness before using it:** ran natively against the 50-read workload - 34/50
+classified (68%), matching S0/4-way/16-way exactly, and a direct diff of per-read taxid assignments
+against S0's output came back empty (identical). Confirms the cache is a pure lookup optimization
+here, not altering classification results, as expected.
+
+**Launched:** `~/cache_simulation/run_1way_dbsize.sh` (PID 4019763), same pattern as the 8-way job -
+across all 4 DBs, same 50-read workload. Writes to `results_1way_dbsize/live_summary.csv`. next:
+monitor both new jobs (8-way, 1-way), merge into the full comparison table once done.
