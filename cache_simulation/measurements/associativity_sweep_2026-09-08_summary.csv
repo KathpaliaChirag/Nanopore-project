@@ -1,0 +1,7 @@
+variant,instructions,cycles,ipc,unique_cache_lines,elapsed_s
+baseline,25.1,14.2,1.77,51557,114.91
+lru-noatomics-4way,25.2,14.3,1.76,55585,115.45
+lru-noatomics-8way,25.4,14.4,1.76,67873,121.30
+lru-noatomics-16way,25.8,14.7,1.76,92449,129.51
+lru-noatomics-32way,26.8,15.1,1.78,141600,138.58
+lru-noatomics-64way,28.6,15.9,1.80,239904,164.55

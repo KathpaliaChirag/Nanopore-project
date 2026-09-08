@@ -640,5 +640,7 @@ each instruction costing about the same. Worth stating as "consistent with, adds
 evidence for" rather than "proves" - this is a 10-read synthetic workload, not yet a
 representative-scale experiment.
 
-**Status:** first real comparative cache-associativity experiment complete via Sniper. Data
-committed to repo alongside this log entry (see `cache_simulation/results/` for the raw summary).
+**Status:** first real comparative cache-associativity experiment complete via Sniper. Summary CSV
+committed at `cache_simulation/measurements/associativity_sweep_2026-09-08_summary.csv` (not
+`results/` - that's repo-gitignored root-wide for large raw dumps; small summary tables belong in
+`measurements/` instead).
