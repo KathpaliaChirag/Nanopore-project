@@ -742,3 +742,21 @@ pattern where wider associativity costs more.
 
 **Status:** DB-size job 5/6 done, read-count job still on first run (2000reads/S0 in progress,
 ~62 min estimated). Both still logging live.
+
+---
+
+### [44] Third job: extending to 16GB and 103GB databases
+
+CK asked to also test `standard_16gb` (15G) and `pluspf_103gb` (104G). **Correction to the earlier
+~4hr/DB extrapolation:** the actual measured 50MB->7.5GB ratio only took DB load from 190s to 748s
+(~4x), not the ~150x a naive byte-for-byte-linear assumption predicted - real bulk file reads use
+vectorized/wide copy instructions, not one CPU instruction per byte, so cost scales far more gently
+than that earlier estimate assumed. Power-law fit from the two real measured points suggests
+~15min for 15GB, ~26min for 103GB - genuinely tractable, correcting the earlier pessimistic
+warning. Verified disk headroom first (137G free, existing result dirs only a few MB each - no
+concern).
+
+**Launched:** `~/cache_simulation/run_bigdb_comparison.sh` (PID 4004452), same S0/4way/16way x
+same 50-read workload, running as a **third parallel job** alongside the DB-size and read-count
+jobs already in progress. Writes to `results_bigdb_comparison/live_summary.csv`. next: monitor all
+three jobs together.
