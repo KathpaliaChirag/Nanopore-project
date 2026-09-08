@@ -1267,3 +1267,20 @@ easy, subtle mistake worth flagging clearly for anyone reading this log later.
 
 **Status: this dataset is final and verified.** Next: regenerate charts using cycles-derived
 speedup (not sim wall-clock), update the published artifact.
+
+---
+
+### [61] Regenerated final figures and published artifact with corrected data
+
+Rewrote `make_slide_charts.py`'s hardcoded data with the final fair-batch numbers; fig3 (speedup)
+now shows all 4 widths (1/4/8/16-way) using cycles-derived speedup instead of 2 widths using
+Sniper's own wall-clock. Caught and fixed a legend-overlap bug on review before finalizing (legend
+moved above the plot, single row). Reviewed all 4 rendered PNGs before committing.
+
+Rewrote the published artifact (https://claude.ai/code/artifact/ccbd8008-8fbd-47cd-b8a2-7bf4baf76c6f)
+from scratch with: the corrected 4-width speedup chart, the full verified 20-row table (all 5
+variants x 4 DB sizes, columns relabeled "Sim. time" vs "Speedup (cycles)" to make the distinction
+unmissable), a new callout explaining the wall-clock-vs-cycles mistake directly (rather than
+burying it in a caveat), and an updated trend caveat reflecting the corrected 103gb number (1.97x,
+a mild recession from 16gb's 2.05x, not the earlier 1.88x/2.21x pair). Removed the stale "2 further
+runs in progress" status chip (2000-reads/10000-reads/full-file were dropped from the plan).
