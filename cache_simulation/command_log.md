@@ -1041,3 +1041,30 @@ table.
 
 readcount job still genuinely alive (322 min CPU time, still climbing) - clean re-run watcher not
 yet triggered.
+
+---
+
+### [55] Cancelled read-count/full-file jobs, launched clean 1way/8way re-run immediately
+
+CK's call: the read-count job (2000reads/S0) had run ~533 min CPU time (~8.9 hours) without
+finishing even its first of 6 runs, with the 10000-read and full-file jobs both queued behind it -
+too long a critical path for too little payoff right now. Cancelled the tail of the plan and
+reprioritized getting clean 1-way/8-way wall-clock numbers immediately instead.
+
+**Killed:** full process tree of the readcount job (`run_readcount_comparison.sh` wrapper +
+`run-sniper` python + `record-trace` + the live `classify` process + the `sniper` simulator core
+and its threads - 5 PIDs), the full-file watcher (`run_fullfile_comparison.sh`, was just polling,
+never started), and the old 1way/8way clean-rerun watcher (`run_1way8way_clean_rerun.sh`, was
+waiting on the two jobs just killed). Verified via `ps aux` that nothing Sniper-related remained
+running before proceeding - a genuinely idle machine.
+
+**Launched:** `run_1way8way_clean_immediate.sh` (PID 4047935) - same script as the queued version,
+minus the wait condition, since the machine is now actually idle. Runs 1-way and 8-way across all
+4 DBs with no contention this time, for wall-clock numbers that are finally directly comparable to
+the original sequential S0/4-way/16-way timings. next: monitor, expect well under an hour given no
+competing load.
+
+**Dropped from the plan (not run):** 2000-read, 10000-read, and full-file (104,832-read) real
+workload-scaling experiments - the proof-of-concept 10/50-read results and the 4-DB-size sweep
+remain the primary evidence; real read-count scaling can be revisited later if useful, not blocking
+the current thesis case.
