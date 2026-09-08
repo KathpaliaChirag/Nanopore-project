@@ -707,3 +707,38 @@ multi-hour job further. Same live-updating pattern:
 `results_readcount_comparison/live_summary.csv` (one row per completed run) and `progress.log`
 (timestamped start/done). Estimated ~3hrs (2000-read x3 variants) + ~15.5hrs (10000-read x3
 variants) ~= 18-19hrs total. next: monitor both jobs, report as they complete.
+
+---
+
+### [43] First results from the DB-size job: the cache's value flips with DB size
+
+5 of 6 runs complete (8gb/16way still running). All completed cleanly with matching, correct
+classification output (48/50 classified, 4% unclassified, identical across variants - not a bug).
+
+| DB | Variant | Instructions (M) | Cycles (M) | IPC | Unique cache lines | Wall time (s) |
+|---|---|---|---|---|---|---|
+| 50mb | S0 | 35.8 | 24.4 | 1.47 | 76,605 | 188.7 |
+| 50mb | 4way | 39.7 | 26.7 | 1.48 | 76,963 | 204.4 |
+| 50mb | 16way | 44.0 | 28.7 | 1.53 | 113,831 | 360.3 |
+| 8gb | S0 | 68.1 | 51.7 | 1.32 | 186,523 | 748.3 |
+| 8gb | 4way | 52.0 | 28.3 | 1.84 | 64,091 | 391.8 |
+
+**Finding:** on the 50MB DB, the 4-way cache costs slightly more than no cache (matches the step
+38-39 associativity-sweep pattern: cache bookkeeping overhead exceeds its benefit when direct
+lookups into a small table are already cheap). **On the 7.5GB DB this completely flips** - the
+identical 4-way cache uses **~24% fewer instructions**, touches **~2.9x fewer unique cache lines**
+(64,091 vs 186,523), runs at **substantially higher IPC** (1.84 vs 1.32 - fewer stalls per
+instruction, not just less total work), and finishes **~1.9x faster** (392s vs 748s) than no-cache
+on the same DB and workload.
+
+**Mechanism:** without a cache, every minimizer lookup re-probes the raw hash table directly -
+cheap on a 50MB table (mostly stays warm), expensive on a 7.5GB table (scattered, mostly-cold
+memory). A small thread-local cache intercepts repeated/nearby minimizers before they reach the
+big table, so its payoff scales with how expensive a raw probe into the underlying table actually
+is - i.e. with DB size. This is real, load-bearing evidence for the adaptive-cache thesis: the
+associativity benefit is DB-size-dependent, not a fixed cost/benefit - worth checking whether
+8gb/16way (still running) keeps improving or starts giving the gain back, matching the 50mb
+pattern where wider associativity costs more.
+
+**Status:** DB-size job 5/6 done, read-count job still on first run (2000reads/S0 in progress,
+~62 min estimated). Both still logging live.
