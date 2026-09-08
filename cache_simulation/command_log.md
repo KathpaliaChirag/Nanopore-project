@@ -787,3 +787,38 @@ or actively harmful (small DB). This directly answers CK's original ask for a qu
 4-way/8-way over both no-associativity and higher-associativity.
 
 **Status:** this job fully complete. Two jobs still running (readcount, bigdb-extended).
+
+---
+
+### [46] Verified read-count job wasn't hung (false alarm) + bigdb 16GB results
+
+Read-count job's 2000reads/S0 run was still on its first run past the ~62min estimate - checked
+`ps` for the wrong process name (`sde64`) first, found nothing, briefly suspected a hang. Full
+process tree check found the real simulator core (`lib/sniper`, not `sde64` - that binary is only
+used transiently during initial trace recording) actively consuming 58.8% CPU with 50+ min of real
+accumulated compute time - genuinely working, just costing more than the earlier per-read
+extrapolation suggested, not stuck.
+
+**bigdb job 16GB results (all 3 variants done):**
+
+| DB | Variant | Instructions (M) | Cycles (M) | IPC | Unique cache lines | Wall time (s) |
+|---|---|---|---|---|---|---|
+| 16gb | S0 | 77.3 | 60.7 | 1.27 | 200,423 | 861 |
+| 16gb | 4way | 51.9 | 29.6 | 1.75 | 56,897 | 390 |
+| 16gb | 16way | 53.0 | 30.3 | 1.75 | 93,761 | 431 |
+
+Confirms the 7.5GB pattern even more cleanly: 4-way beats S0 by **33% fewer instructions, 2.2x
+faster**; 16-way barely differs from 4-way (+2.1% instructions) while touching 65% more memory and
+costing 10% more wall time. 103gb/S0 now running.
+
+---
+
+### [47] Queued: full-file (104,832-read) comparison, auto-starts after readcount job
+
+CK asked to add a full-file run of `reads_fast.fastq` after the 2000/10000-read subsets finish.
+Rather than manually catch the exact completion moment, wrote a watcher script
+(`run_fullfile_comparison.sh`, PID 4007675) that polls every 30s for `run_readcount_comparison.sh`
+to exit, then automatically launches S0/4way/16way on the full 104,832-read file, writing to
+`results_fullfile_comparison/live_summary.csv`. Genuinely long-running (the ~1.85s/read estimate
+looks conservative given how long the 2000-read run is taking) - queued to run unattended
+regardless. next: monitor all jobs, report as each completes.
