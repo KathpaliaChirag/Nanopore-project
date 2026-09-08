@@ -1284,3 +1284,14 @@ unmissable), a new callout explaining the wall-clock-vs-cycles mistake directly 
 burying it in a caveat), and an updated trend caveat reflecting the corrected 103gb number (1.97x,
 a mild recession from 16gb's 2.05x, not the earlier 1.88x/2.21x pair). Removed the stale "2 further
 runs in progress" status chip (2000-reads/10000-reads/full-file were dropped from the plan).
+
+---
+
+### [62] Hardware cache-size comparison started
+
+`run_hwsize_comparison.sh` began right after the fair batch finished. 2/8 runs done so far
+(desktop config, 50mb S0 and 4way). Early signal: desktop's cycles-based speedup at 50MB is
+~0.92x (28.2M -> 30.7M cycles, S0 vs 4way) - same direction and similar magnitude to Luna's own
+50MB result (~0.91x), a reassuring cross-check that the "small DB = slight cache cost" pattern
+isn't specific to Luna's particular cache geometry. Now running desktop/8gb. 2000-reads job still
+queued behind this one.
