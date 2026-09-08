@@ -1295,3 +1295,35 @@ runs in progress" status chip (2000-reads/10000-reads/full-file were dropped fro
 50MB result (~0.91x), a reassuring cross-check that the "small DB = slight cache cost" pattern
 isn't specific to Luna's particular cache geometry. Now running desktop/8gb. 2000-reads job still
 queued behind this one.
+
+---
+
+### [63] Hardware cache-size comparison complete (8/8) - a non-monotonic result
+
+All 8 runs done, `ALL DONE`. Cycles-derived speedup (S0/4-way, same correct metric as everywhere
+else in this log):
+
+| Hardware | 50MB speedup | 8GB speedup |
+|---|---|---|
+| Luna (real server cache) | 0.910x | 1.830x |
+| Desktop-sized (AMD Ryzen 5 5600X specs) | 0.919x | 1.936x |
+| Orion-sized (Jetson AGX Orin specs) | 0.902x | 1.649x |
+
+**Finding 1 - cross-validation:** all three hardware configs agree closely at 50MB (0.90-0.92x) -
+the "cache is a slight net cost on a tiny DB" result isn't specific to Luna's particular cache
+geometry, it holds across genuinely different hardware cache sizes/associativities.
+
+**Finding 2 - NOT simply monotonic with cache size:** at 8GB, desktop (smaller L2 than Luna, 512KB
+vs 2MB, but a comparably generous 32MB shared L3) sees an even *stronger* win (1.94x) than Luna.
+Orion (the smallest cache overall - 256KB L2, only 342KB/core L3-slice-equivalent) sees a distinctly
+*weaker* win (1.65x) than both Luna and desktop. Explicitly avoiding the tempting but unsupported
+generalization "smaller hardware cache -> bigger software-cache benefit" - that's not what this
+data shows. A plausible partial explanation (not verified): Orion's baseline no-cache cycle count
+is itself already lower than desktop's at 8GB (55.9M vs 60.6M), suggesting Orion's larger L1 (64KB
+vs desktop's 32KB) already absorbs some of what S2 would otherwise intercept, leaving less room for
+S2 to help - worth deeper investigation before asserting as fact.
+
+**Caveat already on record, restated:** both configs are config-only (real x86 core model, only
+cache sizes changed) - this tests hardware cache SIZE sensitivity, not real ARM/Orion behavior.
+
+2000-reads job now started (`2026-09-09 09:12:48`).
