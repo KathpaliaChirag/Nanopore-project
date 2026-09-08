@@ -822,3 +822,20 @@ to exit, then automatically launches S0/4way/16way on the full 104,832-read file
 `results_fullfile_comparison/live_summary.csv`. Genuinely long-running (the ~1.85s/read estimate
 looks conservative given how long the 2000-read run is taking) - queued to run unattended
 regardless. next: monitor all jobs, report as each completes.
+
+---
+
+### [48] 103GB results (partial) - the largest gap yet, trend continues to strengthen
+
+| DB | Variant | Instructions (M) | Cycles (M) | IPC | Unique cache lines | Wall time (s) |
+|---|---|---|---|---|---|---|
+| 103gb | S0 | 102.9 | 94.3 | 1.09 | 306,921 | 1262 |
+| 103gb | 4way | 70.3 | 47.7 | 1.47 | 88,782 | 616 |
+
+4-way beats S0 by **~32% fewer instructions, ~71% fewer cache lines, 2.05x faster wall-clock** -
+the largest gap of any DB size tested (50MB -> 7.5GB -> 16GB -> 103GB all show the same direction,
+with the 4-way advantage growing as DB size grows). 103gb/16way still running.
+
+Also verified (second time) the readcount job's 2000reads/S0 run is genuinely still computing, not
+stalled: 63+ min of real accumulated CPU time, 58% CPU utilization live-checked - just taking far
+longer than any extrapolation predicted. No action needed, continuing to monitor.
