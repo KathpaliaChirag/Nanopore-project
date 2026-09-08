@@ -1170,3 +1170,24 @@ clean job AND the fair batch finish.
 **Re-queued 2000-reads at the end of the whole chain** (new watcher PID 4051646, waits on all three
 jobs ahead of it). Full order now: 1way/8way clean (running) -> fair batch (queued) -> hwsize
 comparison (queued) -> 2000-reads (queued, last).
+
+---
+
+### [59] 1way/8way clean re-run fully complete; fair batch in progress, looks genuinely fair
+
+`results_1way8way_clean` finished all 8 runs cleanly (`ALL DONE`). Fair batch started immediately
+after, now 8/20 runs in (50mb complete, 8gb in progress). Checked seconds-per-Mcycle across the
+completed rows this time: 6.44-7.90 s/Mcycle across all variants and both DB sizes so far - a tight
+range, genuinely internally consistent (vs. the ~14-vs-~8 mismatch caught in step 57). This batch
+looks trustworthy.
+
+**Early signal, not yet final** (waiting for the full 20 runs before drawing conclusions or
+touching charts): at 50MB this time, 1-way (174s) and 4-way (182s) come out *faster* than no-cache
+(188s) - different from the earlier batch's numbers (which had all cache variants slower than S0 at
+50MB). This is a real, useful illustration of exactly why the fair-batch re-run mattered - even the
+"small DB = slight net cost" framing may need revisiting once this completes. At 8GB, the ~1.8-1.9x
+speedup for 1-way/4-way over S0 matches earlier findings closely, a reassuring cross-check.
+
+**Status:** fair batch continuing (8gb/8way running now, then 8gb/16way, then all of 16gb and
+103gb - 12 more runs). Not regenerating charts or updating the artifact until this fully completes,
+per instruction.
