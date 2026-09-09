@@ -157,13 +157,15 @@ def fig_cycles_by_db():
         style_ax(ax)
         ax.set_ylim(0, max(vals) * 1.22)
     axes[0].set_ylabel("Cycles (M)")
-    fig.suptitle("Simulated cycles by associativity width, across database sizes",
+    fig.suptitle("Simulated cycles by SOFTWARE cache width, across database sizes",
                  fontsize=11, fontweight="bold", y=1.04)
-    fig.text(0.0, -0.16,
-              "50-read workload. Green outline marks the lowest-cycle cache "
-              "variant at each database size (4-way in every case). Cycles are "
-              "the real-hardware-equivalent metric (cycles / clock frequency).",
-              fontsize=7, color="#555555")
+    fig.text(0.0, -0.22,
+              "50-read workload. Green outline marks the lowest-cycle cache variant at each\n"
+              "database size (4-way in every case). Cycles are the real-hardware-equivalent\n"
+              "metric (cycles / clock frequency). Width shown = the SOFTWARE S2 lookup-cache's\n"
+              "associativity. Real Luna HARDWARE cache is fixed throughout: L1d 48KB/12-way,\n"
+              "L1i 32KB/8-way, L2 2MB/16-way, L3 105MB/15-way (96 cores/socket), 2.1GHz.",
+              fontsize=7, color="#222222")
     fig.tight_layout()
     savefig(fig, "fig2_cycles_by_db_5variant")
 
@@ -228,12 +230,14 @@ def fig_footprint():
         style_ax(ax)
         ax.set_ylim(0, max(vals) * 1.22)
     axes[0].set_ylabel("Unique cache lines touched")
-    fig.suptitle("Memory footprint touched, by associativity width and database size",
+    fig.suptitle("Memory footprint touched, by SOFTWARE cache width and database size",
                  fontsize=11, fontweight="bold", y=1.04)
-    fig.text(0.0, -0.16,
-              "50-read workload. Fewer lines touched indicates fewer cold-memory "
-              "probes into the underlying hash table.",
-              fontsize=7, color="#555555")
+    fig.text(0.0, -0.22,
+              "50-read workload. Fewer lines touched indicates fewer cold-memory probes into\n"
+              "the underlying hash table. Width shown = the SOFTWARE S2 lookup-cache's\n"
+              "associativity. Real Luna HARDWARE cache is fixed throughout: L1d 48KB/12-way,\n"
+              "L1i 32KB/8-way, L2 2MB/16-way, L3 105MB/15-way (96 cores/socket), 2.1GHz.",
+              fontsize=7, color="#222222")
     fig.tight_layout()
     savefig(fig, "fig4_memory_footprint_by_db")
 
@@ -276,11 +280,13 @@ def fig_dual_axis():
     ax2.spines["top"].set_visible(False)
 
     ax1.set_title("Cache speedup grows as the uncached lookup stalls more", fontsize=11, pad=12)
-    fig.text(0.0, -0.13,
-              "50-read workload, all values from the verified fair batch. Bars: real-hardware-"
-              "equivalent speedup (cycles / frequency). Dashed line: no-cache IPC, falling as the "
-              "database grows - the mechanism the cache is compensating for.",
-              fontsize=7.5, color="#555555")
+    fig.text(0.0, -0.19,
+              "50-read workload, all values from the verified fair batch. Bars: real-hardware-\n"
+              "equivalent speedup (cycles / frequency) for the SOFTWARE S2 cache at 4-way.\n"
+              "Dashed line: no-cache IPC, falling as the database grows - the mechanism the\n"
+              "cache is compensating for. Real Luna HARDWARE cache is fixed throughout:\n"
+              "L1d 48KB/12-way, L1i 32KB/8-way, L2 2MB/16-way, L3 105MB/15-way, 2.1GHz.",
+              fontsize=7.5, color="#222222")
     fig.tight_layout()
     savefig(fig, "fig5_speedup_vs_ipc_dualaxis")
 
@@ -328,10 +334,14 @@ def fig_miss_breakdown():
     ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.22), ncol=3, fontsize=7.5, handlelength=1.2, columnspacing=1.0)
     ax.set_ylim(0, 100)
     style_ax(ax, ygrid=True)
-    fig.text(0.0, -0.16,
-              "103 GB database, 50-read workload. DRAM share drops from 46% (no cache) to 24% "
-              "(4-way) - the cache intercepts exactly the expensive misses.",
-              fontsize=7.5, color="#555555")
+    fig.text(0.0, -0.24,
+              "103 GB database, 50-read workload. DRAM share drops from 46% (no cache) to 24%\n"
+              "(4-way) - the cache intercepts exactly the expensive misses. X-axis width = the\n"
+              "SOFTWARE S2 lookup-cache's associativity. The L2/LLC/DRAM breakdown itself is\n"
+              "REAL Luna HARDWARE cache behavior (L1d 48KB/12-way, L2 2MB/16-way,\n"
+              "L3 105MB/15-way) - this chart shows how a software design choice changes what\n"
+              "the real hardware caches actually see.",
+              fontsize=7.5, color="#222222")
     fig.tight_layout()
     savefig(fig, "fig6_miss_breakdown_103gb")
 
@@ -364,12 +374,14 @@ def fig_hw_comparison():
     ax.set_ylim(0, 2.3)
     ax.set_xlim(-0.55, 2.55)
     style_ax(ax)
-    fig.text(0.0, -0.22,
-              "Desktop-sized cache (AMD Ryzen 5\n5600X specs) sees a stronger win than\n"
-              "Luna's real server cache; Orion-sized\n(Jetson AGX Orin specs) sees a weaker\n"
-              "one, despite having the smallest cache\nof the three. Config-only comparison\n"
-              "(same x86 core model).",
-              fontsize=7.5, color="#555555", va="top")
+    fig.text(0.0, -0.30,
+              "This chart is the reverse of the others: the SOFTWARE S2 cache is held FIXED\n"
+              "at 4-way throughout - what changes is the simulated HARDWARE cache itself\n"
+              "(size + associativity) across three profiles. Desktop-sized cache (AMD Ryzen 5\n"
+              "5600X specs) sees a stronger win than Luna's real server cache; Orion-sized\n"
+              "(Jetson AGX Orin specs) sees a weaker one, despite having the smallest cache\n"
+              "of the three. Config-only comparison (same x86 core model throughout).",
+              fontsize=7.5, color="#222222", va="top")
     fig.tight_layout()
     savefig(fig, "fig7_hardware_comparison")
 
