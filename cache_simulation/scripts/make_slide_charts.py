@@ -131,7 +131,7 @@ def fig_width_sweep():
 def fig_cycles_by_db():
     colors = [GRAY, BLUE_RAMP["1way"], BLUE_RAMP["4way"], BLUE_RAMP["8way"], BLUE_RAMP["16way"]]
 
-    fig, axes = plt.subplots(1, 4, figsize=(DOUBLE_COL, 2.8), sharey=False)
+    fig, axes = plt.subplots(1, 4, figsize=(DOUBLE_COL, 3.0), sharey=False)
     for ax, dbname, dbkey in zip(axes, DBS, DB_KEYS):
         vals = [CYCLES[dbkey][v] for v in VARIANTS]
         bars = ax.bar(LABELS, vals, color=colors, width=0.7, zorder=3,
@@ -139,11 +139,15 @@ def fig_cycles_by_db():
         best_idx = int(np.argmin(vals[1:])) + 1
         bars[best_idx].set_edgecolor(GOOD)
         bars[best_idx].set_linewidth(1.8)
+        for b, v in zip(bars, vals):
+            ax.annotate(f"{v:.1f}", (b.get_x() + b.get_width() / 2, v),
+                        xytext=(0, 3), textcoords="offset points",
+                        ha="center", fontsize=7.5, fontweight="600")
         ax.set_title(dbname, fontsize=9.5)
         ax.set_xticks(range(len(LABELS)))
         ax.set_xticklabels(LABELS, rotation=40, ha="right", fontsize=7.5)
         style_ax(ax)
-        ax.set_ylim(0, max(vals) * 1.18)
+        ax.set_ylim(0, max(vals) * 1.22)
     axes[0].set_ylabel("Cycles (M)")
     fig.suptitle("Simulated cycles by associativity width, across database sizes",
                  fontsize=11, fontweight="bold", y=1.04)
@@ -198,16 +202,21 @@ def fig_speedup_clean():
 def fig_footprint():
     colors = [GRAY, BLUE_RAMP["1way"], BLUE_RAMP["4way"], BLUE_RAMP["8way"], BLUE_RAMP["16way"]]
 
-    fig, axes = plt.subplots(1, 4, figsize=(DOUBLE_COL, 2.8))
+    fig, axes = plt.subplots(1, 4, figsize=(DOUBLE_COL, 3.0))
     for ax, dbname, dbkey in zip(axes, DBS, DB_KEYS):
         vals = [LINES[dbkey][v] for v in VARIANTS]
-        ax.bar(LABELS, vals, color=colors, width=0.7, zorder=3,
-               edgecolor="#222222", linewidth=0.4)
+        bars = ax.bar(LABELS, vals, color=colors, width=0.7, zorder=3,
+                       edgecolor="#222222", linewidth=0.4)
+        for b, v in zip(bars, vals):
+            ax.annotate(f"{v/1000:.0f}K", (b.get_x() + b.get_width() / 2, v),
+                        xytext=(0, 3), textcoords="offset points",
+                        ha="center", fontsize=7.5, fontweight="600")
         ax.set_title(dbname, fontsize=9.5)
         ax.set_xticks(range(len(LABELS)))
         ax.set_xticklabels(LABELS, rotation=40, ha="right", fontsize=7.5)
         ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v/1000:.0f}K"))
         style_ax(ax)
+        ax.set_ylim(0, max(vals) * 1.22)
     axes[0].set_ylabel("Unique cache lines touched")
     fig.suptitle("Memory footprint touched, by associativity width and database size",
                  fontsize=11, fontweight="bold", y=1.04)
