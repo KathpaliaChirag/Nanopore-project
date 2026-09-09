@@ -106,23 +106,30 @@ def savefig(fig, name):
 def fig_width_sweep():
     widths = ["4-way", "8-way", "16-way", "32-way", "64-way"]
     times = [115.5, 121.3, 129.5, 138.6, 164.6]
-    colors = ["#5598e7", "#3987e5", "#2a78d6", "#1c5cab", "#184f95"]
+    # Grayscale ramp, light -> dark, with distinct hatch patterns so bars are
+    # still distinguishable in pure black-and-white print with no color at all.
+    grays = ["#dcdcdc", "#b8b8b8", "#8c8c8c", "#5c5c5c", "#2a2a2a"]
+    hatches = ["", "//", "xx", "\\\\", ".."]
 
-    fig, ax = plt.subplots(figsize=(SINGLE_COL, 2.6))
-    bars = ax.bar(widths, times, color=colors, width=0.62, zorder=3,
-                   edgecolor="#222222", linewidth=0.5)
-    ax.axhline(times[0], color="#999999", linestyle="--", linewidth=0.9, zorder=2)
+    fig, ax = plt.subplots(figsize=(SINGLE_COL + 0.3, 3.1))
+    bars = ax.bar(widths, times, color=grays, width=0.62, zorder=3,
+                   edgecolor="#000000", linewidth=0.8)
+    for b, h in zip(bars, hatches):
+        b.set_hatch(h)
+    ax.axhline(times[0], color="#000000", linestyle="--", linewidth=0.9, zorder=2)
     for b, t in zip(bars, times):
         ax.annotate(f"{t:.0f}", (b.get_x() + b.get_width() / 2, t + 4),
-                    ha="center", fontsize=8)
+                    ha="center", fontsize=8.5, fontweight="600")
     ax.set_ylabel("Wall-clock time (s)")
-    ax.set_title("Associativity width vs. simulated time", fontsize=10)
+    ax.set_title("Software cache width vs. simulated time", fontsize=10.5)
     style_ax(ax)
-    ax.set_ylim(0, max(times) * 1.18)
-    fig.text(0.0, -0.16,
-              "10-read workload, 50 MB DB, atomics-contention removed. "
-              "Dashed line: 4-way time. Single batch, directly comparable.",
-              fontsize=7, color="#555555")
+    ax.set_ylim(0, max(times) * 1.22)
+    fig.text(0.0, -0.20,
+              "10-read workload, 50 MB DB, atomics-contention removed. Dashed line: 4-way time.\n"
+              "Width shown = the SOFTWARE S2 lookup-cache's associativity (kraken2's own code).\n"
+              "Real Luna HARDWARE cache is fixed and unchanged throughout: L1d 48KB/12-way,\n"
+              "L1i 32KB/8-way, L2 2MB/16-way, L3 105MB/15-way (96 cores/socket).",
+              fontsize=7, color="#222222")
     savefig(fig, "fig1_width_sweep_10reads")
 
 
@@ -184,16 +191,18 @@ def fig_speedup_clean():
     ax.set_xticks(x)
     ax.set_xticklabels(DBS)
     ax.set_ylabel("Speedup vs. no cache\n(real-hardware-equivalent)")
-    ax.set_title("Cache speedup by width and database size", fontsize=10, pad=28)
+    ax.set_title("Software cache speedup by width and database size", fontsize=10, pad=28)
     ax.legend(frameon=False, loc="lower center", bbox_to_anchor=(0.5, 1.01),
               ncol=4, columnspacing=1.2, handlelength=1.2, fontsize=8)
     style_ax(ax)
     ax.set_ylim(0, 2.5)
-    fig.text(0.0, -0.2,
-              "50-read workload. Speedup computed from simulated CYCLES / core "
-              "frequency (real-hardware-equivalent time), not Sniper's own "
-              "simulation wall-clock. 4-way wins or ties at every database size.",
-              fontsize=7, color="#555555")
+    fig.text(0.0, -0.26,
+              "50-read workload. Speedup computed from simulated CYCLES / core frequency\n"
+              "(real-hardware-equivalent time), not Sniper's own simulation wall-clock.\n"
+              "Width shown = the SOFTWARE S2 lookup-cache's associativity (kraken2's own code).\n"
+              "Real Luna HARDWARE cache is fixed and unchanged throughout: L1d 48KB/12-way,\n"
+              "L1i 32KB/8-way, L2 2MB/16-way, L3 105MB/15-way (96 cores/socket), 2.1GHz.",
+              fontsize=7, color="#222222")
     savefig(fig, "fig3_speedup_vs_nocache")
 
 
