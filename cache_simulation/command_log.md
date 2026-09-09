@@ -1327,3 +1327,23 @@ S2 to help - worth deeper investigation before asserting as fact.
 cache sizes changed) - this tests hardware cache SIZE sensitivity, not real ARM/Orion behavior.
 
 2000-reads job now started (`2026-09-09 09:12:48`).
+
+---
+
+### To-do (not started - logged for later, per CK's requests during Q&A)
+
+1. **Simulate L3 as a single naive flat block, not distributed NUCA slices.** For comparison against
+   the current mesh-slice model. Would need switching away from `meteor_lake_pcore`'s NUCA-based
+   chain to an older-style flat `l3_cache` config (like `nehalem`/`gainestown` originally had),
+   applied with Luna's real total L3 size (105MB) and 15-way associativity as one block instead of
+   split across slices.
+
+2. **Sweep real HARDWARE cache associativity in isolation**, distinct from every experiment so far
+   which varied the *software* S2 cache's width. Hold the S2 software cache fixed (either "no
+   cache" throughout, or one fixed width like 4-way) and vary only Luna's real L2 or L3
+   associativity value (e.g. 1-way, 4-way, 8-way, 15-way [real], 16-way, 30-way) across one DB
+   size, same cycles-based methodology as everything else. Directly answers "does the hardware's
+   own associativity matter to kraken2, independent of any software cache" - a question never
+   actually isolated so far, since the desktop/orion hardware comparison changed hardware
+   associativity only as a side effect of using each hardware's real spec, with S2 still varying
+   too (S0 vs 4-way) in that experiment.
