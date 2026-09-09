@@ -357,7 +357,8 @@ def fig_hw_comparison():
 
     x = np.arange(len(hw_names))
     width = 0.32
-    fig, ax = plt.subplots(figsize=(SINGLE_COL + 0.6, 3.4))
+    fig, (ax, ax_tbl) = plt.subplots(2, 1, figsize=(SINGLE_COL + 1.4, 5.6),
+                                       gridspec_kw={"height_ratios": [3, 2]})
     b1 = ax.bar(x - width / 2, speedup_50mb, width, label="50 MB DB", color="#9ec5f4", edgecolor="#222222", linewidth=0.5, zorder=3)
     b2 = ax.bar(x + width / 2, speedup_8gb, width, label="8 GB DB", color="#184f95", edgecolor="#222222", linewidth=0.5, zorder=3)
     for bars in (b1, b2):
@@ -374,14 +375,41 @@ def fig_hw_comparison():
     ax.set_ylim(0, 2.3)
     ax.set_xlim(-0.55, 2.55)
     style_ax(ax)
-    fig.text(0.0, -0.30,
-              "This chart is the reverse of the others: the SOFTWARE S2 cache is held FIXED\n"
-              "at 4-way throughout - what changes is the simulated HARDWARE cache itself\n"
-              "(size + associativity) across three profiles. Desktop-sized cache (AMD Ryzen 5\n"
-              "5600X specs) sees a stronger win than Luna's real server cache; Orion-sized\n"
-              "(Jetson AGX Orin specs) sees a weaker one, despite having the smallest cache\n"
-              "of the three. Config-only comparison (same x86 core model throughout).",
-              fontsize=7.5, color="#222222", va="top")
+
+    # --- hardware config table ---
+    ax_tbl.axis("off")
+    col_labels = ["Level", "Luna (real)", "Desktop (sim.)", "Orion (sim.)"]
+    rows = [
+        ["L1 data",  "48KB / 12-way",  "32KB / 8-way",   "64KB / 4-way"],
+        ["L1 instr.", "32KB / 8-way",   "32KB / 8-way",   "64KB / 4-way"],
+        ["L2",        "2MB / 16-way",   "512KB / 8-way",  "256KB / 8-way"],
+        ["LLC (total)", "105MB / 15-way", "32MB / 16-way", "4MB / 16-way*"],
+        ["LLC shared by", "96 cores",   "6 cores",        "12 cores"],
+        ["Clock",     "2.1 GHz",        "3.7 GHz",        "2.2 GHz"],
+    ]
+    tbl = ax_tbl.table(cellText=rows, colLabels=col_labels, loc="center",
+                        cellLoc="center", colLoc="center")
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(8)
+    tbl.scale(1, 1.65)
+    for (r, c), cell in tbl.get_celld().items():
+        cell.set_edgecolor("#888888")
+        cell.set_linewidth(0.6)
+        if r == 0:
+            cell.set_facecolor("#e8e8e8")
+            cell.set_text_props(fontweight="700")
+        if c == 0:
+            cell.set_text_props(fontweight="600", ha="left")
+            cell.PAD = 0.03
+    fig.text(0.0, 0.005, "*Orion LLC associativity is an unverified placeholder (real value not "
+              "publicly documented); all other values are real spec or sysfs-measured.",
+              fontsize=6.3, color="#555555")
+    fig.text(0.0, -0.03,
+              "This chart is the reverse of the others: the SOFTWARE S2 cache is held FIXED at "
+              "4-way throughout - what changes is the HARDWARE cache config itself (table above). "
+              "Desktop sees a stronger win than Luna's real cache; Orion sees a weaker one, despite "
+              "having the smallest cache of the three. Config-only comparison (same x86 core model).",
+              fontsize=6.8, color="#222222", va="top")
     fig.tight_layout()
     savefig(fig, "fig7_hardware_comparison")
 
