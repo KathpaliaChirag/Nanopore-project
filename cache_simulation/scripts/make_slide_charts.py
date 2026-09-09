@@ -78,6 +78,7 @@ LINES = {
     "16gb":  {"S0": 200423, "1way": 47681, "4way": 56898, "8way": 69185, "16way": 93761},
     "103gb": {"S0": 306921, "1way": 79566, "4way": 88782, "8way": 101070, "16way": 125646},
 }
+IPC_S0 = {"50mb": 1.47, "8gb": 1.32, "16gb": 1.27, "103gb": 1.09}
 
 
 def style_ax(ax, ygrid=True):
@@ -228,9 +229,148 @@ def fig_footprint():
     savefig(fig, "fig4_memory_footprint_by_db")
 
 
+# =========================================================================
+# FIGURE 5 — Dual-axis: 4-way speedup (bars, hatched) vs no-cache IPC decline
+# (dashed line, secondary axis) across database size. Bars answer "how much
+# faster"; the line answers "why" - IPC falling as DB grows shows the
+# uncached lookup stalling more, which is exactly what the cache fixes.
+# =========================================================================
+def fig_dual_axis():
+    x = np.arange(len(DBS))
+    speedups = [CYCLES[dbkey]["S0"] / CYCLES[dbkey]["4way"] for dbkey in DB_KEYS]
+    ipcs = [IPC_S0[dbkey] for dbkey in DB_KEYS]
+
+    fig, ax1 = plt.subplots(figsize=(DOUBLE_COL - 1.0, 3.6))
+    bars = ax1.bar(x, speedups, width=0.5, color="white", edgecolor="#222222",
+                    linewidth=1.1, hatch="///", zorder=3)
+    for b, v in zip(bars, speedups):
+        ax1.annotate(f"{v:.2f}×", (b.get_x() + b.get_width() / 2, v),
+                     xytext=(0, 5), textcoords="offset points",
+                     ha="center", fontsize=10, fontweight="700")
+    ax1.axhline(1.0, color="#999999", linestyle=":", linewidth=1.0, zorder=1)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(DBS)
+    ax1.set_xlabel("reference database size (log-order)")
+    ax1.set_ylabel("4-way speedup vs. no cache (×)", color="#222222")
+    ax1.set_ylim(0, 2.6)
+    style_ax(ax1)
+
+    ax2 = ax1.twinx()
+    ax2.plot(x, ipcs, color=CRIT, linestyle="--", marker="o", markersize=6,
+              linewidth=1.4, zorder=4)
+    for xi, v in zip(x, ipcs):
+        ax2.annotate(f"{v:.2f}", (xi, v), xytext=(0, -16), textcoords="offset points",
+                     ha="center", fontsize=9.5, color=CRIT, fontweight="600")
+    ax2.set_ylabel("no-cache IPC", color=CRIT)
+    ax2.tick_params(axis="y", colors=CRIT)
+    ax2.set_ylim(0.8, 1.7)
+    ax2.spines["top"].set_visible(False)
+
+    ax1.set_title("Cache speedup grows as the uncached lookup stalls more", fontsize=11, pad=12)
+    fig.text(0.0, -0.13,
+              "50-read workload, all values from the verified fair batch. Bars: real-hardware-"
+              "equivalent speedup (cycles / frequency). Dashed line: no-cache IPC, falling as the "
+              "database grows - the mechanism the cache is compensating for.",
+              fontsize=7.5, color="#555555")
+    fig.tight_layout()
+    savefig(fig, "fig5_speedup_vs_ipc_dualaxis")
+
+
+# =========================================================================
+# FIGURE 6 — Of the accesses that miss L1, where do they get resolved?
+# Stacked 100% bar: L2 share / LLC(NUCA) share / DRAM share of L1 misses,
+# per variant, at the 103GB DB (the size where this matters most). Shows the
+# actual mechanism: wider caches catch more L1-misses before DRAM.
+# =========================================================================
+HIT_PCT_103GB = {
+    "S0":    {"l1": 98.69, "l2": .67,   "nuca": .0365},
+    "1way":  {"l1": 98.67, "l2": .94,   "nuca": .0329},
+    "4way":  {"l1": 98.29, "l2": 1.24,  "nuca": .0668},
+    "8way":  {"l1": 98.07, "l2": 1.30,  "nuca": .1116},
+    "16way": {"l1": 97.68, "l2": 1.33,  "nuca": .1135},
+}
+
+def fig_miss_breakdown():
+    x = np.arange(len(VARIANTS))
+    l2_share, nuca_share, dram_share = [], [], []
+    for v in VARIANTS:
+        h = HIT_PCT_103GB[v]
+        l1_miss = 100 - h["l1"]
+        dram = l1_miss - h["l2"] - h["nuca"]
+        l2_share.append(h["l2"] / l1_miss * 100)
+        nuca_share.append(h["nuca"] / l1_miss * 100)
+        dram_share.append(dram / l1_miss * 100)
+
+    fig, ax = plt.subplots(figsize=(SINGLE_COL + 1.0, 3.3))
+    c_l2, c_nuca, c_dram = "#5598e7", "#184f95", "#b3312f"
+    b1 = ax.bar(x, l2_share, width=0.55, color=c_l2, edgecolor="#222222", linewidth=0.4, zorder=3, label="Resolved at L2")
+    b2 = ax.bar(x, nuca_share, width=0.55, bottom=l2_share, color=c_nuca, edgecolor="#222222", linewidth=0.4, zorder=3, label="Resolved at LLC")
+    bottom2 = [a + b for a, b in zip(l2_share, nuca_share)]
+    b3 = ax.bar(x, dram_share, width=0.55, bottom=bottom2, color=c_dram, edgecolor="#222222", linewidth=0.4, zorder=3, label="Fell through to DRAM")
+
+    for i in range(len(VARIANTS)):
+        ax.annotate(f"{l2_share[i]:.0f}%", (x[i], l2_share[i] / 2), ha="center", va="center", fontsize=8, color="white", fontweight="700")
+        ax.annotate(f"{dram_share[i]:.0f}%", (x[i], bottom2[i] + dram_share[i] / 2), ha="center", va="center", fontsize=8, color="white", fontweight="700")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(LABELS, rotation=20, ha="right")
+    ax.set_ylabel("Share of L1-cache misses (%)")
+    ax.set_title("Wider caches keep more L1 misses out of DRAM", fontsize=10.5)
+    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.22), ncol=3, fontsize=7.5, handlelength=1.2, columnspacing=1.0)
+    ax.set_ylim(0, 100)
+    style_ax(ax, ygrid=True)
+    fig.text(0.0, -0.16,
+              "103 GB database, 50-read workload. DRAM share drops from 46% (no cache) to 24% "
+              "(4-way) - the cache intercepts exactly the expensive misses.",
+              fontsize=7.5, color="#555555")
+    fig.tight_layout()
+    savefig(fig, "fig6_miss_breakdown_103gb")
+
+
+# =========================================================================
+# FIGURE 7 — Hardware cache-size comparison: Luna (real) vs. simulated
+# desktop-sized vs. simulated Orion-sized caches. Non-monotonic finding.
+# =========================================================================
+def fig_hw_comparison():
+    hw_names = ["Luna\n(real server)", "Desktop-sized\n(sim.)", "Orion-sized\n(sim.)"]
+    speedup_50mb = [0.910, 0.919, 0.902]
+    speedup_8gb = [1.830, 1.936, 1.649]
+
+    x = np.arange(len(hw_names))
+    width = 0.32
+    fig, ax = plt.subplots(figsize=(SINGLE_COL + 0.6, 3.4))
+    b1 = ax.bar(x - width / 2, speedup_50mb, width, label="50 MB DB", color="#9ec5f4", edgecolor="#222222", linewidth=0.5, zorder=3)
+    b2 = ax.bar(x + width / 2, speedup_8gb, width, label="8 GB DB", color="#184f95", edgecolor="#222222", linewidth=0.5, zorder=3)
+    for bars in (b1, b2):
+        for b in bars:
+            h = b.get_height()
+            ax.annotate(f"{h:.2f}×", (b.get_x() + b.get_width() / 2, h + 0.05),
+                        ha="center", fontsize=8.5, fontweight="600")
+    ax.axhline(1.0, color="#999999", linestyle="--", linewidth=0.9, zorder=2)
+    ax.set_xticks(x)
+    ax.set_xticklabels(hw_names, fontsize=8.5)
+    ax.set_ylabel("4-way speedup vs. no cache")
+    ax.set_title("Cache benefit isn't simply\n\"smaller hardware cache = bigger win\"", fontsize=10.5, pad=34)
+    ax.legend(frameon=False, loc="lower center", bbox_to_anchor=(0.5, 1.01), ncol=2, fontsize=8.5)
+    ax.set_ylim(0, 2.3)
+    ax.set_xlim(-0.55, 2.55)
+    style_ax(ax)
+    fig.text(0.0, -0.22,
+              "Desktop-sized cache (AMD Ryzen 5\n5600X specs) sees a stronger win than\n"
+              "Luna's real server cache; Orion-sized\n(Jetson AGX Orin specs) sees a weaker\n"
+              "one, despite having the smallest cache\nof the three. Config-only comparison\n"
+              "(same x86 core model).",
+              fontsize=7.5, color="#555555", va="top")
+    fig.tight_layout()
+    savefig(fig, "fig7_hardware_comparison")
+
+
 if __name__ == "__main__":
     fig_width_sweep()
     fig_cycles_by_db()
     fig_speedup_clean()
     fig_footprint()
+    fig_dual_axis()
+    fig_miss_breakdown()
+    fig_hw_comparison()
     print("done")
