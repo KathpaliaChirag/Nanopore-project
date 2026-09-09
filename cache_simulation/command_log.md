@@ -1330,6 +1330,38 @@ cache sizes changed) - this tests hardware cache SIZE sensitivity, not real ARM/
 
 ---
 
+### 2000-reads job progress - S0 variant complete (`2026-09-09 21:38:04`)
+
+S0 (no software cache) finished after 44,716s wallclock (~12.42 hours) - longer than the ~9.8hr
+extrapolation in fig8 (that model was fit from the tiny 10/50-read runs and clearly underestimates
+at this scale; treat fig8's 2000-read row as a rough lower bound, not the real number, until the
+comparison variant confirms the actual ratio). `1way` variant started immediately after, ~20 min in
+as of this check.
+
+Result row (from `results_2000reads/live_summary.csv`):
+
+| workload | variant | instructions_M | cycles_M | ipc | unique_cache_lines | l1d_hit_pct | l2_hit_pct | nuca_hit_pct | wallclock_s |
+|---|---|---|---|---|---|---|---|---|---|
+| 2000reads | S0 | 10053.7 | 6354.0 | 1.58 | 1,615,102 | 99.04 | 0.21 | 0.0297 | 44716 |
+
+Sanity check: cycles/instructions = 6354.0/10053.7 = 0.6321 -> IPC = 1/0.6321 = 1.582, matches the
+reported 1.58 IPC. Internally consistent.
+
+Notable: `unique_cache_lines` (1.6M) dwarfs anything seen in the 10/50-read runs (tens of thousands)
+- this is the first run in this whole project actually large enough to plausibly separate from a
+tiny-workload artifact, which is the whole point of running it. `nuca_hit_pct` is extremely low
+(0.03%) at this scale with no software cache, consistent with a workload whose working set blows far
+past what on-chip caches (even LLC) can hold for a 50MB DB - most lookups are genuinely going to
+DRAM. This is the baseline S0 will be compared against once 4way (the variant that won every DB size
+in the fair batch) finishes.
+
+No verdict yet - only 1 of 5 variants done. At the current per-variant rate (~12.4hrs for S0), the
+remaining 4 variants (1way, 4way, 8way, 16way) would take roughly 2 more days if each runs at a
+similar pace, though variants with a software cache do more instructions/cycle-of-work than S0 in
+past experiments, so actual time-per-variant may differ. Continuing to monitor.
+
+---
+
 ### To-do (not started - logged for later, per CK's requests during Q&A)
 
 1. **Simulate L3 as a single naive flat block, not distributed NUCA slices.** For comparison against

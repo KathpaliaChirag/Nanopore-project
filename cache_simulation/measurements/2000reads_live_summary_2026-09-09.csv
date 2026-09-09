@@ -1,0 +1,2 @@
+workload,variant,instructions_M,cycles_M,ipc,unique_cache_lines,l1d_loads,l1d_hit_pct,l2_hit_pct,nuca_hit_pct,elapsed_s,wallclock_s
+2000reads,S0,10053.7,6354.0,1.58,1615102,3149300943,99.04,.21,.0297,44714.29,44716
