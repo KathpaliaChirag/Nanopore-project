@@ -1362,6 +1362,36 @@ past experiments, so actual time-per-variant may differ. Continuing to monitor.
 
 ---
 
+### 2000-reads job progress - 1way variant complete (`2026-09-10 ~09:57 IST`)
+
+1way finished after 44,497s wallclock (~12.36hrs) - almost identical wallclock to S0's 44,716s,
+confirming host conditions stayed consistent between the two runs (no contention drift this time).
+4way started immediately after, ~4h41m in as of this check.
+
+Result row:
+
+| workload | variant | instructions_M | cycles_M | ipc | unique_cache_lines | l1d_hit_pct | l2_hit_pct | nuca_hit_pct | wallclock_s |
+|---|---|---|---|---|---|---|---|---|---|
+| 2000reads | S0 | 10053.7 | 6354.0 | 1.58 | 1,615,102 | 99.04 | 0.21 | 0.0297 | 44716 |
+| 2000reads | 1way | 11350.6 | 8336.3 | 1.36 | 2,272,676 | 99.21 | 0.17 | 0.0153 | 44497 |
+
+Sanity check: 8336.3/11350.6 = 0.7345 cycles/instruction -> IPC = 1/0.7345 = 1.361, matches reported
+1.36. Consistent.
+
+**Real cycles-based comparison, 1way vs S0 at 2000-read scale:** cycles_1way / cycles_S0 =
+8336.3 / 6354.0 = **1.312x - 1-way is 31% SLOWER (more cycles) than no cache at all**, not faster.
+This matches the direction of every prior width-sweep result in this project (1-way has consistently
+been the worst-performing associativity, sometimes even worse than no cache) - a direct-mapped
+software cache's high conflict-miss rate plus the fixed overhead of checking/maintaining the cache
+array outweighs any benefit, and unique_cache_lines rose 40.7% (1.615M -> 2.273M) versus S0, meaning
+the cache structure itself is adding real extra memory footprint, not just redirecting existing
+traffic. Waiting for 4way (the variant that has won or tied at every DB size in the fair batch) to
+know whether the *real, useful* width actually helps at this larger, more realistic 2000-read scale
+- that comparison (4way vs S0) is the one that actually answers this week's open question against
+last week's real-hardware null result.
+
+---
+
 ### To-do (not started - logged for later, per CK's requests during Q&A)
 
 1. **Simulate L3 as a single naive flat block, not distributed NUCA slices.** For comparison against
