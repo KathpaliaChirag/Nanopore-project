@@ -1,14 +1,16 @@
 """
 Generates a dark-terminal-style table of approximate Sniper simulation run time
-by read count, extrapolated from the real fixed+variable cost model derived
-from actual measured 10/50-read Luna runs this week.
+by read count, on Luna's S0 (no software cache) binary against the 50MB DB.
 
-IMPORTANT: only the 10-read and 50-read rows are REAL MEASURED data. 2,000 reads
-is a live, still-running job (not finished after 11+ hours as of writing) shown
-as an in-progress lower bound, not a completed measurement. 10,000 reads and the
-full 104,832-read file were never run - those rows are ESTIMATES ONLY, computed
-from: fixed_cost (~96s, DB load) + total_bases * per_base_rate, where
-per_base_rate = (188s - 96s) / 91,372 bases, from the real 50-read Luna/50MB run.
+UPDATE (2026-09-11): the 2,000-read row is now REAL MEASURED data - the S0
+variant of the 2000reads job finished at 44,716s (12.42 hrs). 10,000 reads and
+the full 104,832-read file were never run - those rows are ESTIMATES ONLY, now
+refit using BOTH real data points (50 reads @ 188s, 2000 reads @ 44,716s)
+instead of just the tiny 50-read run: fixed_cost=71.78s, per_base_rate=
+(44716-188)/(35,100,000-91,372)=0.0012719 s/base. This revised model raised the
+10,000-read estimate from ~16.9hrs to ~21.3hrs and the full-file estimate from
+~4.2 to ~5.3 days versus the original 50-read-only fit - a reminder that
+extrapolating from a single small data point understated the true cost.
 """
 
 import matplotlib.pyplot as plt
@@ -26,9 +28,9 @@ WARN = "#e0a030"
 rows = [
     ("10 reads",             "~15K",   "111s",      "MEASURED"),
     ("50 reads",             "91K",    "188s",      "MEASURED"),
-    ("2,000 reads",          "35.1M",  "~9.8 hrs",  "IN PROGRESS\n(>11 hrs, not done)"),
-    ("10,000 reads",         "60.2M",  "~16.9 hrs", "ESTIMATED\n(not run)"),
-    ("104,832 reads\n(full file)", "357.6M", "~4.2 days", "ESTIMATED\n(not run)"),
+    ("2,000 reads",          "35.1M",  "12.42 hrs\n(44,716s)", "MEASURED\n(S0, done)"),
+    ("10,000 reads",         "60.2M",  "~21.3 hrs", "ESTIMATED\n(not run)"),
+    ("104,832 reads\n(full file)", "357.6M", "~5.3 days", "ESTIMATED\n(not run)"),
 ]
 
 fig, ax = plt.subplots(figsize=(11.5, 4.6))
@@ -60,14 +62,14 @@ for (r, c), cell in tbl.get_celld().items():
     # color the status column
     if c == 3 and r > 0:
         status = rows[r - 1][3]
-        color = "#7fd97f" if status == "MEASURED" else WARN
+        color = "#7fd97f" if status.startswith("MEASURED") else WARN
         cell.set_text_props(fontfamily="monospace", color=color)
 
 fig.text(0.02, 0.035,
-          "Only 10/50-read rows are measured. 2,000-read is a live job still running past 11 hours\n"
-          "(not yet complete). 10,000-read and the full file are extrapolated from the real fixed+\n"
-          "variable cost model (fixed ~96s DB load + ~1.007ms/base), not actually run - treat as\n"
-          "rough estimates, not measurements, until confirmed.",
+          "10/50/2,000-read rows are measured (S0, no cache, Luna, 50MB DB). 10,000-read and the\n"
+          "full file are extrapolated from a fixed+variable cost model refit on BOTH real points\n"
+          "(50 reads and 2,000 reads): fixed ~71.8s DB load + ~1.272ms/base - not actually run,\n"
+          "treat as rough estimates, not measurements, until confirmed.",
           fontsize=7.3, color="#999999", fontfamily="monospace")
 
 for ext in ("png", "pdf"):
