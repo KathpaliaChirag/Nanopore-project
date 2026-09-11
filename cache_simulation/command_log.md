@@ -1441,6 +1441,39 @@ on this pattern, but not yet confirmed). hw_assoc_sweep is still correctly queue
 
 ---
 
+### CORRECTION (`2026-09-11 ~16:20 IST`) - the reconciliation mechanism above is wrong
+
+The previous section's claim that "the earlier ~2x speedup was a small-workload (10-50 read)
+artifact" is **incorrect** and needs to be walked back. Checked which DB `run_2000reads_standalone.sh`
+actually uses: `DB=/home/student/chirag_K/AccuracyDrift/databases/sample_targeted` - this is the
+SAME 50MB database as the fair batch's `50mb` column, not a different, bigger one.
+
+Looking at the fair batch's own `50mb` row (`make_slide_charts.py`'s `CYCLES["50mb"]`): S0=24.4,
+1way=27.0, 4way=26.8, 8way=27.8, 16way=28.7 - **the cache was ALREADY worse than no-cache on this
+same 50MB DB at just 50 reads.** The ~2x speedup this project has been calling "this week's
+headline result" came entirely from the 8GB/16GB/103GB DB rows of that same fair batch, where S0 is
+much slower (51.8/60.7/94.3M cycles) and the cache variants cluster much lower (~28-30M) - a
+DATABASE-SIZE effect, not a read-count effect.
+
+**What the 2000-reads job actually shows:** the cache was already known to hurt on the 50MB DB at 50
+reads; running 2000 reads on that SAME 50MB DB confirms the cache continues to hurt at a much larger,
+more realistic read count too - ruling out "maybe 50 reads just wasn't enough for the cache to warm
+up" as an excuse for the small-DB result. That's a real and useful finding, but it is NOT a test of
+whether the ~2x speedup (which lives on the 8GB+ DBs) holds up at large read counts - that
+comparison has never been run and remains open. Also relevant: last week's real-hardware null result
+(commit 84436dd) was itself already DB-size-independent ("3 DBs x 6 thread counts x 3 runs: all
+statistically indistinguishable everywhere... <2% hit rate at these sizes regardless of
+implementation") - so it doesn't specifically corroborate the 50MB-DB finding over the 8GB one either;
+it was a null across multiple DB sizes using a dynamically-sized cache formula, not the fixed-width
+binaries used in this week's Sniper sweeps.
+
+**Correct framing going forward:** the 2000-reads job is a large-read-count study on the SMALL
+(50MB) DB specifically, and it reconfirms/strengthens that DB's already-known negative result. The
+open question of whether the ~2x speedup on LARGE (8GB+) DBs survives at large read counts remains
+untested and would need a separate 2000-read run against e.g. the 8GB DB to answer.
+
+---
+
 ### To-do (not started - logged for later, per CK's requests during Q&A)
 
 1. **Simulate L3 as a single naive flat block, not distributed NUCA slices.** For comparison against
