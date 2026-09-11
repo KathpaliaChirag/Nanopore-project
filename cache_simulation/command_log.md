@@ -1392,6 +1392,55 @@ last week's real-hardware null result.
 
 ---
 
+### 2000-reads job progress - 4way and 8way complete (`2026-09-11 ~16:06 IST`) - HEADLINE RESULT
+
+4way finished at 45,600s wallclock (`2026-09-10 22:39:41`), 8way finished at 49,055s
+(`2026-09-11 12:17:16`). 16way is now running. Full table so far:
+
+| workload | variant | instructions_M | cycles_M | ipc | unique_cache_lines | l1d_hit_pct | l2_hit_pct | nuca_hit_pct | wallclock_s |
+|---|---|---|---|---|---|---|---|---|---|
+| 2000reads | S0 | 10053.7 | 6354.0 | 1.58 | 1,615,102 | 99.04 | 0.21 | 0.0297 | 44716 |
+| 2000reads | 1way | 11350.6 | 8336.3 | 1.36 | 2,272,676 | 99.21 | 0.17 | 0.0153 | 44497 |
+| 2000reads | 4way | 11829.2 | 8159.1 | 1.45 | 2,281,890 | 98.49 | 0.81 | 0.0600 | 45600 |
+| 2000reads | 8way | 12391.2 | 8508.1 | 1.46 | 2,294,178 | 98.12 | 1.03 | 0.1485 | 49055 |
+
+Sanity checks (cycles/instructions -> IPC): 4way: 8159.1/11829.2=0.6899 -> 1/0.6899=1.450, matches
+1.45. 8way: 8508.1/12391.2=0.6866 -> 1/0.6866=1.456, matches 1.46. Both internally consistent.
+
+**Real cycles-based ratios vs S0 (no cache), at 2000-read scale:**
+
+| variant | cycles_M | ratio vs S0 | verdict |
+|---|---|---|---|
+| S0 | 6354.0 | 1.000x | baseline |
+| 4way | 8159.1 | **1.284x** | 28.4% SLOWER than no cache |
+| 1way | 8336.3 | 1.312x | 31.2% slower |
+| 8way | 8508.1 | 1.339x | 33.9% slower |
+
+**This is the headline finding of the whole 2000-reads job.** At this scale, EVERY software-cache
+variant tested so far - including 4-way, the width that won or tied at every database size in the
+smaller-scale fair batch - is slower in real cycles than having no software cache at all. 4-way is
+still the *best* among the cache variants (matches the width-sweep's earlier conclusion that 4-way is
+the optimal associativity relative to other cache widths), but "best of the cache variants" is not
+the same as "better than no cache" - and at this scale it clearly is not.
+
+**This directly reconciles this week's simulated finding with last week's real-hardware null result
+(commit 84436dd)** - and goes a step further than "null." Last week's real hardware measured zero
+measurable speedup from the software cache at production scale. This week's Sniper simulation at a
+comparably large scale (2000 reads, 35.1M bases, vs the 10-50 read/91K-base runs the ~2x "speedup"
+figure came from) shows the software cache actively HURTING performance, not just failing to help.
+The two findings now agree in direction (cache stops helping as workload scale grows) and this
+result is *stronger* in the same direction real hardware already showed - not a contradiction to
+explain away, but the missing piece: the earlier ~2x speedup was a small-workload artifact (10-50
+reads is tiny and unrepresentative), and the software cache's own overhead (maintaining/checking the
+array, the extra 40-43% memory footprint every cache variant added over S0's unique_cache_lines) only
+becomes visible once the workload is large enough for that overhead to matter relative to the actual
+lookup savings.
+
+Only 16way remains to complete the full picture (it's expected to also come in slower than S0, based
+on this pattern, but not yet confirmed). hw_assoc_sweep is still correctly queued behind it.
+
+---
+
 ### To-do (not started - logged for later, per CK's requests during Q&A)
 
 1. **Simulate L3 as a single naive flat block, not distributed NUCA slices.** For comparison against
