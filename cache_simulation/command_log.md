@@ -2060,3 +2060,23 @@ Iteration 2 evidence request. Both size sweeps (8GB+16GB mine, 103GB theirs) hav
 the size axis on every big DB planned so far. `hw_assoc_sweep_bigdb` (this session) is 2/12 in
 (assoc=1: 51.8M cycles, assoc=4: 51.7M cycles - nearly flat so far, too early to call). `laptop_sweep`
 is 16/32.
+
+---
+
+### CORRECTION (`2026-09-15 21:52 IST`) - size=65536 anomaly magnitude was wrong
+
+The previous entry's magnitude numbers (+4.4% on 8GB, +10.2% on 103GB) were **wrong** - caught by
+the peer session cross-checking the same CSV. Those were the `instructions_M` deltas
+(52.1->54.4 and 25.4->28.0), mislabeled as `cycles_M` deltas. The correct cycles-based figures:
+
+- 8GB: 27.9M -> 28.6M cycles = **+2.5%**, not +4.4%
+- 103GB: 15.1M -> 16.0M cycles = **+6.0%**, not +10.2%
+
+The underlying finding (an isolated spike at exactly size=65536, absolute entry count not
+DB-relative, confirmed on two DBs) is unaffected - only the magnitude numbers were wrong. Any
+Iteration 3 write-up should cite +2.5%/+6.0% (cycles), not the earlier +4.4%/+10.2% figures.
+Lesson: when multiple similarly-scaled columns exist in the same CSV row (instructions_M and
+cycles_M here), explicitly name which column a percentage was computed from in the log entry
+itself, not just in a table header - this is exactly the kind of transcription error this
+project's `mtpweek2.md` memory already flagged as a recurring bug class ("mis-derived ratios/
+misattributed numbers, always re-derive from source table").
