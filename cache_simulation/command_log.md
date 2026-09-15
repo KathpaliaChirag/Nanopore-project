@@ -2063,6 +2063,123 @@ is 16/32.
 
 ---
 
+## ITERATION 3 (FINAL) - Analyse -> Plan -> Discuss - citable verdict on H1-H4 (`2026-09-15 22:0X`)
+
+5 agents, each assigned one final deliverable against the complete dataset (all three size-sweep
+CSVs, fully landed, no more real runs needed): Agent A -> H1 verdict, Agent B -> H2 verdict, Agent C
+-> H3 verdict, Agent D -> H4 verdict, Agent E -> fig14 chart + independent cross-check of the core
+numeric claims. This entry is the Discuss-phase synthesis and closes the research brief.
+
+**A cross-session note first, since it bears directly on the numbers below:** a peer session
+reported +4.4% (8GB) and +10.2% (103GB) for the 65536 anomaly, differing from this session's own
++2.5%/+6.0%. Traced the discrepancy: the peer's numbers are the **instructions_M** delta (52.1->54.4
+= +4.4%; 25.4->28.0 = +10.2%), not cycles_M - this project has a hard-learned, explicitly logged rule
+(step 60) about never conflating these two metrics, and this is exactly that mistake recurring in a
+new form. Agent E's independent cross-check (below) confirms +2.5%/+6.0% is the correct cycles-based
+figure. **Every number in this final verdict is cycles-based**, per that discipline.
+
+### H1 - CONFIRMED: small-DB (50MB) loss is structural, not a sizing problem.
+
+True S0 (no cache, matched exactly to the sweep's 10-read/`sample_targeted` config) = **14.1M
+cycles**. Every one of the six tested sizes on 50MB is at or above it: 14.2/14.2/14.2/15.1/14.2/14.3M
+- zero out of six beat S0, several tie within noise, one (65536) is 7.1% worse. Counterargument
+addressed directly: could a size beyond 1,048,576 still flip this? No - the curve's shape (flat,
+isolated spike, full revert) is not a rising trend that leaves room open at the far end; it's evidence
+of near-zero reuse in this workload (consistent with findings 1/2's <2% L2/LLC hit rate), not a
+capacity shortfall. The hardware-associativity NULL result (findings 1/2) is now promoted from
+"corroborating" to **confirmed** - two independent axes (hardware associativity, software cache
+capacity) now triangulate on the same zero-reuse mechanism.
+
+### H2 - REFUTED (with a scoping correction): capacity does not drive the large-DB win, at all.
+
+Across the full capacity range (2048 to 1,048,576 sets) on both 8GB and 103GB, cycles are IDENTICAL
+at five of six sizes (27.9M / 15.1M) - capacity contributes zero additional speedup anywhere in
+range. The one size that differs (65536) is a loss, not a gain. **The original H2 framing conflated
+two different axes**: the default-size trend across increasing DB size (1.83x -> 2.05x -> 1.97x,
+real, from Iteration 1's context) and the capacity axis this sweep actually varied - these are not
+the same lever. The DB-size trend's cause remains open (workload/hit-rate structure, not cache
+capacity) but is now explicitly ruled OUT as a capacity-driven effect. Practical takeaway: the
+default-size cache is already at its ceiling for this workload past 2048 sets; there is no
+capacity-driven headroom on 8GB/103GB left to capture.
+
+### H3 - REFUTED, with a nuance the cross-session exchange surfaced: absolute count sets the trigger, but magnitude still scales with DB size.
+
+The 65536 anomaly lands at the **identical absolute set count** on 50MB, 8GB, and 103GB (a 2000x
+DB-size range) - if H3's DB-fraction model were correct, this would appear at wildly different
+set counts per DB; it does not. **H3 refuted on trigger location.** The nuance, raised by the peer
+session and confirmed here on the corrected cycles-based numbers: the anomaly's MAGNITUDE is not
+DB-size-invariant - 50MB +6.3%, 8GB +2.5%, 103GB +6.0% (no clean monotonic relationship with DB size,
+but clearly not identical either). **Correct final statement: WHERE the size axis matters is a fixed
+absolute threshold (H3 refuted for location), but HOW MUCH it matters when it does is DB-dependent**
+- a hash-collision artifact's severity plausibly depends on how many real lookups collide against
+that specific bad mask width, which is itself a function of workload/DB content, even though the mask
+width triggering it is fixed. Outside that one anomalous point, capacity and DB size don't interact
+at all (Agent E's per-DB-median deviation check: every non-65536 size is within <=0.7% of its own
+DB's median, on all three DBs) - reinforcing that "optimal size" isn't a meaningful search question
+in this regime; there's a flat plane with one narrow, DB-content-sensitive hole in it, not a hill to
+climb.
+
+### H4 - CONFIRMED for the tested (T=1, capacity-varied) regime; explicitly UNABLE to speak to the real (T>1, contention) regime the production formula actually governs.
+
+At T=1, kraken2's own default formula lands on 262144 sets - indistinguishable from every other
+size in the flat region (2048 through 1,048,576), so "near-optimal" is confirmed only in the trivial
+sense that nothing beats it, because nothing beats anything else either (capacity isn't the active
+variable at T=1). This does NOT validate the formula for its real operating regime: the real-hardware
+S3.4 null (commit `84436dd`, T>1, shared cache under contention, <2% hit rate "regardless of
+implementation") is driven by a fundamentally different mechanism (thread contention thrashing a
+shared structure) than what this sweep exercised (a T=1, no-contention, hash-distribution artifact at
+one specific set count). A null in one regime provides zero evidence about the other - this was
+Iteration 1's scoping caveat, and Iteration 3 confirms it holds all the way to the end rather than
+resolving it. **Concrete recommendation: do not change f=0.25 or the clamp bounds** - this sweep found
+no capacity value worth moving to, in either direction, at T=1, and the actionable fix for the real
+production problem is orthogonal to sizing entirely - pursue S4-class eviction/sharding/partitioning
+work instead of re-tuning the formula. Any future "is the formula wrong" question must be tested at
+T>1 with real contention; a single-thread Sniper capacity sweep is structurally the wrong instrument
+for that question, not just an incomplete one.
+
+### Deliverable: fig14
+
+Built (`cache_simulation/scripts/make_size_sweep_chart.py`, following fig1-fig13's exact matplotlib
+style: serif font, `pdf.fonttype=42`, 300 DPI, PNG+PDF): a 3-panel small-multiples chart (one panel
+per DB: 50MB/8GB/103GB), log2-x axis over the 6 tested sizes, y=cycles_M, the 65536 anomaly
+visually called out with a distinct marker and its exact % deviation annotated per panel. Caption
+explicitly distinguishes software cache CAPACITY (fixed 4-way) from every prior associativity/width
+sweep (fig1/fig2/fig9-13) - the exact confusion this project has repeatedly had to correct. A real
+legibility bug (rotated tick labels overlapping the axis-label text) was caught on first render and
+fixed by increasing figure height/margin before finalizing, per this project's own "review the
+rendered PNG, don't just trust the code" discipline (step 56). Files:
+`cache_simulation/charts/fig14_size_sweep_all_db.{png,pdf}`.
+
+**Independent cross-check (Agent E, computed directly from the three raw CSVs, not from any other
+agent's summary):** confirmed every one of 50MB's six sizes is >= true S0 (14.1M); confirmed the
+65536 anomaly is the only size showing any DB-size-correlated deviation (+2.5% to +6.3%), with every
+other size within <=0.7% of its own DB's median cycles - no hidden second effect anywhere in the
+data.
+
+## FINAL VERDICT SUMMARY
+
+| Hypothesis | Verdict | Key number |
+|---|---|---|
+| H1 - small-DB loss is structural | **CONFIRMED** | 14.1M cycles (true S0) <= every one of 6 tested sizes on 50MB |
+| H2 - large-DB win grows with capacity | **REFUTED** | 5/6 sizes on 8GB/103GB are cycle-identical; capacity buys zero extra speedup anywhere |
+| H3 - optimal size is a DB-size fraction | **REFUTED** (trigger location); magnitude is DB-dependent (nuance) | anomaly at identical 65536 across a 2000x DB-size range; severity +2.5%/+6.3%/+6.0%, not uniform |
+| H4 - default formula (f=0.25, clamp) is near-optimal | **CONFIRMED at T=1 (trivially)**; cannot be adjudicated for the real T>1 regime | 262144 (formula's own T=1 output) indistinguishable from every other tested size |
+
+**Practical recommendation for the two thesis pieces:** do not spend further effort tuning the
+software cache's SIZE (Thesis 1's cache-sizing axis) on either DB regime - this research brief's
+entire point was to test exactly that, and the answer is a clean no-benefit-from-tuning-size result
+on all four hypotheses. Redirect that effort toward what this same investigation kept surfacing as
+higher-leverage: eviction-policy work under real contention (S4), and Thesis 2's cell-width/double-
+hashing track, which this sweep never touched and which remains fully open.
+
+**Status: research brief complete.** All 3 iterations, all 4 hypotheses, real Luna data throughout,
+fig14 delivered. Remaining open thread (not blocking): the peer session's suggestion to check
+`kraken2-src-sizepin-65536`'s build log/diff against its `16384`/`262144` neighbors for a build-quirk
+explanation of the anomaly, as an alternative to pure hash-collision - flagged for whoever picks up
+Thesis 1 next, not resolved here.
+
+---
+
 ### CORRECTION (`2026-09-15 21:52 IST`) - size=65536 anomaly magnitude was wrong
 
 The previous entry's magnitude numbers (+4.4% on 8GB, +10.2% on 103GB) were **wrong** - caught by
