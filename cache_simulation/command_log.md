@@ -2283,3 +2283,14 @@ laptop_sweep now on 100-read/16gb/S0.
 **laptop_sweep**: 22/32. 100-read/16gb/S0 baseline = 1048.6M cycles (sanity: 1048.6/1575.6=0.6656 ->
 IPC=1.50, matches). This is just the no-cache baseline - need the 1way/4way/8way rows (1way running
 now) to see if 16GB repeats 8GB's full reversal.
+
+---
+
+### New wrinkle: 16GB does NOT repeat 8GB's reversal at 1-way (`2026-09-16 10:01 IST`)
+
+100-read/16gb/1way = 988.4M cycles (sanity: 988.4/1524.5=0.6483 -> IPC=1.54, matches). vs S0's
+1048.6M: **0.943x - 1-way is 5.7% FASTER here**, not slower. This directly contradicts 8GB's pattern
+at the same read count, where 1-way lost by 5.6%. So the reversal is NOT a clean function of read
+count alone - it's DB-specific too, at least at 100 reads. Need 4way/8way on 16GB to see if this
+holds or if 16GB's story is genuinely different from 8GB's at this scale. laptop_sweep now on
+100-read/16gb/4way.
