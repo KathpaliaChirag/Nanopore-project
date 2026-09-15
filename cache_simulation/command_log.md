@@ -1474,20 +1474,99 @@ untested and would need a separate 2000-read run against e.g. the 8GB DB to answ
 
 ---
 
-### To-do (not started - logged for later, per CK's requests during Q&A)
+### 2000-reads job COMPLETE - 16way finished, full 5-variant verdict (`2026-09-12 03:17:14`)
 
-1. **Simulate L3 as a single naive flat block, not distributed NUCA slices.** For comparison against
-   the current mesh-slice model. Would need switching away from `meteor_lake_pcore`'s NUCA-based
-   chain to an older-style flat `l3_cache` config (like `nehalem`/`gainestown` originally had),
-   applied with Luna's real total L3 size (105MB) and 15-way associativity as one block instead of
-   split across slices.
+16way finished at 53,998s wallclock (~15.0 hours) - the longest of all 5 variants, confirming a
+clean monotonic pattern in wallclock too (S0=44716s < 1way=44497s < 4way=45600s < 8way=49055s <
+16way=53998s; 1way's wallclock being marginally below S0's is noise, not signal - cycles is the
+metric that matters and 1way is unambiguously worse there). Full final table (2000-read workload,
+sample_targeted/50MB DB):
 
-2. **Sweep real HARDWARE cache associativity in isolation**, distinct from every experiment so far
-   which varied the *software* S2 cache's width. Hold the S2 software cache fixed (either "no
-   cache" throughout, or one fixed width like 4-way) and vary only Luna's real L2 or L3
-   associativity value (e.g. 1-way, 4-way, 8-way, 15-way [real], 16-way, 30-way) across one DB
-   size, same cycles-based methodology as everything else. Directly answers "does the hardware's
-   own associativity matter to kraken2, independent of any software cache" - a question never
-   actually isolated so far, since the desktop/orion hardware comparison changed hardware
-   associativity only as a side effect of using each hardware's real spec, with S2 still varying
-   too (S0 vs 4-way) in that experiment.
+| variant | cycles_M | ipc | unique_cache_lines | l2_hit_pct | nuca_hit_pct | wallclock_s | ratio vs S0 |
+|---|---|---|---|---|---|---|---|
+| S0 | 6354.0 | 1.58 | 1,615,102 | 0.21 | 0.0297 | 44716 | 1.000x (baseline) |
+| 1way | 8336.3 | 1.36 | 2,272,676 | 0.17 | 0.0153 | 44497 | 1.312x slower |
+| 4way | 8159.1 | 1.45 | 2,281,890 | 0.81 | 0.0600 | 45600 | 1.284x slower |
+| 8way | 8508.1 | 1.46 | 2,294,178 | 1.03 | 0.1485 | 49055 | 1.339x slower |
+| 16way | 8805.9 | 1.51 | 2,313,682 | 1.12 | 0.2182 | 53998 | **1.386x slower** |
+
+Sanity check 16way: 8805.9/13322.2=0.6610 cycles/instruction -> IPC=1/0.6610=1.513, matches reported
+1.51. Consistent.
+
+**Final ranking, best (least bad) to worst, at 2000-read/50MB-DB scale: 4way < 1way < 8way < 16way.**
+Every single cache variant is slower than no cache - confirming (per the correction logged above)
+that this DB's already-known negative result at 50 reads holds, and slightly *worsens*, all the way
+out to 2000 reads. Two distinct cost mechanisms are visible in the data:
+- **1-way is bad from conflict misses**: a direct-mapped cache with almost no ability to keep two
+  competing k-mers resident at once, despite the lowest per-lookup comparison overhead of any width.
+- **8-way and 16-way are bad from comparison overhead**: L2/NUCA hit rates climb steadily with width
+  (0.21% -> 1.12% l2_hit at S0->16way, 0.03%->0.22% nuca_hit) - the wider cache genuinely does cache
+  more distinct entries and serve more hits from itself - but cycles get WORSE anyway, because the
+  software cache's own lookup is a sequential comparison loop (CK's own hypothesis, confirmed
+  earlier in the associativity case study) and checking 16 slots one at a time before falling
+  through to the real hash table costs more than the hits it wins back save.
+- **4-way sits in the middle of both failure modes** - not immune to either, but least exposed to
+  each - which is exactly why it was the width that won or tied at every DB size in the original
+  fair batch (a different, more cache-friendly regime: 8GB/16GB/103GB DBs).
+
+Charts fig9 (`cache_simulation/scripts/make_2000reads_charts.py`), fig10, and fig11
+(`cache_simulation/scripts/make_2000reads_table.py`) still need to be regenerated with this real
+16way row in place of the earlier placeholder/missing entry.
+
+---
+
+### hw_assoc_sweep COMPLETE - hardware LLC associativity alone has NO measurable effect (`2026-09-14 21:22:51`)
+
+All 24 runs finished (6 associativities x 4 workload sizes). This sweep holds the SOFTWARE side
+fixed at none (base kraken2, `S0` binary) and varies only the REAL hardware LLC associativity
+(1/4/8/15[real]/16/30-way) - the mirror image of every other experiment in this project. Full data
+in `cache_simulation/measurements/hw_assoc_sweep_2026-09-14.csv`.
+
+| reads | assoc=1 | assoc=4 | assoc=8 | assoc=15 (real) | assoc=16 | assoc=30 | spread |
+|---|---|---|---|---|---|---|---|
+| 10 | 13.6 | 13.7 | 13.6 | 13.7 | 13.7 | 13.7 | 0.1M (0.7%) |
+| 50 | 24.4 | 24.4 | 24.4 | 24.4 | 24.4 | 24.4 | 0.0M (identical) |
+| 100 | 870.0 | 877.2 | 869.9 | 870.4 | 869.8 | 877.3 | 7.5M (0.86%) |
+| 500 | 4528.2 | 4524.0 | 4537.9 | 4534.5 | 4526.4 | 4523.2 | 14.7M (0.32%) |
+
+**Verdict: NULL RESULT, and a clean one.** Cycles do not move in any consistent direction as
+hardware associativity changes, at any of the 4 workload sizes tested - the small variation present
+(well under 1% everywhere) shows no monotonic trend with associativity and is consistent with
+run-to-run simulation noise, not a real effect. `unique_cache_lines` is also essentially constant
+across every associativity value at a given read count (e.g. 500 reads: 1,614,997-1,614,998 across
+all six - a 1-line difference), confirming the working set itself doesn't change; only microscopic
+`nuca_hit_pct` differences appear (all still under 0.04% at every size), meaning almost nothing is
+ever actually being resolved at the LLC layer to begin with, on this database, at these workload
+sizes - so it wouldn't matter how that layer is organized.
+
+**Why this matters, and how it explains the 2000-reads result above:** on the 50MB DB, kraken2's
+lookups are overwhelmingly either L1 hits or full DRAM misses (l2_hit_pct and nuca_hit_pct are both
+under 1-2% even in the best case) - almost nothing is being caught by mid-level or last-level cache
+regardless of its associativity, because the working set relative to what L1 already holds doesn't
+create the kind of repeat-access, capacity-bound conflict pattern that associativity is designed to
+help with. This is the same underlying reason BOTH results land the way they do: hardware LLC
+associativity can't help what it never gets asked to resolve, and a SOFTWARE cache sitting in front
+of that same access pattern only adds its own fixed per-lookup overhead without enough genuine
+repeat-hit benefit to pay for itself. The real lever for this database size is DRAM latency, not
+cache organization at any level - consistent with (and a mechanistic explanation for) the ~2x
+speedup instead showing up on the 8GB+ DBs in the original fair batch, where the working set is
+large enough that repeat k-mer lookups plausibly do get evicted from hardware cache between visits,
+leaving real room for a software cache (or, by the same logic, hardware associativity) to matter.
+
+This satisfies to-do item 2 below (marked DONE).
+
+---
+
+### To-do (per CK's requests during Q&A)
+
+1. **Simulate L3 as a single naive flat block, not distributed NUCA slices.** NOT STARTED. For
+   comparison against the current mesh-slice model. Would need switching away from
+   `meteor_lake_pcore`'s NUCA-based chain to an older-style flat `l3_cache` config (like
+   `nehalem`/`gainestown` originally had), applied with Luna's real total L3 size (105MB) and 15-way
+   associativity as one block instead of split across slices.
+
+2. **~~Sweep real HARDWARE cache associativity in isolation~~ - DONE, see hw_assoc_sweep section
+   above (`2026-09-14`).** Null result: hardware associativity alone has no measurable effect on
+   this DB at any tested workload size (10/50/100/500 reads), which mechanistically explains why the
+   50MB DB is also where the software cache experiments hurt rather than help - almost nothing ever
+   reaches the LLC layer for either kind of cache to act on.

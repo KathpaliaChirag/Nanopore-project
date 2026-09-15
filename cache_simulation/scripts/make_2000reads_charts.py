@@ -8,7 +8,7 @@ that comparison was never run. This job only shows that the SMALL (50MB) DB's
 already-negative result (cache worse than no-cache, seen even at 50 reads in
 the fair batch) continues to hold, and gets slightly worse, at 2000 reads.
 
-16way is still running as of this data pull - only S0/1way/4way/8way included.
+ALL 5 variants (S0/1way/4way/8way/16way) complete as of 2026-09-12 03:17:14.
 
 Speedup uses CYCLES / core frequency (real-hardware-equivalent), never
 Sniper's own wallclock_s - see make_slide_charts.py's module docstring.
@@ -49,9 +49,9 @@ SINGLE_COL = 3.4
 DOUBLE_COL = 7.0
 
 # ---- 2000-reads data (50MB DB "sample_targeted"), from live_summary.csv ----
-CYCLES_2000 = {"S0": 6354.0, "1way": 8336.3, "4way": 8159.1, "8way": 8508.1}
-VARIANTS_2000 = ["S0", "1way", "4way", "8way"]
-LABELS_2000 = ["No cache", "1-way", "4-way", "8-way"]
+CYCLES_2000 = {"S0": 6354.0, "1way": 8336.3, "4way": 8159.1, "8way": 8508.1, "16way": 8805.9}
+VARIANTS_2000 = ["S0", "1way", "4way", "8way", "16way"]
+LABELS_2000 = ["No cache", "1-way", "4-way", "8-way", "16-way"]
 
 # ---- 50-read data on the SAME 50MB DB, from the fair batch (already-known
 # negative result this job is reconfirming at scale) ------------------------
@@ -79,7 +79,7 @@ def savefig(fig, name):
 # FIGURE 9 - cycles by SOFTWARE cache width at 2000-read scale, 50MB DB
 # =========================================================================
 def fig_2000reads_cycles():
-    colors = [GRAY, BLUE_RAMP["1way"], BLUE_RAMP["4way"], BLUE_RAMP["8way"]]
+    colors = [GRAY, BLUE_RAMP["1way"], BLUE_RAMP["4way"], BLUE_RAMP["8way"], BLUE_RAMP["16way"]]
     vals = [CYCLES_2000[v] for v in VARIANTS_2000]
 
     fig, ax = plt.subplots(figsize=(SINGLE_COL + 0.4, 3.3))
@@ -98,9 +98,9 @@ def fig_2000reads_cycles():
     ax.set_ylim(0, max(vals) * 1.20)
     fig.text(0.0, -0.24,
               "35.1M bases total (2000 reads), sample_targeted (50MB) DB. Dashed line: no-cache\n"
-              "(S0) cycle count - every cache width sits above it. 16-way still running, not shown.\n"
-              "Width shown = the SOFTWARE S2 lookup-cache's associativity. Real Luna HARDWARE cache\n"
-              "is fixed throughout: L1d 48KB/12-way, L1i 32KB/8-way, L2 2MB/16-way, L3 105MB/15-way.",
+              "(S0) cycle count - every cache width sits above it, worsening monotonically past\n"
+              "4-way. Width shown = the SOFTWARE S2 lookup-cache's associativity. Real Luna HARDWARE\n"
+              "cache is fixed throughout: L1d 48KB/12-way, L1i 32KB/8-way, L2 2MB/16-way, L3 105MB/15-way.",
               fontsize=7, color="#222222")
     savefig(fig, "fig9_2000reads_cycles_50mb")
 
@@ -110,8 +110,8 @@ def fig_2000reads_cycles():
 # 50 reads vs 2000 reads, SAME 50MB DB, cycles ratio vs no-cache.
 # =========================================================================
 def fig_readcount_scaling_same_db():
-    widths = ["1way", "4way", "8way"]
-    labels = ["1-way", "4-way", "8-way"]
+    widths = ["1way", "4way", "8way", "16way"]
+    labels = ["1-way", "4-way", "8-way", "16-way"]
     ratio_50 = [CYCLES_50[w] / CYCLES_50["S0"] for w in widths]
     ratio_2000 = [CYCLES_2000[w] / CYCLES_2000["S0"] for w in widths]
 
