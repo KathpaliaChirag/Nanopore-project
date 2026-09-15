@@ -2242,3 +2242,12 @@ hw_assoc_sweep_bigdb: already complete (logged prior entry) - null holds on 8GB/
 
 **laptop_sweep**: 18/32. New row: 100-read/8gb/S0 = 813.6M cycles (sanity: 813.6/1392.2=0.5844 ->
 IPC=1.71, matches). Now on 100-read/8gb/1way. Still in the slow tier.
+
+---
+
+### Hourly brief (`2026-09-16 02:58 IST`)
+
+**laptop_sweep**: 19/32. New row: 100-read/8gb/1way = 859.1M cycles (sanity: 859.1/1447.0=0.5938 ->
+IPC=1.68, matches). Notable: 1way is now SLOWER than S0 (813.6M) at this scale - 1.056x, first
+sign the cache's big win at 10/50 reads may not hold as read count grows further, worth watching
+closely through 4way/8way and the 500-read tier. Now on 100-read/8gb/4way.
