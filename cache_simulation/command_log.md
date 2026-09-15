@@ -1987,4 +1987,36 @@ sizes scale up.
 **Launched a tail run to complete 50MB's ladder** (`run_size_sweep_50mb_tail.sh`, sizes 262144 and
 1,048,576, same binaries/DB/workload as the original 50MB sweep) to check whether 50MB shows the same
 revert-after-spike shape as 103GB/8GB just confirmed - PID 496143, running. This is the last real
-data gap before Iteration 3 can write a fully evidence-backed H1-H4 verdict.
+
+---
+
+### 50MB tail complete, 8GB complete (6/6) - 3-for-3 on the revert pattern; a script bug caught and fixed (`2026-09-15 21:45`)
+
+**8GB (peer's sweep) finished its own remaining points:** 262144=27.9M cycles, 1048576=27.9M cycles
+- both back at the flat baseline, exactly mirroring 103GB's shape. 8GB is now a complete 6-point
+ladder, fully confirming the isolated-spike-at-65536-then-revert pattern independently.
+
+**50MB tail run finished** (`TAIL ALL DONE 2026-09-15 21:45:42`), but hit a real bug: the tail
+script (`run_size_sweep_50mb_tail.sh`) logged progress-log lines correctly but was written without
+the parsing/CSV-append block the original `run_size_sweep.sh` has - both runs completed and produced
+valid `sim.stats`, but never wrote rows into `live_summary.csv`. Caught by checking the CSV directly
+after the "Done" lines appeared in `progress.log` and finding it short two rows. **Fix: recovered
+both rows manually from the raw logs/`sim.stats`** rather than re-running (the simulation output
+itself is valid, only the parsing step was missing from the script):
+
+| size | cycles_M | instructions_M | ipc | unique_cache_lines | l1d_loads | l2_hit_pct |
+|---|---|---|---|---|---|---|
+| 262144 | 14.2 | 25.2 | 1.77 | 49,974 | 6,615,895 | 1.45 |
+| 1048576 | 14.3 | 25.2 | 1.77 | 50,458 | 6,615,882 | 1.44 |
+
+**50MB reverts too** - 14.2M/14.3M cycles, both back at (or within noise of) the 14.2M flat baseline
+seen at 2048/4096/16384, l1d_loads back at ~6.616M (matching the pre-spike baseline exactly, not the
+~7.28M seen at the 65536 spike). **This makes it 3-for-3 across every DB tested (50MB, 8GB, 103GB):
+cycles are flat, spike sharply and specifically at 65536 sets, then fully revert at 262144 and
+1,048,576.** This is now a fully confirmed, cross-DB-replicated finding, not a hypothesis - the
+isolated-spike-at-one-specific-table-size explanation (a hash-distribution artifact tied to this
+project's fixed workload file's minimizer set at exactly the 2^16 mask width) is the best-supported
+account, and no further real runs are needed to establish the SHAPE of the curve. Iteration 3 has
+everything it needs for a fully evidence-backed H1-H4 verdict.
+
+**Status: size sweep fully complete on all 3 DB regimes. Ready for Iteration 3.**
