@@ -1931,3 +1931,60 @@ this DB's working set plausibly reaches the LLC layer - genuinely open until mor
 
 All three CSVs pulled to `cache_simulation/measurements/` (`cache_size_sweep_8gb16gb_2026-09-15.csv`,
 `hw_assoc_sweep_bigdb_2026-09-15.csv`, `laptop_sweep_2026-09-15.csv`).
+
+---
+
+### 103GB size sweep COMPLETE (6/6) + true-S0 baseline landed - Iteration 2's leading mechanism overturned (`2026-09-15 21:3X`)
+
+**True S0 (`kraken2-src-baseline`, zero `s2_cache` symbols) on 50MB, 10 reads, matched exactly to
+the size sweep's own config:** `23.9M instructions, 14.1M cycles, 1.69 IPC, 35,798 unique cache
+lines`. This is the real comparison Agents A/C flagged as missing in Iteration 2. Against it: every
+software-cache size tested on 50MB (2048/4096/16384: 14.2M cycles, +0.7%; 65536: 15.1M, +7.1%) is at
+best a wash and at worst a real loss - **no size tested beats true S0 on this DB.** This is now a
+direct, matched-config confirmation of H1, not an inference from a mislabeled baseline.
+
+**103GB's full 6-point ladder finished** (`ALL DONE 2026-09-15 21:29:42`) and it overturns
+Iteration 2's leading "linear O(sets x ways) init cost" hypothesis:
+
+| size | cycles_M | l1d_loads | l2_hit_pct |
+|---|---|---|---|
+| 2048 | 15.1 | 6,744,761 | 1.57 |
+| 4096 | 15.1 | 6,744,754 | 1.57 |
+| 16384 | 15.1 | 6,744,614 | 1.56 |
+| 65536 | **16.0** | **7,366,038** | 1.75 |
+| 262144 | 15.1 | 6,744,722 | 1.54 |
+| 1048576 | 15.1 | 6,744,732 | 1.54 |
+
+**Cycles and l1d_loads both REVERT to the flat baseline at 262144 and 1,048,576** - the 65536 point
+is an isolated spike, not a threshold that persists or grows at larger sizes. A linear
+init-cost-proportional-to-capacity mechanism (Iteration 2's leading candidate) predicts monotonic
+growth or at minimum persistence past the onset point - it does not predict a full reversion at 4x
+and 16x past the spike. **The 8GB sweep (peer session, still running) shows the identical shape**:
+flat 27.9M cycles at 2048/4096/16384, spike to 28.6M at 65536 (+2.5%, smaller relative jump than
+50MB/103GB's ~6-7% but same direction), reverting to 27.9M at 262144. Three DBs (50MB was stopped
+before reaching 262144/1048576, tail run launched - see below) now show the same isolated-spike
+shape, two of three (8GB, 103GB) confirmed reverting afterward.
+
+**Revised mechanism position: this looks like a genuine hash-distribution/load-factor artifact
+specific to a table with exactly 65536 buckets, for this specific minimizer set, not a general
+size-cost law.** `S2SetIndex` masks `MurmurHash3(minimizer)` against `(sets - 1)` - every power-of-2
+set count consults a different, non-overlapping window of hash bits, and it is entirely possible for
+one specific window (the bits selected at exactly 2^16) to produce worse-than-average bucket
+occupancy for a specific minimizer sample than either its neighbors (2^14, 2^18) do, by ordinary hash
+variance - MurmurHash3 is not perfectly uniform for every possible mask/input combination, especially
+at modest sample sizes (10-50 reads). This retroactively vindicates Agent B's Iteration-2 skepticism
+("workload/hash-interaction artifact... not a general size-cost law") over Agent D's revised linear
+mechanism - though the fact that it recurs at the SAME size (65536) across three independent DBs with
+different minimizer content is still real and needs an honest account: the shared factor across all
+three runs isn't the DB, it's the MurmurHash3-mixed low bits of whatever minimizers this project's
+fixed 10-read (`tiny_10reads.fastq`) / 50-read workload files contain - the workload is the same
+FASTQ file's minimizers hitting the hash function the same way at the same mask width, regardless of
+which DB's k2d file backs the lookup. **This is now the leading, most parsimonious explanation**:
+a real but narrow, workload-file-specific hash-distribution effect at one particular table size, not
+a property of kraken2's cache design that would recur for other read samples or persist as DB/cache
+sizes scale up.
+
+**Launched a tail run to complete 50MB's ladder** (`run_size_sweep_50mb_tail.sh`, sizes 262144 and
+1,048,576, same binaries/DB/workload as the original 50MB sweep) to check whether 50MB shows the same
+revert-after-spike shape as 103GB/8GB just confirmed - PID 496143, running. This is the last real
+data gap before Iteration 3 can write a fully evidence-backed H1-H4 verdict.
