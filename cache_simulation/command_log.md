@@ -1570,3 +1570,99 @@ This satisfies to-do item 2 below (marked DONE).
    this DB at any tested workload size (10/50/100/500 reads), which mechanistically explains why the
    50MB DB is also where the software cache experiments hurt rather than help - almost nothing ever
    reaches the LLC layer for either kind of cache to act on.
+
+---
+
+### Step 0 (research brief `RESEARCH_PROMPT_optimal_cache_size.md`) - located the sizing code, confirmed rebuild-per-size (`2026-09-15`)
+
+**Why:** the brief's open question is whether SOFTWARE cache SIZE (never independently swept) reveals
+a win/loss pattern different from what associativity alone showed. Before building anything, had to
+confirm whether size is a compile-time constant (needs a rebuild per value) or a runtime flag.
+
+**Found:** `/home/student/chirag_K/tools/kraken2-src-fresh/src/classify.cc` (the same base every
+noatomics-width binary was built from) computes cache size via `S3ComputeNumSets()`
+(lines ~841-853): `raw = floor(S3_LLC_FRACTION x S3_LLC_PER_SOCKET_BYTES / (S2_WAYS x sizeof(S2Entry)
+x T))`, rounded down to the nearest power of 2, clamped to `[S3_MIN_SETS, S3_MAX_SETS]`
+(`4096`-`262144` by default) - all four of those are `static const`, compile-time constants. **No
+CLI flag or env var controls it** - checked `getopt` string (`"h?H:t:o:T:p:R:C:U:O:Q:g:nmzqPSMKD"`)
+and confirmed `-C` is `classified_output_filename`, not cache size; `grep getenv classify.cc` found
+nothing. **Confirms the brief's concern: size requires a real rebuild per value**, same technique
+already proven in `plan_paper/command_log.md` (2026-08-26 size-cliff investigation): sed both
+`S3_MIN_SETS` and `S3_MAX_SETS` to the same target value, so the clamp loop
+(`sets = S3_MIN_SETS; while (sets*2 <= raw && sets*2 <= S3_MAX_SETS) sets *= 2;`) never executes and
+`sets` stays pinned at exactly the target, independent of thread count or the `0.25`-fraction formula.
+
+**Math check before trusting the pin technique:** `sizeof(S2Entry)` = `{uint64_t tag (8B); taxid_t
+taxon}`, and `taxid_t` is `typedef uint64_t taxid_t` (`kraken2_data.h:27`) - so `sizeof(S2Entry) = 16`
+bytes exactly, no padding. At the *default* range and T=1: `raw = floor(0.25 x 110100480 / (4 x 16 x
+1)) = floor(27525120 / 64) = 430080`; the clamp loop from `4096` doubles through `8192, 16384, 32768,
+65536, 131072, 262144` (each `<= 430080` and `<= S3_MAX_SETS=262144`), then stops (`524288 >
+S3_MAX_SETS`) - **confirms the already-built `kraken2-fresh-bin-s2-lru-noatomics-4way` binary is
+already, at T=1, the 262144-set point** by coincidence of the default formula's own clamp. Considered
+reusing that binary for the sweep's 262144 point to save a build, but **decided against it**: that
+binary was built 2026-09-02, and the *current* `kraken2-src-fresh` tree already has the S4.0 hashmix
+fix (`MurmurHash3` bit-mixing in `S2SetIndex`, an 8.9x hit-rate change) baked in - verified via
+`strings ... | grep MurmurHash` that the old binary ALSO already has the hashmix symbol, so it's
+probably fine, but "probably fine" isn't good enough for a paper-facing sweep where every other point
+is freshly built from today's exact source state. **Built all 6 points fresh from the same current
+tree instead**, for guaranteed internal consistency, at the cost of one redundant build.
+
+**Status: Step 0 complete.** Size is a compile-time constant; the pin-both-bounds technique is
+mathematically confirmed to work; proceeding to build.
+
+---
+
+### Size ladder built and verified (`2026-09-15`)
+
+Built 6 real `classify` binaries from `kraken2-src-fresh` (current state: S1+S2 4-way noatomics +
+S3.0/S3.1/S3.2/S3.3 + S4.0 hashmix), each a fresh copy with `S3_MIN_SETS`/`S3_MAX_SETS` both sed'd to
+one target: `2048, 4096, 16384, 65536, 262144, 1048576` (the brief's ladder - default clamp bounds
+plus one point below, one above). Install dirs:
+`kraken2-fresh-bin-s2-lru-noatomics-4way-sizepin-{N}` for each N. All 6 `make`/install runs completed
+clean (`install_kraken2.sh` succeeded, binaries present).
+
+**Correctness verified** the same way every prior binary in this project was checked: ran each
+natively against `~/cache_simulation/workloads/tiny_10reads.fastq` on `sample_targeted` (50MB DB).
+All 6 produced **exactly 7/10 classified**, and a pairwise `diff` of the 2048-set output against
+every other size (4096/16384/65536/262144/1048576) came back **empty** - byte-identical
+classification, as expected (the cache is a pure lookup-path optimization; size cannot change *what*
+gets classified, only how fast). Also diffed against true-no-cache S0 (`kraken2-src-baseline`):
+**empty diff** - matches every earlier correctness check in this project (step 40, step 54, etc.).
+
+**Disk headroom checked before building:** 137G free on `/` - six more ~small source/build trees is
+negligible relative to that.
+
+---
+
+### Size sweep launched (`2026-09-15 20:21 IST`)
+
+Wrote `cache_simulation/scripts/run_size_sweep.sh` (mirrors the exact pattern of
+`run_hw_assoc_sweep.sh`/`run_laptop_sweep.sh`: same `./run-sniper -c address_translation_schemes/baseline
+-c luna -n 1 -d <outdir> -- <classify invocation>` syntax, same log-parsing regexes for
+instructions/cycles/IPC/unique-cache-lines/L1-L2-NUCA hit rates from `sim.stats`, same
+`live_summary.csv` + `progress.log` live-append pattern). 12 runs: 6 sizes x 2 DBs (`sample_targeted`
+50MB, `standard_8gb` 8GB), workload fixed at `tiny_10reads.fastq` (10 reads - the read-count axis is
+already characterized per the brief's methodology, kept fixed and small here so each run stays in the
+1-4 minute range based on prior 10-read timings).
+
+Mirrored to Luna (`~/cache_simulation/run_size_sweep.sh`), launched via `nohup ... & disown` so it
+survives disconnect - **PID 485896** (the wrapper script; the actual `run-sniper`/simulator
+subprocesses spawn under it, first one confirmed live via `ps aux` ~3s after launch, already
+running `size2048_50mb`). Runs alongside the pre-existing, unrelated `run_laptop_sweep.sh` job (PID
+484181, mid-way through its own 8GB/16GB queue) - no interference expected, Luna has 96 real cores and
+every prior parallel-job precedent in this log (steps 42, 44) confirms independent Sniper jobs don't
+meaningfully contend at this scale (the earlier contention bug, step 53, was specifically about
+*wall-clock* timing validity across concurrent jobs, not about correctness or the *cycles* metric -
+cycles stays the trustworthy metric here regardless).
+
+Output: `results_size_sweep/live_summary.csv` (columns: `size,db,instructions_M,cycles_M,ipc,
+unique_cache_lines,l1d_loads,l1d_hit_pct,l2_hit_pct,nuca_hit_pct,elapsed_s,wallclock_s`) and
+`results_size_sweep/progress.log` (timestamped start/done per run). Estimated total time: 12 runs x
+~1-4 min/run (10-read workload precedent) = roughly 15-45 min, though running alongside the other job
+may slow wall-clock (cycles metric unaffected either way). Check progress via:
+```bash
+ssh -i ~/.ssh/luna_claude student@luna.cse.iitd.ac.in "tail -20 ~/cache_simulation/results_size_sweep/progress.log; cat ~/cache_simulation/results_size_sweep/live_summary.csv"
+```
+
+**Status: sweep running, not yet complete.** Next: monitor, merge results into the Iteration
+1 Analyse-phase context, regenerate charts (fig14+) once done.
