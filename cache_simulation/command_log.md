@@ -2197,3 +2197,19 @@ cycles_M here), explicitly name which column a percentage was computed from in t
 itself, not just in a table header - this is exactly the kind of transcription error this
 project's `mtpweek2.md` memory already flagged as a recurring bug class ("mis-derived ratios/
 misattributed numbers, always re-derive from source table").
+
+---
+
+### Hourly brief (`2026-09-15 23:25 IST`): flatl3_comparison + cache_size_sweep(16gb) both DONE
+
+**flatl3_comparison (4/4)**: flat L3 is SLOWER than NUCA on both DBs - 50MB: 24.4M->31.9M cycles
+(+30.7%), 8GB: 51.8M->60.4M cycles (+16.6%). Sanity checked (both IPCs match cycles/instr). Real
+finding: the mesh-slice NUCA model isn't just "more realistic," it's meaningfully faster in this
+sim than a naive flat bank - plausibly because the flat model's much larger set count (114,688 vs
+NUCA's 1,200/slice) changes tag-lookup/collision behavior, not just latency. Closes to-do item 1.
+
+**cache_size_sweep (16GB, 6/6)**: complete, not yet cross-checked for the 65536 anomaly on this 3rd
+DB size within the 8GB/16GB pair - next check should confirm/refute it there too.
+
+**Still running**: `hw_assoc_sweep_bigdb` 8/12 (on 16gb/assoc4). `laptop_sweep` 17/32 (on slow
+100-read/8gb tier, expected ~4-5hrs for this row).
