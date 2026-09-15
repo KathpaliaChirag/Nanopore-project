@@ -1804,3 +1804,96 @@ validity across batches, not cycles); wall-clock timings from this run should no
 cross-batch against earlier sequential runs, per the established discipline.
 
 **Status: 50MB portion of the size sweep is done (4/6 points, by design). 103GB portion running.**
+
+---
+
+### Iteration 2 (Analyse -> Plan -> Discuss) - conclusion (`2026-09-15 21:1X`)
+
+Same 5-agent structure as Iteration 1, this time working against REAL landed data (not just
+extrapolation from prior sweeps): 4 points on 50MB (2048/4096/16384/65536), 4 points on 103GB (same
+sizes, 65536 landed mid-iteration), 3 points on 8GB (peer's sweep, stopped at 16384 as of this
+writing). Each agent was given the same real CSV rows plus Iteration 1's conclusion and told to
+independently re-check/revise their own prior Iteration-1 position against the real numbers.
+
+**The headline real finding, confirmed by 3 of 5 agents independently:** cycles are FLAT (identical
+to 1 decimal) from 2048 through 16384 sets on every DB tested, then jump at 65536 - **and the jump
+recurs at the exact same absolute set count on both 50MB (14.2->15.1M cycles, +6.3%) and 103GB
+(15.1->16.0M cycles, +6.0%)**, two DBs 2000x apart in size, with l1d_loads jumping by a similar
+absolute magnitude on both (+660,776 on 50MB, +621,424 on 103GB). This is strong, DB-independent
+evidence that whatever's happening at 65536 is a property of the S2 cache's own pinned array size
+(65536 x 4 ways x 16 bytes = 4,194,304 bytes = 4MB), not of the underlying database.
+
+**Mechanism, resolved further than Iteration 1 left it:** three candidate explanations were live
+going into this iteration (Agent D's original per-thread S3.3-style cliff; Agent E's original
+gradual-growth; a new hardware-boundary theory from Agent A that the 4MB array crosses Luna's real
+2MB private L2). All three took real damage from the data:
+- **Agent D's original cliff-near-1,048,576 prediction is wrong on location** (the real onset is
+  65536, four ladder-steps early) **and wrong on cited mechanism** (S3.3's per-thread multiplication
+  can't apply at T=1, which every run in this sweep uses) - Agent D explicitly retracted it.
+- **Agent E's original "gradual growth" is refuted outright** by the flat 2048->16384 region - there
+  is no gradual per-step cost at any point in this data. Agent E, re-examining the associativity/width
+  CSVs it had originally cited as "gradual," found width is ALSO flat-then-step (1-way->4-way is flat
+  or slightly negative; the real jump is 4-way->8-way), not smooth as characterized in Iteration 1 -
+  a real self-correction, not just data catching the prediction out.
+- **Agent A's L2-boundary theory (4MB array vs. Luna's 2MB private L2) is mechanistically clean but
+  empirically wrong**, per Agent D's direct measurement: a real hardware-boundary/latency effect
+  should show IPC DROPPING at the jump (more stall cycles per instruction). The data shows the
+  OPPOSITE - IPC rises at 65536 on both DBs (50MB: 1.78->1.84; 103GB: 1.68->1.74). Agent D also
+  directly grepped `sim.stats` for `size16384_50mb` vs `size65536_50mb` and found the page-table-walk
+  and DRAM-read counter deltas (1,088 and 1,387 respectively) are three orders of magnitude too small
+  to explain the 660,776-load jump - ruling out TLB-reach and page-walk artifacts by direct
+  measurement, not guesswork.
+
+**Leading mechanism after Discuss (not yet fully confirmed, but the best-supported candidate):**
+Agent D's revised proposal - a linear, one-time O(sets x ways) initialization/bookkeeping cost
+(e.g. an explicit per-slot sentinel write, or some other linear pass over the newly-allocated array)
+that scales with total entry count, not DB size and not thread count. This explains every constraint
+the data imposes at once: (1) same absolute onset regardless of DB (it's a property of the array,
+matching Agents A/C/D's cross-DB observation), (2) IPC flat-or-rising rather than falling (it's
+throughput work, not a latency stall, matching Agent D's own sim.stats check and independently
+Agent B's observation that "more instructions/loads with flat-to-better IPC" is the signature of
+doing more real work, not the same work stalling harder), (3) Agent B's original "hash-collision
+artifact specific to this one sample" concern is substantially weakened (not eliminated) by the
+cross-DB recurrence at 103GB, since an artifact of one specific minimizer sample shouldn't
+reappear at the identical absolute threshold against a completely different DB's completely
+different minimizer distribution.
+
+**Real gap found and filled this iteration:** Agent A and Agent C both independently discovered that
+no genuine true-S0 (no-cache) baseline exists anywhere in this project's logged data for the EXACT
+config this size sweep uses (10 reads, `sample_targeted`, `luna.cfg`) - the closest candidate
+(`associativity_sweep_2026-09-08_summary.csv`'s `baseline` row) is the same mislabeled binary flagged
+back in step 40 (has `s2_cache` compiled in, not true no-cache). This is a real, fillable, cheap gap
+- the coordinating session ran it directly rather than deferring: `kraken2-src-baseline` (source-grep
+and `strings`-confirmed zero `s2_cache` symbols) against the same 10-read/`sample_targeted` config,
+launched on Luna (`results_size_sweep/S0_50mb`), in progress as of this entry - see next entry for
+the result once it lands.
+
+**H1 (small-DB structural loss):** every software-cache size tested on 50MB (14.2-15.1M cycles) is
+close to but has not yet been directly compared against a genuine matched-config S0 number - that
+comparison is the very next thing this log will report. Provisionally, Agent A's argument (using the
+best available, if imperfectly-matched, prior data) that the cache loses at every size and the
+margin WORSENS at 65536 rather than improving is the strongest evidence so far for H1 leaning
+confirmed - but per Agent C's explicit caution, this should not be called fully confirmed until the
+matched S0 number lands.
+
+**H2 (large-DB plateau/reversal):** still open - 103GB's 65536 point shows a COST increase (not
+further speedup) relative to smaller sizes within the software-cache-only comparison, consistent
+with the same linear-init mechanism rather than a size-driven improvement. Whether this holds through
+262144/1,048,576 (still queued on 103GB) or whether hit-rate gains eventually outrun the linear cost
+at larger sizes remains the single biggest open question for Iteration 3.
+
+**H3 (absolute vs. fractional optimum):** this iteration produced the sharpest evidence yet, and it
+points toward REFUTED (absolute count, not DB fraction) - three DBs spanning a 2000x size range
+(50MB/103GB directly measured, 8GB pending its own 65536 point) show the transition at the identical
+absolute set count, not a size scaled to each DB. If 8GB's 65536 point (still queued in the peer's
+sweep) confirms the same ~6% jump at the same point, H3-refuted becomes a 3-for-3 finding.
+
+**Iteration 2 conclusion, carried into Iteration 3:** (1) get the true-S0 comparison landed and
+state H1 with real numbers, not inference; (2) get 8GB's 65536 point and 103GB's 262144/1,048,576
+points to complete the mechanism/H2/H3 picture; (3) Iteration 3's H4 verdict should explicitly state
+that this project's own real-hardware S3.3 cliff mechanism (per-thread allocation multiplication)
+has now been actively RULED OUT as the explanation for what this sweep found at T=1 - a different,
+DB-independent, throughput-bound linear-initialization mechanism is the current best account, and
+this distinction matters for whether kraken2's real multi-threaded default formula should change
+(the fix, if any, would need to address a fixed initialization tax per rebuild-time size choice, not
+a per-thread-scaling problem).
