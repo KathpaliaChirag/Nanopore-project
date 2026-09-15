@@ -2275,3 +2275,11 @@ fully reversed by 100 reads - mirroring exactly what the small-DB job already sh
 2000 reads. This strongly suggests the large-DB speedup is ALSO a small-workload artifact, not a
 durable property of big databases - the 500-read tier (next up) will be the real confirmation.
 laptop_sweep now on 100-read/16gb/S0.
+
+---
+
+### Hourly brief (`2026-09-16 08:19 IST`)
+
+**laptop_sweep**: 22/32. 100-read/16gb/S0 baseline = 1048.6M cycles (sanity: 1048.6/1575.6=0.6656 ->
+IPC=1.50, matches). This is just the no-cache baseline - need the 1way/4way/8way rows (1way running
+now) to see if 16GB repeats 8GB's full reversal.
