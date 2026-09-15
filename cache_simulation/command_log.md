@@ -2213,3 +2213,14 @@ DB size within the 8GB/16GB pair - next check should confirm/refute it there too
 
 **Still running**: `hw_assoc_sweep_bigdb` 8/12 (on 16gb/assoc4). `laptop_sweep` 17/32 (on slow
 100-read/8gb tier, expected ~4-5hrs for this row).
+
+---
+
+### Hourly brief (`2026-09-16 00:22 IST`)
+
+**hw_assoc_sweep_bigdb**: 11/12 done (last row running). Null result HOLDS on big DBs too - 8GB
+cycles flat 51.7-51.8M across all associativities, 16GB flat at 60.7M exactly. Hardware associativity
+alone doesn't matter on 8GB/16GB either, same as the original 50MB null.
+
+**laptop_sweep**: still 17/32, same row (100-read/8gb/S0) as last check - this run is long
+(~4-5hr estimate), no new completion yet.
