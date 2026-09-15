@@ -2020,3 +2020,43 @@ account, and no further real runs are needed to establish the SHAPE of the curve
 everything it needs for a fully evidence-backed H1-H4 verdict.
 
 **Status: size sweep fully complete on all 3 DB regimes. Ready for Iteration 3.**
+
+---
+
+### 8GB size sweep COMPLETE (6/6) - confirms the size=65536 anomaly on a 2nd DB (`2026-09-15 21:49 IST`)
+
+This session's `cache_size_sweep` finished all 6 sizes on the 8GB DB. Combined with the peer
+session's now-also-complete 103GB sweep, the size=65536 spike the peer flagged in Iteration 2 is
+confirmed on a SECOND, very differently-sized database - it is an isolated point anomaly, not a
+trend, on both:
+
+| DB | 2048/4096/16384 | **65536** | 262144/1048576 |
+|---|---|---|---|
+| 8GB | 52.1M instr / 27.9M cycles (flat) | **54.4M instr / 28.6M cycles (+4.4%)** | back to 52.1M / 27.9M |
+| 103GB | 25.4M instr / 15.1M cycles (flat) | **28.0M instr / 16.0M cycles (+10.2%)** | back to 25.4M / 15.1M |
+
+Sanity checks: 8GB/65536: 28.6/54.4=0.5257 -> IPC=1.902, matches reported 1.90. 103GB/65536:
+16.0/28.0=0.5714 -> IPC=1.750, matches reported 1.74 (rounding). Both internally consistent - this
+is a real simulated effect (cycles move, not just wallclock), not a logging artifact.
+
+**This satisfies H3's outstanding requirement from Iteration 2** ("if 8GB's 65536 point confirms
+the same jump at the same point, H3-refuted becomes a 3-for-3 finding") - the spike sits at the
+identical ABSOLUTE entry count (65536 = 2^16) on both DBs despite a ~13x difference in DB size,
+strong evidence this is an absolute-count effect (H3 refuted: the anomaly is NOT scaled to DB size)
+rather than something DB-size-relative. Magnitude does scale with DB size though (4.4% on 8GB vs.
+10.2% on 103GB) - worth noting as a nuance for whoever writes the final H3 verdict: the TRIGGER point
+is absolute, but the SEVERITY may still be DB-size-dependent.
+
+Leading hypothesis (not yet confirmed): 65536 = 2^16 is a suspicious round number to spike at
+specifically - possibly a hash-table internal representation boundary (e.g. a 16-bit index/counter
+type overflowing or changing behavior exactly at this size), a load-factor/rehash threshold
+coinciding with this entry count, or a build-specific quirk in that one sizepin binary's compilation.
+Whoever picks this up next should check `kraken2-src-sizepin-65536`'s build log/diff against its
+neighbors (`16384`, `262144`) for anything size-specific in the generated code, not just the size
+constant itself.
+
+Notified the peer session (`nanopore-project-c1`) of this confirmation since it completes their
+Iteration 2 evidence request. Both size sweeps (8GB+16GB mine, 103GB theirs) have now fully covered
+the size axis on every big DB planned so far. `hw_assoc_sweep_bigdb` (this session) is 2/12 in
+(assoc=1: 51.8M cycles, assoc=4: 51.7M cycles - nearly flat so far, too early to call). `laptop_sweep`
+is 16/32.
