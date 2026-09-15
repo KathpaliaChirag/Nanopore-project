@@ -2233,3 +2233,12 @@ Final row (16gb/assoc30) confirms: 16GB cycles flat at 60.7M across ALL six asso
 (1/4/8/15/16/30-way). 8GB likewise flat 51.7-51.8M. **Verdict: hardware associativity null result
 holds on 8GB and 16GB, same as the original 50MB finding** - associativity alone doesn't move
 performance at any DB size tested in this project so far.
+
+---
+
+### Hourly brief (`2026-09-16 01:22 IST`)
+
+hw_assoc_sweep_bigdb: already complete (logged prior entry) - null holds on 8GB/16GB.
+
+**laptop_sweep**: 18/32. New row: 100-read/8gb/S0 = 813.6M cycles (sanity: 813.6/1392.2=0.5844 ->
+IPC=1.71, matches). Now on 100-read/8gb/1way. Still in the slow tier.
