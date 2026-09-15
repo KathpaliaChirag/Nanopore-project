@@ -2251,3 +2251,15 @@ IPC=1.71, matches). Now on 100-read/8gb/1way. Still in the slow tier.
 IPC=1.68, matches). Notable: 1way is now SLOWER than S0 (813.6M) at this scale - 1.056x, first
 sign the cache's big win at 10/50 reads may not hold as read count grows further, worth watching
 closely through 4way/8way and the 500-read tier. Now on 100-read/8gb/4way.
+
+---
+
+### Hourly brief (`2026-09-16 04:34 IST`) - 4-way also flips to slower at 100 reads/8GB
+
+**laptop_sweep**: 20/32. New row: 100-read/8gb/4way = 839.1M cycles (sanity: 839.1/1453.0=0.5775 ->
+IPC=1.73, matches). **4-way is now ALSO slower than S0 (813.6M)** - 1.031x (+3.1%), following 1-way's
++5.6%. This matters because 4-way was the best/winning width everywhere else in this project (small
+DB, large DB, every prior scale). At 100 reads on the 8GB DB, EVERY width tested so far loses to no
+cache - the large-DB win from 10/50 reads has fully reversed by 100 reads, mirroring what happened on
+the small DB between 50 and 2000 reads. Now on 100-read/8gb/8way - expect the same pattern to hold,
+watching to confirm.
