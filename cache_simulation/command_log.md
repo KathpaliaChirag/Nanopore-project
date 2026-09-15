@@ -1762,3 +1762,45 @@ pre-decided by the hw_assoc null, per Agent C's catch). H2 leans toward "non-mon
 TBD" using existing DB-size-axis evidence as a proxy, to be replaced by real cache-size-axis
 evidence in Iteration 2. H3 and H4 remain open with explicit scoping caveats attached, carried
 forward as-is.
+
+---
+
+### Size sweep redirected mid-run: 50MB queue stopped, retargeted to pluspf_103gb (`2026-09-15 20:44`)
+
+**Why:** a peer Claude session working this same repo relayed CK's explicit instruction (given in
+that other session): stop queuing more 50MB (`sample_targeted`) size-sweep runs - that DB is already
+established (hw_assoc_sweep, every prior associativity/read-count sweep) to structurally never
+benefit from any software cache regardless of organization, so further size points there add
+confirmation, not new signal. The peer's own equivalent script had already been redirected to cover
+`standard_8gb` + `standard_16gb` concurrently - to avoid duplicating that coverage, this session
+retargeted its own sweep to the one DB regime neither covers: `pluspf_103gb` (104GB).
+
+**What happened operationally:** `run_size_sweep.sh` (PID 485896) had completed 4 of its planned 6
+50MB points (2048/4096/16384/65536, all recorded in `results_size_sweep/live_summary.csv`) and had
+just started `262144/50mb` when the redirect decision landed. Attempting to stop it hit a real,
+instructive bug: `pkill -f "run_size_sweep.sh"` run over SSH matches against full command lines,
+and the remote shell invocation *of that very SSH command* contains the literal substring
+"run_size_sweep.sh" - so the kill command killed its own remote shell (and, as a side effect, the
+wrapper's parent process group), dropping the SSH connection with exit 255 and orphaning the
+in-flight `262144/50mb` run's child processes. Diagnosed via reconnecting and checking `ps`/exit
+codes directly rather than guessing - confirmed the orphaned run-sniper/record-trace processes had
+also died (no separate `nohup`/`disown` of their own, only the wrapper had it) rather than
+completing, so `262144` and `1048576` on 50MB were never produced and don't appear in the CSV. Net
+effect: **the 50MB portion stops cleanly at 4 real points (2048/4096/16384/65536)** - not the full
+6-point ladder, but enough to see the shape of the curve where it's already expected to be flat/null
+(per Iteration 1's synthesis), and no runs were left dangling or half-written.
+
+**New script:** `cache_simulation/scripts/run_size_sweep_103gb.sh` - identical structure/binaries/
+workload (`tiny_10reads.fastq`, same 6 pinned 4-way binaries, same `luna.cfg`, same
+`live_summary.csv`/`progress.log` schema) as `run_size_sweep.sh`, DB fixed to `pluspf_103gb`. Full
+6-point ladder queued (2048/4096/16384/65536/262144/1048576), since 103GB is a regime where the
+default-size cache already shows the largest measured win (1.97x) and where H2's plateau/reversal
+question matters most. Mirrored to Luna, launched via `nohup`+`disown` (PID `490326`), confirmed live
+~1s after launch on `size2048_103gb`. Output: `results_size_sweep_103gb/{live_summary.csv,
+progress.log}`. Running alongside 3 other concurrent Sniper jobs on Luna now (peer's 8GB/16GB size
+sweep, the pre-existing `run_laptop_sweep.sh`) - correctness/cycles unaffected by concurrency per
+every prior precedent in this log (step 53's contention bug was specifically about wall-clock
+validity across batches, not cycles); wall-clock timings from this run should not be compared
+cross-batch against earlier sequential runs, per the established discipline.
+
+**Status: 50MB portion of the size sweep is done (4/6 points, by design). 103GB portion running.**
