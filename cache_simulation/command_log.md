@@ -2263,3 +2263,15 @@ DB, large DB, every prior scale). At 100 reads on the 8GB DB, EVERY width tested
 cache - the large-DB win from 10/50 reads has fully reversed by 100 reads, mirroring what happened on
 the small DB between 50 and 2000 reads. Now on 100-read/8gb/8way - expect the same pattern to hold,
 watching to confirm.
+
+---
+
+### FULL REVERSAL CONFIRMED at 100 reads/8GB (`2026-09-16 06:10 IST`)
+
+8-way lands at 859.4M cycles (sanity: 859.4/1460.5=0.5884 -> IPC=1.70, matches) - also slower than
+S0 (813.6M), +5.6%. **All three cache widths now lose to no-cache at 100 reads/8GB**: 1way +5.6%,
+4way +3.1%, 8way +5.6%. The large-DB win seen at 10 reads (up to 3.59x) and 50 reads (~2x) has
+fully reversed by 100 reads - mirroring exactly what the small-DB job already showed between 50 and
+2000 reads. This strongly suggests the large-DB speedup is ALSO a small-workload artifact, not a
+durable property of big databases - the 500-read tier (next up) will be the real confirmation.
+laptop_sweep now on 100-read/16gb/S0.
