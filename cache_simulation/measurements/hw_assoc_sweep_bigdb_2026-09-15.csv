@@ -1,0 +1,2 @@
+db,associativity,sets,instructions_M,cycles_M,ipc,unique_cache_lines,l1d_loads,l1d_hit_pct,l2_hit_pct,nuca_hit_pct,elapsed_s,wallclock_s
+8gb,1,18000,68.1,51.8,1.32,186524,13969748,98.86,.65,.0064,1394.64,1395

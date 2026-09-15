@@ -1897,3 +1897,37 @@ DB-independent, throughput-bound linear-initialization mechanism is the current 
 this distinction matters for whether kraken2's real multi-threaded default formula should change
 (the fix, if any, would need to address a fixed initialization tax per rebuild-time size choice, not
 a per-thread-scaling problem).
+
+---
+
+### This session's parallel jobs - progress check (`2026-09-15 21:17 IST`)
+
+Three jobs owned by this session, running in parallel with the peer session's `run_size_sweep_103gb`:
+
+**`cache_size_sweep` (8GB+16GB, size axis, 4-way fixed)** - 3 of 12 rows in on 8GB:
+
+| size | cycles_M | ipc | unique_cache_lines | l2_hit_pct |
+|---|---|---|---|---|
+| 2048 | 27.9 | 1.87 | 53,769 | 0.90 |
+| 4096 | 27.9 | 1.87 | 54,949 | 0.90 |
+| 16384 | 27.9 | 1.87 | 56,942 | 0.89 |
+
+Sanity check (16384): 27.9/52.1=0.5355 cycles/instr -> IPC=1.867, matches reported 1.87. Cycles are
+completely FLAT across these first 3 sizes despite `unique_cache_lines` climbing (the cache is
+genuinely holding more distinct entries as it grows) - consistent with the peer's Iteration 1/2
+finding that small-to-mid sizes don't move cycles on the 8GB DB either; watching for whether the same
+~6% jump the peer found at 65536 on 103GB also appears here once 8GB's own 65536 row lands (still
+running as of this check).
+
+**`hw_assoc_sweep_bigdb` (8GB+16GB, hardware-only associativity, S0/no software cache)** - 1 of 12
+rows in: assoc=1 (18000 sets) on 8GB -> 51.8M cycles, 1.32 IPC (sanity: 51.8/68.1=0.7606 ->
+IPC=1.315, matches). `instructions_M`=68.1 exactly matches the historical `desktop,8gb,S0` row from
+`hwsize_comparison_2026-09-09.csv` - expected, since instruction count comes from the trace and is
+hardware-config-independent. Too early to say whether associativity matters on this DB (only 1 of 6
+associativities done); the 50MB DB's null result does NOT necessarily carry over here, since more of
+this DB's working set plausibly reaches the LLC layer - genuinely open until more rows land.
+
+**`laptop_sweep`** - 13/32 rows done, now on `50 reads/16GB/S0`. On schedule, no anomalies.
+
+All three CSVs pulled to `cache_simulation/measurements/` (`cache_size_sweep_8gb16gb_2026-09-15.csv`,
+`hw_assoc_sweep_bigdb_2026-09-15.csv`, `laptop_sweep_2026-09-15.csv`).
