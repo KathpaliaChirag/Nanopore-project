@@ -2224,3 +2224,12 @@ alone doesn't matter on 8GB/16GB either, same as the original 50MB null.
 
 **laptop_sweep**: still 17/32, same row (100-read/8gb/S0) as last check - this run is long
 (~4-5hr estimate), no new completion yet.
+
+---
+
+### hw_assoc_sweep_bigdb COMPLETE (12/12) (`2026-09-16 00:32 IST`)
+
+Final row (16gb/assoc30) confirms: 16GB cycles flat at 60.7M across ALL six associativities
+(1/4/8/15/16/30-way). 8GB likewise flat 51.7-51.8M. **Verdict: hardware associativity null result
+holds on 8GB and 16GB, same as the original 50MB finding** - associativity alone doesn't move
+performance at any DB size tested in this project so far.
