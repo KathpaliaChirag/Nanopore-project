@@ -1666,3 +1666,99 @@ ssh -i ~/.ssh/luna_claude student@luna.cse.iitd.ac.in "tail -20 ~/cache_simulati
 
 **Status: sweep running, not yet complete.** Next: monitor, merge results into the Iteration
 1 Analyse-phase context, regenerate charts (fig14+) once done.
+
+---
+
+### Iteration 1 (Analyse -> Plan -> Discuss) - conclusion (`2026-09-15`)
+
+5 independent agents (A-E) read the brief + `command_log.md` + all 5 CSVs + the scripts/configs,
+each took an independent first-pass position on H1-H4 before any cross-talk, then drafted an
+iteration-1 plan, then were put in Discuss together. Full per-agent Analyse/Plan text is not
+reproduced here (available in this session's transcript) - this entry is the Discuss-phase
+synthesis: where they agreed, where they genuinely disagreed, and what iteration 2 inherits.
+
+**Convergence (4-5 of 5 agents independently landed here):**
+- H1 (small-DB loss is structural): all 5 lean "likely holds," none claim it's proven - correctly,
+  since no agent's evidence actually varied SOFTWARE cache size on the 50MB DB before this
+  synthesis. The shared reasoning is the hw_assoc NULL result (findings 1/2) plus the fact that
+  L2/LLC hit rates stay under ~1-2% at every tested associativity/read-count on this DB.
+- H2 (large-DB win plateaus/reverses, not monotonic): all 5 lean toward refuted-as-monotonic,
+  citing the already-logged 103GB dip below 16GB (1.97x vs 2.05x, `final_fair_batch`) even at the
+  DEFAULT cache size, before capacity is touched at all - i.e. there's already a non-monotonicity
+  signal in existing data, just along the DB-size axis rather than the cache-size axis.
+
+**The most important catch, surfaced by Agent C, that the other 4 agents did not flag on their
+own:** it is a live methodological risk to treat the hw_assoc_sweep NULL result (fig12/13) as
+dispositive evidence against a SOFTWARE size win on the 50MB DB. Hardware LLC associativity and a
+software S2 lookup cache intercept at genuinely different points in the pipeline - the hardware
+LLC only gets consulted on an L1 miss for whatever physical address the raw hash-table probe
+touches, while the S2 cache sits BEFORE that probe and intercepts by minimizer identity, not
+address. A workload that never pushes traffic past L1 tells you hardware associativity is moot: it
+says nothing directly about whether repeat MINIMIZER lookups exist for an identity-keyed structure
+to catch, since that's a question about logical reuse in the access pattern, not physical cache
+residency. **Verdict: H1 stays a genuinely open, not a foregone, conclusion until the real
+size-ladder data lands on sample_targeted** - the group explicitly declines to let the hw_assoc
+null pre-decide it.
+
+**The sharpest real disagreement, between Agent D and Agent E, carried forward as the specific
+thing Iteration 2 must resolve with real data:** what mechanism would drive a "size costs more
+than it helps" reversal (the thing H2 predicts), and does it look like width's reversal did?
+- **Agent E's position:** size and width are effectively the same dial - both grow the amount of
+  cache structure/metadata touched per operation, so a size sweep should reproduce the same
+  gradual, monotonic-with-scale cost curve already seen going 4-way -> 8-way -> 16-way (instructions
+  and unique_cache_lines climbing steadily, IPC flat, cycles worsening in step).
+- **Agent D's position, mechanistically sharper:** in a fixed-4-way set-associative cache, a
+  lookup only ever scans the 4 ways of ONE set - growing the total set count (S3_MIN_SETS/MAX_SETS,
+  what this sweep actually varies) does NOT increase per-lookup comparison work the way growing
+  WAYS did. So size's cost, if any, should come from a structurally different source: allocation /
+  first-touch / page-fault cost of a much bigger `calloc`'d array, which the log's own S3.3 section
+  already identified as a real, separate failure mode on real hardware (`>=1,048,576`-set slowdown
+  cliff, 22x, driven by PER-THREAD memory multiplication) - a CLIFF at a specific large size, not a
+  gradual climb.
+- **Why this matters for what the data should look like:** if E is right, cycles-vs-size should
+  rise smoothly across the whole ladder, same shape as the width curve. If D is right, cycles-vs-size
+  should stay roughly FLAT from 2048 through 262144 (no extra per-lookup cost, only one set's 4 ways
+  ever get scanned regardless of table size) and only jump sharply at/near 1,048,576 (the allocation
+  cliff). One important caveat the group flagged explicitly: D's cited real-hardware cliff mechanism
+  was measured under many-thread contention (96 threads x per-thread multiplication); every Sniper
+  run in this sweep is `-n 1`/`-p 1` (T=1) - so even if a cliff exists at T=1, the underlying cost
+  driver may be pure first-touch/page-fault latency for one large allocation, not the
+  thread-multiplied blowup the real-hardware finding described. The two mechanisms could still
+  produce a similarly-shaped cliff at a similar size, or could diverge - genuinely unresolved,
+  Iteration 2's first job is to check the ACTUAL SHAPE of the curve (flat-then-cliff vs. gradual
+  climb), not just compare endpoints.
+
+**H3 (absolute vs. fractional optimum):** no agent had real cross-DB size data; two (A, E)
+independently offered the same weak prior (footprint/cache_lines touched at 4-way stays in a
+similar order of magnitude across 8GB/16GB/103GB in the existing default-size data, suggesting the
+"useful working set" a cache can capture may be bounded by workload/read characteristics more than
+DB size) - both explicitly flagged this as their shakiest, least-evidenced position. Carried
+forward as a weak lean toward H3 refuted (near-constant absolute optimum), to be tested for real
+once the 50MB and 8GB size-sweep rows can be compared directly.
+
+**H4, the sharpest scoping catch, from Agent D:** the real-hardware null (commit `84436dd`,
+`f=0.25` clamped `[4096,262144]`, "<2% hit rate regardless of implementation") and this project's
+Sniper sweeps may not be adjudicating the same claim. Three concrete incompatibilities: (1) the
+real-hardware result spans 6 THREAD COUNTS with one SHARED cache under contention; every Sniper run
+here is single-threaded, no contention - not the same regime. (2) the wallclock-vs-cycles metric
+discipline (this log's own step 60 correction) was locked down AFTER that Aug 2026 real-hardware
+work; unclear if it used comparable rigor. (3) the real-hardware null is a uniform "<2% everywhere"
+claim across multiple DB sizes, stronger and broader than anything the DB-size-dependent Sniper
+data has shown. **Group conclusion: Iteration 3's H4 verdict must be explicitly SCOPED** - a
+single-thread, capacity-varied Sniper finding can support or complicate H4 for that regime, but
+cannot by itself confirm or refute the real-hardware multi-thread null. State both regimes'
+findings side by side at the end rather than collapsing them into one verdict.
+
+**Iteration 1 conclusion (per the brief's requirement that each iteration end in something
+decided, not "more research needed"):** the group adopts the size-ladder-x-2-DB Sniper sweep already
+launched (see above) as satisfying Iteration 1's Plan phase exactly - no agent's proposed plan
+materially diverged from what the fork was already executing, only emphasis differed. The one
+substantive addition Discuss produced beyond the launched sweep: **Iteration 2 must read the SHAPE
+of the cycles-vs-size curve on both DBs (flat-then-cliff vs. gradual climb), not just the
+2048-vs-1048576 endpoints**, to adjudicate the D-vs-E mechanism disagreement - this determines how
+the eventual fig14 chart should be built (log-x with attention to a possible discontinuity, not a
+simple two-point bar comparison). H1 remains open pending real 50MB size data (explicitly NOT
+pre-decided by the hw_assoc null, per Agent C's catch). H2 leans toward "non-monotonic, mechanism
+TBD" using existing DB-size-axis evidence as a proxy, to be replaced by real cache-size-axis
+evidence in Iteration 2. H3 and H4 remain open with explicit scoping caveats attached, carried
+forward as-is.
