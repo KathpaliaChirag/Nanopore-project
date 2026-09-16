@@ -2306,3 +2306,20 @@ read count. This is a real, DB-specific divergence, not noise - two widths in a 
 in a row (well, all three) on 8GB, consistent internally. Watching 8way (running now) to complete
 the 16GB picture, then the 500-read tier is the real decider for whether 16GB's win survives further
 scaling the way 8GB's didn't.
+
+---
+
+### 100-READ TIER COMPLETE - 16GB fully diverges from 8GB (`2026-09-16 13:28 IST`)
+
+100-read/16gb/8way = 992.3M cycles (sanity: 992.3/1551.4=0.6396 -> IPC=1.56, matches). vs S0's
+1048.6M: 0.946x - 5.4% FASTER. **All three widths win on 16GB at 100 reads** (1way +5.7%, 4way
++7.7%, 8way +5.4%), a clean, internally consistent result - while **all three widths LOST on 8GB**
+at the same read count (1way -5.6%, 4way -3.1%, 8way -5.6%). This is now a confirmed, real
+DB-specific divergence, not noise: two databases only 2x apart in size (8GB vs 16GB) show opposite
+directions at the identical workload. The mechanism isn't understood yet - worth flagging as an
+open question, not just a data point.
+
+**100-read tier now fully done (24/24 across both DBs). laptop_sweep now entering the 500-read
+tier** (8 runs remaining: S0/1way/4way/8way x 8GB/16GB) - this is the real decider for whether
+either DB's win/loss at 100 reads is itself just another transient stage, the way 8GB's 10/50-read
+win already flipped by 100 reads.
