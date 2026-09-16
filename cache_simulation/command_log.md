@@ -2294,3 +2294,15 @@ at the same read count, where 1-way lost by 5.6%. So the reversal is NOT a clean
 count alone - it's DB-specific too, at least at 100 reads. Need 4way/8way on 16GB to see if this
 holds or if 16GB's story is genuinely different from 8GB's at this scale. laptop_sweep now on
 100-read/16gb/4way.
+
+---
+
+### 16GB continues to win at 100 reads - confirms DB-specific divergence from 8GB (`2026-09-16 11:44 IST`)
+
+100-read/16gb/4way = 968.2M cycles (sanity: 968.2/1536.6=0.6300 -> IPC=1.59, matches). vs S0's
+1048.6M: **0.923x - 4-way is 7.7% FASTER**, an even bigger win than 1-way's 5.7%. 16GB now has TWO
+widths (1way, 4way) both still winning at 100 reads, while 8GB had ALL THREE widths lose at the same
+read count. This is a real, DB-specific divergence, not noise - two widths in a row on 16GB, two
+in a row (well, all three) on 8GB, consistent internally. Watching 8way (running now) to complete
+the 16GB picture, then the 500-read tier is the real decider for whether 16GB's win survives further
+scaling the way 8GB's didn't.
