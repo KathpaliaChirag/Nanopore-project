@@ -2323,3 +2323,11 @@ open question, not just a data point.
 tier** (8 runs remaining: S0/1way/4way/8way x 8GB/16GB) - this is the real decider for whether
 either DB's win/loss at 100 reads is itself just another transient stage, the way 8GB's 10/50-read
 win already flipped by 100 reads.
+
+---
+
+### Hourly brief (`2026-09-16 22:21 IST`)
+
+**laptop_sweep**: 26/32. 500-read/8gb/S0 baseline = 3946.5M cycles (sanity: 3946.5/7043.1=0.5604 ->
+IPC=1.78, matches; took 31964s/~8.9hrs). Baseline only - need 1way/4way/8way (1way running now) to
+see if 8GB's reversal continues, reverts, or does something new at 500 reads.
