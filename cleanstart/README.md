@@ -10,7 +10,7 @@ what hardware cache (L1d / L2 / L3 size and associativity) is best for running k
 ## fixed rules
 
 - binary: S0 only (`kraken2-src-baseline`, no software cache). the software cache is out of scope here.
-- reads: `~/chirag_K/data/basecalled/sup/FBE01990_24778b97_03e50f91_10.fastq` (104,980 reads, 723 MB, dorado sup basecall, already on Luna, no new basecalling needed). each simulator run uses a fixed slice of it (N reads, N still to decide, 104K is far too many for detailed mode).
+- reads: `~/chirag_K/data/basecalled/sup/FBE01990_24778b97_03e50f91_10.fastq` (104,980 reads, 723 MB, dorado sup basecall, already on Luna, no new basecalling needed). each simulator run uses a nested-prefix slice of it: 10, 50 or 100 reads (`~/cleanstart/workloads/reads_{10,50,100}.fastq`).
 - databases (3, one at a time): 50 MB = `sample_targeted`, 8 GB = `standard_8gb`, 16 GB = `standard_16gb`, all under `~/chirag_K/AccuracyDrift/databases/`.
 - simulator: Sniper, detailed mode (no `--fast-forward`), `-n 1`.
 - change exactly one hardware knob per run (L3 size, then L2, L1d, associativity). everything else stays fixed.
