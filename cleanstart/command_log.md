@@ -113,3 +113,15 @@ CK asked: (a) keep L3 size the same when cores change, (b) model instruction cac
 ### [6] 2026-09-19 - L4 dropped
 
 CK: there is no L4, it was only an example. removed `_L4none` from the config name in `run_one.sh` and the README. baseline name is now `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`. no results existed under the old name.
+
+---
+
+### [7] 2026-09-19 23:04 IST - baseline queue launched (27 runs)
+
+```bash
+ssh ... 'nohup setsid bash ~/cleanstart/run_baseline_queue.sh > ~/cleanstart/results/queue.out 2>&1 < /dev/null &'
+```
+
+**why:** CK: "just do the baseline runs first". order: cores 1, 4, 8 x reads 10, 50, 100 x db 50mb, 8gb, 16gb, one after another. baseline = `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`, S0 binary, detailed mode. launched as a plain nohup+setsid with all fds redirected (no `&&` list) so the ssh call returns and the queue survives a disconnect. first run `1c r10 50mb` started 23:04:31, confirmed `lib/sniper` alive.
+
+progress: `~/cleanstart/results/queue_progress.log`. results: `~/cleanstart/results/summary_all.csv`. re-running the queue script skips finished runs.
