@@ -86,3 +86,24 @@ cd ~/cache_simulation/snipersim
 - stats live in `<outdir>/simulation/sim.stats`, not `<outdir>/sim.stats`. the queue script had this wrong and was fixed before launch.
 - `ssh host 'cd x && nohup cmd > f 2>&1 &'` hangs the ssh call because the whole `&&` list is backgrounded and holds the ssh output open. the run itself was fine. for the queue, launch as a plain `nohup setsid bash script > log 2>&1 < /dev/null &`.
 - `performance_model.elapsed_time` is in femtoseconds.
+
+---
+
+### [5] 2026-09-19 - baseline redefined after CK's review; smoke tests found `-n` was silently ignored
+
+CK asked: (a) keep L3 size the same when cores change, (b) model instruction cache + TLB like the Ryzen 7 5800H, (c) name every test by all its knobs, (d) add an L4 to the mix (not done yet, see below), (e) also run 4 cores.
+
+**findings from reading sim.cfg / config on Luna:**
+- TLBs were never off: the real ones live under `perf_model/mmu/tlb_level_*` (L1 DTLB 64-entry 4-way x2 page sizes, L1 ITLB 64-entry 4-way, L2 TLB 2048-entry 8-way unified). `perf_model/dtlb|itlb size=0` are unused legacy sections.
+- `enable_icache_modeling = "false"` in every earlier run (this whole project's old data). now set to true.
+- **`-n N` alone does NOT give N cores.** smoke test `-n 4 -- /bin/true`: effective `total_cores = 1`. some later config layer resets it. fix: add `-c general/total_cores=N` after the config overlays. verified: `total_cores = 4`, per-core stat columns, 4 `nuca-cache` entries (one L3 slice per core).
+- sim.stats multicore lines are `name = v0, v1, v2, v3`, so parsers must sum across commas (old `awk '{print $3}'` parse would read only core 0).
+- all overrides checked in effective `sim.cfg` (4-core smoke): icache modeling true, L1 TLBs assoc 64, nuca 4096 KB x 4 slices = 16 MB, L2 512/8w, L1d 32/8w.
+- icache modeling on changed the /bin/true smoke IPC 0.87 -> 0.42 (cold instruction cache), expected.
+
+**caveats to remember:**
+- Sniper cache latency does NOT scale with size: a 16 MB single-slice L3 (1 core) has the same 20+15 cycle latency as a 2 MB slice. "bigger is better" will look artificially true in size sweeps unless we model latency vs size.
+- Zen 3 TLB numbers are from AMD's published specs as recalled, not re-verified. Sniper's L2 TLB is unified (Zen 3 has a separate 512-entry L2 ITLB).
+- L4: the fork has an `l4_cache` section but the L3 is the NUCA mesh (`perf_model/cache/levels = 2`), so how a 4th level stacks is untested. needs CK's decision on what L4 is, then a smoke test.
+
+**done:** wrote `configs/cleanstart_laptop.cfg` (deployed to snipersim/config/), `scripts/run_one.sh`, `scripts/run_baseline_queue.sh` (27 runs). old first run moved to `~/cleanstart/results/old_no_icache_2MB_L3/` (124.9M instr, 89.6M cycles, IPC 1.39: obsolete definition, kept for reference). queue NOT launched yet, waiting for CK.
