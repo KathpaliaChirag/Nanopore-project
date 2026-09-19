@@ -42,8 +42,8 @@ WS=$(date +%s)
 WALL=$(( $(date +%s) - WS ))
 
 # sim.stats lines look like "name = v0, v1, ..." (one value per core): sum across cores / max across cores
-stat_sum() { grep -m1 "^$1 " $STATS | sed 's/^[^=]*= *//' | tr ',' ' ' | awk '{s=0;for(i=1;i<=NF;i++)s+=$i;printf "%d",s}'; }
-stat_max() { grep -m1 "^$1 " $STATS | sed 's/^[^=]*= *//' | tr ',' ' ' | awk '{m=0;for(i=1;i<=NF;i++)if($i+0>m)m=$i+0;printf "%d",m}'; }
+stat_sum() { grep -m1 "^$1 " $STATS | sed 's/^[^=]*= *//' | tr ',' ' ' | awk '{s=0;for(i=1;i<=NF;i++)s+=$i;printf "%.0f",s}'; }
+stat_max() { grep -m1 "^$1 " $STATS | sed 's/^[^=]*= *//' | tr ',' ' ' | awk '{m=0;for(i=1;i<=NF;i++)if($i+0>m)m=$i+0;printf "%.0f",m}'; }
 INSTR=$(grep -oP 'Simulated \K[0-9.]+(?=M instructions)' $LOG)
 CYC=$(grep -oP 'Simulated [0-9.]+M instructions, \K[0-9.]+(?=M cycles)' $LOG)
 IPC=$(grep -oP '[0-9.]+M cycles, \K[0-9.]+(?= IPC)' $LOG)

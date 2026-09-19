@@ -125,3 +125,11 @@ ssh ... 'nohup setsid bash ~/cleanstart/run_baseline_queue.sh > ~/cleanstart/res
 **why:** CK: "just do the baseline runs first". order: cores 1, 4, 8 x reads 10, 50, 100 x db 50mb, 8gb, 16gb, one after another. baseline = `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`, S0 binary, detailed mode. launched as a plain nohup+setsid with all fds redirected (no `&&` list) so the ssh call returns and the queue survives a disconnect. first run `1c r10 50mb` started 23:04:31, confirmed `lib/sniper` alive.
 
 progress: `~/cleanstart/results/queue_progress.log`. results: `~/cleanstart/results/summary_all.csv`. re-running the queue script skips finished runs.
+
+---
+
+### [8] 2026-09-19 23:16 IST - first baseline row + parser bug fix
+
+**run 1 done:** `1c_r10_50mb` (1 core, 10 reads, 50 MB db, baseline `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`): 124.9M instr, **86.0M cycles, IPC 1.45**, 202,401 unique data lines, L1d 99.09% / L2 0.12% / L3 0.49% of loads, wall 695 s. (old definition with 2 MB L3 + no icache: 89.6M cycles, IPC 1.39.)
+
+**bug:** `sim_time_max_fs` came out as 2147483647 (int32 max): awk `printf "%d"` overflows on femtosecond values (26,860,600,000,000). the same overflow would hit load counts > 2.1 billion on large/multicore runs. fixed both `stat_sum`/`stat_max` to `%.0f`. deployed via write-to-temp + `mv` (atomic rename) so the queue's running run_one.sh instance was not disturbed. repaired row 1 in place from `sim.stats` (26.86 ms = 86.0M cycles / 3.2 GHz, consistent).
