@@ -2331,3 +2331,41 @@ win already flipped by 100 reads.
 **laptop_sweep**: 26/32. 500-read/8gb/S0 baseline = 3946.5M cycles (sanity: 3946.5/7043.1=0.5604 ->
 IPC=1.78, matches; took 31964s/~8.9hrs). Baseline only - need 1way/4way/8way (1way running now) to
 see if 8GB's reversal continues, reverts, or does something new at 500 reads.
+
+---
+
+### laptop_sweep COMPLETE (32/32) - cache flips to losing on BOTH DBs by 500 reads (`2026-09-19 18:00 IST`)
+
+All 32 rows pass the cycles/instructions-vs-IPC check (script-verified, no mismatches). Ratio = cycles
+vs that row's own S0 (<1 = cache faster, >1 = cache slower), laptop.cfg (Ryzen 7 5800H):
+
+| reads | DB | 1way | 4way | 8way |
+|---|---|---|---|---|
+| 10 | 8GB | 0.279x | 0.279x | 0.290x |
+| 10 | 16GB | 0.299x | 0.299x | 0.308x |
+| 50 | 8GB | 0.523x | 0.516x | 0.526x |
+| 50 | 16GB | 0.464x | 0.456x | 0.466x |
+| 100 | 8GB | 1.056x | 1.031x | 1.056x |
+| 100 | 16GB | 0.943x | 0.923x | 0.946x |
+| 500 | 8GB | 1.119x | 1.092x | 1.119x |
+| 500 | 16GB | 1.044x | 1.022x | 1.050x |
+
+Read: the cache advantage shrinks monotonically with workload size and flips to a loss. 8GB flips by
+100 reads, 16GB survives to 100 reads (4way still 7.7% faster) and flips by 500. 4way is the least-bad
+(or best) width in every row, so width ranking is stable; only the sign changes. 16GB losing later than
+8GB is consistent with bigger DBs holding the win longer, but two DBs is too few to call a rule.
+
+**CONFOUND, must be stated with these results:** this sweep's "reads" axis is not clean. The 10/50-read
+files are short reads (786 / 1,827 bp avg; 8K / 91K total bases) while the 100/500-read files are cut
+from reads_fast_2000.fastq (47,260 / 50,779 bp avg; 4.7M / 25.4M total bases). Between the 50 and 100
+tiers read count went 2x, read length ~26x, total bases ~52x, and that is exactly where 8GB flips. So
+this sweep cannot say whether read count, read length or total bases drives the flip.
+
+**Follow-up launched (same day): `run_longread_scaling.sh`.** Nested prefixes of the SAME source file
+(long_10/long_25/long_50.fastq = 10/25/50 reads, 0.35M/0.90M/1.87M bases, 34.6-37.4 kbp avg read length)
+fill the gap between 91K and 4.7M bases with roughly constant read length. S0 and 4way, 8GB, laptop.cfg,
+launched as two parallel detached jobs (results_longread_scaling_S0/, results_longread_scaling_4way/).
+Combined with laptop_sweep's existing 100/500 rows from the same source file this gives a clean 5-point
+curve (10/25/50/100/500 long reads). Prediction to test: if total bases/read count drives the flip, the
+cache should already lose somewhere between 25 and 100 long reads; if read length is the driver, it
+should lose even at 10 long reads. Est. ~3h for S0, ~1.5-2h for 4way.
