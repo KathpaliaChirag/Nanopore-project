@@ -2369,3 +2369,13 @@ Combined with laptop_sweep's existing 100/500 rows from the same source file thi
 curve (10/25/50/100/500 long reads). Prediction to test: if total bases/read count drives the flip, the
 cache should already lose somewhere between 25 and 100 long reads; if read length is the driver, it
 should lose even at 10 long reads. Est. ~3h for S0, ~1.5-2h for 4way.
+
+---
+
+### longread_scaling partial (`2026-09-19 19:05 IST`)
+
+10 long reads (346K bases, 34.6 kbp avg read length), 8GB, laptop.cfg: S0 = 94.1M cycles, 4way = 66.2M
+cycles -> **4way/S0 = 0.703x, the cache is still ~30% FASTER**. IPC checks pass (1.36 / 1.72 / 1.73).
+So long reads alone do NOT cause the loss: at ~35 kbp/read the cache still wins at 10 reads. Read length
+is ruled out as the sole driver. 4way 25 reads = 166.6M (S0 25-read still running); 4way 50-read running.
+Verdict on count-vs-total-bases still pending the S0 25/50 rows.
