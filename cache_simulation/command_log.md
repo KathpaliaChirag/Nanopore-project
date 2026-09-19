@@ -2379,3 +2379,14 @@ cycles -> **4way/S0 = 0.703x, the cache is still ~30% FASTER**. IPC checks pass 
 So long reads alone do NOT cause the loss: at ~35 kbp/read the cache still wins at 10 reads. Read length
 is ruled out as the sole driver. 4way 25 reads = 166.6M (S0 25-read still running); 4way 50-read running.
 Verdict on count-vs-total-bases still pending the S0 25/50 rows.
+
+---
+
+### longread_scaling partial 2 (`2026-09-19 20:08 IST`)
+
+25 long reads (900K bases): S0 = 200.5M, 4way = 166.6M -> **0.831x** (cache 17% faster). 4way at 50 reads
+= 331.9M; S0 at 50 reads still running. IPC checks pass on every row. Same-source curve for 4way/S0 so far:
+10 reads 0.704x -> 25 reads 0.831x -> (50: pending) -> 100 reads 1.031x -> 500 reads 1.092x. The advantage
+shrinks steadily as total bases grow (0.35M -> 0.9M -> 4.7M -> 25M) with read length held roughly constant,
+which points at total bases / read count, not read length, as the driver. Crossover so far sits somewhere
+between 0.9M and 4.7M bases; the 50-read (1.87M bases) S0 row will narrow it.

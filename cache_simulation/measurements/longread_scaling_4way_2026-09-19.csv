@@ -1,3 +1,4 @@
 reads,db,variant,total_bases,instructions_M,cycles_M,ipc,unique_cache_lines,l1d_loads,l1d_hit_pct,l2_hit_pct,nuca_hit_pct,elapsed_s,wallclock_s
 10,8gb,4way,346387,113.9,66.2,1.72,113186,33502539,99.19,.26,.2295,876.83,878
 25,8gb,4way,900057,288.6,166.6,1.73,235858,84294124,99.21,.24,.2310,2144.60,2145
+50,8gb,4way,1868769,581.8,331.9,1.75,431146,169403905,99.26,.20,.2247,4308.47,4309
