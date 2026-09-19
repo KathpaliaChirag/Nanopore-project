@@ -2390,3 +2390,28 @@ Verdict on count-vs-total-bases still pending the S0 25/50 rows.
 shrinks steadily as total bases grow (0.35M -> 0.9M -> 4.7M -> 25M) with read length held roughly constant,
 which points at total bases / read count, not read length, as the driver. Crossover so far sits somewhere
 between 0.9M and 4.7M bases; the 50-read (1.87M bases) S0 row will narrow it.
+
+---
+
+### Full audit of commits + measurements (`2026-09-19`): data caveats found
+
+Cross-checked all 91 cache_simulation commits, every CSV in measurements/, every chart script and runner.
+Nothing missing from the run history, but three data problems that affect how results should be cited:
+
+1. **fig14 mixes workloads across its panels.** run_size_sweep.sh and run_size_sweep_103gb.sh use
+   tiny_10reads.fastq (50MB and 103GB panels: 14.2M / 15.1M cycles), but the 8GB panel is THIS session's
+   run_cache_size_sweep.sh at 50reads.fastq (27.9M cycles, 52.1M instructions). The peer's own 8GB ladder was
+   never run (its script was stopped during the 50MB pass); `size_sweep_8gb_peer_2026-09-15.csv` is a
+   byte-identical copy of the 8GB rows in `cache_size_sweep_8gb16gb_2026-09-15.csv`. The "identical isolated
+   spike at 65,536 across 3 DBs" statement therefore compares 10-read (50MB, 103GB) and 50-read (8GB) data.
+2. **The 16GB size ladder (50 reads, mine) was never used in the H1-H4 verdict or fig14.** It shows a much
+   weaker size-65,536 blip than the other DBs: 29.3M -> 29.6M cycles (+1.0%), instructions 52.1M -> 53.1M.
+   With it, the spike is not uniform across DBs (+6.3% / +2.5% / +6.0% / +1.0%). H3's "identical trigger,
+   DB-dependent magnitude" wording still holds, but "3-for-3" should read "3 of 4 DBs clearly, 16GB weakly".
+3. **flatl3_comparison.csv: the `l3_hit_pct` column is 0 for both NUCA rows** (script bug: it reads the
+   L3 stat name and never falls back to the NUCA stat when that name exists with value 0). Cycles, IPC and
+   instructions are unaffected; only that column is wrong for the NUCA rows.
+
+Also noted: `size_sweep_103gb_2026-09-15.csv` and `size_sweep_103gb_peer_2026-09-15.csv` are identical
+duplicates; `size_sweep_50mb_2026-09-15.csv` last two rows had l1d_hit_pct/nuca_hit_pct blank (recovered by
+hand after the tail script omitted its parsing block, see earlier entry).
