@@ -165,3 +165,15 @@ baseline `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`, S0, detailed mode, 1 core, 
 - 50mb classifies fewer reads (10 reads: 90% vs 100%; 50 reads: 84% vs 98%) and causes more DRAM reads (1.11M vs 0.81M) and more unique cache lines (842K vs 612K).
 - **hypothesis, NOT tested:** `sample_targeted` hash table is nearly full, so lookups of k-mers it does not contain probe a long linear-probing chain before hitting an empty slot; unclassified reads pay this on most of their k-mers. to test: compare the hash table load factor (`opts.k2d`/`inspect`) of the 3 dbs, or count probe steps.
 - wall time ~1 h per 50-read run, matches the estimate. queue now on `1c r50 16gb` (started 01:44).
+
+---
+
+### [11] 2026-09-20 02:54 IST - 1 core, 50 reads complete (all 3 dbs)
+
+| db | instr (M) | cycles (M) | IPC | unique lines | L1d hit | L2 hit | L3 hit | classified | dram reads | wall |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 50mb | 677.5 | 446.1 | 1.52 | 842,162 | 99.15% | 0.09% | 0.45% | 84% | 1.11M | 3607 s |
+| 8gb | 685.0 | 373.3 | 1.84 | 611,804 | 99.31% | 0.15% | 0.43% | 98% | 0.81M | 3640 s |
+| 16gb | 783.1 | 470.8 | 1.66 | 700,624 | 99.31% | 0.15% | 0.42% | 98% | 0.98M | 4221 s |
+
+cycle order at 50 reads: 8gb (373M) < 50mb (446M) < 16gb (471M). 16gb is not the fastest, so the 50mb anomaly is not simply "small db = slow" and not simply "big db = slow" either: 8gb is the odd one out. the nearly-full-hash-table hypothesis for 50mb (see [10]) is still untested. next: 1c r100 x 3 dbs (started 02:54, ~2 h each expected).
