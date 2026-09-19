@@ -107,3 +107,9 @@ CK asked: (a) keep L3 size the same when cores change, (b) model instruction cac
 - L4: the fork has an `l4_cache` section but the L3 is the NUCA mesh (`perf_model/cache/levels = 2`), so how a 4th level stacks is untested. needs CK's decision on what L4 is, then a smoke test.
 
 **done:** wrote `configs/cleanstart_laptop.cfg` (deployed to snipersim/config/), `scripts/run_one.sh`, `scripts/run_baseline_queue.sh` (27 runs). old first run moved to `~/cleanstart/results/old_no_icache_2MB_L3/` (124.9M instr, 89.6M cycles, IPC 1.39: obsolete definition, kept for reference). queue NOT launched yet, waiting for CK.
+
+---
+
+### [6] 2026-09-19 - L4 dropped
+
+CK: there is no L4, it was only an example. removed `_L4none` from the config name in `run_one.sh` and the README. baseline name is now `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`. no results existed under the old name.

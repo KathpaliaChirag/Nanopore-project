@@ -4,8 +4,8 @@
 #   cores  = sniper -n AND classify -p AND general/total_cores (forced, see below)
 #   reads  = 10 | 50 | 100        dbname = 50mb | 8gb | 16gb
 # knobs (env vars, default = baseline = the laptop): L3_KB=16384 (TOTAL, split over cores) L2_KB=512
-#   L1_KB=32 (L1d only) L1W=8 L2W=8 L3W=16.   L4 is not implemented yet (name says L4none).
-# result dir is named after the config:  results/L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16_L4none/<cores>c_r<reads>_<db>
+#   L1_KB=32 (L1d only) L1W=8 L2W=8 L3W=16.
+# result dir is named after the config:  results/L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16/<cores>c_r<reads>_<db>
 # why total_cores is forced with -c general/total_cores=N: with only -n N, a later config layer resets it to 1
 # and the "multicore" run silently simulates 1 core (found by smoke test 2026-09-19).
 cores=$1; reads=$2; dbname=$3
@@ -18,7 +18,7 @@ W=$HOME/cleanstart/workloads
 DBROOT=$HOME/chirag_K/AccuracyDrift/databases
 case $dbname in 50mb) DB=$DBROOT/sample_targeted;; 8gb) DB=$DBROOT/standard_8gb;; 16gb) DB=$DBROOT/standard_16gb;; *) echo bad db; exit 1;; esac
 fmt() { if [ $1 -ge 1024 ]; then echo "$(( $1 / 1024 ))MB"; else echo "${1}KB"; fi; }
-CFG="L3-$(fmt $L3_KB)_L2-$(fmt $L2_KB)_L1-$(fmt $L1_KB)_L1w${L1W}_L2w${L2W}_L3w${L3W}_L4none"
+CFG="L3-$(fmt $L3_KB)_L2-$(fmt $L2_KB)_L1-$(fmt $L1_KB)_L1w${L1W}_L2w${L2W}_L3w${L3W}"
 if [ $(( L3_KB % cores )) -ne 0 ]; then echo "L3_KB $L3_KB not divisible by $cores cores"; exit 1; fi
 SLICE=$(( L3_KB / cores ))
 name=${cores}c_r${reads}_${dbname}

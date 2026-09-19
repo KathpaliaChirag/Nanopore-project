@@ -29,7 +29,7 @@ what hardware cache (L1d / L2 / L3 size and associativity) is best for running k
 ## test naming
 
 every config is named by all its knobs, e.g. the baseline is
-`L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16_L4none`
+`L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`
 (L3/L2/L1 sizes, then L1/L2/L3 ways, then L4). "L3" size is the TOTAL across slices. "L1" means L1d only. results live in `results/<name>/<cores>c_r<reads>_<db>` and one row per run goes to `results/summary_all.csv`. sweeps change one term of the name at a time.
 
 ## scripts
