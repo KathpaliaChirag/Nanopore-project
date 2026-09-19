@@ -1,0 +1,21 @@
+# cleanstart
+
+started 2026-09-19. a from-scratch redo of the hardware cache simulation, done by hand by CK, one step at a time.
+the old cache_simulation/ folder stays untouched as history. nothing in it is trusted here until re-measured.
+
+## the one question
+
+what hardware cache (L1d / L2 / L3 size and associativity) is best for running kraken2?
+
+## fixed rules
+
+- binary: S0 only (`kraken2-src-baseline`, no software cache). the software cache is out of scope here.
+- reads: one 4 GB pod5 file, basecalled to fastq with dorado. each simulator run uses a fixed slice of it (N reads, N still to decide).
+- database: one fixed kraken2 database (still to decide).
+- simulator: Sniper, detailed mode (no `--fast-forward`), `-n 1`.
+- change exactly one hardware knob per run (L3 size, then L2, L1d, associativity). everything else stays fixed.
+- after every step: explain the result, log it in command_log.md, commit, push.
+
+## files
+
+- `command_log.md` - every command actually run, in order, with why and result.
