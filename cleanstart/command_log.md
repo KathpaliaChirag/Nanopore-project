@@ -149,3 +149,19 @@ baseline `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`, S0, detailed mode:
 - row 2 (8gb) had the old int32 overflow in `sim_time_max_fs` (it started before the parser fix); repaired by hand from sim.stats (25.09 ms = 80.3M cycles / 3.2 GHz).
 - **odd, unexplained:** 8gb finished in FEWER cycles than 50mb (80.3M vs 86.0M) despite more instructions. a 10-read run is ~125M instructions for only 0.37M bases, so it is dominated by fixed startup work (database load), not classification. do not read a DB-size trend into 10-read numbers.
 - results copy committed at `cleanstart/measurements/summary_all.csv`.
+
+---
+
+### [10] 2026-09-20 01:44 IST - batch 2: 1 core, 50 reads, 50mb + 8gb done
+
+baseline `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`, S0, detailed mode, 1 core, 50 reads (2.2M bases):
+
+| db | instr (M) | cycles (M) | IPC | unique lines | L1d hit | L2 hit | L3 hit | reads classified | wall |
+|---|---|---|---|---|---|---|---|---|---|
+| 50mb | 677.5 | 446.1 | 1.52 | 842,162 | 99.15% | 0.09% | 0.45% | 84% (42/50) | 3607 s |
+| 8gb | 685.0 | 373.3 | 1.84 | 611,804 | 99.31% | 0.15% | 0.43% | 98% (49/50) | 3640 s |
+
+- **repeat pattern:** the 8gb db is FASTER than the 50mb db at both 10 reads (80.3M vs 86.0M cycles) and 50 reads (373M vs 446M, -16%), with almost the same instruction count. not noise.
+- 50mb classifies fewer reads (10 reads: 90% vs 100%; 50 reads: 84% vs 98%) and causes more DRAM reads (1.11M vs 0.81M) and more unique cache lines (842K vs 612K).
+- **hypothesis, NOT tested:** `sample_targeted` hash table is nearly full, so lookups of k-mers it does not contain probe a long linear-probing chain before hitting an empty slot; unclassified reads pay this on most of their k-mers. to test: compare the hash table load factor (`opts.k2d`/`inspect`) of the 3 dbs, or count probe steps.
+- wall time ~1 h per 50-read run, matches the estimate. queue now on `1c r50 16gb` (started 01:44).
