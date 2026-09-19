@@ -61,3 +61,28 @@ for n in 10 50 100; do head -n $((n*4)) $SRC > $W/reads_$n.fastq; done
 | reads_100.fastq | 100 | 11 MB | 5,262,723 |
 
 base count grows unevenly (read lengths vary a lot), so "100 reads" is ~14x the work of "10 reads", not 10x.
+
+---
+
+### [4] 2026-09-19 - first baseline run: 1 core, 10 reads, 50 MB db, laptop.cfg unchanged
+
+```bash
+cd ~/cache_simulation/snipersim
+./run-sniper -c address_translation_schemes/baseline -c laptop -n 1 -d ~/cleanstart/results/base_r10_50mb -- \
+  ~/chirag_K/tools/kraken2-src-baseline/src/classify -H $DB/hash.k2d -t $DB/taxo.k2d -o $DB/opts.k2d \
+  -p 1 -T 0 -Q 0 -g 2 ~/cleanstart/workloads/reads_10.fastq      # DB = .../databases/sample_targeted
+```
+
+**why:** the reference run. no `--fast-forward` (detailed timing mode). S0 binary, unchanged laptop.cfg (Ryzen 7 5800H: 32K/8w L1d, 512K/8w L2, L3 as NUCA slices of 2048 KB/16-way).
+
+**result (took 620 s wall, simulator ran at 202 KIPS):**
+- 124.9M instructions, 89.6M cycles, **IPC 1.39**, 202,397 unique data cache lines
+- classify itself: 10 reads, 9 classified (90%)
+- L1d loads 41,560,001: L1 hit 99.10%, L2 hits 0.126%, L3 (NUCA) hits 0.312%, remaining ~0.46% went past L3 (DRAM)
+- simulated time 28.01 ms (`performance_model.elapsed_time` = 28011600000000 fs, matches 89.6M cycles / 3.2 GHz)
+- confirmed in `simulation/sim.cfg`: with `-n 1` the L3 is `cache_size = 2048` (one 2 MB slice, NOT the laptop's real 16 MB). multicore `-n 8` gets 8 slices.
+
+**gotchas found:**
+- stats live in `<outdir>/simulation/sim.stats`, not `<outdir>/sim.stats`. the queue script had this wrong and was fixed before launch.
+- `ssh host 'cd x && nohup cmd > f 2>&1 &'` hangs the ssh call because the whole `&&` list is backgrounded and holds the ssh output open. the run itself was fine. for the queue, launch as a plain `nohup setsid bash script > log 2>&1 < /dev/null &`.
+- `performance_model.elapsed_time` is in femtoseconds.
