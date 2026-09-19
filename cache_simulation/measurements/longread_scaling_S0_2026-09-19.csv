@@ -1,3 +1,4 @@
 reads,db,variant,total_bases,instructions_M,cycles_M,ipc,unique_cache_lines,l1d_loads,l1d_hit_pct,l2_hit_pct,nuca_hit_pct,elapsed_s,wallclock_s
 10,8gb,S0,346387,128.3,94.1,1.36,265930,34401644,99.11,.20,.3677,1317.57,1318
 25,8gb,S0,900057,302.8,200.5,1.51,464082,87350277,99.05,.30,.2490,2917.18,2918
+50,8gb,S0,1868769,567.6,346.8,1.64,713090,172785568,99.22,.17,.2169,4269.26,4269

@@ -2415,3 +2415,23 @@ Nothing missing from the run history, but three data problems that affect how re
 Also noted: `size_sweep_103gb_2026-09-15.csv` and `size_sweep_103gb_peer_2026-09-15.csv` are identical
 duplicates; `size_sweep_50mb_2026-09-15.csv` last two rows had l1d_hit_pct/nuca_hit_pct blank (recovered by
 hand after the tail script omitted its parsing block, see earlier entry).
+
+---
+
+### longread_scaling COMPLETE (6/6) - verdict (`2026-09-19 20:35 IST`)
+
+Same-source long reads (8GB, laptop.cfg), 4way/S0 cycles, all IPC checks pass:
+
+| long reads | total bases | S0 (M) | 4way (M) | 4way/S0 |
+|---|---|---|---|---|
+| 10 | 0.35M | 94.1 | 66.2 | 0.704x |
+| 25 | 0.90M | 200.5 | 166.6 | 0.831x |
+| 50 | 1.87M | 346.8 | 331.9 | 0.957x |
+| 100 (laptop_sweep) | 4.7M | 813.6 | 839.1 | 1.031x |
+| 500 (laptop_sweep) | 25.4M | 3946.5 | 4310.7 | 1.092x |
+
+**Verdict:** with read length held at ~35-51 kbp, the cache advantage falls steadily as total bases grow
+(30% -> 17% -> 4% faster) and flips to a loss between 1.87M and 4.7M bases. Read length is NOT the driver
+(10 long reads at ~35 kbp still wins big); total bases / read count is. Caveat: the 10-50 rows use the first
+10/25/50 reads of the file while 100/500 use its first 100/500 reads, so they are nested prefixes of one
+source but read length still drifts slightly (34.6 -> 50.8 kbp avg) across the curve.
