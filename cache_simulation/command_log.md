@@ -2435,3 +2435,30 @@ Same-source long reads (8GB, laptop.cfg), 4way/S0 cycles, all IPC checks pass:
 (10 long reads at ~35 kbp still wins big); total bases / read count is. Caveat: the 10-50 rows use the first
 10/25/50 reads of the file while 100/500 use its first 100/500 reads, so they are nested prefixes of one
 source but read length still drifts slightly (34.6 -> 50.8 kbp avg) across the curve.
+
+---
+
+### CORRECTION + measured cache sizes: two different S2 designs were used (`2026-09-19`)
+
+Measured each binary's per-thread static memory (`readelf -lW`, TLS segment) and read both source variants:
+
+| build | per-thread static memory | design |
+|---|---|---|
+| S0 (`kraken2-src-baseline`) | 0 B | no S2; one-entry memory is a local variable |
+| 1-way (`kraken2-src-1way`) | 98,312 B (96 KB) | ORIGINAL S2: 4,096 sets x 1 way x 24 B entries, LRU, static thread_local array |
+| 4-way (`...noatomics-4way`) | 393,224 B (384 KB) | same, 4,096 x 4 x 24 B |
+| 8-way | 786,440 B (768 KB) | same, 4,096 x 8 x 24 B |
+| 16-way | 1,572,872 B (1.5 MB) | same, 4,096 x 16 x 24 B |
+| sizepin-N (size sweep) | 48 B (table is on the heap) | CURRENT tree: calloc'd, 16 B entries, round-robin eviction, MurmurHash set index, sizing formula; N sets x 4 ways x 16 B (2,048 sets = 128 KB ... 262,144 = 16 MiB ... 1,048,576 = 64 MiB) |
+
+**Correction:** the earlier Step 0 entry claimed the already-built `noatomics-4way` binary "is already, at T=1,
+the 262144-set point". That is wrong. The fair-batch / 2000-read / laptop_sweep / hw_assoc_sweep 1/4/8/16-way
+binaries are the ORIGINAL design (fixed 4,096 sets, LRU, raw low-bit set index, no S3 sizing formula, no
+hash mixing). Only the size-sweep `sizepin-*` binaries are the current design. So "S2" in the width sweeps and
+"S2" in the size sweep are different implementations; the size sweep does not test the same cache the width
+sweeps did, and H4's "default formula lands on 262144" refers to the current design only.
+
+`noatomics` = the original S2 kept global std::atomic hit/miss counters (fetch_add on every lookup from every
+thread); at 32/96 real threads that contention caused a 2-3x artifact on 50MB. The noatomics patches remove
+those counters only (see plan_paper/scripts/s2_lru_4way_noatomics_patch.py header). No effect on what the
+cache stores.
