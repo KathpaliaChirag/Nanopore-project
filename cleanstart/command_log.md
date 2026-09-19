@@ -133,3 +133,19 @@ progress: `~/cleanstart/results/queue_progress.log`. results: `~/cleanstart/resu
 **run 1 done:** `1c_r10_50mb` (1 core, 10 reads, 50 MB db, baseline `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`): 124.9M instr, **86.0M cycles, IPC 1.45**, 202,401 unique data lines, L1d 99.09% / L2 0.12% / L3 0.49% of loads, wall 695 s. (old definition with 2 MB L3 + no icache: 89.6M cycles, IPC 1.39.)
 
 **bug:** `sim_time_max_fs` came out as 2147483647 (int32 max): awk `printf "%d"` overflows on femtosecond values (26,860,600,000,000). the same overflow would hit load counts > 2.1 billion on large/multicore runs. fixed both `stat_sum`/`stat_max` to `%.0f`. deployed via write-to-temp + `mv` (atomic rename) so the queue's running run_one.sh instance was not disturbed. repaired row 1 in place from `sim.stats` (26.86 ms = 86.0M cycles / 3.2 GHz, consistent).
+
+---
+
+### [9] 2026-09-19 23:43 IST - batch 1: 1 core, 10 reads, all 3 databases done
+
+baseline `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`, S0, detailed mode:
+
+| db | instr (M) | cycles (M) | IPC | unique lines | L1d hit | L2 hit | L3 hit | wall |
+|---|---|---|---|---|---|---|---|---|
+| 50mb | 124.9 | 86.0 | 1.45 | 202,401 | 99.09% | 0.12% | 0.49% | 695 s |
+| 8gb | 132.6 | 80.3 | 1.65 | 189,048 | 99.21% | 0.22% | 0.42% | 758 s |
+| 16gb | 154.1 | 99.4 | 1.55 | 202,578 | 99.23% | 0.20% | 0.42% | 884 s |
+
+- row 2 (8gb) had the old int32 overflow in `sim_time_max_fs` (it started before the parser fix); repaired by hand from sim.stats (25.09 ms = 80.3M cycles / 3.2 GHz).
+- **odd, unexplained:** 8gb finished in FEWER cycles than 50mb (80.3M vs 86.0M) despite more instructions. a 10-read run is ~125M instructions for only 0.37M bases, so it is dominated by fixed startup work (database load), not classification. do not read a DB-size trend into 10-read numbers.
+- results copy committed at `cleanstart/measurements/summary_all.csv`.
