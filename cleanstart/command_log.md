@@ -231,3 +231,10 @@ L3 hit share of loads fell to 0.26% (1-core 0.45%), unexplained, not investigate
 **watchdog failed to catch it:** the first rule ("total session CPU unchanged for 900 s") never fired because the `run-sniper` python wrapper wakes every few seconds and keeps total CPU time creeping up. new rule: every `HANG_S`=900 s compare session CPU with the value 900 s earlier; if it grew < `MIN_CPU`=60 CPU-s the run is hung (healthy ~850 CPU-s per 900 s). deployed via temp file + mv.
 
 **killed by PID** (parent `run_one.sh` first, so no blank CSV row is written, then `kill -- -<sid>`). queue moved on to `4c_r100_50mb` on its own (00:37:25), healthy. `4c_r50_16gb` has no sim.stats, so re-launching the queue after it finishes will retry it (do NOT relaunch while the queue is running).
+
+---
+
+### [16] 2026-09-21 08:14 IST - 4-core group done except the hung run
+
+4 cores, 100 reads (cycles, speedup vs 1 core): 50mb 450.2M (2.26x), 8gb 465.6M (1.89x), 16gb see csv. per-core instructions are 3 balanced working threads + 1 light (e.g. 50mb: 508.8M / 496.6M / 581.6M / 51.3M). 4 cores at 50 reads: 50mb 1.28x, 8gb 1.18x. 10 reads: no speedup (0.95-0.96x, single batch, one working thread).
+speedup grows with read count because kraken2 hands reads to threads in batches. `4c_r50_16gb` still needs its retry (hung, see [15]). queue continues into the 8-core group.
