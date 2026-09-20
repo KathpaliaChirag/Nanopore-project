@@ -31,24 +31,41 @@ rm -rf $OUT
 
 cd $SNIPER
 WS=$(date +%s)
-./run-sniper -c address_translation_schemes/baseline -c laptop -c cleanstart_laptop \
+# run in its own session (setsid) so the whole process tree can be killed as one group
+setsid ./run-sniper -c address_translation_schemes/baseline -c laptop -c cleanstart_laptop \
   -c general/total_cores=$cores -n $cores \
   -c perf_model/l1_dcache/cache_size=$L1_KB -c perf_model/l1_dcache/associativity=$L1W \
   -c perf_model/l2_cache/cache_size=$L2_KB -c perf_model/l2_cache/associativity=$L2W \
   -c perf_model/nuca/cache_size=$SLICE -c perf_model/nuca/associativity=$L3W \
   -d $OUT -- $BIN -H $DB/hash.k2d -t $DB/taxo.k2d -o $DB/opts.k2d \
   -p $cores -T 0 -O $R/$CFG/${name}_out.txt -Q 0 -R $R/$CFG/${name}_report.txt -g 2 $W/reads_$reads.fastq \
-  > $LOG 2>&1 < /dev/null
+  > $LOG 2>&1 < /dev/null &
+RS=$!
+# hang watchdog: a healthy run burns CPU continuously (simulator ~95%). if total CPU time of every process in the
+# run's session does not advance for HANG_S seconds, it is deadlocked (seen once: 4c_r10_50mb, 9 h at 0% CPU).
+HANG_S=${HANG_S:-900}; idle=0; last=-1; HUNG=0
+while kill -0 $RS 2>/dev/null; do
+  sleep 30
+  cpu=$(ps -s $RS -o cputimes= 2>/dev/null | awk '{s+=$1}END{print s+0}')
+  if [ "$cpu" = "$last" ]; then idle=$((idle+30)); else idle=0; last=$cpu; fi
+  if [ $idle -ge $HANG_S ]; then HUNG=1; kill -TERM -- -$RS 2>/dev/null; sleep 5; kill -KILL -- -$RS 2>/dev/null; break; fi
+done
+wait $RS 2>/dev/null
 WALL=$(( $(date +%s) - WS ))
+if [ $HUNG = 1 ]; then
+  echo "HUNG $CFG/$name (no CPU progress for ${HANG_S}s, killed after ${WALL}s)"
+  echo "$CFG,$cores,$reads,$dbname,HUNG,HUNG,HUNG,HUNG,HUNG,HUNG,HUNG,HUNG,HUNG,HUNG,$WALL" >> $SUMMARY
+  exit 3
+fi
 
 # sim.stats lines look like "name = v0, v1, ..." (one value per core): sum across cores / max across cores
 stat_sum() { grep -m1 "^$1 " $STATS | sed 's/^[^=]*= *//' | tr ',' ' ' | awk '{s=0;for(i=1;i<=NF;i++)s+=$i;printf "%.0f",s}'; }
 stat_max() { grep -m1 "^$1 " $STATS | sed 's/^[^=]*= *//' | tr ',' ' ' | awk '{m=0;for(i=1;i<=NF;i++)if($i+0>m)m=$i+0;printf "%.0f",m}'; }
-INSTR=$(grep -oP 'Simulated \K[0-9.]+(?=M instructions)' $LOG)
-CYC=$(grep -oP 'Simulated [0-9.]+M instructions, \K[0-9.]+(?=M cycles)' $LOG)
-IPC=$(grep -oP '[0-9.]+M cycles, \K[0-9.]+(?= IPC)' $LOG)
-LINES=$(grep -oP 'accessed \K[0-9]+(?= unique data cache lines)' $LOG | paste -sd+ | bc)
-ELAPSED=$(grep -oP 'Elapsed time: \K[0-9.]+' $LOG)
+INSTR=$(grep -aoP 'Simulated \K[0-9.]+(?=M instructions)' $LOG)
+CYC=$(grep -aoP 'Simulated [0-9.]+M instructions, \K[0-9.]+(?=M cycles)' $LOG)
+IPC=$(grep -aoP '[0-9.]+M cycles, \K[0-9.]+(?= IPC)' $LOG)
+LINES=$(grep -aoP 'accessed \K[0-9]+(?= unique data cache lines)' $LOG | paste -sd+ | bc)
+ELAPSED=$(grep -aoP 'Elapsed time: \K[0-9.]+' $LOG)
 L1L=NA; P1=NA; P2=NA; P3=NA; TM=NA
 if [ -f $STATS ]; then
   L1L=$(stat_sum L1-D.loads-data); L1H=$(stat_sum L1-D.loads-where-data-L1)

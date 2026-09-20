@@ -196,3 +196,15 @@ cycle order at 50 reads: 8gb (373M) < 50mb (446M) < 16gb (471M). 16gb is not the
 **gotcha:** `ssh host 'pkill -f "pattern"'` kills its own remote shell (the pattern is in that shell's command line) -> ssh exit 255 before the rest runs. use PIDs.
 
 **likely cause (NOT verified):** the `address_translation_schemes/baseline` scheme does not support a multi-threaded app; the fork ships separate `address_translation_schemes/multicore/parametric_baseline_{2,4,8,16}c.cfg` schemes (which set `total_cores` themselves). the 1-core baseline is unaffected. the 17 other multicore runs would all hang the same way if launched unchanged, so the 4/8-core groups are on hold.
+
+---
+
+### [13] 2026-09-20 20:33 IST - multicore smoke test passed; hang watchdog + binary-log fix; queue relaunched
+
+**smoke test:** `-n 4 -p 4`, 2 reads, 50mb db, same setup as the queue (baseline scheme, cleanstart_laptop overlay, `total_cores=4`, nuca 4096 KB x 4 slices): completed in 181 s, no hang. per-core instructions 18.4M / 6.1M / 6.1M / 6.1M (worker threads spin ~6M instr each), 13.8M cycles each core, 1 of 2 reads classified. so multi-threading works in general under the `baseline` scheme; the earlier 9-hour hang of `4c_r10_50mb` was NOT the scheme (`baseline` and the fork's `multicore/parametric_baseline_4c` differ only in DRAM model: ddr4_2400 45 ns / 57.6 GB/s vs readwrite 153 GB/s; both already use `parametric_dram_directory_msi` mesi). cause of that one hang still unknown, could not reproduce with 2 reads.
+
+**fixes to `run_one.sh`:**
+1. **hang watchdog:** run-sniper now starts in its own session (`setsid`); every 30 s the runner sums CPU time of all processes in the session (`ps -s <sid> -o cputimes=`); no advance for `HANG_S=900` s -> kill the session group, print `HUNG ...`, write a HUNG row to the CSV, exit 3. the queue then continues instead of blocking.
+2. **`grep -a`:** multicore logs contain binary bytes, plain `grep` printed "binary file matches" and the parser would have written blank rows for every multicore run.
+
+**relaunched** the same queue script (1-core runs skip, 9 done). `4c_r10_50mb` started 20:33:48: simulator 95% CPU, classify 40% CPU after 90 s (healthy, unlike the hung run's 0%).
