@@ -1,0 +1,63 @@
+
+<section id="hwassoc" data-nav="L3 associativity" data-group="Hardware">
+  <div class="kicker">Hardware only · no software cache · steps 25 and 35</div>
+  <h2>Hardware L3 associativity: 1 to 30-way</h2>
+  <div class="expt">
+    <header><div class="id">Stock kraken2 · Luna setup · 36 runs across three databases</div>
+      <h3>Does the CPU's own L3 associativity change kraken2's speed?</h3>
+      <span class="pill nul">NO EFFECT</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Kept stock kraken2 (no S2 table) and changed only the <i>hardware</i> L3's associativity: 1, 4, 8, 15 (Luna's real value), 16 and 30-way, at fixed slice size (1,125 KB, so the set count changes with the ways). First on 50 MB at 10, 50, 100 and 500 reads (24 runs); then on 8 GB and 16 GB at 50 reads (12 runs).</dd></div>
+        <div><dt>Why</dt><dd>Every other experiment varied the <i>software</i> cache. This is its mirror: does the hardware's own associativity matter, independent of any software cache? It had never been isolated.</dd></div>
+        <div><dt>Result</dt><dd>Cycles do not move: under 1% spread at every workload size on 50 MB (at 500 reads: 4,523 to 4,538 M), 51.7 to 51.8 M on 8 GB, exactly 60.7 M on 16 GB. There is no trend with associativity.</dd></div>
+        <div><dt>What we learned</dt><dd>Almost nothing on this workload is resolved at L2 or L3: those hit rates stay under about 2%. Lookups are nearly all an L1 hit or a full memory miss, so tuning the mid-level caches has nothing to act on. It also explains why the software cache fails on small databases. The bottleneck is memory latency, not cache organisation.</dd></div>
+      </dl>
+      <div class="controls"><span class="lab">Show</span><div class="seg" id="hwaMode" role="group"></div></div>
+      <div class="chartbox"><canvas id="cHwa" role="img" aria-label="Hardware associativity chart"></canvas></div>
+      <p class="figcap">The default view plots each run's cycles as a percent difference from the same workload at Luna's real 15-way, so all workload sizes share one axis. Sources: <code>hw_assoc_sweep_2026-09-14.csv</code> (50 MB), <code>hw_assoc_sweep_bigdb_2026-09-15.csv</code> (8 and 16 GB). Charts: fig12, fig13.</p>
+      <div class="tw" style="max-height:420px"><table id="tHwa"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="flat" data-nav="Flat L3 vs mesh L3" data-group="Hardware">
+  <div class="kicker">Hardware only · step 36</div>
+  <h2>Flat L3 versus the per-core mesh model</h2>
+  <div class="expt">
+    <header><div class="id">Stock kraken2 · Luna setup · 50 MB and 8 GB · 50 reads · 4 runs</div>
+      <h3>Does modeling the L3 as one bank instead of 96 slices change the answer?</h3>
+      <span class="pill info">TOPOLOGY MATTERS</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Rebuilt Luna's L3 as a single 105 MB, 15-way bank (114,688 sets) instead of 96 per-core mesh slices, keeping the same latencies, and ran stock kraken2 both ways.</dd></div>
+        <div><dt>Why</dt><dd>Every Luna experiment assumed the mesh-slice model. The simpler flat model might have given the same numbers, which would make the extra modeling unnecessary.</dd></div>
+        <div><dt>Result</dt><dd>The flat model is slower on both databases: about 31% more cycles on 50 MB and 17% more on 8 GB. IPC falls from 1.47 to 1.12 and from 1.32 to 1.13.</dd></div>
+        <div><dt>What we learned</dt><dd>The mesh model is not just extra realism: it changes the result. The flat bank's very different set count (114,688 vs 1,200 per slice) changes tag lookup and conflict behaviour. Caveat: every run uses one simulated core, so this shows the latency-model effect and would be larger for a multi-core workload.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">Data caveat</b>
+      <p>In <code>flatl3_comparison_2026-09-15.csv</code> the <code>l3_hit_pct</code> column reads 0 for both mesh rows. That is a bug in the run script (it never fell back to the mesh statistic). Cycles, instructions and IPC are unaffected.</p></div>
+      <div class="chartbox short"><canvas id="cFlat" role="img" aria-label="Flat versus mesh L3 chart"></canvas></div>
+      <p class="figcap">Source: <code>flatl3_comparison_2026-09-15.csv</code>. No committed chart yet.</p>
+      <div class="tw"><table id="tFlat"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="hwnot" data-nav="Hardware not yet tested" data-group="Hardware">
+  <div class="kicker">Hardware only · gaps</div>
+  <h2>What no experiment has varied yet</h2>
+  <p class="sub">Two hardware knobs have been isolated (L3 associativity, L3 layout). These have not, and are the natural next hardware sweep on the 8 GB and 16 GB databases:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Knob</th><th>Why it might matter</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>L3 total size</td><td class="wrap">Only changed as part of whole-machine profiles</td><td><span class="pill warn">NOT ISOLATED</span></td></tr>
+      <tr><td>L2 size and ways</td><td class="wrap">Luna's cycles are ~15% lower than the desktop's; the larger L2 is one suspect</td><td><span class="pill warn">NOT ISOLATED</span></td></tr>
+      <tr><td>L1 size and ways</td><td class="wrap">Orin's 64 KB L1 may explain its cheaper stock run</td><td><span class="pill warn">NOT ISOLATED</span></td></tr>
+      <tr><td>Memory latency and bandwidth</td><td class="wrap">Kraken2 waits on memory; this is the most likely lever. Currently a generic DDR4-2400 placeholder</td><td><span class="pill warn">PLACEHOLDER</span></td></tr>
+      <tr><td>Overlapping memory requests (prefetch, batching)</td><td class="wrap">A batched-lookup patch (S5.0) exists in the source tree but was never simulated</td><td><span class="pill warn">NEVER SIMULATED</span></td></tr>
+      <tr><td>L3 replacement policy</td><td class="wrap">Set to LRU; the real chip's policy is an undocumented adaptive scheme</td><td><span class="pill warn">PLACEHOLDER</span></td></tr>
+      <tr><td>Page size and TLB</td><td class="wrap">A real-hardware finding: memory mapping was worth 12 to 14×, more than any patch</td><td><span class="pill warn">NOT SIMULATED</span></td></tr>
+      <tr><td>Multiple threads</td><td class="wrap">Real-hardware slowdowns appear under contention, which one simulated core cannot show</td><td><span class="pill warn">NOT SIMULATED</span></td></tr>
+    </tbody></table></div>
+</section>

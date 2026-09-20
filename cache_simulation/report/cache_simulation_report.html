@@ -1,0 +1,1490 @@
+<title>Kraken2 Cache Notebook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#f4f6f9; --surface:#ffffff; --surface2:#eef1f6;
+  --ink:#11151c; --ink2:#48515f; --muted:#788296;
+  --line:#dde2ea; --line2:#c7cedb;
+  --accent:#2a78d6; --accent-ink:#ffffff; --accent-soft:#e4effc;
+  --win:#0b7a55; --win-soft:#dff3ea; --loss:#c23a30; --loss-soft:#fbe6e3;
+  --warn:#9a6a00; --warn-soft:#fbf0d6; --nul:#5d6675; --nul-soft:#e8ebf0;
+  --s0:#6b7383; --w1:#eb6834; --w4:#2a78d6; --w8:#1baf7a; --w16:#4a3aa7;
+  --grid:#e3e7ee; --axis:#b9c1cf;
+  --shadow:0 1px 2px rgba(17,21,28,.06),0 4px 14px rgba(17,21,28,.05);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1116; --surface:#161a22; --surface2:#1d222c;
+    --ink:#eef1f6; --ink2:#b7bfce; --muted:#8892a6;
+    --line:#262c39; --line2:#363e4e;
+    --accent:#3987e5; --accent-ink:#0e1116; --accent-soft:#182a44;
+    --win:#39c996; --win-soft:#12342a; --loss:#f0776c; --loss-soft:#3a1c1a;
+    --warn:#e2b04a; --warn-soft:#3a2f12; --nul:#a4adbd; --nul-soft:#252b36;
+    --s0:#9aa3b4; --w1:#e8703f; --w4:#4b93ea; --w8:#22b884; --w16:#9085e9;
+    --grid:#232936; --axis:#3a4253;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1116; --surface:#161a22; --surface2:#1d222c;
+  --ink:#eef1f6; --ink2:#b7bfce; --muted:#8892a6;
+  --line:#262c39; --line2:#363e4e;
+  --accent:#3987e5; --accent-ink:#0e1116; --accent-soft:#182a44;
+  --win:#39c996; --win-soft:#12342a; --loss:#f0776c; --loss-soft:#3a1c1a;
+  --warn:#e2b04a; --warn-soft:#3a2f12; --nul:#a4adbd; --nul-soft:#252b36;
+  --s0:#9aa3b4; --w1:#e8703f; --w4:#4b93ea; --w8:#22b884; --w16:#9085e9;
+  --grid:#232936; --axis:#3a4253;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:76px}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;padding-inline:16px}
+h1,h2,h3,h4{font-family:"Bricolage Grotesque","IBM Plex Sans",system-ui,sans-serif;text-wrap:balance;line-height:1.15;margin:0}
+code,.mono,td.n,th.n{font-family:"IBM Plex Mono",ui-monospace,Consolas,monospace;font-variant-numeric:tabular-nums}
+code{background:var(--surface2);padding:.08em .35em;border-radius:4px;font-size:.88em}
+a{color:var(--accent)}
+p{margin:0 0 .9em;max-width:72ch}
+
+/* top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;margin-inline:-16px;padding:10px 16px;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.top b{font-family:"Bricolage Grotesque",sans-serif;font-size:1.02rem;letter-spacing:.01em}
+.top .sp{flex:1}
+.top select,.top button{font:inherit;font-size:.86rem;color:var(--ink);background:var(--surface);border:1px solid var(--line2);border-radius:8px;padding:6px 10px}
+.top button{cursor:pointer}
+.top select{max-width:52vw}
+
+.shell{display:grid;grid-template-columns:minmax(0,1fr);gap:28px;max-width:1240px;margin:0 auto;padding-block:26px 90px}
+.rail{display:none}
+@media (min-width:1020px){
+  .shell{grid-template-columns:230px minmax(0,1fr)}
+  .rail{display:block;position:sticky;top:78px;align-self:start;max-height:calc(100vh - 96px);overflow:auto;font-size:.84rem}
+  .top select{display:none}
+}
+.rail a{display:block;padding:5px 10px;border-left:2px solid var(--line);color:var(--ink2);text-decoration:none}
+.rail a:hover{color:var(--ink);border-color:var(--line2)}
+.rail a.on{color:var(--accent);border-color:var(--accent);font-weight:600}
+.rail .grp{margin:14px 0 4px 10px;font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+main{min-width:0}
+
+/* hero */
+.hero{padding:6px 0 10px}
+.eyebrow{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.hero h1{font-size:clamp(1.9rem,4.6vw,3rem);letter-spacing:-.01em;max-width:20ch}
+.hero .lead{font-size:1.08rem;color:var(--ink2);margin-top:14px;max-width:70ch}
+.meta{display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:16px;font-size:.82rem;color:var(--muted)}
+.meta span b{color:var(--ink2);font-weight:600}
+
+/* sections */
+section{padding-top:38px;border-top:1px solid var(--line);margin-top:38px}
+section:first-of-type{border-top:0;margin-top:14px}
+section h2{font-size:1.65rem;margin-bottom:6px}
+section h3{font-size:1.15rem;margin:26px 0 6px}
+.kicker{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.sub{color:var(--ink2);max-width:74ch}
+
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:18px 0}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;box-shadow:var(--shadow)}
+.tile .big{font-family:"Bricolage Grotesque",sans-serif;font-size:1.9rem;font-weight:700;line-height:1.1;letter-spacing:-.01em}
+.tile .cap{font-size:.84rem;color:var(--ink2);margin-top:6px}
+.tile.win .big{color:var(--win)} .tile.loss .big{color:var(--loss)} .tile.nul .big{color:var(--nul)}
+
+/* callouts */
+.callout{border:1px solid var(--line);border-left-width:4px;border-radius:8px;padding:12px 16px;margin:16px 0;background:var(--surface);max-width:80ch}
+.callout b.t{display:block;font-size:.72rem;letter-spacing:.09em;text-transform:uppercase;margin-bottom:4px}
+.callout.note{border-left-color:var(--accent)} .callout.note b.t{color:var(--accent)}
+.callout.warn{border-left-color:var(--warn);background:var(--warn-soft)} .callout.warn b.t{color:var(--warn)}
+.callout.fix{border-left-color:var(--loss);background:var(--loss-soft)} .callout.fix b.t{color:var(--loss)}
+.callout.ok{border-left-color:var(--win);background:var(--win-soft)} .callout.ok b.t{color:var(--win)}
+.callout p:last-child{margin-bottom:0}
+
+/* experiment blocks */
+.expt{margin:22px 0;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.expt>header{padding:16px 18px 6px}
+.expt>header .id{font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--muted)}
+.expt>header h3{margin:2px 0 6px;font-size:1.22rem}
+.expt .body{padding:2px 18px 16px}
+.qa{display:grid;grid-template-columns:1fr;gap:10px 22px;margin:8px 0 12px}
+@media (min-width:760px){.qa{grid-template-columns:1fr 1fr}}
+.qa div{font-size:.93rem}
+.qa dt{font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;font-weight:600}
+.qa dd{margin:0;color:var(--ink2)}
+.pill{display:inline-block;font-size:.7rem;font-weight:600;letter-spacing:.04em;padding:2px 9px;border-radius:99px;vertical-align:middle;margin-right:6px}
+.pill.win{background:var(--win-soft);color:var(--win)} .pill.loss{background:var(--loss-soft);color:var(--loss)}
+.pill.nul{background:var(--nul-soft);color:var(--nul)} .pill.info{background:var(--accent-soft);color:var(--accent)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+details.more{border-top:1px solid var(--line);padding:10px 18px;background:var(--surface2)}
+details.more summary{cursor:pointer;font-size:.86rem;font-weight:600;color:var(--ink2)}
+details.more[open] summary{margin-bottom:8px}
+
+/* controls + charts */
+.controls{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:12px 0 8px;font-size:.84rem}
+.controls .lab{color:var(--muted);font-size:.7rem;letter-spacing:.09em;text-transform:uppercase}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:.82rem;padding:5px 11px;border:0;background:transparent;color:var(--ink2);cursor:pointer;border-right:1px solid var(--line)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.chk{display:inline-flex;align-items:center;gap:6px;cursor:pointer;color:var(--ink2)}
+.chk i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.chartbox{position:relative;height:340px;margin:8px 0 4px}
+.chartbox.tall{height:400px} .chartbox.short{height:270px}
+.figcap{font-size:.8rem;color:var(--muted);max-width:80ch;margin:2px 0 10px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:10px 0 14px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.84rem}
+th,td{padding:7px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--surface2);font-weight:600;font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;color:var(--ink2);position:sticky;top:0}
+th.sortable{cursor:pointer;user-select:none} th.sortable:hover{color:var(--accent)}
+td.n,th.n{text-align:right}
+tr:last-child td{border-bottom:0}
+tr.hl td{background:var(--accent-soft)}
+td.win{color:var(--win);font-weight:600} td.loss{color:var(--loss);font-weight:600}
+td.wrap{white-space:normal;min-width:220px}
+
+/* experiment index */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chips button{font:inherit;font-size:.8rem;border:1px solid var(--line2);background:var(--surface);color:var(--ink2);padding:4px 11px;border-radius:99px;cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.idx{list-style:none;padding:0;margin:0}
+.idx li{border-bottom:1px solid var(--line)}
+.idx summary{cursor:pointer;padding:10px 4px;display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:baseline;list-style:none}
+.idx summary::-webkit-details-marker{display:none}
+.idx .no{font-family:"IBM Plex Mono",monospace;color:var(--muted);font-size:.8rem}
+.idx .nm{font-weight:500}
+.idx .dt{font-size:.75rem;color:var(--muted);white-space:nowrap}
+.idx .det{padding:0 4px 12px 44px;color:var(--ink2);font-size:.9rem}
+.idx .det p{margin:0 0 .5em}
+footer{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);font-size:.8rem;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+<div class="top">
+  <b>Kraken2 Cache Notebook</b>
+  <span class="sp"></span>
+  <select id="jump" aria-label="Jump to section"></select>
+  <button id="themeBtn" type="button" aria-label="Toggle light or dark theme">Theme</button>
+</div>
+
+<div class="shell">
+<nav class="rail" id="rail" aria-label="Sections"></nav>
+<main>
+
+<div class="hero" id="top">
+  <div class="eyebrow">Sniper simulation study · Luna server · Sept 4 to Sept 20, 2026</div>
+  <h1>What a software cache does for kraken2, cycle by cycle</h1>
+  <p class="lead">Kraken2 classifies DNA reads by looking up short fingerprints (minimizers) in a huge hash table. That lookup is slow because it waits on memory. We asked whether a small software cache in front of the table speeds it up, and how the answer changes with the cache's shape, its size, the CPU's own caches, the database and the workload. Every number below comes from a detailed Sniper simulation and is read straight from the committed data files.</p>
+  <div class="meta">
+    <span><b id="mRows">0</b> measured rows</span>
+    <span><b id="mFiles">0</b> data files</span>
+    <span><b>14</b> figures</span>
+    <span><b>5</b> simulated machines</span>
+    <span><b>4</b> databases (50 MB to 103 GB)</span>
+  </div>
+</div>
+
+<section id="verdict">
+  <div class="kicker">Overview</div>
+  <h2>The verdict in seven numbers</h2>
+  <p class="sub">"Speedup" everywhere on this page means <b>stock kraken2 cycles ÷ variant cycles</b>: above 1.0 the variant is faster, below 1.0 it is slower. Stock kraken2 is called <b>S0</b>. The variant is our software cache table (called <b>S2</b>), usually 4-way.</p>
+  <div class="tiles">
+    <div class="tile win"><div class="big" id="tWin">…</div><div class="cap"><span class="pill win">WIN</span>4-way vs stock on the 8, 16 and 103 GB databases at 50 reads (Luna). Best of the widths at every size.</div></div>
+    <div class="tile win"><div class="big" id="tWin2">…</div><div class="cap"><span class="pill win">WIN</span>Best case: 10 reads on the 8 GB database, your laptop's cache setup. Small workloads only.</div></div>
+    <div class="tile loss"><div class="big" id="tLoss">…</div><div class="cap"><span class="pill loss">LOSS</span>The same cache at 500 long reads on 8 GB. The win shrinks as the workload grows and flips between about 1.9 M and 4.7 M total bases.</div></div>
+    <div class="tile loss"><div class="big" id="tLoss2">…</div><div class="cap"><span class="pill loss">LOSS</span>On the 50 MB database the cache never wins, at any width, size or workload we tried (Luna, 50 reads).</div></div>
+    <div class="tile nul"><div class="big">±1%</div><div class="cap"><span class="pill nul">NO EFFECT</span>Changing the CPU's L3 associativity from 1 to 30-way, on 50 MB, 8 GB and 16 GB. 36 runs.</div></div>
+    <div class="tile nul"><div class="big">±0.7%</div><div class="cap"><span class="pill nul">NO EFFECT</span>Changing the software cache size 512-fold. One isolated spike at exactly 65,536 sets, on every database.</div></div>
+    <div class="tile"><div class="big" id="tFlat">…</div><div class="cap"><span class="pill info">MODEL</span>Modeling Luna's L3 as one flat bank instead of per-core mesh slices makes it slower. The topology model matters.</div></div>
+  </div>
+
+  <div class="callout warn"><b class="t">Nothing here is measured on real hardware</b>
+  <p>Everything is simulated, on one thread. The last real-hardware benchmark (Aug 30, three databases, six thread counts) found no speedup from the cache at all. So the wins above are simulated wins at small workloads. Whether they survive production-size runs is still open.</p></div>
+
+  <div class="callout note"><b class="t">What "no cache" really means</b>
+  <p>Stock kraken2 already has a one-entry memory: it remembers the last minimizer and its answer, and skips the table search when the next window repeats it. <b>S0 keeps that.</b> Our S2 build keeps it too and puts a real table (many entries, several slots per group) in front of the hash-table search. So "S0" is "no S2 table", not "zero caching". Details in <a href="#internals">what is inside S2</a>.</p></div>
+
+  <h3>Scorecard</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Question</th><th>Answer</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td class="wrap">Does the S2 cache speed up kraken2 on big databases?</td><td class="wrap"><span class="pill win">YES, at small workloads</span>1.8 to 2.1× at 50 reads, up to 3.6× at 10 reads</td><td><a href="#dbsize">Database size</a>, <a href="#laptop">Laptop sweep</a></td></tr>
+      <tr><td class="wrap">Does it help on a small (50 MB) database?</td><td class="wrap"><span class="pill loss">NO</span>10% slower at 50 reads; 1.3× slower at 2,000 reads</td><td><a href="#dbsize">Database size</a>, <a href="#r2000">2,000 reads</a></td></tr>
+      <tr><td class="wrap">Does the win survive bigger workloads?</td><td class="wrap"><span class="pill loss">NO</span>Crossover at about 2 to 5 M total bases; read length is not the cause</td><td><a href="#laptop">Laptop sweep</a>, <a href="#longread">Long reads</a></td></tr>
+      <tr><td class="wrap">Which width is best?</td><td class="wrap"><span class="pill win">4-way</span>Best or tied at every database size on cycles</td><td><a href="#dbsize">Database size</a></td></tr>
+      <tr><td class="wrap">Does a bigger or smaller cache help?</td><td class="wrap"><span class="pill nul">NO</span>Flat across 2,048 to 1,048,576 sets, apart from one anomaly</td><td><a href="#size">Cache size</a></td></tr>
+      <tr><td class="wrap">Does hardware L3 associativity matter?</td><td class="wrap"><span class="pill nul">NO</span>Under 1% spread on every database</td><td><a href="#hwassoc">Hardware associativity</a></td></tr>
+      <tr><td class="wrap">Does the L3 model (flat vs mesh) matter?</td><td class="wrap"><span class="pill info">YES</span>Flat is 17 to 31% slower</td><td><a href="#flat">Flat L3</a></td></tr>
+      <tr><td class="wrap">Does it work on real hardware?</td><td class="wrap"><span class="pill warn">UNKNOWN</span>Last real benchmark found no speedup</td><td><a href="#open">Open questions</a></td></tr>
+    </tbody></table></div>
+</section>
+
+<section id="how">
+  <div class="kicker">Read this first</div>
+  <h2>How to read the numbers</h2>
+  <h3>Simulator terms</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><b>Sniper</b></td><td class="wrap">A CPU simulator. It runs the real compiled kraken2 and models the core, the caches and the memory cycle by cycle. Its settings change the <i>simulated machine</i>, not kraken2 itself.</td></tr>
+      <tr><td><b>Detailed mode</b></td><td class="wrap">Full timing model: cycles, IPC, cache hit rates. <b>Every result on this page is detailed mode.</b> It runs roughly 25 to 200 times slower than fast-forward.</td></tr>
+      <tr><td><b>Fast-forward mode</b></td><td class="wrap">Runs the program without timing. Fast, and its printed IPC is meaningless. Used only for setup checks (the smoke test and the first tracing).</td></tr>
+      <tr><td><b>Cycles</b></td><td class="wrap">The simulated CPU clock ticks a run took. This is the real-time proxy: cycles ÷ clock speed = simulated time.</td></tr>
+      <tr><td><b>Wall-clock / elapsed</b></td><td class="wrap">How long <i>Sniper itself</i> took on the host. It tracks instruction count, drifts between sessions and is <b>not</b> program speed. Early results used it by mistake; see the <a href="#fixes">corrections</a>.</td></tr>
+      <tr><td><b>IPC</b></td><td class="wrap">Instructions per cycle. Higher means fewer stalls per instruction. Checked on every row: cycles ÷ instructions must equal the reported IPC.</td></tr>
+      <tr><td><b>Ways / sets / line</b></td><td class="wrap">A cache is split into <i>sets</i>; each set has several <i>ways</i> (slots) that one address may occupy; a <i>line</i> is 64 bytes moved at a time. More ways means fewer collisions but more slots to check.</td></tr>
+      <tr><td><b>Unique cache lines</b></td><td class="wrap">How many distinct 64-byte lines the run touched. A footprint measure.</td></tr>
+      <tr><td><b>NUCA</b></td><td class="wrap">Non-uniform cache architecture: the shared L3 is modeled as one slice per core on a mesh, not one block. Luna's L3 (105 MB) becomes 96 slices of 1,125 KB.</td></tr>
+    </tbody></table></div>
+
+  <h3>The three things called "cache"</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Name</th><th>What it is</th><th>Size</th><th>In stock kraken2 (S0)?</th></tr></thead>
+    <tbody>
+      <tr><td><b>One-entry memory</b></td><td class="wrap">Last minimizer and its answer</td><td class="n">16 bytes</td><td>Yes</td></tr>
+      <tr><td><b>S2 software cache</b></td><td class="wrap">Our table of many recent minimizer answers, private to each thread, checked before the hash table</td><td class="wrap">96 KB to 1.5 MB (width tests), 128 KB to 64 MB (size tests)</td><td>No, this is what we added</td></tr>
+      <tr><td><b>Hardware caches</b></td><td class="wrap">L1, L2, L3 inside the CPU</td><td class="wrap">Set by the simulated machine</td><td>Yes, always</td></tr>
+    </tbody></table></div>
+  <div class="callout note"><b class="t">Software or hardware?</b>
+  <p>Any chart labeled "1-way, 4-way, 8-way, 16-way" is about the <b>software</b> S2 cache. The hardware caches stay fixed in those charts. Only the "Hardware" section changes the hardware.</p></div>
+</section>
+
+<section id="setup">
+  <div class="kicker">Foundation</div>
+  <h2>Setup: modeling Luna</h2>
+  <p class="sub">Luna is a Dell R760 with two Intel Xeon Platinum 8468 (Sapphire Rapids) processors, 96 cores per socket. Its cache layout was read straight from the machine (<code>/sys/devices/system/cpu/cpu0/cache/index*/</code>) rather than from a spec sheet, because a wrong spec-sheet claim had already burned the project once.</p>
+  <h3>Luna's real cache geometry</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Level</th><th class="n">Size</th><th class="n">Ways</th><th class="n">Sets</th><th class="n">Line</th></tr></thead>
+    <tbody>
+      <tr><td>L1 data (per core)</td><td class="n">48 KB</td><td class="n">12</td><td class="n">64</td><td class="n">64 B</td></tr>
+      <tr><td>L1 instruction (per core)</td><td class="n">32 KB</td><td class="n">8</td><td class="n">64</td><td class="n">64 B</td></tr>
+      <tr><td>L2 (per core)</td><td class="n">2 MB</td><td class="n">16</td><td class="n">2,048</td><td class="n">64 B</td></tr>
+      <tr><td>L3 (shared by 96 cores)</td><td class="n">105 MB</td><td class="n">15</td><td class="n">114,688</td><td class="n">64 B</td></tr>
+    </tbody></table></div>
+
+  <h3>Every simulated machine</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Machine</th><th class="n">Clock</th><th>L1 (i / d)</th><th>L2 per core</th><th>L3 / SLC</th><th>Basis</th></tr></thead>
+    <tbody>
+      <tr><td><b>Luna</b> (<code>luna.cfg</code>)</td><td class="n">2.1 GHz</td><td>32 KB 8-way / 48 KB 12-way</td><td>2 MB 16-way</td><td class="wrap">105 MB 15-way, as 96 slices of 1,125 KB</td><td class="wrap">Read from the machine; clock is Intel's base spec</td></tr>
+      <tr><td><b>Desktop</b> (<code>desktop.cfg</code>)</td><td class="n">3.7 GHz</td><td>32 KB 8-way / 32 KB 8-way</td><td>512 KB 8-way</td><td class="wrap">32 MB 16-way over 6 cores (5,461 KB slices)</td><td class="wrap">AMD Ryzen 5 5600X published spec</td></tr>
+      <tr><td><b>Orin-sized</b> (<code>orion_sizes.cfg</code>)</td><td class="n">2.2 GHz</td><td>64 KB 4-way / 64 KB 4-way</td><td>256 KB 8-way</td><td class="wrap">4 MB over 12 cores (342 KB slices), 16-way is a placeholder</td><td class="wrap">Jetson AGX Orin sizes; associativity unverified</td></tr>
+      <tr><td><b>Laptop</b> (<code>laptop.cfg</code>)</td><td class="n">3.2 GHz</td><td>32 KB 8-way / 32 KB 8-way</td><td>512 KB 8-way</td><td class="wrap">16 MB 16-way, 8 slices of 2,048 KB</td><td class="wrap">Ryzen 7 5800H: sizes and clock read from your machine, ways from AMD's spec</td></tr>
+      <tr><td><b>Flat L3</b> (<code>luna_flatl3.cfg</code>)</td><td class="n">2.1 GHz</td><td colspan="2">same as Luna</td><td class="wrap">107,520 KB in one bank, 15-way, 114,688 sets</td><td class="wrap">Same latencies as the mesh model, only the topology differs</td></tr>
+    </tbody></table></div>
+  <div class="callout warn"><b class="t">What is real and what is a placeholder</b>
+  <p><b>Real:</b> cache sizes, ways and line size for Luna and (partly) the laptop. <b>Placeholder or borrowed:</b> the L3 speed (tag 15 / data 20 cycles), the L3 replacement policy (LRU, though the real chip differs), memory timing (a generic DDR4-2400 model), and the CPU core model (inherited from a different chip; Sniper has no Sapphire Rapids core). Every machine here uses the <i>same</i> stand-in x86 core, so machine comparisons test cache configuration, not real ARM or AMD behavior.</p></div>
+
+  <h3>Four bugs found getting the config to load</h3>
+  <ol>
+    <li><b>Wrong <code>-c</code> syntax.</b> A path (<code>config/luna.cfg</code>) silently fell back to defaults. The correct form is the bare name, <code>-c luna</code>.</li>
+    <li><b>Comma-joined flags.</b> <code>-c base,luna</code> triggers Sniper's heterogeneous per-core mode instead of chaining files. Two separate <code>-c</code> flags are needed, base first.</li>
+    <li><b>Cache-size validation abort.</b> Sniper requires size = sets × ways × line exactly. A 1,120 KB target had to be rounded to 1,125 KB (1,200 sets).</li>
+    <li><b>Crash with a non-power-of-2 set count.</b> The default <code>xor_mod</code> hash goes out of range when sets is not a power of 2. Switching the L3 to plain <code>mod</code> fixed it. The same check later caught the flat-L3 config (114,688 sets is not a power of 2).</li>
+  </ol>
+  <p class="sub">There was also a false start: kraken2 is a Perl wrapper script, so pointing Sniper at it instrumented Perl's start-up and showed near-zero work. Finding the real compiled <code>classify</code> binary (with <code>strace</code>) and its raw arguments fixed it.</p>
+</section>
+
+
+<section id="assoc10" data-nav="Width sweep, 10 reads" data-group="Software cache">
+  <div class="kicker">Software cache · Luna hardware · steps 9 to 11</div>
+  <h2>Width sweep: 4 to 64 ways at 10 reads</h2>
+  <div class="expt">
+    <header><div class="id">First real comparative experiment · 50 MB database · 10 reads</div>
+      <h3>Does a wider software cache cost more or help?</h3>
+      <span class="pill nul">WIDER IS WORSE</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Ran six kraken2 builds through Sniper on the same 10-read workload, changing only how many slots (ways) each set of the software cache has: 4, 8, 16, 32 and 64, plus one row called "baseline".</dd></div>
+        <div><dt>Why</dt><dd>An earlier sweep on real hardware found more ways was slower, but its cache kept global atomic hit/miss counters that made threads fight. The "noatomics" builds delete those counters, so any slowdown left belongs to the width itself.</dd></div>
+        <div><dt>Result</dt><dd>Instructions, cycles and cache lines touched all rise with width. 64-way needs 11% more cycles than 4-way and touches 4.3× more cache lines. IPC stays flat (1.76 to 1.80), so the extra cost is more instructions, not more stalls.</dd></div>
+        <div><dt>What we learned</dt><dd>The real-hardware trend (more ways is worse) reproduces with the thread-locking overhead removed, so it is not an artifact of that overhead. It is consistent with wider caches simply having more slots to touch and check.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">Caveat: the "baseline" row is not stock kraken2</b>
+      <p>That build already contained an early version of our S2 cache (its numbers are almost identical to 4-way, so it is probably a 4-way). The true stock build (S0) was identified in the next step. So this sweep compares S2 widths against each other only. It is also a tiny 10-read workload, where start-up work dominates.</p></div>
+      <div class="controls"><span class="lab">Metric</span>
+        <div class="seg" id="assocMetric" role="group"></div></div>
+      <div class="chartbox short"><canvas id="cAssoc10" role="img" aria-label="Width sweep chart"></canvas></div>
+      <p class="figcap">Luna cache setup, 10 reads (7,862 bases), 50 MB database, single thread. Source: <code>associativity_sweep_2026-09-08_summary.csv</code>. Chart figure: fig1 (which shows simulator time, not cycles).</p>
+      <div class="tw"><table id="tAssoc10"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="dbsize" data-nav="Database size (fair batch)" data-group="Software cache">
+  <div class="kicker">Software cache · Luna hardware · steps 12 to 20</div>
+  <h2>Database size: the cache's value flips with the database</h2>
+  <div class="expt">
+    <header><div class="id">Five variants × four databases · 50 reads · 20 runs in one batch</div>
+      <h3>Does the S2 cache help, and at which width, as the database grows?</h3>
+      <span class="pill win">WINS ON 8 GB+</span><span class="pill loss">LOSES ON 50 MB</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Ran stock kraken2 (S0) and four S2 widths (1, 4, 8, 16-way) on four databases: 50 MB, 8 GB, 16 GB and 103 GB, all on the same 50-read workload with Luna's cache setup. A 1-way (direct-mapped) build did not exist, so it was built from scratch and its output checked identical to S0.</dd></div>
+        <div><dt>Why</dt><dd>A small database's table mostly stays warm, so a lookup is cheap and a cache has little to save. A huge database's table is scattered, mostly cold memory, so a lookup is expensive and a cache that intercepts repeats should pay off. We wanted to see where the split falls.</dd></div>
+        <div><dt>Result</dt><dd>On 50 MB every width is slower than stock (0.85 to 0.91×). On 8, 16 and 103 GB every width is faster (1.8 to 2.05×), and 4-way is best or tied everywhere. On 8 GB the stock run needs 68.1 M instructions at IPC 1.32; 4-way needs 51.9 M at IPC 1.84.</dd></div>
+        <div><dt>What we learned</dt><dd>The value of a software cache depends on the database, not on the cache. 4-way is the sweet spot: 16-way adds cost and touches far more memory for no gain. The benefit rises to 16 GB then dips slightly at 103 GB (1.97× vs 2.05×), so it may be approaching a ceiling.</dd></div>
+      </dl>
+      <div class="callout fix"><b class="t">Three corrections made on the way to this table</b>
+      <p><b>1. Wall-clock contamination.</b> The 1-way and 8-way runs overlapped other jobs, so 1-way looked 122% slower than 4-way at the same cycles. Their wall-clock was discarded and re-run. <b>2. Cross-batch drift.</b> Batches run hours apart ran at 14 vs 8 seconds per million cycles, so wall-clock cannot be compared across batches. One "final fair batch" ran everything together. <b>3. Wrong metric.</b> Sniper's wall-clock measures the simulator, not the program. By that measure 1-way "wins"; by cycles (the right measure) 4-way wins. Use the metric selector below to see both.</p></div>
+      <div class="controls">
+        <span class="lab">Metric</span><div class="seg" id="fairMetric" role="group"></div>
+        <span class="lab">Variants</span><span id="fairVars"></span>
+      </div>
+      <div class="chartbox tall"><canvas id="cFair" role="img" aria-label="Fair batch chart"></canvas></div>
+      <p class="figcap">Luna cache setup, 50 reads (91,372 bases). Databases: 50 MB (<code>sample_targeted</code>), 8 GB (<code>standard_8gb</code>), 16 GB, 103 GB. Source: <code>final_fair_batch_2026-09-09_5variant_all_db.csv</code>. Charts: fig2, fig3, fig4, fig5, fig6.</p>
+      <div class="tw"><table id="tFair"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="profiles" data-nav="Other machines" data-group="Software cache">
+  <div class="kicker">Software cache on different hardware · steps 20 to 21</div>
+  <h2>Does the win depend on the machine's caches?</h2>
+  <div class="expt">
+    <header><div class="id">Luna · desktop · Orin-sized · your laptop · 4-way vs stock</div>
+      <h3>Same software cache, four simulated machines</h3>
+      <span class="pill info">NOT MONOTONIC IN CACHE SIZE</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Rebuilt the simulated machine with other cache setups (config-only overlays: cache sizes, ways, clock) and reran stock and 4-way on the same 50-read workload. Luna and the desktop and Orin configs ran 50 MB and 8 GB; your laptop config came from the laptop sweep (8 GB only).</dd></div>
+        <div><dt>Why</dt><dd>To check the 50 MB result is not an accident of Luna's cache geometry, and to see whether smaller CPU caches make a software cache more or less valuable.</dd></div>
+        <div><dt>Result</dt><dd>50 MB is a small loss on every machine (0.90 to 0.92×). On 8 GB the win is 1.83× (Luna), 1.94× (desktop), 1.65× (Orin-sized), 1.94× (laptop).</dd></div>
+        <div><dt>What we learned</dt><dd>Consistent in direction everywhere, so the pattern is not a Luna quirk. But the size of the win does not follow cache size: the desktop (smaller L2) gains more than Luna, and Orin (smallest caches) gains least. Orin's stock run is already cheaper (55.9 M vs the desktop's 60.6 M cycles), possibly because of its larger L1, but that is a guess.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">Caveat</b><p>These are config-only stand-ins on the same x86 core model, not real ARM or AMD behavior, and Orin's L3 associativity is a placeholder. Each machine changes several things at once (sizes, ways, clock), so no single knob can be blamed.</p></div>
+      <div class="controls"><span class="lab">Show</span><div class="seg" id="profMetric" role="group"></div></div>
+      <div class="chartbox short"><canvas id="cProf" role="img" aria-label="Machine comparison chart"></canvas></div>
+      <p class="figcap">Luna: fair batch. Desktop and Orin: <code>hwsize_comparison_2026-09-09.csv</code>. Laptop: laptop sweep at 50 reads, 8 GB. Chart: fig7.</p>
+      <div class="tw"><table id="tProf"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="r2000" data-nav="2,000 reads on 50 MB" data-group="Software cache">
+  <div class="kicker">Software cache · Luna hardware · steps 22 to 24</div>
+  <h2>2,000 reads: does the small-database loss fade with more data?</h2>
+  <div class="expt">
+    <header><div class="id">50 MB database · 2,000 reads (35.1 M bases) · five variants · 12 to 15 hours each</div>
+      <h3>Was the 50 MB loss just a warm-up effect of a tiny workload?</h3>
+      <span class="pill loss">LOSS HOLDS AND GROWS</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Ran the same 50 MB database at 2,000 reads, 40 times the earlier 50-read run, for stock and all four widths.</dd></div>
+        <div><dt>Why</dt><dd>At 50 reads the cache lost by about 10% on this database. The obvious excuse was that 50 reads is too little for a cache to warm up.</dd></div>
+        <div><dt>Result</dt><dd>Every width loses to stock, and by more than before: 4-way 1.28× slower, 1-way 1.31×, 8-way 1.34×, 16-way 1.39×. Cost rises steadily past 4-way.</dd></div>
+        <div><dt>What we learned</dt><dd>Not a warm-up problem. Two mechanisms show: 1-way suffers conflict misses (too few slots), while 8 and 16-way pay for checking more slots per lookup even though their hit rate rises. 4-way sits between the two costs.</dd></div>
+      </dl>
+      <div class="callout fix"><b class="t">Correction to our own explanation</b>
+      <p>This job was first described as showing "the earlier ~2× speedup was a small-workload artifact". That was wrong: this job uses the 50 MB database, which was already losing at 50 reads. The ~2× win lives on the 8 GB+ databases, which this job never tested at scale. The finding is only that the small-database loss holds at 40× the data.</p></div>
+      <div class="controls"><span class="lab">Compare</span><div class="seg" id="r2000Mode" role="group"></div></div>
+      <div class="chartbox short"><canvas id="cR2000" role="img" aria-label="2000 read chart"></canvas></div>
+      <p class="figcap">Luna cache setup, 50 MB database. 50-read values from the fair batch; 2,000-read values from <code>2000reads_live_summary_2026-09-09.csv</code>. Charts: fig9, fig10, fig11.</p>
+      <div class="tw"><table id="tR2000"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="timemodel" data-nav="Simulation time" data-group="Software cache">
+  <div class="kicker">How long runs take · step 24 (fig8)</div>
+  <h2>How long a simulated run takes</h2>
+  <div class="expt">
+    <header><div class="id">Stock kraken2 · 50 MB · Luna · wall-clock of Sniper itself</div>
+      <h3>Simulation time grows with total bases, not read count</h3>
+      <span class="pill info">PLANNING TOOL</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Plotted how long stock-kraken2 simulations took against the total bases in the workload, and fitted a fixed-plus-variable cost line from two measured points (50 reads and 2,000 reads).</dd></div>
+        <div><dt>Result</dt><dd>Fixed cost about 72 s (database and taxonomy load) plus about 1.27 ms per base on 50 MB. It predicts the measured 100 and 500-read runs to within about 6%. The 8 GB database costs roughly 2.7× more per base.</dd></div>
+        <div><dt>Why it matters</dt><dd>The full 104,832-read file (357.6 M bases) would take about 5.3 days for one stock run on 50 MB, which is why the project uses subsets.</dd></div>
+        <div><dt>Caveat</dt><dd>This is simulator time, not program speed. Numbers for 10,000 reads and the full file are extrapolations, never run.</dd></div>
+      </dl>
+      <div class="controls"><span class="lab">Estimate</span>
+        <label class="chk" for="tmBases">total bases (millions)</label>
+        <input id="tmBases" type="range" min="0.01" max="360" step="0.01" value="35" style="width:200px">
+        <b class="mono" id="tmOut"></b></div>
+      <div class="chartbox short"><canvas id="cTime" role="img" aria-label="Simulation time versus bases"></canvas></div>
+      <p class="figcap">Points: stock kraken2 on 50 MB, Luna setup (the four hardware-sweep workloads at 15-way plus the 2,000-read run). Line: the two-point fit. Chart: fig8.</p>
+    </div>
+  </div>
+</section>
+
+
+<section id="laptop" data-nav="Laptop sweep (32 runs)" data-group="Software cache">
+  <div class="kicker">Software cache · your laptop's cache setup · step 26</div>
+  <h2>Laptop sweep: read count × database × width</h2>
+  <div class="expt">
+    <header><div class="id">Ryzen 7 5800H config · 8 GB and 16 GB · 10, 50, 100, 500 reads · stock and 1, 4, 8-way · 32 runs</div>
+      <h3>Does the large-database win hold as the workload grows?</h3>
+      <span class="pill win">WINS SMALL</span><span class="pill loss">LOSES LARGE</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Ran every combination of four workload sizes, two big databases and four builds (stock, 1, 4 and 8-way), 32 runs, on the laptop's simulated cache setup. The biggest run took about 9 hours.</dd></div>
+        <div><dt>Why</dt><dd>The fair batch only used 50 reads. The open question was whether the 8 GB+ win survives larger workloads, the same test we had already run for the small database.</dd></div>
+        <div><dt>Result</dt><dd>At 10 reads the cache is 3.3 to 3.6× faster; at 50 reads about 2×. At 100 reads 8 GB flips to a loss (1.03 to 1.06× slower) while 16 GB still wins (up to 1.08× faster). At 500 reads both lose: 8 GB 1.09× slower, 16 GB 1.02× slower. 4-way is the best width in every row.</dd></div>
+        <div><dt>What we learned</dt><dd>The win shrinks steadily with workload size and reverses. Bigger databases hold the win longer (16 GB flips later than 8 GB), but two databases are too few to call that a rule. Width ranking never changes; only the sign does.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">Confound: the "reads" axis is not clean</b>
+      <p>The 10 and 50-read files are short reads (786 and 1,827 bases on average, 8 K and 91 K bases in total). The 100 and 500-read files come from the front of a long-read file (47 K and 51 K bases per read, 4.7 M and 25.4 M in total). Between 50 and 100 reads the count doubled, but the sequence grew about 50-fold, exactly where 8 GB flips. See the <a href="#longread">long-read test</a> that separates these.</p></div>
+      <div class="controls">
+        <span class="lab">Database</span><div class="seg" id="lapDb" role="group"></div>
+        <span class="lab">Metric</span><div class="seg" id="lapMetric" role="group"></div>
+        <span class="lab">Variants</span><span id="lapVars"></span>
+      </div>
+      <div class="chartbox tall"><canvas id="cLap" role="img" aria-label="Laptop sweep chart"></canvas></div>
+      <p class="figcap">Speedup above 1.0 means faster than stock kraken2 at the same reads and database. Source: <code>laptop_sweep_2026-09-15.csv</code>. No committed chart yet; this page is its first graph.</p>
+      <h3>Speedup matrix</h3>
+      <div class="tw"><table id="tLapMatrix"></table></div>
+      <h3>All 32 runs</h3>
+      <div class="tw" style="max-height:420px"><table id="tLap"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="longread" data-nav="Long-read scaling" data-group="Software cache">
+  <div class="kicker">Software cache · laptop setup · 8 GB · step 45</div>
+  <h2>Long-read scaling: what drives the flip?</h2>
+  <div class="expt">
+    <header><div class="id">10, 25, 50 long reads from the same file as the 100 and 500-read runs · stock vs 4-way</div>
+      <h3>Read count, read length, or total bases?</h3>
+      <span class="pill loss">CROSSOVER AT 2 TO 5 M BASES</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Cut the first 10, 25 and 50 reads of <code>reads_fast_2000.fastq</code> (0.35 M, 0.90 M and 1.87 M bases, 35 to 37 kbp per read) and ran stock and 4-way on the 8 GB database. Together with the sweep's 100 and 500-read rows from the same file, that gives a five-point curve where read length stays roughly constant.</dd></div>
+        <div><dt>Why</dt><dd>To separate read count, read length and total bases, which all changed together in the laptop sweep.</dd></div>
+        <div><dt>Result</dt><dd>4-way beats stock by 42% at 10 long reads (1.42×), 20% at 25, 4.5% at 50, then loses by 3% at 100 and 9% at 500.</dd></div>
+        <div><dt>What we learned</dt><dd>Read length alone does not cause the loss: 10 reads of about 35 kbp each still win by 42%. The advantage falls steadily with total sequence and flips between 1.87 M and 4.7 M bases.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">A suspicious constant in the small-workload wins</b>
+      <p>The second chart shows stock minus 4-way instructions. It is <b>+14.4 M at 10 long reads and +14.2 M at 25</b>, the same number even though the data grew 2.6×. A per-read saving from the cache would grow with the data. This looks like a fixed difference in start-up code between the two builds (they come from different kraken2 source snapshots, and Sniper simulates the whole program including start-up). Part of the small-workload win may therefore be a start-up artifact, not the cache. The test that settles it is to run both builds on about 1 read.</p></div>
+      <div class="controls"><span class="lab">Chart</span><div class="seg" id="lrMode" role="group"></div></div>
+      <div class="chartbox tall"><canvas id="cLong" role="img" aria-label="Long read scaling chart"></canvas></div>
+      <p class="figcap">8 GB database, laptop cache setup. Circles are the new long-read runs; squares are the laptop sweep's 100 and 500-read rows. Sources: <code>longread_scaling_S0/4way_2026-09-19.csv</code>, <code>laptop_sweep_2026-09-15.csv</code>.</p>
+      <div class="tw"><table id="tLong"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="size" data-nav="Cache size sweep" data-group="Software cache">
+  <div class="kicker">Software cache · size axis · steps 27 to 34</div>
+  <h2>Cache size: 2,048 to 1,048,576 sets</h2>
+  <div class="expt">
+    <header><div class="id">Six size-pinned 4-way binaries · four databases · run by two sessions in parallel</div>
+      <h3>Is there a cache size that helps?</h3>
+      <span class="pill nul">SIZE DOES NOT MATTER</span><span class="pill warn">ONE ANOMALY AT 65,536</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Found that kraken2 fixes the cache size at compile time (a formula sets it from the L3 size and the thread count, clamped to 4,096 to 262,144 sets). Built six binaries with the size pinned to 2,048, 4,096, 16,384, 65,536, 262,144 and 1,048,576 sets, all 4-way, and swept them over four databases. Each build's classification output was checked identical to stock.</dd></div>
+        <div><dt>Why</dt><dd>Every earlier test changed the number of ways at whatever size the formula picked. Nobody had varied capacity itself. A tuned size might be where the real gain hides.</dd></div>
+        <div><dt>Result</dt><dd>Flat within 0.7% of each database's median at five of six sizes, on every database. The one exception is 65,536 sets: +6.3% (50 MB), +2.5% (8 GB), +1.0% (16 GB), +6.0% (103 GB), then back to baseline at 262,144 and above. On 50 MB, stock kraken2 (14.1 M cycles) beats or ties every size.</dd></div>
+        <div><dt>What we learned</dt><dd>Capacity is not the lever, on small or large databases. The best-supported explanation for the 65,536 spike is a hash-distribution artifact of this workload file's minimizers at that one mask width, not a general size law. It is unproven.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">Data caveats for this sweep</b>
+      <p><b>Mixed workloads.</b> The 50 MB and 103 GB ladders used 10 reads; the 8 GB and 16 GB ladders used 50 reads. Do not compare their cycle counts to each other. <b>Different cache.</b> These binaries are the current S2 design (heap-allocated, 16-byte entries, hash-mixed set index), not the fixed-4,096-set builds used in the width tests. <b>Not in the verdict chart.</b> The 16 GB ladder was left out of fig14 and shows the weakest spike.</p></div>
+      <div class="controls"><span class="lab">Database</span><div class="seg" id="szDb" role="group"></div>
+        <span class="lab">Y axis</span><div class="seg" id="szMode" role="group"></div></div>
+      <div class="chartbox tall"><canvas id="cSize" role="img" aria-label="Cache size sweep chart"></canvas></div>
+      <p class="figcap">Log-scale x axis. Sources: <code>size_sweep_50mb</code>, <code>cache_size_sweep_8gb16gb</code>, <code>size_sweep_103gb</code> (2026-09-15). Chart: fig14 (50 MB, 8 GB and 103 GB only).</p>
+      <div class="tw" style="max-height:380px"><table id="tSize"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="debate" data-nav="Hypotheses H1 to H4" data-group="Software cache">
+  <div class="kicker">Verdict of the size research brief · step 33</div>
+  <h2>Five agents, three iterations, four hypotheses</h2>
+  <p class="sub">A two-session research pipeline. Five independent agents each analysed the existing data, wrote a plan, then debated to a written conclusion, three times, folding real new runs in between. Iteration 2's leading mechanism (a linear start-up cost proportional to cache size) was overturned when the 103 GB data showed the spike reverting at larger sizes.</p>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>Hypothesis</th><th>Verdict</th><th>Key evidence</th></tr></thead>
+    <tbody>
+      <tr><td>H1</td><td class="wrap">The small-database loss is structural, not a sizing problem</td><td><span class="pill win">CONFIRMED</span></td><td class="wrap">Stock 14.1 M cycles ≤ all six sizes on 50 MB; hardware associativity null triangulates on the same near-zero reuse</td></tr>
+      <tr><td>H2</td><td class="wrap">The large-database win grows with cache capacity</td><td><span class="pill loss">REFUTED</span></td><td class="wrap">Five of six sizes on 8 and 103 GB are cycle-identical; the one different size is a loss</td></tr>
+      <tr><td>H3</td><td class="wrap">The best size is a fixed fraction of the database</td><td><span class="pill loss">REFUTED (location)</span></td><td class="wrap">Anomaly at the identical 65,536 sets across a 2,000× database range; its size varies (+1.0 to +6.3%), so magnitude is database-dependent</td></tr>
+      <tr><td>H4</td><td class="wrap">Kraken2's default sizing formula is near-optimal</td><td><span class="pill nul">CONFIRMED, TRIVIALLY, AT ONE THREAD</span></td><td class="wrap">Nothing beats it because nothing beats anything at one thread. Says nothing about the multi-thread regime the formula governs; a real-hardware null exists there too. Recommendation: do not retune the formula</td></tr>
+    </tbody></table></div>
+  <div class="callout note"><b class="t">Practical recommendation from the brief</b>
+  <p>Stop tuning cache size. Redirect effort to eviction policy under real thread contention and to Thesis 2 (cell width and double hashing), which none of this touched.</p></div>
+</section>
+
+
+<section id="hwassoc" data-nav="L3 associativity" data-group="Hardware">
+  <div class="kicker">Hardware only · no software cache · steps 25 and 35</div>
+  <h2>Hardware L3 associativity: 1 to 30-way</h2>
+  <div class="expt">
+    <header><div class="id">Stock kraken2 · Luna setup · 36 runs across three databases</div>
+      <h3>Does the CPU's own L3 associativity change kraken2's speed?</h3>
+      <span class="pill nul">NO EFFECT</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Kept stock kraken2 (no S2 table) and changed only the <i>hardware</i> L3's associativity: 1, 4, 8, 15 (Luna's real value), 16 and 30-way, at fixed slice size (1,125 KB, so the set count changes with the ways). First on 50 MB at 10, 50, 100 and 500 reads (24 runs); then on 8 GB and 16 GB at 50 reads (12 runs).</dd></div>
+        <div><dt>Why</dt><dd>Every other experiment varied the <i>software</i> cache. This is its mirror: does the hardware's own associativity matter, independent of any software cache? It had never been isolated.</dd></div>
+        <div><dt>Result</dt><dd>Cycles do not move: under 1% spread at every workload size on 50 MB (at 500 reads: 4,523 to 4,538 M), 51.7 to 51.8 M on 8 GB, exactly 60.7 M on 16 GB. There is no trend with associativity.</dd></div>
+        <div><dt>What we learned</dt><dd>Almost nothing on this workload is resolved at L2 or L3: those hit rates stay under about 2%. Lookups are nearly all an L1 hit or a full memory miss, so tuning the mid-level caches has nothing to act on. It also explains why the software cache fails on small databases. The bottleneck is memory latency, not cache organisation.</dd></div>
+      </dl>
+      <div class="controls"><span class="lab">Show</span><div class="seg" id="hwaMode" role="group"></div></div>
+      <div class="chartbox"><canvas id="cHwa" role="img" aria-label="Hardware associativity chart"></canvas></div>
+      <p class="figcap">The default view plots each run's cycles as a percent difference from the same workload at Luna's real 15-way, so all workload sizes share one axis. Sources: <code>hw_assoc_sweep_2026-09-14.csv</code> (50 MB), <code>hw_assoc_sweep_bigdb_2026-09-15.csv</code> (8 and 16 GB). Charts: fig12, fig13.</p>
+      <div class="tw" style="max-height:420px"><table id="tHwa"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="flat" data-nav="Flat L3 vs mesh L3" data-group="Hardware">
+  <div class="kicker">Hardware only · step 36</div>
+  <h2>Flat L3 versus the per-core mesh model</h2>
+  <div class="expt">
+    <header><div class="id">Stock kraken2 · Luna setup · 50 MB and 8 GB · 50 reads · 4 runs</div>
+      <h3>Does modeling the L3 as one bank instead of 96 slices change the answer?</h3>
+      <span class="pill info">TOPOLOGY MATTERS</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Rebuilt Luna's L3 as a single 105 MB, 15-way bank (114,688 sets) instead of 96 per-core mesh slices, keeping the same latencies, and ran stock kraken2 both ways.</dd></div>
+        <div><dt>Why</dt><dd>Every Luna experiment assumed the mesh-slice model. The simpler flat model might have given the same numbers, which would make the extra modeling unnecessary.</dd></div>
+        <div><dt>Result</dt><dd>The flat model is slower on both databases: about 31% more cycles on 50 MB and 17% more on 8 GB. IPC falls from 1.47 to 1.12 and from 1.32 to 1.13.</dd></div>
+        <div><dt>What we learned</dt><dd>The mesh model is not just extra realism: it changes the result. The flat bank's very different set count (114,688 vs 1,200 per slice) changes tag lookup and conflict behaviour. Caveat: every run uses one simulated core, so this shows the latency-model effect and would be larger for a multi-core workload.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">Data caveat</b>
+      <p>In <code>flatl3_comparison_2026-09-15.csv</code> the <code>l3_hit_pct</code> column reads 0 for both mesh rows. That is a bug in the run script (it never fell back to the mesh statistic). Cycles, instructions and IPC are unaffected.</p></div>
+      <div class="chartbox short"><canvas id="cFlat" role="img" aria-label="Flat versus mesh L3 chart"></canvas></div>
+      <p class="figcap">Source: <code>flatl3_comparison_2026-09-15.csv</code>. No committed chart yet.</p>
+      <div class="tw"><table id="tFlat"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="hwnot" data-nav="Hardware not yet tested" data-group="Hardware">
+  <div class="kicker">Hardware only · gaps</div>
+  <h2>What no experiment has varied yet</h2>
+  <p class="sub">Two hardware knobs have been isolated (L3 associativity, L3 layout). These have not, and are the natural next hardware sweep on the 8 GB and 16 GB databases:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Knob</th><th>Why it might matter</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>L3 total size</td><td class="wrap">Only changed as part of whole-machine profiles</td><td><span class="pill warn">NOT ISOLATED</span></td></tr>
+      <tr><td>L2 size and ways</td><td class="wrap">Luna's cycles are ~15% lower than the desktop's; the larger L2 is one suspect</td><td><span class="pill warn">NOT ISOLATED</span></td></tr>
+      <tr><td>L1 size and ways</td><td class="wrap">Orin's 64 KB L1 may explain its cheaper stock run</td><td><span class="pill warn">NOT ISOLATED</span></td></tr>
+      <tr><td>Memory latency and bandwidth</td><td class="wrap">Kraken2 waits on memory; this is the most likely lever. Currently a generic DDR4-2400 placeholder</td><td><span class="pill warn">PLACEHOLDER</span></td></tr>
+      <tr><td>Overlapping memory requests (prefetch, batching)</td><td class="wrap">A batched-lookup patch (S5.0) exists in the source tree but was never simulated</td><td><span class="pill warn">NEVER SIMULATED</span></td></tr>
+      <tr><td>L3 replacement policy</td><td class="wrap">Set to LRU; the real chip's policy is an undocumented adaptive scheme</td><td><span class="pill warn">PLACEHOLDER</span></td></tr>
+      <tr><td>Page size and TLB</td><td class="wrap">A real-hardware finding: memory mapping was worth 12 to 14×, more than any patch</td><td><span class="pill warn">NOT SIMULATED</span></td></tr>
+      <tr><td>Multiple threads</td><td class="wrap">Real-hardware slowdowns appear under contention, which one simulated core cannot show</td><td><span class="pill warn">NOT SIMULATED</span></td></tr>
+    </tbody></table></div>
+</section>
+
+
+<section id="internals" data-nav="What is inside S2" data-group="Reference">
+  <div class="kicker">Reference · measured from the binaries and the source</div>
+  <h2>What is inside the S2 cache</h2>
+  <p class="sub">Each kraken2 lookup goes through up to three stages. The S2 table is only the middle one.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Stage</th><th>What happens</th><th>Where the data lives</th></tr></thead>
+    <tbody>
+      <tr><td><b>1. One-entry memory</b></td><td class="wrap">Same minimizer as the previous window? Reuse the stored answer. Stock kraken2 has this; our builds make it per-thread so it survives across reads.</td><td class="wrap">Two variables, 16 bytes: register or L1</td></tr>
+      <tr><td><b>2. S2 table</b> (ours)</td><td class="wrap">Different minimizer: look in a set-associative table of recent answers. On a miss, do stage 3 and insert the result.</td><td class="wrap">Ordinary RAM, private to each thread; the CPU pulls hot parts into L1, L2, L3</td></tr>
+      <tr><td><b>3. Hash table</b></td><td class="wrap">The real search of the database's hash table.</td><td class="wrap">The database: 50 MB to 103 GB of mostly cold memory</td></tr>
+    </tbody></table></div>
+  <div class="callout note"><b class="t">A correctness rule built into the code</b>
+  <p>The S2 table only decides whether stage 3 must run again. Hit counting and species counts stay tied to "different from the immediately preceding minimizer", exactly as stock kraken2 does. Otherwise the cache would silently change the classification report. Every build's output was checked identical to stock.</p></div>
+
+  <h3>Two different S2 designs were used</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Build</th><th>Per-thread memory (measured)</th><th>Layout</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td>Stock (S0)</td><td class="n">0 B</td><td class="wrap">No S2 table; one-entry memory is a local variable</td><td class="wrap">Every "stock / no S2" number</td></tr>
+      <tr><td>1-way</td><td class="n">98,312 B (96 KB)</td><td class="wrap" rowspan="4">Original S2: 4,096 sets × ways × 24-byte entries (tag, taxon, last-used stamp); LRU eviction; raw low bits pick the set; fixed array; atomic counters removed</td><td class="wrap" rowspan="4">Width sweep, fair batch, 2,000 reads, laptop sweep, hardware associativity, long-read scaling</td></tr>
+      <tr><td>4-way</td><td class="n">393,224 B (384 KB)</td></tr>
+      <tr><td>8-way</td><td class="n">786,440 B (768 KB)</td></tr>
+      <tr><td>16-way</td><td class="n">1,572,872 B (1.5 MB)</td></tr>
+      <tr><td>Size-sweep builds</td><td class="n">128 KB at 2,048 sets to 64 MiB at 1,048,576 sets</td><td class="wrap">Current S2: heap-allocated (zero-filled), 16-byte entries, round-robin eviction, hashed set index, 4-way, size pinned at compile time</td><td class="wrap">Cache size sweep only</td></tr>
+    </tbody></table></div>
+  <div class="callout fix"><b class="t">Correction logged 2026-09-19</b>
+  <p>An earlier log entry said the fair-batch 4-way binary "is already the 262,144-set point". Measuring each binary's per-thread memory showed it is 4,096 sets. So the width tests and the size test use different implementations of S2.</p></div>
+
+  <h3>The sizing formula</h3>
+  <p>Current S2 sets the number of sets to <code>floor(0.25 × 105 MiB ÷ (ways × 16 B × threads))</code>, rounded down to a power of 2 and clamped to 4,096 to 262,144. At one thread and 4 ways that gives 262,144 sets (16 MiB). Two real bugs were fixed on the way: a crash at large sizes with 16+ threads, and a slowdown cliff at 1,048,576+ sets from touching every entry at start-up. Neither ever triggers at the sizes the formula picks, and the full real-hardware benchmark (three databases, six thread counts, three runs) found stock, early S2 and final S2 statistically indistinguishable. Our size sweep found no size that beats the others at one thread.</p>
+
+  <h3>The set-index fix</h3>
+  <p>The original index used the minimizer's raw low bits. Measured on the 8 GB database, one set absorbed 225× the average load while another was never touched. Mixing the bits with MurmurHash3 first raised the hit rate from 0.40% to 3.58% at the same capacity, but changed no wall-clock time on real hardware.</p>
+
+  <h3>What "noatomics" means</h3>
+  <p>The first S2 kept global hit and miss counters updated with atomic operations from every thread. With 32 to 96 real threads they fought over one memory location and caused a 2 to 3× artifact on the 50 MB database. The noatomics builds remove only those counters. What the cache stores is unchanged. Our Sniper runs use one thread, so it mostly keeps instruction counts clean.</p>
+
+  <h3>Is S2 the only difference from stock?</h3>
+  <div class="callout warn"><b class="t">Not strictly</b>
+  <p>The source audit found that stock (S0) and our S2 tree are different snapshots of kraken2. The S2 tree's base has program structure S0 lacks (for example a daemon mode), <code>classify.cc</code> differs by about 490 lines even before any S2 code, and the S2 tree also carries the project's other patches: per-thread one-entry memory, the S2 table, the sizing formula and heap allocation, the set-index hash fix, and a prefetch-batching patch. The minimizer lookup loop itself is identical, the hash-table code differs by about 3 lines, and classification output is byte-identical, so most of any difference is very likely the S2 table. But it has not been proven. A clean test builds S0's own source with only the S2 table added.</p></div>
+</section>
+
+<section id="workloads" data-nav="Workloads (FASTQ files)" data-group="Reference">
+  <div class="kicker">Reference · every input file</div>
+  <h2>The FASTQ workloads</h2>
+  <p class="sub">All nine test workloads are the first N reads of a bigger file. The front of that file has unusually long reads, so they are not typical of the data.</p>
+  <div class="controls"><span class="lab">Show</span><div class="seg" id="wlMode" role="group"></div></div>
+  <div class="chartbox short"><canvas id="cWl" role="img" aria-label="Workload sizes chart"></canvas></div>
+  <div class="tw"><table id="tWl"></table></div>
+  <h3>What else exists on Luna</h3>
+  <p class="sub">A search of the whole filesystem found 86 FASTQ files, 85 GB in total, all in our own account. They are one sequencing run (16 raw-signal files basecalled three ways) plus copies and tiny examples.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Set</th><th class="n">Files</th><th class="n">Size</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Basecalled run: fast, hac, sup</td><td class="n">16 each</td><td class="n">about 12 GB each</td><td class="wrap">Same reads at three accuracies. One file: 141,109 reads, 450 M bases, 3.2 kbp average, so roughly 2 M reads per quality.</td></tr>
+      <tr><td>Per-file copy and merged files</td><td class="n">16 + 3</td><td class="n">12 GB + 36 GB</td><td class="wrap">Copies and merges of the same reads</td></tr>
+      <tr><td><code>reads_fast/hac/sup.fastq</code></td><td class="n">3</td><td class="n">about 0.7 GB each</td><td class="wrap">104,832 reads (357.6 M bases, 3.4 kbp average). The source of every long-read workload.</td></tr>
+      <tr><td>Tool example reads</td><td class="n">4</td><td class="n">under 2 MB</td><td class="wrap">5,000 short read pairs from a public set, and a tiny example</td></tr>
+      <tr><td>Raw signal (<code>pod5</code>)</td><td class="n">22</td><td class="n">65.5 GB</td><td class="wrap">Already basecalled</td></tr>
+    </tbody></table></div>
+  <div class="callout note"><b class="t">The better sample</b>
+  <p>A random sample drawn across all 16 files would have a realistic 3.2 kbp average length. It has not been built or run yet.</p></div>
+</section>
+
+
+<section id="fixes" data-nav="Corrections and caveats" data-group="Reference">
+  <div class="kicker">Reference · honesty log</div>
+  <h2>Mistakes caught and caveats to carry</h2>
+  <p class="sub">Each of these changed a number or a claim. All are also written up in the command log.</p>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>What was wrong</th><th>How it was caught</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="wrap">The width-sweep "baseline" was thought to be no cache; it already had an S2 cache</td><td class="wrap">Looked for the S2 symbol in the binary</td><td class="wrap">True stock build (S0) identified and used from then on</td></tr>
+      <tr><td>2</td><td class="wrap">1-way/8-way timings taken while other jobs were running</td><td class="wrap">1-way looked 122% slower than 4-way at almost identical cycles</td><td class="wrap">Wall-clock discarded, clean rerun</td></tr>
+      <tr><td>3</td><td class="wrap">Batches run hours apart are not comparable in wall-clock</td><td class="wrap">Seconds per million cycles differed 14 vs 8 between batches</td><td class="wrap">One fair batch of 20 runs</td></tr>
+      <tr><td>4</td><td class="wrap">Sniper's wall-clock was used as speed; it measures the simulator</td><td class="wrap">Wall-clock said 1-way wins; cycles said 4-way</td><td class="wrap">All headline numbers switched to cycles</td></tr>
+      <tr><td>5</td><td class="wrap">"The 2× speedup was a small-read-count artifact"</td><td class="wrap">Checked the 2,000-read job's database: 50 MB, already losing at 50 reads</td><td class="wrap">Explanation withdrawn; the split is by database size</td></tr>
+      <tr><td>6</td><td class="wrap">Size-65,536 spike quoted as +4.4% and +10.2%</td><td class="wrap">Peer session: those were instruction deltas, not cycles</td><td class="wrap">Correct: +2.5% (8 GB), +6.0% (103 GB)</td></tr>
+      <tr><td>7</td><td class="wrap">"The fair-batch 4-way is the 262,144-set point"</td><td class="wrap">Measured each binary's per-thread memory</td><td class="wrap">It is 4,096 sets; two S2 designs were used</td></tr>
+      <tr><td>8</td><td class="wrap">"64-way touches 4.7× more lines than 4-way"</td><td class="wrap">Recomputed from the table</td><td class="wrap">4.3× (the 4.7× is against the baseline row)</td></tr>
+      <tr><td>9</td><td class="wrap">50 MB tail run wrote no results rows</td><td class="wrap">CSV was two rows short after the log said done</td><td class="wrap">Rows recovered by hand from the raw logs</td></tr>
+      <tr><td>10</td><td class="wrap">Figure 14 panels use different workloads; the "peer 8 GB" file is a copy of our 8 GB data; the 16 GB ladder was never used</td><td class="wrap">Full audit of commits and data</td><td class="wrap">Cross-database comparison is not like-for-like</td></tr>
+      <tr><td>11</td><td class="wrap">Flat-L3 file's hit-rate column is 0 for the mesh rows</td><td class="wrap">Compared with the same config's other runs</td><td class="wrap">Column unreliable; cycles unaffected</td></tr>
+      <tr><td>12</td><td class="wrap">"Stock" has a one-entry cache, and is a different kraken2 snapshot</td><td class="wrap">Read both sources</td><td class="wrap">Claim narrowed to "S2 build vs stock kraken2"</td></tr>
+      <tr><td>13</td><td class="wrap">Small-workload wins may include a fixed start-up difference (constant ~14 M instruction gap)</td><td class="wrap">Instruction gap was the same at 10 and 25 long reads</td><td class="wrap">Open: needs the 1-read test</td></tr>
+    </tbody></table></div>
+</section>
+
+<section id="open" data-nav="Open questions and next steps" data-group="Reference">
+  <div class="kicker">Reference · what is not known</div>
+  <h2>Open questions and the next experiments</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Priority</th><th>Experiment</th><th>What it settles</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="wrap"><b>1-read fixed-cost test.</b> Run stock and 4-way on about one read, 8 GB.</td><td class="wrap">Whether the small-workload wins are a start-up artifact of two different source snapshots</td></tr>
+      <tr><td>2</td><td class="wrap"><b>Clean A/B build.</b> Stock's own source plus only the S2 table, nothing else.</td><td class="wrap">Whether the S2 table alone produces the gains and losses</td></tr>
+      <tr><td>3</td><td class="wrap"><b>Random-sample workloads.</b> 10 to 10,000 reads drawn across all 16 basecalled files (3.2 kbp average).</td><td class="wrap">Where the crossover really sits on realistic data</td></tr>
+      <tr><td>4</td><td class="wrap"><b>Simulate the prefetch-batching patch</b> (S5.0).</td><td class="wrap">Whether overlapping memory requests, aimed at the actual bottleneck, helps</td></tr>
+      <tr><td>5</td><td class="wrap"><b>Isolated hardware sweeps.</b> L3 size, L2 and L1 size and ways, memory latency, on 8 GB and 16 GB.</td><td class="wrap">Which hardware knob has headroom for this workload</td></tr>
+      <tr><td>6</td><td class="wrap"><b>Multi-thread simulation.</b></td><td class="wrap">The contention regime where real slowdowns appear</td></tr>
+      <tr><td>7</td><td class="wrap"><b>Real-hardware confirmation</b> of any promising simulated result.</td><td class="wrap">Whether anything here survives outside the simulator</td></tr>
+      <tr><td>8</td><td class="wrap"><b>Redo figure 14</b> with matched workloads and the 16 GB ladder.</td><td class="wrap">Whether the size-65,536 spike is really the same effect on every database</td></tr>
+    </tbody></table></div>
+</section>
+
+<section id="index" data-nav="Experiment index" data-group="Reference">
+  <div class="kicker">Reference · full chronological index</div>
+  <h2>Every experiment, in order</h2>
+  <p class="sub">Filter by type, then open any row for what was done and what came out. Dates are the day work started.</p>
+  <div class="chips" id="idxChips" role="group" aria-label="Filter experiments"></div>
+  <ul class="idx" id="idxList"></ul>
+</section>
+
+<section id="data" data-nav="Data files and figures" data-group="Reference">
+  <div class="kicker">Reference · everything committed</div>
+  <h2>Data files, figures and scripts</h2>
+  <p class="sub">All of it lives in the <a href="https://github.com/KathpaliaChirag/Nanopore-project/tree/main/cache_simulation">cache_simulation folder</a> of the repository. Every chart on this page is drawn from these files by <code>scripts/build_report.py</code>.</p>
+  <h3>Measurement files</h3>
+  <div class="tw"><table id="tInv"></table></div>
+  <h3>Committed figures</h3>
+  <div class="tw"><table id="tFigs"></table></div>
+</section>
+
+<footer>Built from committed data by <code>cache_simulation/scripts/build_report.py</code>. Simulator: Sniper, detailed mode, single core. Sept 2026.</footer>
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const DATA = {"fair":[{"db":"50mb","variant":"S0","instructions_M":35.8,"cycles_M":24.4,"ipc":1.47,"unique_cache_lines":76606.0,"l1d_loads":11052946.0,"l1d_hit_pct":98.97,"l2_hit_pct":0.4,"nuca_hit_pct":0.0186,"sim_elapsed_s":187.16,"sim_wallclock_s":188.0},{"db":"50mb","variant":"1way","instructions_M":38.2,"cycles_M":27.0,"ipc":1.41,"unique_cache_lines":67751.0,"l1d_loads":11132500.0,"l1d_hit_pct":99.07,"l2_hit_pct":0.41,"nuca_hit_pct":0.0141,"sim_elapsed_s":173.97,"sim_wallclock_s":174.0},{"db":"50mb","variant":"4way","instructions_M":39.7,"cycles_M":26.8,"ipc":1.48,"unique_cache_lines":76966.0,"l1d_loads":11438683.0,"l1d_hit_pct":98.45,"l2_hit_pct":0.96,"nuca_hit_pct":0.0374,"sim_elapsed_s":180.87,"sim_wallclock_s":182.0},{"db":"50mb","variant":"8way","instructions_M":41.3,"cycles_M":27.8,"ipc":1.49,"unique_cache_lines":89255.0,"l1d_loads":12021875.0,"l1d_hit_pct":98.1,"l2_hit_pct":1.12,"nuca_hit_pct":0.1548,"sim_elapsed_s":192.84,"sim_wallclock_s":194.0},{"db":"50mb","variant":"16way","instructions_M":44.0,"cycles_M":28.7,"ipc":1.53,"unique_cache_lines":113831.0,"l1d_loads":12992365.0,"l1d_hit_pct":97.48,"l2_hit_pct":1.15,"nuca_hit_pct":0.2034,"sim_elapsed_s":208.44,"sim_wallclock_s":209.0},{"db":"8gb","variant":"S0","instructions_M":68.1,"cycles_M":51.8,"ipc":1.32,"unique_cache_lines":186526.0,"l1d_loads":13971371.0,"l1d_hit_pct":98.86,"l2_hit_pct":0.66,"nuca_hit_pct":0.0086,"sim_elapsed_s":408.42,"sim_wallclock_s":409.0},{"db":"8gb","variant":"1way","instructions_M":51.7,"cycles_M":28.6,"ipc":1.81,"unique_cache_lines":54874.0,"l1d_loads":14455233.0,"l1d_hit_pct":98.83,"l2_hit_pct":0.89,"nuca_hit_pct":0.0037,"sim_elapsed_s":219.69,"sim_wallclock_s":220.0},{"db":"8gb","variant":"4way","instructions_M":51.9,"cycles_M":28.3,"ipc":1.84,"unique_cache_lines":64091.0,"l1d_loads":14508400.0,"l1d_hit_pct":98.75,"l2_hit_pct":0.92,"nuca_hit_pct":0.0117,"sim_elapsed_s":222.17,"sim_wallclock_s":223.0},{"db":"8gb","variant":"8way","instructions_M":52.2,"cycles_M":28.7,"ipc":1.82,"unique_cache_lines":76379.0,"l1d_loads":14595899.0,"l1d_hit_pct":98.68,"l2_hit_pct":0.92,"nuca_hit_pct":0.0339,"sim_elapsed_s":229.3,"sim_wallclock_s":230.0},{"db":"8gb","variant":"16way","instructions_M":52.6,"cycles_M":28.9,"ipc":1.82,"unique_cache_lines":100954.0,"l1d_loads":14807557.0,"l1d_hit_pct":98.55,"l2_hit_pct":0.91,"nuca_hit_pct":0.0403,"sim_elapsed_s":235.32,"sim_wallclock_s":236.0},{"db":"16gb","variant":"S0","instructions_M":77.3,"cycles_M":60.7,"ipc":1.27,"unique_cache_lines":200423.0,"l1d_loads":15591214.0,"l1d_hit_pct":98.71,"l2_hit_pct":0.83,"nuca_hit_pct":0.0164,"sim_elapsed_s":463.08,"sim_wallclock_s":464.0},{"db":"16gb","variant":"1way","instructions_M":51.6,"cycles_M":30.1,"ipc":1.71,"unique_cache_lines":47681.0,"l1d_loads":14613269.0,"l1d_hit_pct":99.03,"l2_hit_pct":0.72,"nuca_hit_pct":0.0081,"sim_elapsed_s":225.83,"sim_wallclock_s":226.0},{"db":"16gb","variant":"4way","instructions_M":51.9,"cycles_M":29.6,"ipc":1.76,"unique_cache_lines":56898.0,"l1d_loads":14696932.0,"l1d_hit_pct":98.9,"l2_hit_pct":0.8,"nuca_hit_pct":0.0268,"sim_elapsed_s":231.27,"sim_wallclock_s":232.0},{"db":"16gb","variant":"8way","instructions_M":52.3,"cycles_M":30.1,"ipc":1.74,"unique_cache_lines":69185.0,"l1d_loads":14842511.0,"l1d_hit_pct":98.8,"l2_hit_pct":0.81,"nuca_hit_pct":0.0528,"sim_elapsed_s":236.32,"sim_wallclock_s":237.0},{"db":"16gb","variant":"16way","instructions_M":53.0,"cycles_M":30.4,"ipc":1.75,"unique_cache_lines":93761.0,"l1d_loads":15145608.0,"l1d_hit_pct":98.62,"l2_hit_pct":0.8,"nuca_hit_pct":0.0609,"sim_elapsed_s":246.41,"sim_wallclock_s":248.0},{"db":"103gb","variant":"S0","instructions_M":102.9,"cycles_M":94.3,"ipc":1.09,"unique_cache_lines":306921.0,"l1d_loads":18687186.0,"l1d_hit_pct":98.69,"l2_hit_pct":0.67,"nuca_hit_pct":0.0365,"sim_elapsed_s":699.79,"sim_wallclock_s":700.0},{"db":"103gb","variant":"1way","instructions_M":68.8,"cycles_M":48.8,"ipc":1.41,"unique_cache_lines":79566.0,"l1d_loads":19341407.0,"l1d_hit_pct":98.67,"l2_hit_pct":0.94,"nuca_hit_pct":0.0329,"sim_elapsed_s":345.41,"sim_wallclock_s":346.0},{"db":"103gb","variant":"4way","instructions_M":70.3,"cycles_M":47.8,"ipc":1.47,"unique_cache_lines":88782.0,"l1d_loads":19651122.0,"l1d_hit_pct":98.29,"l2_hit_pct":1.24,"nuca_hit_pct":0.0668,"sim_elapsed_s":360.32,"sim_wallclock_s":360.0},{"db":"103gb","variant":"8way","instructions_M":71.9,"cycles_M":49.1,"ipc":1.46,"unique_cache_lines":101070.0,"l1d_loads":20234291.0,"l1d_hit_pct":98.07,"l2_hit_pct":1.3,"nuca_hit_pct":0.1116,"sim_elapsed_s":374.1,"sim_wallclock_s":375.0},{"db":"103gb","variant":"16way","instructions_M":74.6,"cycles_M":50.0,"ipc":1.49,"unique_cache_lines":125646.0,"l1d_loads":21223106.0,"l1d_hit_pct":97.68,"l2_hit_pct":1.33,"nuca_hit_pct":0.1135,"sim_elapsed_s":394.56,"sim_wallclock_s":395.0}],"assoc10":[{"variant":"baseline","instructions":25.1,"cycles":14.2,"ipc":1.77,"unique_cache_lines":51557.0,"elapsed_s":114.91},{"variant":"lru-noatomics-4way","instructions":25.2,"cycles":14.3,"ipc":1.76,"unique_cache_lines":55585.0,"elapsed_s":115.45},{"variant":"lru-noatomics-8way","instructions":25.4,"cycles":14.4,"ipc":1.76,"unique_cache_lines":67873.0,"elapsed_s":121.3},{"variant":"lru-noatomics-16way","instructions":25.8,"cycles":14.7,"ipc":1.76,"unique_cache_lines":92449.0,"elapsed_s":129.51},{"variant":"lru-noatomics-32way","instructions":26.8,"cycles":15.1,"ipc":1.78,"unique_cache_lines":141600.0,"elapsed_s":138.58},{"variant":"lru-noatomics-64way","instructions":28.6,"cycles":15.9,"ipc":1.8,"unique_cache_lines":239904.0,"elapsed_s":164.55}],"hwsize":[{"hw":"desktop","db":"50mb","variant":"S0","instructions_M":35.8,"cycles_M":28.2,"ipc":1.27,"unique_cache_lines":76608.0,"l1d_loads":11048808.0,"l1d_hit_pct":98.88,"l2_hit_pct":0.41,"nuca_hit_pct":0.183,"sim_elapsed_s":195.06,"sim_wallclock_s":196.0},{"hw":"desktop","db":"50mb","variant":"4way","instructions_M":39.7,"cycles_M":30.7,"ipc":1.29,"unique_cache_lines":76968.0,"l1d_loads":11438835.0,"l1d_hit_pct":98.29,"l2_hit_pct":0.67,"nuca_hit_pct":0.5557,"sim_elapsed_s":190.4,"sim_wallclock_s":191.0},{"hw":"desktop","db":"8gb","variant":"S0","instructions_M":68.1,"cycles_M":60.6,"ipc":1.12,"unique_cache_lines":186524.0,"l1d_loads":13969666.0,"l1d_hit_pct":98.66,"l2_hit_pct":0.68,"nuca_hit_pct":0.2549,"sim_elapsed_s":425.48,"sim_wallclock_s":425.0},{"hw":"desktop","db":"8gb","variant":"4way","instructions_M":51.9,"cycles_M":31.3,"ipc":1.66,"unique_cache_lines":64091.0,"l1d_loads":14508256.0,"l1d_hit_pct":98.61,"l2_hit_pct":0.68,"nuca_hit_pct":0.4305,"sim_elapsed_s":229.8,"sim_wallclock_s":230.0},{"hw":"orion_sizes","db":"50mb","variant":"S0","instructions_M":35.8,"cycles_M":26.7,"ipc":1.34,"unique_cache_lines":76605.0,"l1d_loads":11048748.0,"l1d_hit_pct":99.0,"l2_hit_pct":0.19,"nuca_hit_pct":0.1557,"sim_elapsed_s":195.04,"sim_wallclock_s":196.0},{"hw":"orion_sizes","db":"50mb","variant":"4way","instructions_M":39.7,"cycles_M":29.6,"ipc":1.34,"unique_cache_lines":76966.0,"l1d_loads":11439456.0,"l1d_hit_pct":98.47,"l2_hit_pct":0.31,"nuca_hit_pct":0.1933,"sim_elapsed_s":192.17,"sim_wallclock_s":193.0},{"hw":"orion_sizes","db":"8gb","variant":"S0","instructions_M":68.1,"cycles_M":55.9,"ipc":1.22,"unique_cache_lines":186524.0,"l1d_loads":13969745.0,"l1d_hit_pct":98.93,"l2_hit_pct":0.3,"nuca_hit_pct":0.1379,"sim_elapsed_s":416.94,"sim_wallclock_s":418.0},{"hw":"orion_sizes","db":"8gb","variant":"4way","instructions_M":51.9,"cycles_M":33.9,"ipc":1.53,"unique_cache_lines":64095.0,"l1d_loads":14508332.0,"l1d_hit_pct":98.81,"l2_hit_pct":0.36,"nuca_hit_pct":0.1112,"sim_elapsed_s":233.28,"sim_wallclock_s":234.0}],"r2000":[{"workload":"2000reads","variant":"S0","instructions_M":10053.7,"cycles_M":6354.0,"ipc":1.58,"unique_cache_lines":1615102.0,"l1d_loads":3149300943.0,"l1d_hit_pct":99.04,"l2_hit_pct":0.21,"nuca_hit_pct":0.0297,"elapsed_s":44714.29,"wallclock_s":44716.0},{"workload":"2000reads","variant":"1way","instructions_M":11350.6,"cycles_M":8336.3,"ipc":1.36,"unique_cache_lines":2272676.0,"l1d_loads":3160208416.0,"l1d_hit_pct":99.21,"l2_hit_pct":0.17,"nuca_hit_pct":0.0153,"elapsed_s":44497.1,"wallclock_s":44497.0},{"workload":"2000reads","variant":"4way","instructions_M":11829.2,"cycles_M":8159.1,"ipc":1.45,"unique_cache_lines":2281890.0,"l1d_loads":3259257863.0,"l1d_hit_pct":98.49,"l2_hit_pct":0.81,"nuca_hit_pct":0.06,"elapsed_s":45598.46,"wallclock_s":45600.0},{"workload":"2000reads","variant":"8way","instructions_M":12391.2,"cycles_M":8508.1,"ipc":1.46,"unique_cache_lines":2294178.0,"l1d_loads":3459818613.0,"l1d_hit_pct":98.12,"l2_hit_pct":1.03,"nuca_hit_pct":0.1485,"elapsed_s":49054.87,"wallclock_s":49055.0},{"workload":"2000reads","variant":"16way","instructions_M":13322.2,"cycles_M":8805.9,"ipc":1.51,"unique_cache_lines":2313682.0,"l1d_loads":3789760288.0,"l1d_hit_pct":97.44,"l2_hit_pct":1.12,"nuca_hit_pct":0.2182,"elapsed_s":53997.69,"wallclock_s":53998.0}],"laptop":[{"reads":10.0,"db":"8gb","variant":"S0","instructions_M":16.3,"cycles_M":18.3,"ipc":0.89,"unique_cache_lines":80157.0,"l1d_loads":2134796.0,"l1d_hit_pct":98.14,"l2_hit_pct":0.84,"nuca_hit_pct":0.1825,"elapsed_s":137.77,"wallclock_s":139.0},{"reads":10.0,"db":"8gb","variant":"1way","instructions_M":7.3,"cycles_M":5.1,"ipc":1.45,"unique_cache_lines":21669.0,"l1d_loads":2052415.0,"l1d_hit_pct":98.41,"l2_hit_pct":0.78,"nuca_hit_pct":0.0705,"elapsed_s":51.74,"wallclock_s":52.0},{"reads":10.0,"db":"8gb","variant":"4way","instructions_M":7.4,"cycles_M":5.1,"ipc":1.45,"unique_cache_lines":30884.0,"l1d_loads":2078120.0,"l1d_hit_pct":98.18,"l2_hit_pct":0.76,"nuca_hit_pct":0.1075,"elapsed_s":55.55,"wallclock_s":57.0},{"reads":10.0,"db":"8gb","variant":"8way","instructions_M":7.5,"cycles_M":5.3,"ipc":1.42,"unique_cache_lines":43171.0,"l1d_loads":2113662.0,"l1d_hit_pct":97.9,"l2_hit_pct":0.75,"nuca_hit_pct":0.0885,"elapsed_s":57.91,"wallclock_s":58.0},{"reads":10.0,"db":"16gb","variant":"S0","instructions_M":19.1,"cycles_M":21.1,"ipc":0.9,"unique_cache_lines":88347.0,"l1d_loads":2555985.0,"l1d_hit_pct":98.18,"l2_hit_pct":0.85,"nuca_hit_pct":0.1767,"elapsed_s":158.47,"wallclock_s":160.0},{"reads":10.0,"db":"16gb","variant":"1way","instructions_M":9.3,"cycles_M":6.3,"ipc":1.47,"unique_cache_lines":23763.0,"l1d_loads":2554630.0,"l1d_hit_pct":98.35,"l2_hit_pct":0.92,"nuca_hit_pct":0.0628,"elapsed_s":63.27,"wallclock_s":63.0},{"reads":10.0,"db":"16gb","variant":"4way","instructions_M":9.3,"cycles_M":6.3,"ipc":1.48,"unique_cache_lines":32978.0,"l1d_loads":2582755.0,"l1d_hit_pct":98.15,"l2_hit_pct":0.9,"nuca_hit_pct":0.1123,"elapsed_s":65.56,"wallclock_s":66.0},{"reads":10.0,"db":"16gb","variant":"8way","instructions_M":9.4,"cycles_M":6.5,"ipc":1.45,"unique_cache_lines":45266.0,"l1d_loads":2622829.0,"l1d_hit_pct":97.91,"l2_hit_pct":0.89,"nuca_hit_pct":0.1061,"elapsed_s":70.09,"wallclock_s":71.0},{"reads":50.0,"db":"8gb","variant":"S0","instructions_M":68.1,"cycles_M":59.7,"ipc":1.14,"unique_cache_lines":186527.0,"l1d_loads":13971437.0,"l1d_hit_pct":98.66,"l2_hit_pct":0.68,"nuca_hit_pct":0.2214,"elapsed_s":571.82,"wallclock_s":573.0},{"reads":50.0,"db":"8gb","variant":"1way","instructions_M":51.7,"cycles_M":31.2,"ipc":1.66,"unique_cache_lines":54875.0,"l1d_loads":14455238.0,"l1d_hit_pct":98.69,"l2_hit_pct":0.67,"nuca_hit_pct":0.3803,"elapsed_s":512.96,"wallclock_s":513.0},{"reads":50.0,"db":"8gb","variant":"4way","instructions_M":51.9,"cycles_M":30.8,"ipc":1.69,"unique_cache_lines":64090.0,"l1d_loads":14508403.0,"l1d_hit_pct":98.61,"l2_hit_pct":0.68,"nuca_hit_pct":0.4132,"elapsed_s":531.43,"wallclock_s":532.0},{"reads":50.0,"db":"8gb","variant":"8way","instructions_M":52.2,"cycles_M":31.4,"ipc":1.66,"unique_cache_lines":76378.0,"l1d_loads":14595835.0,"l1d_hit_pct":98.54,"l2_hit_pct":0.68,"nuca_hit_pct":0.4101,"elapsed_s":683.47,"wallclock_s":683.0},{"reads":50.0,"db":"16gb","variant":"S0","instructions_M":77.3,"cycles_M":69.9,"ipc":1.11,"unique_cache_lines":200425.0,"l1d_loads":15591212.0,"l1d_hit_pct":98.47,"l2_hit_pct":0.84,"nuca_hit_pct":0.2962,"elapsed_s":1766.69,"wallclock_s":1767.0},{"reads":50.0,"db":"16gb","variant":"1way","instructions_M":51.6,"cycles_M":32.4,"ipc":1.59,"unique_cache_lines":47683.0,"l1d_loads":14613261.0,"l1d_hit_pct":98.86,"l2_hit_pct":0.69,"nuca_hit_pct":0.2452,"elapsed_s":698.61,"wallclock_s":699.0},{"reads":50.0,"db":"16gb","variant":"4way","instructions_M":51.9,"cycles_M":31.9,"ipc":1.63,"unique_cache_lines":56898.0,"l1d_loads":14696890.0,"l1d_hit_pct":98.73,"l2_hit_pct":0.71,"nuca_hit_pct":0.3063,"elapsed_s":742.79,"wallclock_s":743.0},{"reads":50.0,"db":"16gb","variant":"8way","instructions_M":52.3,"cycles_M":32.6,"ipc":1.6,"unique_cache_lines":69186.0,"l1d_loads":14842564.0,"l1d_hit_pct":98.64,"l2_hit_pct":0.71,"nuca_hit_pct":0.3133,"elapsed_s":604.53,"wallclock_s":605.0},{"reads":100.0,"db":"8gb","variant":"S0","instructions_M":1392.2,"cycles_M":813.6,"ipc":1.71,"unique_cache_lines":1133473.0,"l1d_loads":428253239.0,"l1d_hit_pct":99.27,"l2_hit_pct":0.15,"nuca_hit_pct":0.1822,"elapsed_s":11968.46,"wallclock_s":11969.0},{"reads":100.0,"db":"8gb","variant":"1way","instructions_M":1447.0,"cycles_M":859.1,"ipc":1.68,"unique_cache_lines":843508.0,"l1d_loads":423363218.0,"l1d_hit_pct":99.41,"l2_hit_pct":0.15,"nuca_hit_pct":0.1393,"elapsed_s":5721.07,"wallclock_s":5721.0},{"reads":100.0,"db":"8gb","variant":"4way","instructions_M":1453.0,"cycles_M":839.1,"ipc":1.73,"unique_cache_lines":852723.0,"l1d_loads":424570917.0,"l1d_hit_pct":99.33,"l2_hit_pct":0.15,"nuca_hit_pct":0.1823,"elapsed_s":5771.77,"wallclock_s":5773.0},{"reads":100.0,"db":"8gb","variant":"8way","instructions_M":1460.5,"cycles_M":859.4,"ipc":1.7,"unique_cache_lines":865011.0,"l1d_loads":427268922.0,"l1d_hit_pct":99.29,"l2_hit_pct":0.15,"nuca_hit_pct":0.1898,"elapsed_s":5837.43,"wallclock_s":5838.0},{"reads":100.0,"db":"16gb","variant":"S0","instructions_M":1575.6,"cycles_M":1048.6,"ipc":1.5,"unique_cache_lines":1504746.0,"l1d_loads":464145285.0,"l1d_hit_pct":99.18,"l2_hit_pct":0.19,"nuca_hit_pct":0.1907,"elapsed_s":7655.56,"wallclock_s":7656.0},{"reads":100.0,"db":"16gb","variant":"1way","instructions_M":1524.5,"cycles_M":988.4,"ipc":1.54,"unique_cache_lines":1018879.0,"l1d_loads":446231268.0,"l1d_hit_pct":99.4,"l2_hit_pct":0.14,"nuca_hit_pct":0.1526,"elapsed_s":6131.11,"wallclock_s":6131.0},{"reads":100.0,"db":"16gb","variant":"4way","instructions_M":1536.6,"cycles_M":968.2,"ipc":1.59,"unique_cache_lines":1028093.0,"l1d_loads":448668460.0,"l1d_hit_pct":99.25,"l2_hit_pct":0.16,"nuca_hit_pct":0.2308,"elapsed_s":6136.62,"wallclock_s":6137.0},{"reads":100.0,"db":"16gb","variant":"8way","instructions_M":1551.4,"cycles_M":992.3,"ipc":1.56,"unique_cache_lines":1040381.0,"l1d_loads":453975748.0,"l1d_hit_pct":99.16,"l2_hit_pct":0.17,"nuca_hit_pct":0.2461,"elapsed_s":6264.63,"wallclock_s":6265.0},{"reads":500.0,"db":"8gb","variant":"S0","instructions_M":7043.1,"cycles_M":3946.5,"ipc":1.78,"unique_cache_lines":2806895.0,"l1d_loads":2170377610.0,"l1d_hit_pct":99.28,"l2_hit_pct":0.14,"nuca_hit_pct":0.1757,"elapsed_s":31962.87,"wallclock_s":31964.0},{"reads":500.0,"db":"8gb","variant":"1way","instructions_M":7497.4,"cycles_M":4417.5,"ipc":1.7,"unique_cache_lines":2261034.0,"l1d_loads":2149224599.0,"l1d_hit_pct":99.43,"l2_hit_pct":0.13,"nuca_hit_pct":0.1398,"elapsed_s":28528.62,"wallclock_s":28529.0},{"reads":500.0,"db":"8gb","variant":"4way","instructions_M":7531.1,"cycles_M":4310.7,"ipc":1.75,"unique_cache_lines":2270247.0,"l1d_loads":2156073420.0,"l1d_hit_pct":99.35,"l2_hit_pct":0.14,"nuca_hit_pct":0.1858,"elapsed_s":28874.07,"wallclock_s":28874.0},{"reads":500.0,"db":"8gb","variant":"8way","instructions_M":7571.8,"cycles_M":4416.3,"ipc":1.71,"unique_cache_lines":2282536.0,"l1d_loads":2170669058.0,"l1d_hit_pct":99.3,"l2_hit_pct":0.14,"nuca_hit_pct":0.1961,"elapsed_s":29325.59,"wallclock_s":29327.0},{"reads":500.0,"db":"16gb","variant":"S0","instructions_M":7629.0,"cycles_M":4882.5,"ipc":1.56,"unique_cache_lines":3939088.0,"l1d_loads":2293278535.0,"l1d_hit_pct":99.21,"l2_hit_pct":0.16,"nuca_hit_pct":0.1855,"elapsed_s":35791.56,"wallclock_s":35792.0},{"reads":500.0,"db":"16gb","variant":"1way","instructions_M":7886.8,"cycles_M":5095.6,"ipc":1.55,"unique_cache_lines":3127321.0,"l1d_loads":2255585177.0,"l1d_hit_pct":99.38,"l2_hit_pct":0.15,"nuca_hit_pct":0.1525,"elapsed_s":30554.57,"wallclock_s":30556.0},{"reads":500.0,"db":"16gb","variant":"4way","instructions_M":7955.1,"cycles_M":4988.0,"ipc":1.59,"unique_cache_lines":3136536.0,"l1d_loads":2269458455.0,"l1d_hit_pct":99.22,"l2_hit_pct":0.18,"nuca_hit_pct":0.2403,"elapsed_s":30889.62,"wallclock_s":30890.0},{"reads":500.0,"db":"16gb","variant":"8way","instructions_M":8037.0,"cycles_M":5128.0,"ipc":1.57,"unique_cache_lines":3148824.0,"l1d_loads":2298685720.0,"l1d_hit_pct":99.13,"l2_hit_pct":0.18,"nuca_hit_pct":0.2569,"elapsed_s":31693.11,"wallclock_s":31693.0}],"longS0":[{"reads":10.0,"db":"8gb","variant":"S0","total_bases":346387.0,"instructions_M":128.3,"cycles_M":94.1,"ipc":1.36,"unique_cache_lines":265930.0,"l1d_loads":34401644.0,"l1d_hit_pct":99.11,"l2_hit_pct":0.2,"nuca_hit_pct":0.3677,"elapsed_s":1317.57,"wallclock_s":1318.0},{"reads":25.0,"db":"8gb","variant":"S0","total_bases":900057.0,"instructions_M":302.8,"cycles_M":200.5,"ipc":1.51,"unique_cache_lines":464082.0,"l1d_loads":87350277.0,"l1d_hit_pct":99.05,"l2_hit_pct":0.3,"nuca_hit_pct":0.249,"elapsed_s":2917.18,"wallclock_s":2918.0},{"reads":50.0,"db":"8gb","variant":"S0","total_bases":1868769.0,"instructions_M":567.6,"cycles_M":346.8,"ipc":1.64,"unique_cache_lines":713090.0,"l1d_loads":172785568.0,"l1d_hit_pct":99.22,"l2_hit_pct":0.17,"nuca_hit_pct":0.2169,"elapsed_s":4269.26,"wallclock_s":4269.0}],"long4":[{"reads":10.0,"db":"8gb","variant":"4way","total_bases":346387.0,"instructions_M":113.9,"cycles_M":66.2,"ipc":1.72,"unique_cache_lines":113186.0,"l1d_loads":33502539.0,"l1d_hit_pct":99.19,"l2_hit_pct":0.26,"nuca_hit_pct":0.2295,"elapsed_s":876.83,"wallclock_s":878.0},{"reads":25.0,"db":"8gb","variant":"4way","total_bases":900057.0,"instructions_M":288.6,"cycles_M":166.6,"ipc":1.73,"unique_cache_lines":235858.0,"l1d_loads":84294124.0,"l1d_hit_pct":99.21,"l2_hit_pct":0.24,"nuca_hit_pct":0.231,"elapsed_s":2144.6,"wallclock_s":2145.0},{"reads":50.0,"db":"8gb","variant":"4way","total_bases":1868769.0,"instructions_M":581.8,"cycles_M":331.9,"ipc":1.75,"unique_cache_lines":431146.0,"l1d_loads":169403905.0,"l1d_hit_pct":99.26,"l2_hit_pct":0.2,"nuca_hit_pct":0.2247,"elapsed_s":4308.47,"wallclock_s":4309.0}],"hwassoc50":[{"reads":10.0,"associativity":1.0,"sets":18000.0,"instructions_M":22.4,"cycles_M":13.6,"ipc":1.64,"unique_cache_lines":35802.0,"l1d_loads":5085989.0,"l1d_hit_pct":98.33,"l2_hit_pct":1.18,"nuca_hit_pct":0.0003,"elapsed_s":114.84,"wallclock_s":115.0},{"reads":10.0,"associativity":4.0,"sets":4500.0,"instructions_M":22.4,"cycles_M":13.7,"ipc":1.64,"unique_cache_lines":35802.0,"l1d_loads":5086068.0,"l1d_hit_pct":98.32,"l2_hit_pct":1.18,"nuca_hit_pct":0.0005,"elapsed_s":116.14,"wallclock_s":117.0},{"reads":10.0,"associativity":8.0,"sets":2250.0,"instructions_M":22.4,"cycles_M":13.6,"ipc":1.64,"unique_cache_lines":35801.0,"l1d_loads":5085943.0,"l1d_hit_pct":98.32,"l2_hit_pct":1.18,"nuca_hit_pct":0.0004,"elapsed_s":115.08,"wallclock_s":117.0},{"reads":10.0,"associativity":15.0,"sets":1200.0,"instructions_M":22.4,"cycles_M":13.7,"ipc":1.64,"unique_cache_lines":35801.0,"l1d_loads":5085923.0,"l1d_hit_pct":98.32,"l2_hit_pct":1.18,"nuca_hit_pct":0.0004,"elapsed_s":115.53,"wallclock_s":116.0},{"reads":10.0,"associativity":16.0,"sets":1125.0,"instructions_M":22.4,"cycles_M":13.7,"ipc":1.64,"unique_cache_lines":35802.0,"l1d_loads":5086029.0,"l1d_hit_pct":98.33,"l2_hit_pct":1.18,"nuca_hit_pct":0.0003,"elapsed_s":113.55,"wallclock_s":114.0},{"reads":10.0,"associativity":30.0,"sets":600.0,"instructions_M":22.4,"cycles_M":13.7,"ipc":1.64,"unique_cache_lines":35801.0,"l1d_loads":5085822.0,"l1d_hit_pct":98.32,"l2_hit_pct":1.18,"nuca_hit_pct":0.0004,"elapsed_s":115.64,"wallclock_s":116.0},{"reads":50.0,"associativity":1.0,"sets":18000.0,"instructions_M":35.8,"cycles_M":24.4,"ipc":1.47,"unique_cache_lines":76608.0,"l1d_loads":11048748.0,"l1d_hit_pct":98.97,"l2_hit_pct":0.41,"nuca_hit_pct":0.0147,"elapsed_s":192.28,"wallclock_s":193.0},{"reads":50.0,"associativity":4.0,"sets":4500.0,"instructions_M":35.8,"cycles_M":24.4,"ipc":1.47,"unique_cache_lines":76608.0,"l1d_loads":11048903.0,"l1d_hit_pct":98.97,"l2_hit_pct":0.4,"nuca_hit_pct":0.0179,"elapsed_s":193.95,"wallclock_s":194.0},{"reads":50.0,"associativity":8.0,"sets":2250.0,"instructions_M":35.8,"cycles_M":24.4,"ipc":1.47,"unique_cache_lines":76609.0,"l1d_loads":11048905.0,"l1d_hit_pct":98.97,"l2_hit_pct":0.4,"nuca_hit_pct":0.018,"elapsed_s":192.46,"wallclock_s":193.0},{"reads":50.0,"associativity":15.0,"sets":1200.0,"instructions_M":35.8,"cycles_M":24.4,"ipc":1.47,"unique_cache_lines":76608.0,"l1d_loads":11048796.0,"l1d_hit_pct":98.97,"l2_hit_pct":0.41,"nuca_hit_pct":0.018,"elapsed_s":191.76,"wallclock_s":193.0},{"reads":50.0,"associativity":16.0,"sets":1125.0,"instructions_M":35.8,"cycles_M":24.4,"ipc":1.47,"unique_cache_lines":76607.0,"l1d_loads":11048746.0,"l1d_hit_pct":98.97,"l2_hit_pct":0.41,"nuca_hit_pct":0.0189,"elapsed_s":192.04,"wallclock_s":193.0},{"reads":50.0,"associativity":30.0,"sets":600.0,"instructions_M":35.8,"cycles_M":24.4,"ipc":1.47,"unique_cache_lines":76607.0,"l1d_loads":11048796.0,"l1d_hit_pct":98.97,"l2_hit_pct":0.41,"nuca_hit_pct":0.0179,"elapsed_s":193.85,"wallclock_s":194.0},{"reads":100.0,"associativity":1.0,"sets":18000.0,"instructions_M":1377.5,"cycles_M":870.0,"ipc":1.58,"unique_cache_lines":1379987.0,"l1d_loads":439797000.0,"l1d_hit_pct":99.04,"l2_hit_pct":0.21,"nuca_hit_pct":0.0332,"elapsed_s":6491.03,"wallclock_s":6492.0},{"reads":100.0,"associativity":4.0,"sets":4500.0,"instructions_M":1377.5,"cycles_M":877.2,"ipc":1.57,"unique_cache_lines":1379986.0,"l1d_loads":439797004.0,"l1d_hit_pct":99.04,"l2_hit_pct":0.21,"nuca_hit_pct":0.0356,"elapsed_s":6472.26,"wallclock_s":6473.0},{"reads":100.0,"associativity":8.0,"sets":2250.0,"instructions_M":1377.5,"cycles_M":869.9,"ipc":1.58,"unique_cache_lines":1379986.0,"l1d_loads":439797004.0,"l1d_hit_pct":99.04,"l2_hit_pct":0.21,"nuca_hit_pct":0.0361,"elapsed_s":6490.85,"wallclock_s":6491.0},{"reads":100.0,"associativity":15.0,"sets":1200.0,"instructions_M":1377.5,"cycles_M":870.4,"ipc":1.58,"unique_cache_lines":1379985.0,"l1d_loads":439796997.0,"l1d_hit_pct":99.04,"l2_hit_pct":0.21,"nuca_hit_pct":0.0363,"elapsed_s":6477.49,"wallclock_s":6477.0},{"reads":100.0,"associativity":16.0,"sets":1125.0,"instructions_M":1377.5,"cycles_M":869.8,"ipc":1.58,"unique_cache_lines":1379985.0,"l1d_loads":439797078.0,"l1d_hit_pct":99.04,"l2_hit_pct":0.21,"nuca_hit_pct":0.0364,"elapsed_s":6482.87,"wallclock_s":6484.0},{"reads":100.0,"associativity":30.0,"sets":600.0,"instructions_M":1377.5,"cycles_M":877.3,"ipc":1.57,"unique_cache_lines":1379985.0,"l1d_loads":439797071.0,"l1d_hit_pct":99.04,"l2_hit_pct":0.21,"nuca_hit_pct":0.0362,"elapsed_s":6400.48,"wallclock_s":6401.0},{"reads":500.0,"associativity":1.0,"sets":18000.0,"instructions_M":7207.1,"cycles_M":4528.2,"ipc":1.59,"unique_cache_lines":1614998.0,"l1d_loads":2259468054.0,"l1d_hit_pct":99.03,"l2_hit_pct":0.2,"nuca_hit_pct":0.0316,"elapsed_s":32770.82,"wallclock_s":32771.0},{"reads":500.0,"associativity":4.0,"sets":4500.0,"instructions_M":7207.1,"cycles_M":4524.0,"ipc":1.59,"unique_cache_lines":1614998.0,"l1d_loads":2259468259.0,"l1d_hit_pct":99.03,"l2_hit_pct":0.2,"nuca_hit_pct":0.0326,"elapsed_s":33189.19,"wallclock_s":33190.0},{"reads":500.0,"associativity":8.0,"sets":2250.0,"instructions_M":7207.1,"cycles_M":4537.9,"ipc":1.59,"unique_cache_lines":1614998.0,"l1d_loads":2259468232.0,"l1d_hit_pct":99.03,"l2_hit_pct":0.2,"nuca_hit_pct":0.0336,"elapsed_s":33106.59,"wallclock_s":33108.0},{"reads":500.0,"associativity":15.0,"sets":1200.0,"instructions_M":7207.1,"cycles_M":4534.5,"ipc":1.59,"unique_cache_lines":1614997.0,"l1d_loads":2259468045.0,"l1d_hit_pct":99.03,"l2_hit_pct":0.2,"nuca_hit_pct":0.0336,"elapsed_s":32715.51,"wallclock_s":32716.0},{"reads":500.0,"associativity":16.0,"sets":1125.0,"instructions_M":7207.1,"cycles_M":4526.4,"ipc":1.59,"unique_cache_lines":1614997.0,"l1d_loads":2259468681.0,"l1d_hit_pct":99.03,"l2_hit_pct":0.2,"nuca_hit_pct":0.0335,"elapsed_s":32482.53,"wallclock_s":32483.0},{"reads":500.0,"associativity":30.0,"sets":600.0,"instructions_M":7207.1,"cycles_M":4523.2,"ipc":1.59,"unique_cache_lines":1614997.0,"l1d_loads":2259468252.0,"l1d_hit_pct":99.03,"l2_hit_pct":0.2,"nuca_hit_pct":0.0334,"elapsed_s":32962.34,"wallclock_s":32963.0}],"hwassocBig":[{"db":"8gb","associativity":1.0,"sets":18000.0,"instructions_M":68.1,"cycles_M":51.8,"ipc":1.32,"unique_cache_lines":186524.0,"l1d_loads":13969748.0,"l1d_hit_pct":98.86,"l2_hit_pct":0.65,"nuca_hit_pct":0.0064,"elapsed_s":1394.64,"wallclock_s":1395.0},{"db":"8gb","associativity":4.0,"sets":4500.0,"instructions_M":68.1,"cycles_M":51.7,"ipc":1.32,"unique_cache_lines":186524.0,"l1d_loads":13969905.0,"l1d_hit_pct":98.86,"l2_hit_pct":0.65,"nuca_hit_pct":0.0077,"elapsed_s":1437.75,"wallclock_s":1439.0},{"db":"8gb","associativity":8.0,"sets":2250.0,"instructions_M":68.1,"cycles_M":51.8,"ipc":1.32,"unique_cache_lines":186524.0,"l1d_loads":13969568.0,"l1d_hit_pct":98.86,"l2_hit_pct":0.65,"nuca_hit_pct":0.0079,"elapsed_s":1268.21,"wallclock_s":1269.0},{"db":"8gb","associativity":15.0,"sets":1200.0,"instructions_M":68.1,"cycles_M":51.7,"ipc":1.32,"unique_cache_lines":186523.0,"l1d_loads":13969785.0,"l1d_hit_pct":98.86,"l2_hit_pct":0.65,"nuca_hit_pct":0.0078,"elapsed_s":1296.0,"wallclock_s":1296.0},{"db":"8gb","associativity":16.0,"sets":1125.0,"instructions_M":68.1,"cycles_M":51.8,"ipc":1.32,"unique_cache_lines":186523.0,"l1d_loads":13969928.0,"l1d_hit_pct":98.86,"l2_hit_pct":0.65,"nuca_hit_pct":0.0081,"elapsed_s":1473.47,"wallclock_s":1475.0},{"db":"8gb","associativity":30.0,"sets":600.0,"instructions_M":68.1,"cycles_M":51.7,"ipc":1.32,"unique_cache_lines":186523.0,"l1d_loads":13969776.0,"l1d_hit_pct":98.86,"l2_hit_pct":0.65,"nuca_hit_pct":0.008,"elapsed_s":1347.57,"wallclock_s":1348.0},{"db":"16gb","associativity":1.0,"sets":18000.0,"instructions_M":77.3,"cycles_M":60.7,"ipc":1.27,"unique_cache_lines":200411.0,"l1d_loads":15581360.0,"l1d_hit_pct":98.7,"l2_hit_pct":0.84,"nuca_hit_pct":0.0116,"elapsed_s":1088.57,"wallclock_s":1089.0},{"db":"16gb","associativity":4.0,"sets":4500.0,"instructions_M":77.3,"cycles_M":60.7,"ipc":1.27,"unique_cache_lines":200411.0,"l1d_loads":15581004.0,"l1d_hit_pct":98.7,"l2_hit_pct":0.84,"nuca_hit_pct":0.0154,"elapsed_s":842.2,"wallclock_s":843.0},{"db":"16gb","associativity":8.0,"sets":2250.0,"instructions_M":77.3,"cycles_M":60.7,"ipc":1.27,"unique_cache_lines":200411.0,"l1d_loads":15581373.0,"l1d_hit_pct":98.7,"l2_hit_pct":0.84,"nuca_hit_pct":0.0161,"elapsed_s":849.61,"wallclock_s":851.0},{"db":"16gb","associativity":15.0,"sets":1200.0,"instructions_M":77.3,"cycles_M":60.7,"ipc":1.27,"unique_cache_lines":200411.0,"l1d_loads":15581242.0,"l1d_hit_pct":98.7,"l2_hit_pct":0.84,"nuca_hit_pct":0.017,"elapsed_s":861.64,"wallclock_s":862.0},{"db":"16gb","associativity":16.0,"sets":1125.0,"instructions_M":77.3,"cycles_M":60.7,"ipc":1.27,"unique_cache_lines":200411.0,"l1d_loads":15580991.0,"l1d_hit_pct":98.7,"l2_hit_pct":0.84,"nuca_hit_pct":0.0166,"elapsed_s":858.7,"wallclock_s":859.0},{"db":"16gb","associativity":30.0,"sets":600.0,"instructions_M":77.3,"cycles_M":60.7,"ipc":1.27,"unique_cache_lines":200411.0,"l1d_loads":15581005.0,"l1d_hit_pct":98.7,"l2_hit_pct":0.84,"nuca_hit_pct":0.0163,"elapsed_s":856.23,"wallclock_s":857.0}],"flat":[{"db":"50mb","topology":"nuca","instructions_M":35.8,"cycles_M":24.4,"ipc":1.47,"unique_cache_lines":76608.0,"l1d_loads":11048874.0,"l1d_hit_pct":98.97,"l2_hit_pct":0.4,"l3_hit_pct":0.0,"elapsed_s":649.03,"wallclock_s":649.0},{"db":"50mb","topology":"flat","instructions_M":35.8,"cycles_M":31.9,"ipc":1.12,"unique_cache_lines":76607.0,"l1d_loads":11048800.0,"l1d_hit_pct":98.97,"l2_hit_pct":0.57,"l3_hit_pct":0.0199,"elapsed_s":697.55,"wallclock_s":698.0},{"db":"8gb","topology":"nuca","instructions_M":68.1,"cycles_M":51.8,"ipc":1.32,"unique_cache_lines":186524.0,"l1d_loads":13969748.0,"l1d_hit_pct":98.86,"l2_hit_pct":0.65,"l3_hit_pct":0.0,"elapsed_s":1474.86,"wallclock_s":1476.0},{"db":"8gb","topology":"flat","instructions_M":68.1,"cycles_M":60.4,"ipc":1.13,"unique_cache_lines":186524.0,"l1d_loads":13969795.0,"l1d_hit_pct":98.86,"l2_hit_pct":0.82,"l3_hit_pct":0.1122,"elapsed_s":1125.42,"wallclock_s":1126.0}],"sizes":[{"size":2048.0,"db":"50mb","instructions_M":25.2,"cycles_M":14.2,"ipc":1.78,"unique_cache_lines":45203.0,"l1d_loads":6616026.0,"l1d_hit_pct":97.98,"l2_hit_pct":1.47,"nuca_hit_pct":0.003,"elapsed_s":191.34,"wallclock_s":191.0,"reads":10},{"size":4096.0,"db":"50mb","instructions_M":25.2,"cycles_M":14.2,"ipc":1.78,"unique_cache_lines":46217.0,"l1d_loads":6616055.0,"l1d_hit_pct":97.97,"l2_hit_pct":1.47,"nuca_hit_pct":0.0038,"elapsed_s":248.04,"wallclock_s":249.0,"reads":10},{"size":16384.0,"db":"50mb","instructions_M":25.2,"cycles_M":14.2,"ipc":1.78,"unique_cache_lines":47782.0,"l1d_loads":6616075.0,"l1d_hit_pct":97.95,"l2_hit_pct":1.47,"nuca_hit_pct":0.0044,"elapsed_s":253.79,"wallclock_s":255.0,"reads":10},{"size":65536.0,"db":"50mb","instructions_M":27.9,"cycles_M":15.1,"ipc":1.84,"unique_cache_lines":49033.0,"l1d_loads":7276802.0,"l1d_hit_pct":97.78,"l2_hit_pct":1.68,"nuca_hit_pct":0.0036,"elapsed_s":270.95,"wallclock_s":271.0,"reads":10},{"size":262144.0,"db":"50mb","instructions_M":25.2,"cycles_M":14.2,"ipc":1.77,"unique_cache_lines":49974.0,"l1d_loads":6615895.0,"l1d_hit_pct":null,"l2_hit_pct":1.45,"nuca_hit_pct":null,"elapsed_s":null,"wallclock_s":null,"reads":10},{"size":1048576.0,"db":"50mb","instructions_M":25.2,"cycles_M":14.3,"ipc":1.77,"unique_cache_lines":50458.0,"l1d_loads":6615882.0,"l1d_hit_pct":null,"l2_hit_pct":1.44,"nuca_hit_pct":null,"elapsed_s":null,"wallclock_s":null,"reads":10},{"db":"8gb","size":2048.0,"instructions_M":52.1,"cycles_M":27.9,"ipc":1.87,"unique_cache_lines":53769.0,"l1d_loads":14746198.0,"l1d_hit_pct":98.81,"l2_hit_pct":0.9,"nuca_hit_pct":0.0042,"elapsed_s":532.55,"wallclock_s":534.0,"reads":50},{"db":"8gb","size":4096.0,"instructions_M":52.1,"cycles_M":27.9,"ipc":1.87,"unique_cache_lines":54949.0,"l1d_loads":14746076.0,"l1d_hit_pct":98.81,"l2_hit_pct":0.9,"nuca_hit_pct":0.0043,"elapsed_s":598.9,"wallclock_s":599.0,"reads":50},{"db":"8gb","size":16384.0,"instructions_M":52.1,"cycles_M":27.9,"ipc":1.87,"unique_cache_lines":56942.0,"l1d_loads":14745914.0,"l1d_hit_pct":98.8,"l2_hit_pct":0.89,"nuca_hit_pct":0.01,"elapsed_s":745.69,"wallclock_s":746.0,"reads":50},{"db":"8gb","size":65536.0,"instructions_M":54.4,"cycles_M":28.6,"ipc":1.9,"unique_cache_lines":58254.0,"l1d_loads":15318438.0,"l1d_hit_pct":98.69,"l2_hit_pct":1.0,"nuca_hit_pct":0.0052,"elapsed_s":803.96,"wallclock_s":805.0,"reads":50},{"db":"8gb","size":262144.0,"instructions_M":52.1,"cycles_M":27.9,"ipc":1.87,"unique_cache_lines":59514.0,"l1d_loads":14746856.0,"l1d_hit_pct":98.8,"l2_hit_pct":0.87,"nuca_hit_pct":0.0074,"elapsed_s":749.72,"wallclock_s":750.0,"reads":50},{"db":"8gb","size":1048576.0,"instructions_M":52.1,"cycles_M":27.9,"ipc":1.87,"unique_cache_lines":60080.0,"l1d_loads":14746915.0,"l1d_hit_pct":98.8,"l2_hit_pct":0.87,"nuca_hit_pct":0.0093,"elapsed_s":735.23,"wallclock_s":736.0,"reads":50},{"db":"16gb","size":2048.0,"instructions_M":52.1,"cycles_M":29.2,"ipc":1.78,"unique_cache_lines":46699.0,"l1d_loads":14962649.0,"l1d_hit_pct":98.97,"l2_hit_pct":0.78,"nuca_hit_pct":0.0122,"elapsed_s":605.1,"wallclock_s":606.0,"reads":50},{"db":"16gb","size":4096.0,"instructions_M":52.1,"cycles_M":29.3,"ipc":1.78,"unique_cache_lines":48543.0,"l1d_loads":14962651.0,"l1d_hit_pct":98.96,"l2_hit_pct":0.77,"nuca_hit_pct":0.0161,"elapsed_s":610.88,"wallclock_s":611.0,"reads":50},{"db":"16gb","size":16384.0,"instructions_M":52.1,"cycles_M":29.3,"ipc":1.78,"unique_cache_lines":53175.0,"l1d_loads":14962579.0,"l1d_hit_pct":98.94,"l2_hit_pct":0.75,"nuca_hit_pct":0.0176,"elapsed_s":773.58,"wallclock_s":775.0,"reads":50},{"db":"16gb","size":65536.0,"instructions_M":53.1,"cycles_M":29.6,"ipc":1.79,"unique_cache_lines":56185.0,"l1d_loads":15217145.0,"l1d_hit_pct":98.88,"l2_hit_pct":0.8,"nuca_hit_pct":0.0175,"elapsed_s":810.36,"wallclock_s":811.0,"reads":50},{"db":"16gb","size":262144.0,"instructions_M":52.1,"cycles_M":29.3,"ipc":1.77,"unique_cache_lines":58978.0,"l1d_loads":14961909.0,"l1d_hit_pct":98.93,"l2_hit_pct":0.72,"nuca_hit_pct":0.0212,"elapsed_s":792.63,"wallclock_s":794.0,"reads":50},{"db":"16gb","size":1048576.0,"instructions_M":52.1,"cycles_M":29.3,"ipc":1.78,"unique_cache_lines":60900.0,"l1d_loads":14961902.0,"l1d_hit_pct":98.93,"l2_hit_pct":0.7,"nuca_hit_pct":0.0177,"elapsed_s":797.38,"wallclock_s":798.0,"reads":50},{"size":2048.0,"db":"103gb","instructions_M":25.4,"cycles_M":15.1,"ipc":1.68,"unique_cache_lines":44298.0,"l1d_loads":6744761.0,"l1d_hit_pct":97.89,"l2_hit_pct":1.57,"nuca_hit_pct":0.0022,"elapsed_s":413.66,"wallclock_s":415.0,"reads":10},{"size":4096.0,"db":"103gb","instructions_M":25.4,"cycles_M":15.1,"ipc":1.68,"unique_cache_lines":45313.0,"l1d_loads":6744754.0,"l1d_hit_pct":97.88,"l2_hit_pct":1.57,"nuca_hit_pct":0.003,"elapsed_s":430.95,"wallclock_s":432.0,"reads":10},{"size":16384.0,"db":"103gb","instructions_M":25.4,"cycles_M":15.1,"ipc":1.68,"unique_cache_lines":46876.0,"l1d_loads":6744614.0,"l1d_hit_pct":97.86,"l2_hit_pct":1.56,"nuca_hit_pct":0.0086,"elapsed_s":442.76,"wallclock_s":443.0,"reads":10},{"size":65536.0,"db":"103gb","instructions_M":28.0,"cycles_M":16.0,"ipc":1.74,"unique_cache_lines":48126.0,"l1d_loads":7366038.0,"l1d_hit_pct":97.72,"l2_hit_pct":1.75,"nuca_hit_pct":0.0023,"elapsed_s":466.52,"wallclock_s":467.0,"reads":10},{"size":262144.0,"db":"103gb","instructions_M":25.4,"cycles_M":15.1,"ipc":1.68,"unique_cache_lines":49070.0,"l1d_loads":6744722.0,"l1d_hit_pct":97.86,"l2_hit_pct":1.54,"nuca_hit_pct":0.0024,"elapsed_s":521.15,"wallclock_s":522.0,"reads":10},{"size":1048576.0,"db":"103gb","instructions_M":25.4,"cycles_M":15.1,"ipc":1.68,"unique_cache_lines":49553.0,"l1d_loads":6744732.0,"l1d_hit_pct":97.85,"l2_hit_pct":1.54,"nuca_hit_pct":0.0023,"elapsed_s":446.44,"wallclock_s":447.0,"reads":10}],"inventory":[{"file":"2000reads_live_summary_2026-09-09.csv","rows":5},{"file":"associativity_sweep_2026-09-08_summary.csv","rows":6},{"file":"cache_size_sweep_8gb16gb_2026-09-15.csv","rows":12},{"file":"final_fair_batch_2026-09-09_5variant_all_db.csv","rows":20},{"file":"flatl3_comparison_2026-09-15.csv","rows":4},{"file":"hw_assoc_sweep_2026-09-14.csv","rows":24},{"file":"hw_assoc_sweep_bigdb_2026-09-15.csv","rows":12},{"file":"hwsize_comparison_2026-09-09.csv","rows":8},{"file":"laptop_sweep_2026-09-15.csv","rows":32},{"file":"longread_scaling_4way_2026-09-19.csv","rows":3},{"file":"longread_scaling_S0_2026-09-19.csv","rows":3},{"file":"size_sweep_103gb_2026-09-15.csv","rows":6},{"file":"size_sweep_103gb_peer_2026-09-15.csv","rows":6},{"file":"size_sweep_50mb_2026-09-15.csv","rows":6},{"file":"size_sweep_8gb_peer_2026-09-15.csv","rows":6}],"totalRows":153};
+"use strict";
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (v, d = 1) => v == null || isNaN(v) ? "–" : Number(v).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+const int = v => v == null ? "–" : Number(v).toLocaleString("en-US");
+const times = v => fmt(v, 2) + "×";
+const pct = (v, d = 1) => (v >= 0 ? "+" : "") + fmt(v, d) + "%";
+const DBL = { "50mb": "50 MB", "8gb": "8 GB", "16gb": "16 GB", "103gb": "103 GB" };
+const VAR = {
+  S0: { label: "Stock (S0)", key: "--s0", pt: "rect" },
+  "1way": { label: "1-way", key: "--w1", pt: "triangle" },
+  "4way": { label: "4-way", key: "--w4", pt: "circle" },
+  "8way": { label: "8-way", key: "--w8", pt: "rectRot" },
+  "16way": { label: "16-way", key: "--w16", pt: "star" },
+};
+const VORDER = ["S0", "1way", "4way", "8way", "16way"];
+const vcol = v => css(VAR[v].key);
+
+/* ---------- chart plumbing ---------- */
+const registry = [];
+const HAS_CHART = typeof Chart !== "undefined" && typeof Chart.register === "function";
+const hline = {
+  id: "hline",
+  afterDatasetsDraw(chart, args, o) {
+    if (!o || o.y == null) return;
+    const a = chart.chartArea, y = chart.scales.y;
+    if (!y) return;
+    const py = y.getPixelForValue(o.y);
+    if (py < a.top || py > a.bottom) return;
+    const c = chart.ctx;
+    c.save();
+    c.strokeStyle = o.color || css("--muted");
+    c.setLineDash([5, 4]);
+    c.lineWidth = 1.25;
+    c.beginPath(); c.moveTo(a.left, py); c.lineTo(a.right, py); c.stroke();
+    if (o.label) {
+      c.setLineDash([]);
+      c.fillStyle = css("--muted");
+      c.font = '11px "IBM Plex Sans", sans-serif';
+      c.textAlign = "right";
+      c.fillText(o.label, a.right - 4, py - 5);
+    }
+    c.restore();
+  },
+};
+if (HAS_CHART) Chart.register(hline);
+
+function themeDefaults() {
+  if (!HAS_CHART) return;
+  Chart.defaults.color = css("--ink2");
+  Chart.defaults.font.family = '"IBM Plex Sans", system-ui, sans-serif';
+  Chart.defaults.font.size = 12;
+}
+function merge(a, b) {
+  for (const k in b) {
+    if (b[k] && typeof b[k] === "object" && !Array.isArray(b[k]) && a[k] && typeof a[k] === "object" && !Array.isArray(a[k])) merge(a[k], b[k]);
+    else a[k] = b[k];
+  }
+  return a;
+}
+function base(extra = {}) {
+  const o = {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 220 },
+    interaction: { mode: "nearest", intersect: true },
+    plugins: {
+      legend: { labels: { color: css("--ink2"), usePointStyle: true, boxWidth: 8, boxHeight: 8 } },
+      tooltip: {
+        backgroundColor: css("--surface"), titleColor: css("--ink"), bodyColor: css("--ink2"),
+        borderColor: css("--line2"), borderWidth: 1, padding: 10, boxPadding: 4,
+      },
+    },
+    scales: {},
+  };
+  return merge(o, extra);
+}
+function ax(title, extra = {}) {
+  return Object.assign({
+    title: { display: !!title, text: title, color: css("--muted") },
+    grid: { color: css("--grid") }, border: { color: css("--axis") },
+    ticks: { color: css("--muted") },
+  }, extra);
+}
+function chart(id, build) {
+  if (!HAS_CHART) {
+    const cv = document.getElementById(id);
+    if (cv && cv.parentNode) cv.parentNode.innerHTML = '<p class="figcap">The chart library did not load. The table below holds the same data.</p>';
+    return { draw() {} };
+  }
+  const e = { id, build, chart: null };
+  e.draw = () => {
+    if (e.chart) e.chart.destroy();
+    const cv = document.getElementById(id);
+    if (!cv) return;
+    e.chart = new Chart(cv, build());
+  };
+  registry.push(e);
+  e.draw();
+  return e;
+}
+function redrawAll() { themeDefaults(); registry.forEach(e => e.draw()); }
+
+/* ---------- controls ---------- */
+function seg(id, items, get, set) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const draw = () => {
+    el.innerHTML = items.map(([k, l]) => `<button type="button" aria-pressed="${k === get()}" data-k="${k}">${l}</button>`).join("");
+    $$("button", el).forEach(b => b.onclick = () => { set(b.dataset.k); draw(); });
+  };
+  draw();
+}
+function checks(id, items, sel, onChange) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = items.map(v => `<label class="chk" for="${id}_${v}"><input type="checkbox" id="${id}_${v}" ${sel.has(v) ? "checked" : ""}><i style="background:var(${VAR[v].key})"></i>${VAR[v].label}</label>`).join(" ");
+  items.forEach(v => {
+    document.getElementById(`${id}_${v}`).onchange = ev => {
+      if (ev.target.checked) sel.add(v); else sel.delete(v);
+      onChange();
+    };
+  });
+}
+
+/* ---------- tables ---------- */
+function table(id, cols, rows, opt = {}) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const st = { k: opt.sortBy == null ? null : opt.sortBy, dir: opt.dir || 1 };
+  const draw = () => {
+    let rs = rows.slice();
+    if (st.k != null) {
+      const c = cols[st.k];
+      rs.sort((a, b) => {
+        const va = c.v ? c.v(a) : c.f(a), vb = c.v ? c.v(b) : c.f(b);
+        return (va > vb ? 1 : va < vb ? -1 : 0) * st.dir;
+      });
+    }
+    el.innerHTML = "<thead><tr>" + cols.map((c, i) => `<th class="${c.n ? "n " : ""}sortable" data-i="${i}">${c.h}${st.k === i ? (st.dir > 0 ? " ▲" : " ▼") : ""}</th>`).join("") + "</tr></thead><tbody>" +
+      rs.map(r => `<tr class="${opt.rowClass ? opt.rowClass(r) : ""}">` + cols.map(c => `<td class="${[c.n ? "n" : "", c.cls ? c.cls(r) : ""].join(" ").trim()}">${c.f(r)}</td>`).join("") + "</tr>").join("") + "</tbody>";
+    $$("th", el).forEach(th => th.onclick = () => {
+      const i = +th.dataset.i;
+      if (st.k === i) st.dir *= -1; else { st.k = i; st.dir = 1; }
+      draw();
+    });
+  };
+  draw();
+}
+const winCls = sp => (sp > 1.005 ? "win" : sp < 0.995 ? "loss" : "");
+const spTxt = sp => times(sp) + (sp > 1.005 ? " ▲" : sp < 0.995 ? " ▼" : "");
+
+/* ---------- theme, nav ---------- */
+function effectiveDark() {
+  const t = document.documentElement.getAttribute("data-theme");
+  return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+}
+function initTheme() {
+  $("#themeBtn").onclick = () => {
+    document.documentElement.setAttribute("data-theme", effectiveDark() ? "light" : "dark");
+  };
+  new MutationObserver(() => redrawAll()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => redrawAll());
+}
+function initNav() {
+  const secs = $$("main section[data-nav]");
+  const rail = $("#rail"), jump = $("#jump");
+  let html = "", last = "";
+  jump.innerHTML = '<option value="top">Jump to…</option>';
+  secs.forEach(s => {
+    const g = s.dataset.group;
+    if (g !== last) { html += `<div class="grp">${g}</div>`; last = g; }
+    html += `<a href="#${s.id}" data-id="${s.id}">${s.dataset.nav}</a>`;
+    jump.insertAdjacentHTML("beforeend", `<option value="${s.id}">${s.dataset.nav}</option>`);
+  });
+  rail.innerHTML = html;
+  jump.onchange = () => { const t = document.getElementById(jump.value); if (t) t.scrollIntoView({ behavior: "smooth" }); };
+  const links = $$("a", rail);
+  const io = new IntersectionObserver(es => {
+    es.forEach(e => {
+      if (e.isIntersecting) links.forEach(a => a.classList.toggle("on", a.dataset.id === e.target.id));
+    });
+  }, { rootMargin: "-20% 0px -70% 0px" });
+  secs.forEach(s => io.observe(s));
+}
+
+/* ---------- experiment index (chronological) ---------- */
+const INDEX = [
+  { n: 1, d: "Sep 4", g: "setup", t: "Simulator choice: Sniper over TEJAS", x: "Chose Sniper, a cycle-level CPU simulator, for the cache study. A same-day reversal toward TEJAS was undone. No data; a decision recorded in the log.", a: "how" },
+  { n: 2, d: "Sep 4", g: "setup", t: "Persistent tmux session and proxy on Luna", x: "Luna needs a logged-in tmux session and proxy variables for internet access. Set up once so long jobs survive disconnects.", a: null },
+  { n: 3, d: "Sep 4", g: "setup", t: "Cloned, built and disk-checked Sniper", x: "Cloned Sniper, installed the missing build dependencies, built it, and checked free disk on the shared machine. Result: a working build.", a: "setup" },
+  { n: 4, d: "Sep 4", g: "setup", t: "Smoke test on /bin/true (fast-forward and detailed)", x: "Ran a do-nothing program in both modes to prove the simulator itself works before touching a workload. Both exit cleanly; detailed mode gave 0.66 IPC and 0 memory-consistency errors. Every later result is detailed mode.", a: "how" },
+  { n: 5, d: "Sep 4", g: "setup", t: "Read Luna's real cache geometry and clock", x: "Read sizes, ways, sets and line size from the machine's sysfs files: L1d 48 KB 12-way, L1i 32 KB 8-way, L2 2 MB 16-way, L3 105 MB 15-way. Clock is Intel's 2.1 GHz base spec, not measured.", a: "setup" },
+  { n: 6, d: "Sep 4", g: "setup", t: "Wrote luna.cfg", x: "Encoded the real geometry as a Sniper overlay config, modeling the L3 as 96 per-core mesh slices of 1,125 KB. L3 speed, replacement policy and memory timing remain placeholders.", a: "setup" },
+  { n: 7, d: "Sep 4 to 8", g: "setup", t: "Config debugging (four bugs)", x: "Wrong -c syntax, comma-joined flags, cache-size validation abort, and a crash from a non-power-of-2 set count. Fixed by using two separate -c flags and the plain mod hash.", a: "setup" },
+  { n: 8, d: "Sep 8", g: "setup", t: "SSH access and crash root cause", x: "Direct SSH to Luna enabled running commands. The crash was traced to the xor_mod hash going out of range for 1,200 sets, by reading Sniper's source.", a: "setup" },
+  { n: 9, d: "Sep 8", g: "setup", t: "Found kraken2 is a Perl wrapper", x: "Sniper showed near-zero work because it was instrumenting Perl. Using strace to find the real compiled classify binary and its raw arguments fixed it.", a: "setup" },
+  { n: 10, d: "Sep 8", g: "setup", t: "First detailed kraken2 run (10 reads)", x: "25.1 M instructions, 14.3 M cycles, IPC 1.76, 51,558 unique cache lines, correct 7-of-10 classification, in 114 s.", a: "assoc10" },
+  { n: 11, d: "Sep 8", g: "software", t: "Width sweep: 4 to 64-way, 10 reads, 50 MB", x: "More ways means more instructions, cycles and memory touched (64-way: +11% cycles, 4.3× cache lines vs 4-way). IPC flat. Reproduces the real-hardware trend without atomics.", a: "assoc10" },
+  { n: 12, d: "Sep 8", g: "fix", t: "Found the true no-cache S0", x: "The earlier 'baseline' binary already contained an S2 cache. The real stock build is kraken2-src-baseline, with no S2 code.", a: "fixes" },
+  { n: 13, d: "Sep 8", g: "setup", t: "Built and timed the 50-read workload", x: "Stock on 50 reads took 188 s versus about 115 s for 10 reads, showing most fixed cost is database load (about 96 s).", a: "workloads" },
+  { n: 14, d: "Sep 8", g: "software", t: "Database-size comparison: 50 MB and 8 GB", x: "On 50 MB the 4-way cache costs about 10% more cycles; on 8 GB it uses 24% fewer instructions and runs 1.83× faster. The cache's value flips with database size.", a: "dbsize" },
+  { n: 15, d: "Sep 8", g: "software", t: "Extended to 16 GB and 103 GB", x: "4-way is 2.05× (16 GB) and 1.97× (103 GB) faster than stock. The benefit rises then dips slightly at 103 GB.", a: "dbsize" },
+  { n: 16, d: "Sep 8", g: "software", t: "Added 8-way; built 1-way from scratch", x: "No 1-way build existed. Built from the pristine source with a patch script; its classification output is identical to stock. Complete five-variant table across four databases.", a: "dbsize" },
+  { n: 17, d: "Sep 8 to 9", g: "fix", t: "2,000/10,000-read and full-file jobs cancelled", x: "The head of the read file has unusually long reads (17.5 kbp vs a 3.4 kbp true mean), so read count is a poor size measure. The jobs were slow for that reason and were dropped, then 2,000 reads was re-queued alone.", a: "workloads" },
+  { n: 18, d: "Sep 8", g: "fix", t: "Wall-clock contamination caught", x: "1-way took 454 s versus 8-way 341 s at nearly identical cycles because jobs overlapped. Wall-clock discarded; clean rerun.", a: "fixes" },
+  { n: 19, d: "Sep 9", g: "fix", t: "Cross-batch drift and the fair batch", x: "Batches hours apart ran at 14 vs 8 s per million cycles. One fair batch of 20 runs (5 variants × 4 databases) ran together.", a: "dbsize" },
+  { n: 20, d: "Sep 9", g: "fix", t: "Metric corrected from wall-clock to cycles", x: "Sniper's wall-clock is simulator time and tracks instruction count. Cycles ÷ clock is the real-time proxy. By cycles, 4-way wins or ties at every database size.", a: "dbsize" },
+  { n: 21, d: "Sep 9", g: "software", t: "Figures 1 to 7", x: "Publication-style charts of the fair-batch data (widths, cycles by database, speedup, footprint, IPC, miss breakdown, machine comparison).", a: "data" },
+  { n: 22, d: "Sep 9", g: "software", t: "Report 'The 4-Way Verdict' v1, then v2", x: "Published a report, then republished it with the cycles-based corrections after the metric error was found.", a: null },
+  { n: 23, d: "Sep 9", g: "hardware", t: "Desktop and Orin-sized cache configs", x: "Reran stock and 4-way on 50 MB and 8 GB under a Ryzen 5 5600X and a Jetson Orin cache setup. 8 GB win: 1.83× (Luna), 1.94× (desktop), 1.65× (Orin). 50 MB about 0.9× on all.", a: "profiles" },
+  { n: 24, d: "Sep 9", g: "hardware", t: "Real Orin / DynamoRIO route explored, paused", x: "Sniper's x86 front end cannot instrument ARM binaries; the ARM route needs recording on the board. Chose the config-only stand-in instead.", a: null },
+  { n: 25, d: "Sep 9 to 12", g: "software", t: "2,000-read job on 50 MB", x: "All five variants took 12 to 15 hours each. Every width lost to stock (4-way 1.28× slower, 16-way 1.39×). The small-database loss is not a warm-up effect.", a: "r2000" },
+  { n: 26, d: "Sep 11", g: "fix", t: "Correction: it was database size, not read count", x: "The first explanation of the 2,000-read result was withdrawn: that database was already losing at 50 reads.", a: "r2000" },
+  { n: 27, d: "Sep 9 to 11", g: "software", t: "Figures 8 to 11", x: "Simulation-time table, 2,000-read charts, and the results table.", a: "timemodel" },
+  { n: 28, d: "Sep 12 to 14", g: "hardware", t: "Hardware L3 associativity sweep, 50 MB", x: "1/4/8/15/16/30-way × 10/50/100/500 reads, no software cache, 24 runs. Under 1% spread at every size: no effect.", a: "hwassoc" },
+  { n: 29, d: "Sep 9", g: "setup", t: "To-do list saved from the Q&A", x: "Queued two hardware questions (flat L3, isolated hardware associativity). Both were done later.", a: "hwnot" },
+  { n: 30, d: "Sep 15", g: "hardware", t: "laptop.cfg (Ryzen 7 5800H)", x: "Read core count, clock, L2 and L3 size from your laptop; ways from AMD's spec. L3 split into 8 slices of 2,048 KB (a power-of-2 set count, so no hash override).", a: "setup" },
+  { n: 31, d: "Sep 15 to 19", g: "software", t: "laptop_sweep: 32 runs", x: "Reads 10/50/100/500 × stock, 1, 4, 8-way × 8 GB and 16 GB. Cache wins small, loses large; 8 GB flips by 100 reads, 16 GB by 500.", a: "laptop" },
+  { n: 32, d: "Sep 15", g: "analysis", t: "Cache-size research brief", x: "Wrote a multi-agent brief: five agents, three iterations, hypotheses H1 to H4, with a full file index.", a: "debate" },
+  { n: 33, d: "Sep 15", g: "setup", t: "Step 0: where cache size is set", x: "The sizing formula (S3ComputeNumSets) and its limits are compile-time constants, so each size needs its own build. Pinning both limits to one value pins the size.", a: "internals" },
+  { n: 34, d: "Sep 15", g: "setup", t: "Six size-pinned 4-way binaries", x: "Built for 2,048 to 1,048,576 sets; all classify identically to stock (7 of 10 reads, empty diff).", a: "size" },
+  { n: 35, d: "Sep 15", g: "software", t: "Size sweep: 50 MB (10 reads)", x: "14.2 M cycles at five sizes, 15.1 M at 65,536 (+6.3%). Stock is 14.1 M, so no size beats stock. A tail run's results were recovered by hand.", a: "size" },
+  { n: 36, d: "Sep 15", g: "fix", t: "50 MB pass redirected to 103 GB", x: "After four of six 50 MB sizes, the small-database pass was stopped (already known to lose) and the remaining effort moved to the big database.", a: "size" },
+  { n: 37, d: "Sep 15", g: "software", t: "Size sweep: 103 GB (10 reads)", x: "Flat 15.1 M cycles except 16.0 M at 65,536 (+6.0%).", a: "size" },
+  { n: 38, d: "Sep 15", g: "software", t: "Size sweep: 8 GB and 16 GB (50 reads)", x: "8 GB flat 27.9 M with 28.6 M at 65,536 (+2.5%); 16 GB flat 29.3 M with 29.6 M (+1.0%).", a: "size" },
+  { n: 39, d: "Sep 15", g: "software", t: "True no-cache baseline for the size sweep", x: "Stock at the sweep's exact config: 14.1 M cycles on 50 MB. Every S2 size is at or above it.", a: "size" },
+  { n: 40, d: "Sep 15", g: "analysis", t: "Five-agent debate, three iterations (H1 to H4)", x: "H1 confirmed, H2 refuted, H3 refuted on location (magnitude varies), H4 holds only at one thread. Iteration 2's mechanism was overturned by the 103 GB data. Figure 14.", a: "debate" },
+  { n: 41, d: "Sep 15", g: "fix", t: "Size-65,536 anomaly and magnitude correction", x: "Quoted +4.4% / +10.2% were instruction deltas; the cycle figures are +2.5% / +6.0%. Best explanation: a hash-distribution artifact of the workload at that mask width.", a: "size" },
+  { n: 42, d: "Sep 15", g: "hardware", t: "Hardware L3 associativity on 8 GB and 16 GB", x: "12 runs. 8 GB: 51.7 to 51.8 M cycles for all six settings; 16 GB exactly 60.7 M. Still no effect.", a: "hwassoc" },
+  { n: 43, d: "Sep 15", g: "hardware", t: "Flat L3 versus mesh-slice L3", x: "Flat bank is 30.7% slower on 50 MB and 16.6% slower on 8 GB, with lower IPC. The mesh model matters.", a: "flat" },
+  { n: 44, d: "Sep 19", g: "software", t: "laptop_sweep finished", x: "500-read tier: 8 GB 1.09× slower, 16 GB 1.02× slower than stock. The win is gone by 500 reads on both.", a: "laptop" },
+  { n: 45, d: "Sep 19", g: "software", t: "Long-read scaling: 10/25/50 long reads", x: "Same-source long reads, 8 GB. 4-way speedup 1.42×, 1.20×, 1.05×, then 0.97× at 100 and 0.92× at 500. Crossover between 1.87 M and 4.7 M bases; read length is not the cause.", a: "longread" },
+  { n: 46, d: "Sep 19", g: "fix", t: "Full audit of commits and data", x: "Found that figure 14 mixes workloads, the 'peer 8 GB' file is a copy of our data, the 16 GB ladder was unused, and the flat-L3 hit-rate column is wrong.", a: "fixes" },
+  { n: 47, d: "Sep 19", g: "analysis", t: "S2 internals audit", x: "Measured per-thread memory from each binary (0 B, 96 KB to 1.5 MB, tiny for size builds), read both source variants, and found S0 and the S2 tree are different kraken2 snapshots.", a: "internals" },
+  { n: 48, d: "Sep 19", g: "analysis", t: "FASTQ inventory of all of Luna", x: "86 files, 85 GB, one sequencing run basecalled three ways plus copies. All test workloads are the front of one file.", a: "workloads" },
+  { n: 49, d: "Sep 20", g: "analysis", t: "Start-up constant found in the small-workload wins", x: "Stock minus 4-way instructions is +14.4 M at 10 long reads and +14.2 M at 25: a fixed offset, not a per-read saving. Suggests part of the small-workload win is a start-up difference.", a: "longread" },
+  { n: 50, d: "Sep 20", g: "analysis", t: "This report", x: "Interactive page generated from the committed data files.", a: "top" },
+];
+const GROUPS = { all: "All", setup: "Setup", software: "Software cache", hardware: "Hardware", fix: "Corrections", analysis: "Analysis" };
+
+function renderIndex() {
+  const chips = $("#idxChips"), ul = $("#idxList");
+  let g = "all";
+  const draw = () => {
+    chips.innerHTML = Object.entries(GROUPS).map(([k, l]) => `<button type="button" aria-pressed="${k === g}" data-k="${k}">${l}</button>`).join("");
+    $$("button", chips).forEach(b => b.onclick = () => { g = b.dataset.k; draw(); });
+    ul.innerHTML = INDEX.filter(e => g === "all" || e.g === g).map(e =>
+      `<li><details><summary><span class="no">${e.n}</span><span class="nm">${e.t}</span><span class="dt">${e.d}</span></summary>` +
+      `<div class="det"><p>${e.x}</p>${e.a && e.a !== "top" ? `<p><a href="#${e.a}">Jump to the section</a></p>` : ""}</div></details></li>`).join("");
+  };
+  draw();
+}
+
+/* ---------- committed figures and files ---------- */
+const GH = "https://github.com/KathpaliaChirag/Nanopore-project/blob/main/cache_simulation/";
+const FIGS = [
+  ["fig1", "fig1_width_sweep_10reads.png", "Width sweep, 10 reads (simulator time)"],
+  ["fig2", "fig2_cycles_by_db_5variant.png", "Cycles by variant, four databases"],
+  ["fig3", "fig3_speedup_vs_nocache.png", "Speedup versus stock, by width and database"],
+  ["fig4", "fig4_memory_footprint_by_db.png", "Unique cache lines touched"],
+  ["fig5", "fig5_speedup_vs_ipc_dualaxis.png", "Speedup and IPC"],
+  ["fig6", "fig6_miss_breakdown_103gb.png", "Where lookups are resolved, 103 GB"],
+  ["fig7", "fig7_hardware_comparison.png", "Machine comparison with config table"],
+  ["fig8", "fig8_readcount_time_estimate.png", "Simulation time by read count"],
+  ["fig9", "fig9_2000reads_cycles_50mb.png", "2,000-read cycles, 50 MB"],
+  ["fig10", "fig10_readcount_scaling_same_db.png", "50 vs 2,000 reads, same database"],
+  ["fig11", "fig11_2000reads_results_table.png", "2,000-read results table"],
+  ["fig12", "fig12_hw_assoc_sweep_null.png", "Hardware associativity, null result"],
+  ["fig13", "fig13_hw_assoc_full_table.png", "Hardware associativity, all 24 runs"],
+  ["fig14", "fig14_size_sweep_all_db.png", "Cache size sweep, three databases"],
+];
+
+function renderData() {
+  $("#mRows").textContent = int(DATA.totalRows);
+  $("#mFiles").textContent = DATA.inventory.length;
+  table("tInv", [
+    { h: "File", f: r => `<a href="${GH}measurements/${r.file}">${r.file}</a>`, v: r => r.file },
+    { h: "Rows", n: 1, f: r => int(r.rows), v: r => r.rows },
+  ], DATA.inventory);
+  table("tFigs", [
+    { h: "Figure", f: r => r[0], v: r => r[0] },
+    { h: "What it shows", f: r => r[2] },
+    { h: "File", f: r => `<a href="${GH}charts/${r[1]}">${r[1]}</a>` },
+  ], FIGS, {});
+}
+
+/* ---------- 1. width sweep, 10 reads ---------- */
+function initAssoc10() {
+  const st = { m: "cycles" };
+  const M = { cycles: ["Cycles (M)", "cycles"], instr: ["Instructions (M)", "instructions"], lines: ["Unique cache lines", "unique_cache_lines"], ipc: ["IPC", "ipc"] };
+  const rows = DATA.assoc10;
+  const lab = r => r.variant === "baseline" ? "early S2 build" : r.variant.replace("lru-noatomics-", "").replace("way", "-way");
+  seg("assocMetric", [["cycles", "Cycles"], ["instr", "Instructions"], ["lines", "Cache lines"], ["ipc", "IPC"]], () => st.m, v => { st.m = v; e.draw(); });
+  const e = chart("cAssoc10", () => {
+    const [yl, k] = M[st.m];
+    return {
+      type: "line",
+      data: { labels: rows.map(lab), datasets: [{ label: yl, data: rows.map(r => r[k]), borderColor: css("--w4"), backgroundColor: css("--w4"), pointRadius: 6, pointHoverRadius: 8, borderWidth: 2.5, tension: 0 }] },
+      options: base({ plugins: { legend: { display: false } }, scales: { x: ax("Software cache width (baseline = an early S2 build)"), y: ax(yl) } }),
+    };
+  });
+  const four = rows.find(r => r.variant.includes("4way"));
+  table("tAssoc10", [
+    { h: "Variant", f: lab },
+    { h: "Instructions (M)", n: 1, f: r => fmt(r.instructions, 1), v: r => r.instructions },
+    { h: "Cycles (M)", n: 1, f: r => fmt(r.cycles, 1), v: r => r.cycles },
+    { h: "IPC", n: 1, f: r => fmt(r.ipc, 2), v: r => r.ipc },
+    { h: "Cache lines", n: 1, f: r => int(r.unique_cache_lines), v: r => r.unique_cache_lines },
+    { h: "Cycles vs 4-way", n: 1, f: r => pct((r.cycles / four.cycles - 1) * 100), v: r => r.cycles },
+  ], rows, { rowClass: r => r === four ? "hl" : "" });
+}
+
+/* ---------- 2. fair batch across databases ---------- */
+function initFair() {
+  const st = { m: "speedup" };
+  const sel = new Set(["1way", "4way", "8way", "16way"]);
+  const dbs = ["50mb", "8gb", "16gb", "103gb"];
+  const get = (db, v) => DATA.fair.find(r => r.db === db && r.variant === v);
+  const M = {
+    speedup: ["Speedup vs stock (above 1 is faster)", (r, s0) => s0.cycles_M / r.cycles_M, 2],
+    cycles: ["Cycles (M)", r => r.cycles_M, 1],
+    instr: ["Instructions (M)", r => r.instructions_M, 1],
+    ipc: ["IPC", r => r.ipc, 2],
+    lines: ["Unique cache lines", r => r.unique_cache_lines, 0],
+    l2: ["L2 hit rate (% of loads)", r => r.l2_hit_pct, 2],
+    wall: ["Sniper wall-clock (s), NOT program speed", r => r.sim_wallclock_s, 0],
+  };
+  seg("fairMetric", [["speedup", "Speedup"], ["cycles", "Cycles"], ["instr", "Instructions"], ["ipc", "IPC"], ["lines", "Cache lines"], ["l2", "L2 hit %"], ["wall", "Simulator wall-clock"]], () => st.m, v => { st.m = v; e.draw(); });
+  checks("fairVars", VORDER, sel, () => e.draw());
+  const e = chart("cFair", () => {
+    const [yl, fn] = M[st.m];
+    const vars = VORDER.filter(v => sel.has(v) && !(st.m === "speedup" && v === "S0"));
+    return {
+      type: "bar",
+      data: {
+        labels: dbs.map(d => DBL[d]),
+        datasets: vars.map(v => ({
+          label: VAR[v].label, backgroundColor: vcol(v), borderRadius: 3, borderSkipped: false,
+          data: dbs.map(d => fn(get(d, v), get(d, "S0"))),
+        })),
+      },
+      options: base({
+        interaction: { mode: "index", intersect: false },
+        plugins: { hline: st.m === "speedup" ? { y: 1, label: "stock = 1.0" } : {} },
+        scales: { x: ax("Database"), y: ax(yl, { beginAtZero: true }) },
+      }),
+    };
+  });
+  table("tFair", [
+    { h: "Database", f: r => DBL[r.db], v: r => dbs.indexOf(r.db) },
+    { h: "Variant", f: r => VAR[r.variant].label, v: r => VORDER.indexOf(r.variant) },
+    { h: "Instr. (M)", n: 1, f: r => fmt(r.instructions_M), v: r => r.instructions_M },
+    { h: "Cycles (M)", n: 1, f: r => fmt(r.cycles_M), v: r => r.cycles_M },
+    { h: "IPC", n: 1, f: r => fmt(r.ipc, 2), v: r => r.ipc },
+    { h: "Cache lines", n: 1, f: r => int(r.unique_cache_lines), v: r => r.unique_cache_lines },
+    { h: "L2 hit %", n: 1, f: r => fmt(r.l2_hit_pct, 2), v: r => r.l2_hit_pct },
+    { h: "LLC hit %", n: 1, f: r => fmt(r.nuca_hit_pct, 3), v: r => r.nuca_hit_pct },
+    { h: "Sim wall (s)", n: 1, f: r => int(r.sim_wallclock_s), v: r => r.sim_wallclock_s },
+    { h: "Speedup", n: 1, f: r => r.variant === "S0" ? "1.00×" : spTxt(get(r.db, "S0").cycles_M / r.cycles_M), v: r => get(r.db, "S0").cycles_M / r.cycles_M, cls: r => r.variant === "S0" ? "" : winCls(get(r.db, "S0").cycles_M / r.cycles_M) },
+  ], DATA.fair, { rowClass: r => r.variant === "4way" ? "hl" : "" });
+}
+
+/* ---------- 3. other machines ---------- */
+function initProfiles() {
+  const st = { m: "speedup" };
+  const MACH = [["Luna", 2.1], ["Desktop", 3.7], ["Orin-sized", 2.2], ["Laptop", 3.2]];
+  const cyc = {};
+  const put = (m, db, v, c) => { (cyc[m] = cyc[m] || {}); (cyc[m][db] = cyc[m][db] || {})[v] = c; };
+  DATA.fair.filter(r => (r.variant === "S0" || r.variant === "4way") && (r.db === "50mb" || r.db === "8gb")).forEach(r => put("Luna", r.db, r.variant, r.cycles_M));
+  DATA.hwsize.forEach(r => put(r.hw === "desktop" ? "Desktop" : "Orin-sized", r.db, r.variant, r.cycles_M));
+  DATA.laptop.filter(r => r.reads === 50 && r.db === "8gb" && (r.variant === "S0" || r.variant === "4way")).forEach(r => put("Laptop", "8gb", r.variant, r.cycles_M));
+  const ghz = Object.fromEntries(MACH);
+  const val = (m, db) => {
+    const c = cyc[m] && cyc[m][db];
+    if (!c || c.S0 == null || c["4way"] == null) return null;
+    if (st.m === "speedup") return c.S0 / c["4way"];
+    if (st.m === "stock") return c.S0;
+    if (st.m === "four") return c["4way"];
+    return c.S0 / ghz[m];
+  };
+  const YL = { speedup: "4-way speedup vs stock (above 1 is faster)", stock: "Stock cycles (M)", four: "4-way cycles (M)", ms: "Stock time = cycles ÷ clock (ms)" };
+  seg("profMetric", [["speedup", "Speedup"], ["stock", "Stock cycles"], ["four", "4-way cycles"], ["ms", "Stock time (ms)"]], () => st.m, v => { st.m = v; e.draw(); });
+  const e = chart("cProf", () => ({
+    type: "bar",
+    data: {
+      labels: MACH.map(m => m[0] + " (" + m[1] + " GHz)"),
+      datasets: [["50mb", "50 MB database", "--w1"], ["8gb", "8 GB database", "--w4"]].map(([db, l, c]) => ({
+        label: l, backgroundColor: css(c), borderRadius: 3, borderSkipped: false, data: MACH.map(m => val(m[0], db)),
+      })),
+    },
+    options: base({
+      interaction: { mode: "index", intersect: false },
+      plugins: { hline: st.m === "speedup" ? { y: 1, label: "stock = 1.0" } : {} },
+      scales: { x: ax("Simulated machine (clock speed)"), y: ax(YL[st.m], { beginAtZero: true }) },
+    }),
+  }));
+  const rows = [];
+  MACH.forEach(([m]) => ["50mb", "8gb"].forEach(db => { const c = cyc[m] && cyc[m][db]; if (c) rows.push({ m, db, s0: c.S0, w4: c["4way"], sp: c.S0 / c["4way"], ms: c.S0 / ghz[m] }); }));
+  table("tProf", [
+    { h: "Machine", f: r => r.m }, { h: "Database", f: r => DBL[r.db] },
+    { h: "Stock cycles (M)", n: 1, f: r => fmt(r.s0), v: r => r.s0 },
+    { h: "4-way cycles (M)", n: 1, f: r => fmt(r.w4), v: r => r.w4 },
+    { h: "Speedup", n: 1, f: r => spTxt(r.sp), v: r => r.sp, cls: r => winCls(r.sp) },
+    { h: "Stock time (ms)", n: 1, f: r => fmt(r.ms), v: r => r.ms },
+  ], rows);
+}
+
+/* ---------- 4. 2,000 reads ---------- */
+function initR2000() {
+  const st = { m: "speedup" };
+  const V = ["1way", "4way", "8way", "16way"];
+  const f50 = v => DATA.fair.find(r => r.db === "50mb" && r.variant === v);
+  const f2k = v => DATA.r2000.find(r => r.variant === v);
+  seg("r2000Mode", [["speedup", "Speedup: 50 vs 2,000 reads"], ["cycles", "Cycles at 2,000 reads"]], () => st.m, v => { st.m = v; e.draw(); });
+  const e = chart("cR2000", () => {
+    if (st.m === "speedup") {
+      return {
+        type: "bar",
+        data: { labels: V.map(v => VAR[v].label), datasets: [
+          { label: "50 reads (fair batch)", backgroundColor: css("--s0"), borderRadius: 3, borderSkipped: false, data: V.map(v => f50("S0").cycles_M / f50(v).cycles_M) },
+          { label: "2,000 reads", backgroundColor: css("--accent"), borderRadius: 3, borderSkipped: false, data: V.map(v => f2k("S0").cycles_M / f2k(v).cycles_M) },
+        ] },
+        options: base({ interaction: { mode: "index", intersect: false }, plugins: { hline: { y: 1, label: "stock = 1.0" } }, scales: { x: ax("S2 cache width"), y: ax("Speedup vs stock (below 1 is slower)", { beginAtZero: true }) } }),
+      };
+    }
+    return {
+      type: "bar",
+      data: { labels: VORDER.map(v => VAR[v].label), datasets: [{ label: "Cycles (M)", backgroundColor: VORDER.map(v => vcol(v)), borderRadius: 3, borderSkipped: false, data: VORDER.map(v => v === "S0" ? f2k("S0").cycles_M : f2k(v).cycles_M) }] },
+      options: base({ plugins: { legend: { display: false }, hline: { y: f2k("S0").cycles_M, label: "stock" } }, scales: { x: ax("Variant"), y: ax("Cycles (M)", { beginAtZero: true }) } }),
+    };
+  });
+  const s0 = f2k("S0");
+  table("tR2000", [
+    { h: "Variant", f: r => VAR[r.variant].label, v: r => VORDER.indexOf(r.variant) },
+    { h: "Instr. (M)", n: 1, f: r => fmt(r.instructions_M), v: r => r.instructions_M },
+    { h: "Cycles (M)", n: 1, f: r => fmt(r.cycles_M), v: r => r.cycles_M },
+    { h: "IPC", n: 1, f: r => fmt(r.ipc, 2), v: r => r.ipc },
+    { h: "Cache lines", n: 1, f: r => int(r.unique_cache_lines), v: r => r.unique_cache_lines },
+    { h: "L2 hit %", n: 1, f: r => fmt(r.l2_hit_pct, 2), v: r => r.l2_hit_pct },
+    { h: "Sim wall (h)", n: 1, f: r => fmt(r.wallclock_s / 3600, 2), v: r => r.wallclock_s },
+    { h: "Speedup vs stock", n: 1, f: r => r.variant === "S0" ? "1.00×" : spTxt(s0.cycles_M / r.cycles_M), v: r => s0.cycles_M / r.cycles_M, cls: r => r.variant === "S0" ? "" : winCls(s0.cycles_M / r.cycles_M) },
+  ], DATA.r2000, { rowClass: r => r.variant === "4way" ? "hl" : "" });
+}
+
+/* ---------- 5. simulation time model ---------- */
+const BASES = { 10: 7862, 50: 91372, 100: 4725953, 500: 25389294, 2000: 35051480 };
+function humanTime(s) {
+  if (s < 120) return fmt(s, 0) + " s";
+  if (s < 7200) return fmt(s / 60, 0) + " min";
+  if (s < 172800) return fmt(s / 3600, 1) + " hours";
+  return fmt(s / 86400, 1) + " days";
+}
+function initTime() {
+  const s50 = DATA.fair.find(r => r.db === "50mb" && r.variant === "S0").sim_wallclock_s;
+  const s2k = DATA.r2000.find(r => r.variant === "S0").wallclock_s;
+  const slope = (s2k - s50) / (BASES[2000] - BASES[50]);
+  const fixed = s50 - slope * BASES[50];
+  const est = b => fixed + slope * b;
+  const pts = [];
+  DATA.hwassoc50.filter(r => r.associativity === 15).forEach(r => pts.push({ x: BASES[r.reads], y: r.wallclock_s, l: r.reads + " reads" }));
+  pts.push({ x: BASES[2000], y: s2k, l: "2,000 reads" });
+  const slider = $("#tmBases"), out = $("#tmOut");
+  const e = chart("cTime", () => {
+    const line = [];
+    for (let i = 0; i <= 40; i++) { const x = Math.pow(10, 3.6 + (i / 40) * 5.1); line.push({ x, y: est(x) }); }
+    const b = +slider.value * 1e6;
+    return {
+      type: "scatter",
+      data: { datasets: [
+        { label: "Measured (Luna, stock, 50 MB)", data: pts, backgroundColor: css("--w4"), pointRadius: 6, pointHoverRadius: 8 },
+        { label: "Fit: " + fmt(fixed, 0) + " s + " + fmt(slope * 1000, 2) + " ms per base", type: "line", data: line, borderColor: css("--muted"), borderDash: [6, 4], pointRadius: 0, borderWidth: 1.5 },
+        { label: "Your estimate", data: [{ x: b, y: est(b), l: "estimate" }], backgroundColor: css("--w1"), pointRadius: 8, pointStyle: "rectRot" },
+      ] },
+      options: base({
+        plugins: { tooltip: { callbacks: { label: c => (c.raw.l ? c.raw.l + ": " : "") + humanTime(c.raw.y) + " at " + fmt(c.raw.x / 1e6, 2) + " M bases" } } },
+        scales: { x: ax("Total bases in the workload", { type: "logarithmic", ticks: { color: css("--muted"), callback: v => [1e4, 1e5, 1e6, 1e7, 1e8].includes(v) ? fmt(v / 1e6, v < 1e6 ? 2 : 0) + " M" : "" } }), y: ax("Sniper wall-clock (s)", { type: "logarithmic", ticks: { color: css("--muted"), callback: v => [10, 100, 1e3, 1e4, 1e5, 1e6].includes(v) ? int(v) : "" } }) },
+      }),
+    };
+  });
+  const upd = () => {
+    const b = +slider.value * 1e6;
+    out.textContent = fmt(+slider.value, 2) + " M bases: about " + humanTime(est(b));
+    e.draw();
+  };
+  slider.oninput = upd;
+  upd();
+}
+
+/* ---------- 6. laptop sweep ---------- */
+function initLaptop() {
+  const st = { db: "8gb", m: "speedup" };
+  const sel = new Set(["1way", "4way", "8way"]);
+  const READS = [10, 50, 100, 500];
+  const get = (rd, db, v) => DATA.laptop.find(r => r.reads === rd && r.db === db && r.variant === v);
+  const sp = (rd, db, v) => get(rd, db, "S0").cycles_M / get(rd, db, v).cycles_M;
+  seg("lapDb", [["8gb", "8 GB"], ["16gb", "16 GB"], ["both", "Both"]], () => st.db, v => { st.db = v; e.draw(); });
+  seg("lapMetric", [["speedup", "Speedup"], ["cycles", "Cycles"], ["ipc", "IPC"]], () => st.m, v => { st.m = v; e.draw(); });
+  checks("lapVars", VORDER.filter(v => v !== "16way"), sel, () => e.draw());
+  const e = chart("cLap", () => {
+    const dbs = st.db === "both" ? ["8gb", "16gb"] : [st.db];
+    const ds = [];
+    VORDER.filter(v => sel.has(v) && !(st.m === "speedup" && v === "S0")).forEach(v => dbs.forEach(db => {
+      ds.push({
+        label: VAR[v].label + (dbs.length > 1 ? " · " + DBL[db] : ""),
+        data: READS.map(rd => st.m === "speedup" ? sp(rd, db, v) : st.m === "cycles" ? get(rd, db, v).cycles_M : get(rd, db, v).ipc),
+        borderColor: vcol(v), backgroundColor: vcol(v), pointStyle: VAR[v].pt, pointRadius: 6, pointHoverRadius: 8,
+        borderWidth: 2.4, tension: 0, borderDash: db === "16gb" && dbs.length > 1 ? [6, 4] : [],
+      });
+    }));
+    const yl = { speedup: "Speedup vs stock (above 1 is faster)", cycles: "Cycles (M, log scale)", ipc: "IPC" }[st.m];
+    return {
+      type: "line",
+      data: { labels: READS.map(String), datasets: ds },
+      options: base({
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          hline: st.m === "speedup" ? { y: 1, label: "stock = 1.0" } : {},
+          tooltip: { callbacks: { label: c => c.dataset.label + ": " + (st.m === "speedup" ? times(c.parsed.y) + " (" + pct((1 / c.parsed.y - 1) * 100) + " cycles)" : fmt(c.parsed.y, st.m === "ipc" ? 2 : 1)) } },
+        },
+        scales: { x: ax("Reads in the workload (10 and 50 are short reads; 100 and 500 are long reads)"), y: st.m === "cycles" ? ax(yl, { type: "logarithmic" }) : ax(yl, { beginAtZero: st.m === "speedup" }) },
+      }),
+    };
+  });
+  const rows = [];
+  ["8gb", "16gb"].forEach(db => READS.forEach(rd => rows.push({ rd, db })));
+  const cell = v => ({ h: VAR[v].label, n: 1, f: r => spTxt(sp(r.rd, r.db, v)), v: r => sp(r.rd, r.db, v), cls: r => winCls(sp(r.rd, r.db, v)) });
+  table("tLapMatrix", [
+    { h: "Database", f: r => DBL[r.db] }, { h: "Reads", n: 1, f: r => r.rd, v: r => r.rd },
+    { h: "Stock cycles (M)", n: 1, f: r => fmt(get(r.rd, r.db, "S0").cycles_M), v: r => get(r.rd, r.db, "S0").cycles_M },
+    cell("1way"), cell("4way"), cell("8way"),
+  ], rows);
+  table("tLap", [
+    { h: "Reads", n: 1, f: r => r.reads, v: r => r.reads }, { h: "Database", f: r => DBL[r.db] },
+    { h: "Variant", f: r => VAR[r.variant].label, v: r => VORDER.indexOf(r.variant) },
+    { h: "Instr. (M)", n: 1, f: r => fmt(r.instructions_M), v: r => r.instructions_M },
+    { h: "Cycles (M)", n: 1, f: r => fmt(r.cycles_M), v: r => r.cycles_M },
+    { h: "IPC", n: 1, f: r => fmt(r.ipc, 2), v: r => r.ipc },
+    { h: "Cache lines", n: 1, f: r => int(r.unique_cache_lines), v: r => r.unique_cache_lines },
+    { h: "L2 hit %", n: 1, f: r => fmt(r.l2_hit_pct, 2), v: r => r.l2_hit_pct },
+    { h: "Sim wall (s)", n: 1, f: r => int(r.wallclock_s), v: r => r.wallclock_s },
+    { h: "Speedup", n: 1, f: r => r.variant === "S0" ? "1.00×" : spTxt(sp(r.reads, r.db, r.variant)), v: r => sp(r.reads, r.db, r.variant), cls: r => r.variant === "S0" ? "" : winCls(sp(r.reads, r.db, r.variant)) },
+  ], DATA.laptop, { rowClass: r => r.variant === "4way" ? "hl" : "" });
+}
+
+/* ---------- 7. long-read scaling ---------- */
+function initLong() {
+  const st = { m: "speedup" };
+  const P = [];
+  [10, 25, 50].forEach(n => {
+    const a = DATA.longS0.find(r => r.reads === n), b = DATA.long4.find(r => r.reads === n);
+    P.push({ reads: n, kind: "long-read run", bases: a.total_bases, s0c: a.cycles_M, w4c: b.cycles_M, s0i: a.instructions_M, w4i: b.instructions_M });
+  });
+  [100, 500].forEach(n => {
+    const a = DATA.laptop.find(r => r.reads === n && r.db === "8gb" && r.variant === "S0"), b = DATA.laptop.find(r => r.reads === n && r.db === "8gb" && r.variant === "4way");
+    P.push({ reads: n, kind: "laptop sweep", bases: BASES[n], s0c: a.cycles_M, w4c: b.cycles_M, s0i: a.instructions_M, w4i: b.instructions_M });
+  });
+  P.forEach(p => { p.sp = p.s0c / p.w4c; p.gap = p.s0i - p.w4i; });
+  const lab = p => p.reads + " reads · " + fmt(p.bases / 1e6, 2) + " M bases";
+  seg("lrMode", [["speedup", "Speedup vs total bases"], ["gap", "Instruction gap"], ["cycles", "Cycles"]], () => st.m, v => { st.m = v; e.draw(); });
+  const e = chart("cLong", () => {
+    if (st.m === "speedup") {
+      return {
+        type: "scatter",
+        data: { datasets: [{
+          label: "4-way speedup vs stock", showLine: true, data: P.map(p => ({ x: p.bases, y: p.sp, p })),
+          borderColor: css("--w4"), backgroundColor: css("--w4"), borderWidth: 2.4,
+          pointStyle: P.map(p => p.kind === "laptop sweep" ? "rect" : "circle"), pointRadius: 7, pointHoverRadius: 9,
+        }] },
+        options: base({
+          plugins: { legend: { display: false }, hline: { y: 1, label: "stock = 1.0" }, tooltip: { callbacks: { label: c => { const p = c.raw.p; return [lab(p) + " (" + p.kind + ")", times(p.sp) + " · " + pct((1 / p.sp - 1) * 100) + " cycles"]; } } } },
+          scales: { x: ax("Total bases in the workload (log scale)", { type: "logarithmic", min: 2e5, max: 4e7, ticks: { color: css("--muted"), callback: v => [3e5, 1e6, 3e6, 1e7, 3e7].includes(v) ? fmt(v / 1e6, 1) + " M" : "" } }), y: ax("Speedup vs stock (above 1 is faster)", { beginAtZero: true }) },
+        }),
+      };
+    }
+    if (st.m === "gap") {
+      return {
+        type: "bar",
+        data: { labels: P.map(lab), datasets: [{ label: "Stock minus 4-way instructions (M)", data: P.map(p => p.gap), backgroundColor: P.map(p => p.gap > 0 ? css("--win") : css("--loss")), borderRadius: 3, borderSkipped: false }] },
+        options: base({ plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => (c.parsed.y >= 0 ? "4-way ran " + fmt(c.parsed.y) + " M FEWER instructions" : "4-way ran " + fmt(-c.parsed.y) + " M MORE instructions") } } }, scales: { x: ax("Workload"), y: ax("Stock minus 4-way instructions (M). Positive: 4-way ran fewer") } }),
+      };
+    }
+    return {
+      type: "bar",
+      data: { labels: P.map(lab), datasets: [
+        { label: "Stock", data: P.map(p => p.s0c), backgroundColor: css("--s0"), borderRadius: 3, borderSkipped: false },
+        { label: "4-way", data: P.map(p => p.w4c), backgroundColor: css("--w4"), borderRadius: 3, borderSkipped: false },
+      ] },
+      options: base({ interaction: { mode: "index", intersect: false }, scales: { x: ax("Workload"), y: ax("Cycles (M, log scale)", { type: "logarithmic", min: 10 }) } }),
+    };
+  });
+  table("tLong", [
+    { h: "Reads", n: 1, f: r => r.reads, v: r => r.reads }, { h: "Source", f: r => r.kind },
+    { h: "Total bases", n: 1, f: r => int(r.bases), v: r => r.bases },
+    { h: "Stock cycles (M)", n: 1, f: r => fmt(r.s0c), v: r => r.s0c },
+    { h: "4-way cycles (M)", n: 1, f: r => fmt(r.w4c), v: r => r.w4c },
+    { h: "Speedup", n: 1, f: r => spTxt(r.sp), v: r => r.sp, cls: r => winCls(r.sp) },
+    { h: "Stock instr. (M)", n: 1, f: r => fmt(r.s0i), v: r => r.s0i },
+    { h: "4-way instr. (M)", n: 1, f: r => fmt(r.w4i), v: r => r.w4i },
+    { h: "Instr. gap (M)", n: 1, f: r => (r.gap >= 0 ? "+" : "") + fmt(r.gap), v: r => r.gap, cls: r => r.gap > 0 ? "win" : "loss" },
+  ], P);
+}
+
+/* ---------- 8. cache size sweep ---------- */
+const SIZES = [2048, 4096, 16384, 65536, 262144, 1048576];
+const TRUE_S0_50MB = 14.1; /* stock kraken2, 50 MB, 10 reads, same config: measured in the size research (command log), not in a CSV */
+function initSize() {
+  const st = { db: "all", m: "dev" };
+  const order = ["50mb", "8gb", "16gb", "103gb"];
+  const colr = { "50mb": "--w1", "8gb": "--w4", "16gb": "--w8", "103gb": "--w16" };
+  const med = {};
+  order.forEach(db => { const c = DATA.sizes.filter(r => r.db === db).map(r => r.cycles_M).sort((a, b) => a - b); med[db] = (c[2] + c[3]) / 2; });
+  const dev = r => (r.cycles_M / med[r.db] - 1) * 100;
+  seg("szDb", [["all", "All"], ["50mb", "50 MB"], ["8gb", "8 GB"], ["16gb", "16 GB"], ["103gb", "103 GB"]], () => st.db, v => { st.db = v; e.draw(); });
+  seg("szMode", [["dev", "% vs database median"], ["cyc", "Cycles (M)"]], () => st.m, v => { st.m = v; e.draw(); });
+  const e = chart("cSize", () => {
+    const dbs = st.db === "all" ? order : [st.db];
+    return {
+      type: "line",
+      data: { datasets: dbs.map(db => ({
+        label: DBL[db] + " (" + DATA.sizes.find(r => r.db === db).reads + " reads)",
+        data: DATA.sizes.filter(r => r.db === db).map(r => ({ x: r.size, y: st.m === "dev" ? dev(r) : r.cycles_M })),
+        borderColor: css(colr[db]), backgroundColor: css(colr[db]), pointRadius: 6, pointHoverRadius: 8, borderWidth: 2.4, tension: 0,
+      })) },
+      options: base({
+        interaction: { mode: "nearest", intersect: true },
+        plugins: {
+          hline: st.m === "cyc" && st.db === "50mb" ? { y: TRUE_S0_50MB, label: "stock: 14.1 M cycles" } : (st.m === "dev" ? { y: 0, label: "median" } : {}),
+          tooltip: { callbacks: { label: c => c.dataset.label + ": " + (st.m === "dev" ? pct(c.parsed.y, 2) : fmt(c.parsed.y) + " M cycles") + " at " + int(c.parsed.x) + " sets" } },
+        },
+        scales: {
+          x: ax("Software cache size (sets, 4 ways each, log scale)", { type: "logarithmic", afterBuildTicks: sc => { sc.ticks = SIZES.map(v => ({ value: v })); }, ticks: { color: css("--muted"), callback: v => int(v) } }),
+          y: ax(st.m === "dev" ? "Cycles vs the database's own median (%)" : "Cycles (M)"),
+        },
+      }),
+    };
+  });
+  table("tSize", [
+    { h: "Database", f: r => DBL[r.db], v: r => order.indexOf(r.db) },
+    { h: "Reads", n: 1, f: r => r.reads, v: r => r.reads },
+    { h: "Sets", n: 1, f: r => int(r.size), v: r => r.size },
+    { h: "Cache (4 ways × 16 B)", n: 1, f: r => r.size * 64 >= 1048576 ? fmt(r.size * 64 / 1048576, 0) + " MiB" : fmt(r.size * 64 / 1024, 0) + " KiB", v: r => r.size },
+    { h: "Cycles (M)", n: 1, f: r => fmt(r.cycles_M), v: r => r.cycles_M },
+    { h: "vs median", n: 1, f: r => pct(dev(r), 2), v: r => dev(r), cls: r => Math.abs(dev(r)) > 0.9 ? "loss" : "" },
+    { h: "Instr. (M)", n: 1, f: r => fmt(r.instructions_M), v: r => r.instructions_M },
+    { h: "IPC", n: 1, f: r => fmt(r.ipc, 2), v: r => r.ipc },
+    { h: "Cache lines", n: 1, f: r => int(r.unique_cache_lines), v: r => r.unique_cache_lines },
+    { h: "L2 hit %", n: 1, f: r => fmt(r.l2_hit_pct, 2), v: r => r.l2_hit_pct },
+  ], DATA.sizes, { rowClass: r => r.size === 65536 ? "hl" : "" });
+}
+
+/* ---------- 9. hardware associativity ---------- */
+function initHwa() {
+  const st = { m: "pct" };
+  const A = [1, 4, 8, 15, 16, 30];
+  const S = [];
+  [10, 50, 100, 500].forEach(rd => S.push({ key: "50 MB · " + rd + " reads", db: "50mb", rows: DATA.hwassoc50.filter(r => r.reads === rd) }));
+  ["8gb", "16gb"].forEach(db => S.push({ key: DBL[db] + " · 50 reads", db, rows: DATA.hwassocBig.filter(r => r.db === db) }));
+  const cols = ["--w1", "--w4", "--w8", "--w16", "--s0", "--ink2"];
+  const shapes = ["circle", "triangle", "rect", "rectRot", "star", "crossRot"];
+  const at = (s, a) => s.rows.find(r => r.associativity === a);
+  const d = (s, a) => (at(s, a).cycles_M / at(s, 15).cycles_M - 1) * 100;
+  seg("hwaMode", [["pct", "% vs Luna's real 15-way"], ["cyc", "Cycles (M)"]], () => st.m, v => { st.m = v; e.draw(); });
+  const e = chart("cHwa", () => ({
+    type: "line",
+    data: { labels: A.map(String), datasets: S.map((s, i) => ({
+      label: s.key, data: A.map(a => st.m === "pct" ? d(s, a) : at(s, a).cycles_M),
+      borderColor: css(cols[i]), backgroundColor: css(cols[i]), pointStyle: shapes[i], pointRadius: 6, pointHoverRadius: 8,
+      borderWidth: 2, tension: 0, borderDash: s.db === "50mb" ? [] : [6, 4],
+    })) },
+    options: base({
+      interaction: { mode: "nearest", intersect: true },
+      plugins: {
+        hline: st.m === "pct" ? { y: 0, label: "no change" } : {},
+        tooltip: { callbacks: { label: c => c.dataset.label + ": " + (st.m === "pct" ? pct(c.parsed.y, 2) : fmt(c.parsed.y) + " M cycles") } },
+      },
+      scales: {
+        x: ax("Hardware L3 associativity (ways). Luna's real value is 15"),
+        y: st.m === "pct" ? ax("Cycles vs the same run at 15-way (%)", { min: -2, max: 2 }) : ax("Cycles (M, log scale)", { type: "logarithmic" }),
+      },
+    }),
+  }));
+  const rows = [];
+  S.forEach(s => s.rows.forEach(r => rows.push({ s, r })));
+  table("tHwa", [
+    { h: "Workload", f: x => x.s.key, v: x => S.indexOf(x.s) },
+    { h: "Ways", n: 1, f: x => x.r.associativity, v: x => x.r.associativity },
+    { h: "Sets", n: 1, f: x => int(x.r.sets), v: x => x.r.sets },
+    { h: "Cycles (M)", n: 1, f: x => fmt(x.r.cycles_M), v: x => x.r.cycles_M },
+    { h: "vs 15-way", n: 1, f: x => pct(d(x.s, x.r.associativity), 2), v: x => d(x.s, x.r.associativity) },
+    { h: "IPC", n: 1, f: x => fmt(x.r.ipc, 2), v: x => x.r.ipc },
+    { h: "L2 hit %", n: 1, f: x => fmt(x.r.l2_hit_pct, 2), v: x => x.r.l2_hit_pct },
+    { h: "LLC hit %", n: 1, f: x => fmt(x.r.nuca_hit_pct, 4), v: x => x.r.nuca_hit_pct },
+    { h: "Sim wall (s)", n: 1, f: x => int(x.r.wallclock_s), v: x => x.r.wallclock_s },
+  ], rows, { rowClass: x => x.r.associativity === 15 ? "hl" : "" });
+}
+
+/* ---------- 10. flat vs mesh L3 ---------- */
+function initFlat() {
+  const dbs = ["50mb", "8gb"];
+  const g = (db, t) => DATA.flat.find(r => r.db === db && r.topology === t);
+  chart("cFlat", () => ({
+    type: "bar",
+    data: { labels: dbs.map(d => DBL[d] + " database"), datasets: [
+      { label: "Per-core mesh slices (used everywhere else)", data: dbs.map(d => g(d, "nuca").cycles_M), backgroundColor: css("--w4"), borderRadius: 3, borderSkipped: false },
+      { label: "One flat bank", data: dbs.map(d => g(d, "flat").cycles_M), backgroundColor: css("--w1"), borderRadius: 3, borderSkipped: false },
+    ] },
+    options: base({
+      interaction: { mode: "index", intersect: false },
+      plugins: { tooltip: { callbacks: { afterLabel: c => c.datasetIndex === 1 ? pct((c.parsed.y / g(dbs[c.dataIndex], "nuca").cycles_M - 1) * 100) + " vs mesh" : "" } } },
+      scales: { x: ax("Database (stock kraken2, 50 reads)"), y: ax("Cycles (M)", { beginAtZero: true }) },
+    }),
+  }));
+  table("tFlat", [
+    { h: "Database", f: r => DBL[r.db] },
+    { h: "L3 model", f: r => r.topology === "nuca" ? "Mesh slices" : "Flat bank", v: r => r.topology },
+    { h: "Instr. (M)", n: 1, f: r => fmt(r.instructions_M), v: r => r.instructions_M },
+    { h: "Cycles (M)", n: 1, f: r => fmt(r.cycles_M), v: r => r.cycles_M },
+    { h: "IPC", n: 1, f: r => fmt(r.ipc, 2), v: r => r.ipc },
+    { h: "L2 hit %", n: 1, f: r => fmt(r.l2_hit_pct, 2), v: r => r.l2_hit_pct },
+    { h: "Cycles vs mesh", n: 1, f: r => r.topology === "nuca" ? "baseline" : pct((r.cycles_M / g(r.db, "nuca").cycles_M - 1) * 100), v: r => r.cycles_M / g(r.db, "nuca").cycles_M, cls: r => r.topology === "flat" ? "loss" : "" },
+  ], DATA.flat);
+}
+
+/* ---------- 11. workloads ---------- */
+const WL = [
+  { f: "tiny_10reads", reads: 10, bases: 7862, avg: 786, size: "18 KB", use: "Width sweep, hardware associativity (10 reads), size sweep (50 MB, 103 GB), laptop 10" },
+  { f: "50reads", reads: 50, bases: 91372, avg: 1827, size: "191 KB", use: "Fair batch, machine comparison, laptop 50, size sweep (8, 16 GB), hardware associativity (8, 16 GB)" },
+  { f: "long_10", reads: 10, bases: 346387, avg: 34639, size: "680 KB", use: "Long-read scaling" },
+  { f: "long_25", reads: 25, bases: 900057, avg: 36002, size: "1.8 MB", use: "Long-read scaling" },
+  { f: "long_50", reads: 50, bases: 1868769, avg: 37375, size: "3.6 MB", use: "Long-read scaling" },
+  { f: "reads_100", reads: 100, bases: 4725953, avg: 47260, size: "9.1 MB", use: "Laptop 100, hardware associativity (100 reads)" },
+  { f: "reads_500", reads: 500, bases: 25389294, avg: 50779, size: "49 MB", use: "Laptop 500, hardware associativity (500 reads)" },
+  { f: "reads_fast_2000", reads: 2000, bases: 35051480, avg: 17526, size: "68 MB", use: "2,000-read job" },
+  { f: "reads_fast_10000", reads: 10000, bases: 60185436, avg: 6019, size: "118 MB", use: "Built for the 10,000-read job; that job was cancelled" },
+];
+function initWl() {
+  const st = { m: "avg" };
+  const M = { avg: ["Average read length (bases, log scale)", w => w.avg], bases: ["Total bases (log scale)", w => w.bases], reads: ["Reads (log scale)", w => w.reads] };
+  seg("wlMode", [["avg", "Read length"], ["bases", "Total bases"], ["reads", "Reads"]], () => st.m, v => { st.m = v; e.draw(); });
+  const e = chart("cWl", () => ({
+    type: "bar",
+    data: { labels: WL.map(w => w.f), datasets: [{ label: M[st.m][0], data: WL.map(M[st.m][1]), backgroundColor: WL.map(w => w.avg > 30000 ? css("--w1") : css("--w4")), borderRadius: 3, borderSkipped: false }] },
+    options: base({
+      plugins: { legend: { display: false }, hline: st.m === "avg" ? { y: 3411, label: "whole file: 3,411" } : {}, tooltip: { callbacks: { label: c => fmt(c.parsed.y, 0) } } },
+      scales: { x: ax("Workload file (orange = long-read heavy, over 30 kbp per read)"), y: ax(M[st.m][0], { type: "logarithmic" }) },
+    }),
+  }));
+  table("tWl", [
+    { h: "File", f: w => "<code>" + w.f + ".fastq</code>", v: w => w.f },
+    { h: "Reads", n: 1, f: w => int(w.reads), v: w => w.reads },
+    { h: "Total bases", n: 1, f: w => int(w.bases), v: w => w.bases },
+    { h: "Avg length", n: 1, f: w => int(w.avg), v: w => w.avg },
+    { h: "File size", n: 1, f: w => w.size },
+    { h: "Used in", f: w => w.use, cls: () => "wrap" },
+  ], WL);
+}
+
+/* ---------- headline tiles ---------- */
+function initTiles() {
+  const f = (db, v) => DATA.fair.find(r => r.db === db && r.variant === v).cycles_M;
+  const sps = ["8gb", "16gb", "103gb"].map(db => f(db, "S0") / f(db, "4way"));
+  $("#tWin").textContent = fmt(Math.min(...sps), 1) + " to " + fmt(Math.max(...sps), 1) + "×";
+  const L = (rd, db, v) => DATA.laptop.find(r => r.reads === rd && r.db === db && r.variant === v).cycles_M;
+  $("#tWin2").textContent = times(L(10, "8gb", "S0") / L(10, "8gb", "4way"));
+  $("#tLoss").textContent = times(L(500, "8gb", "S0") / L(500, "8gb", "4way"));
+  $("#tLoss2").textContent = times(f("50mb", "S0") / f("50mb", "4way"));
+  const g = (db, t) => DATA.flat.find(r => r.db === db && r.topology === t).cycles_M;
+  $("#tFlat").textContent = pct((g("50mb", "flat") / g("50mb", "nuca") - 1) * 100, 0) + " / " + pct((g("8gb", "flat") / g("8gb", "nuca") - 1) * 100, 0);
+}
+
+/* ---------- boot ---------- */
+(function boot() {
+  themeDefaults();
+  const steps = [initTheme, initNav, initTiles, renderData, renderIndex, initAssoc10, initFair, initProfiles, initR2000, initTime, initLaptop, initLong, initSize, initHwa, initFlat, initWl];
+  steps.forEach(fn => {
+    try { fn(); } catch (err) { console.error("report init failed:", fn.name, err); }
+  });
+})();
+
+</script>

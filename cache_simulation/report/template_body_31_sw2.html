@@ -1,0 +1,96 @@
+
+<section id="laptop" data-nav="Laptop sweep (32 runs)" data-group="Software cache">
+  <div class="kicker">Software cache · your laptop's cache setup · step 26</div>
+  <h2>Laptop sweep: read count × database × width</h2>
+  <div class="expt">
+    <header><div class="id">Ryzen 7 5800H config · 8 GB and 16 GB · 10, 50, 100, 500 reads · stock and 1, 4, 8-way · 32 runs</div>
+      <h3>Does the large-database win hold as the workload grows?</h3>
+      <span class="pill win">WINS SMALL</span><span class="pill loss">LOSES LARGE</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Ran every combination of four workload sizes, two big databases and four builds (stock, 1, 4 and 8-way), 32 runs, on the laptop's simulated cache setup. The biggest run took about 9 hours.</dd></div>
+        <div><dt>Why</dt><dd>The fair batch only used 50 reads. The open question was whether the 8 GB+ win survives larger workloads, the same test we had already run for the small database.</dd></div>
+        <div><dt>Result</dt><dd>At 10 reads the cache is 3.3 to 3.6× faster; at 50 reads about 2×. At 100 reads 8 GB flips to a loss (1.03 to 1.06× slower) while 16 GB still wins (up to 1.08× faster). At 500 reads both lose: 8 GB 1.09× slower, 16 GB 1.02× slower. 4-way is the best width in every row.</dd></div>
+        <div><dt>What we learned</dt><dd>The win shrinks steadily with workload size and reverses. Bigger databases hold the win longer (16 GB flips later than 8 GB), but two databases are too few to call that a rule. Width ranking never changes; only the sign does.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">Confound: the "reads" axis is not clean</b>
+      <p>The 10 and 50-read files are short reads (786 and 1,827 bases on average, 8 K and 91 K bases in total). The 100 and 500-read files come from the front of a long-read file (47 K and 51 K bases per read, 4.7 M and 25.4 M in total). Between 50 and 100 reads the count doubled, but the sequence grew about 50-fold, exactly where 8 GB flips. See the <a href="#longread">long-read test</a> that separates these.</p></div>
+      <div class="controls">
+        <span class="lab">Database</span><div class="seg" id="lapDb" role="group"></div>
+        <span class="lab">Metric</span><div class="seg" id="lapMetric" role="group"></div>
+        <span class="lab">Variants</span><span id="lapVars"></span>
+      </div>
+      <div class="chartbox tall"><canvas id="cLap" role="img" aria-label="Laptop sweep chart"></canvas></div>
+      <p class="figcap">Speedup above 1.0 means faster than stock kraken2 at the same reads and database. Source: <code>laptop_sweep_2026-09-15.csv</code>. No committed chart yet; this page is its first graph.</p>
+      <h3>Speedup matrix</h3>
+      <div class="tw"><table id="tLapMatrix"></table></div>
+      <h3>All 32 runs</h3>
+      <div class="tw" style="max-height:420px"><table id="tLap"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="longread" data-nav="Long-read scaling" data-group="Software cache">
+  <div class="kicker">Software cache · laptop setup · 8 GB · step 45</div>
+  <h2>Long-read scaling: what drives the flip?</h2>
+  <div class="expt">
+    <header><div class="id">10, 25, 50 long reads from the same file as the 100 and 500-read runs · stock vs 4-way</div>
+      <h3>Read count, read length, or total bases?</h3>
+      <span class="pill loss">CROSSOVER AT 2 TO 5 M BASES</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Cut the first 10, 25 and 50 reads of <code>reads_fast_2000.fastq</code> (0.35 M, 0.90 M and 1.87 M bases, 35 to 37 kbp per read) and ran stock and 4-way on the 8 GB database. Together with the sweep's 100 and 500-read rows from the same file, that gives a five-point curve where read length stays roughly constant.</dd></div>
+        <div><dt>Why</dt><dd>To separate read count, read length and total bases, which all changed together in the laptop sweep.</dd></div>
+        <div><dt>Result</dt><dd>4-way beats stock by 42% at 10 long reads (1.42×), 20% at 25, 4.5% at 50, then loses by 3% at 100 and 9% at 500.</dd></div>
+        <div><dt>What we learned</dt><dd>Read length alone does not cause the loss: 10 reads of about 35 kbp each still win by 42%. The advantage falls steadily with total sequence and flips between 1.87 M and 4.7 M bases.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">A suspicious constant in the small-workload wins</b>
+      <p>The second chart shows stock minus 4-way instructions. It is <b>+14.4 M at 10 long reads and +14.2 M at 25</b>, the same number even though the data grew 2.6×. A per-read saving from the cache would grow with the data. This looks like a fixed difference in start-up code between the two builds (they come from different kraken2 source snapshots, and Sniper simulates the whole program including start-up). Part of the small-workload win may therefore be a start-up artifact, not the cache. The test that settles it is to run both builds on about 1 read.</p></div>
+      <div class="controls"><span class="lab">Chart</span><div class="seg" id="lrMode" role="group"></div></div>
+      <div class="chartbox tall"><canvas id="cLong" role="img" aria-label="Long read scaling chart"></canvas></div>
+      <p class="figcap">8 GB database, laptop cache setup. Circles are the new long-read runs; squares are the laptop sweep's 100 and 500-read rows. Sources: <code>longread_scaling_S0/4way_2026-09-19.csv</code>, <code>laptop_sweep_2026-09-15.csv</code>.</p>
+      <div class="tw"><table id="tLong"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="size" data-nav="Cache size sweep" data-group="Software cache">
+  <div class="kicker">Software cache · size axis · steps 27 to 34</div>
+  <h2>Cache size: 2,048 to 1,048,576 sets</h2>
+  <div class="expt">
+    <header><div class="id">Six size-pinned 4-way binaries · four databases · run by two sessions in parallel</div>
+      <h3>Is there a cache size that helps?</h3>
+      <span class="pill nul">SIZE DOES NOT MATTER</span><span class="pill warn">ONE ANOMALY AT 65,536</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Found that kraken2 fixes the cache size at compile time (a formula sets it from the L3 size and the thread count, clamped to 4,096 to 262,144 sets). Built six binaries with the size pinned to 2,048, 4,096, 16,384, 65,536, 262,144 and 1,048,576 sets, all 4-way, and swept them over four databases. Each build's classification output was checked identical to stock.</dd></div>
+        <div><dt>Why</dt><dd>Every earlier test changed the number of ways at whatever size the formula picked. Nobody had varied capacity itself. A tuned size might be where the real gain hides.</dd></div>
+        <div><dt>Result</dt><dd>Flat within 0.7% of each database's median at five of six sizes, on every database. The one exception is 65,536 sets: +6.3% (50 MB), +2.5% (8 GB), +1.0% (16 GB), +6.0% (103 GB), then back to baseline at 262,144 and above. On 50 MB, stock kraken2 (14.1 M cycles) beats or ties every size.</dd></div>
+        <div><dt>What we learned</dt><dd>Capacity is not the lever, on small or large databases. The best-supported explanation for the 65,536 spike is a hash-distribution artifact of this workload file's minimizers at that one mask width, not a general size law. It is unproven.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">Data caveats for this sweep</b>
+      <p><b>Mixed workloads.</b> The 50 MB and 103 GB ladders used 10 reads; the 8 GB and 16 GB ladders used 50 reads. Do not compare their cycle counts to each other. <b>Different cache.</b> These binaries are the current S2 design (heap-allocated, 16-byte entries, hash-mixed set index), not the fixed-4,096-set builds used in the width tests. <b>Not in the verdict chart.</b> The 16 GB ladder was left out of fig14 and shows the weakest spike.</p></div>
+      <div class="controls"><span class="lab">Database</span><div class="seg" id="szDb" role="group"></div>
+        <span class="lab">Y axis</span><div class="seg" id="szMode" role="group"></div></div>
+      <div class="chartbox tall"><canvas id="cSize" role="img" aria-label="Cache size sweep chart"></canvas></div>
+      <p class="figcap">Log-scale x axis. Sources: <code>size_sweep_50mb</code>, <code>cache_size_sweep_8gb16gb</code>, <code>size_sweep_103gb</code> (2026-09-15). Chart: fig14 (50 MB, 8 GB and 103 GB only).</p>
+      <div class="tw" style="max-height:380px"><table id="tSize"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="debate" data-nav="Hypotheses H1 to H4" data-group="Software cache">
+  <div class="kicker">Verdict of the size research brief · step 33</div>
+  <h2>Five agents, three iterations, four hypotheses</h2>
+  <p class="sub">A two-session research pipeline. Five independent agents each analysed the existing data, wrote a plan, then debated to a written conclusion, three times, folding real new runs in between. Iteration 2's leading mechanism (a linear start-up cost proportional to cache size) was overturned when the 103 GB data showed the spike reverting at larger sizes.</p>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>Hypothesis</th><th>Verdict</th><th>Key evidence</th></tr></thead>
+    <tbody>
+      <tr><td>H1</td><td class="wrap">The small-database loss is structural, not a sizing problem</td><td><span class="pill win">CONFIRMED</span></td><td class="wrap">Stock 14.1 M cycles ≤ all six sizes on 50 MB; hardware associativity null triangulates on the same near-zero reuse</td></tr>
+      <tr><td>H2</td><td class="wrap">The large-database win grows with cache capacity</td><td><span class="pill loss">REFUTED</span></td><td class="wrap">Five of six sizes on 8 and 103 GB are cycle-identical; the one different size is a loss</td></tr>
+      <tr><td>H3</td><td class="wrap">The best size is a fixed fraction of the database</td><td><span class="pill loss">REFUTED (location)</span></td><td class="wrap">Anomaly at the identical 65,536 sets across a 2,000× database range; its size varies (+1.0 to +6.3%), so magnitude is database-dependent</td></tr>
+      <tr><td>H4</td><td class="wrap">Kraken2's default sizing formula is near-optimal</td><td><span class="pill nul">CONFIRMED, TRIVIALLY, AT ONE THREAD</span></td><td class="wrap">Nothing beats it because nothing beats anything at one thread. Says nothing about the multi-thread regime the formula governs; a real-hardware null exists there too. Recommendation: do not retune the formula</td></tr>
+    </tbody></table></div>
+  <div class="callout note"><b class="t">Practical recommendation from the brief</b>
+  <p>Stop tuning cache size. Redirect effort to eviction policy under real thread contention and to Thesis 2 (cell width and double hashing), which none of this touched.</p></div>
+</section>

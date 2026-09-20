@@ -1,0 +1,62 @@
+
+<section id="fixes" data-nav="Corrections and caveats" data-group="Reference">
+  <div class="kicker">Reference · honesty log</div>
+  <h2>Mistakes caught and caveats to carry</h2>
+  <p class="sub">Each of these changed a number or a claim. All are also written up in the command log.</p>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>What was wrong</th><th>How it was caught</th><th>Effect</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="wrap">The width-sweep "baseline" was thought to be no cache; it already had an S2 cache</td><td class="wrap">Looked for the S2 symbol in the binary</td><td class="wrap">True stock build (S0) identified and used from then on</td></tr>
+      <tr><td>2</td><td class="wrap">1-way/8-way timings taken while other jobs were running</td><td class="wrap">1-way looked 122% slower than 4-way at almost identical cycles</td><td class="wrap">Wall-clock discarded, clean rerun</td></tr>
+      <tr><td>3</td><td class="wrap">Batches run hours apart are not comparable in wall-clock</td><td class="wrap">Seconds per million cycles differed 14 vs 8 between batches</td><td class="wrap">One fair batch of 20 runs</td></tr>
+      <tr><td>4</td><td class="wrap">Sniper's wall-clock was used as speed; it measures the simulator</td><td class="wrap">Wall-clock said 1-way wins; cycles said 4-way</td><td class="wrap">All headline numbers switched to cycles</td></tr>
+      <tr><td>5</td><td class="wrap">"The 2× speedup was a small-read-count artifact"</td><td class="wrap">Checked the 2,000-read job's database: 50 MB, already losing at 50 reads</td><td class="wrap">Explanation withdrawn; the split is by database size</td></tr>
+      <tr><td>6</td><td class="wrap">Size-65,536 spike quoted as +4.4% and +10.2%</td><td class="wrap">Peer session: those were instruction deltas, not cycles</td><td class="wrap">Correct: +2.5% (8 GB), +6.0% (103 GB)</td></tr>
+      <tr><td>7</td><td class="wrap">"The fair-batch 4-way is the 262,144-set point"</td><td class="wrap">Measured each binary's per-thread memory</td><td class="wrap">It is 4,096 sets; two S2 designs were used</td></tr>
+      <tr><td>8</td><td class="wrap">"64-way touches 4.7× more lines than 4-way"</td><td class="wrap">Recomputed from the table</td><td class="wrap">4.3× (the 4.7× is against the baseline row)</td></tr>
+      <tr><td>9</td><td class="wrap">50 MB tail run wrote no results rows</td><td class="wrap">CSV was two rows short after the log said done</td><td class="wrap">Rows recovered by hand from the raw logs</td></tr>
+      <tr><td>10</td><td class="wrap">Figure 14 panels use different workloads; the "peer 8 GB" file is a copy of our 8 GB data; the 16 GB ladder was never used</td><td class="wrap">Full audit of commits and data</td><td class="wrap">Cross-database comparison is not like-for-like</td></tr>
+      <tr><td>11</td><td class="wrap">Flat-L3 file's hit-rate column is 0 for the mesh rows</td><td class="wrap">Compared with the same config's other runs</td><td class="wrap">Column unreliable; cycles unaffected</td></tr>
+      <tr><td>12</td><td class="wrap">"Stock" has a one-entry cache, and is a different kraken2 snapshot</td><td class="wrap">Read both sources</td><td class="wrap">Claim narrowed to "S2 build vs stock kraken2"</td></tr>
+      <tr><td>13</td><td class="wrap">Small-workload wins may include a fixed start-up difference (constant ~14 M instruction gap)</td><td class="wrap">Instruction gap was the same at 10 and 25 long reads</td><td class="wrap">Open: needs the 1-read test</td></tr>
+    </tbody></table></div>
+</section>
+
+<section id="open" data-nav="Open questions and next steps" data-group="Reference">
+  <div class="kicker">Reference · what is not known</div>
+  <h2>Open questions and the next experiments</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Priority</th><th>Experiment</th><th>What it settles</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td class="wrap"><b>1-read fixed-cost test.</b> Run stock and 4-way on about one read, 8 GB.</td><td class="wrap">Whether the small-workload wins are a start-up artifact of two different source snapshots</td></tr>
+      <tr><td>2</td><td class="wrap"><b>Clean A/B build.</b> Stock's own source plus only the S2 table, nothing else.</td><td class="wrap">Whether the S2 table alone produces the gains and losses</td></tr>
+      <tr><td>3</td><td class="wrap"><b>Random-sample workloads.</b> 10 to 10,000 reads drawn across all 16 basecalled files (3.2 kbp average).</td><td class="wrap">Where the crossover really sits on realistic data</td></tr>
+      <tr><td>4</td><td class="wrap"><b>Simulate the prefetch-batching patch</b> (S5.0).</td><td class="wrap">Whether overlapping memory requests, aimed at the actual bottleneck, helps</td></tr>
+      <tr><td>5</td><td class="wrap"><b>Isolated hardware sweeps.</b> L3 size, L2 and L1 size and ways, memory latency, on 8 GB and 16 GB.</td><td class="wrap">Which hardware knob has headroom for this workload</td></tr>
+      <tr><td>6</td><td class="wrap"><b>Multi-thread simulation.</b></td><td class="wrap">The contention regime where real slowdowns appear</td></tr>
+      <tr><td>7</td><td class="wrap"><b>Real-hardware confirmation</b> of any promising simulated result.</td><td class="wrap">Whether anything here survives outside the simulator</td></tr>
+      <tr><td>8</td><td class="wrap"><b>Redo figure 14</b> with matched workloads and the 16 GB ladder.</td><td class="wrap">Whether the size-65,536 spike is really the same effect on every database</td></tr>
+    </tbody></table></div>
+</section>
+
+<section id="index" data-nav="Experiment index" data-group="Reference">
+  <div class="kicker">Reference · full chronological index</div>
+  <h2>Every experiment, in order</h2>
+  <p class="sub">Filter by type, then open any row for what was done and what came out. Dates are the day work started.</p>
+  <div class="chips" id="idxChips" role="group" aria-label="Filter experiments"></div>
+  <ul class="idx" id="idxList"></ul>
+</section>
+
+<section id="data" data-nav="Data files and figures" data-group="Reference">
+  <div class="kicker">Reference · everything committed</div>
+  <h2>Data files, figures and scripts</h2>
+  <p class="sub">All of it lives in the <a href="https://github.com/KathpaliaChirag/Nanopore-project/tree/main/cache_simulation">cache_simulation folder</a> of the repository. Every chart on this page is drawn from these files by <code>scripts/build_report.py</code>.</p>
+  <h3>Measurement files</h3>
+  <div class="tw"><table id="tInv"></table></div>
+  <h3>Committed figures</h3>
+  <div class="tw"><table id="tFigs"></table></div>
+</section>
+
+<footer>Built from committed data by <code>cache_simulation/scripts/build_report.py</code>. Simulator: Sniper, detailed mode, single core. Sept 2026.</footer>
+</main>
+</div>

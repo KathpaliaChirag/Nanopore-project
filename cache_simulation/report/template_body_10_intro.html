@@ -1,0 +1,118 @@
+<div class="shell">
+<nav class="rail" id="rail" aria-label="Sections"></nav>
+<main>
+
+<div class="hero" id="top">
+  <div class="eyebrow">Sniper simulation study · Luna server · Sept 4 to Sept 20, 2026</div>
+  <h1>What a software cache does for kraken2, cycle by cycle</h1>
+  <p class="lead">Kraken2 classifies DNA reads by looking up short fingerprints (minimizers) in a huge hash table. That lookup is slow because it waits on memory. We asked whether a small software cache in front of the table speeds it up, and how the answer changes with the cache's shape, its size, the CPU's own caches, the database and the workload. Every number below comes from a detailed Sniper simulation and is read straight from the committed data files.</p>
+  <div class="meta">
+    <span><b id="mRows">0</b> measured rows</span>
+    <span><b id="mFiles">0</b> data files</span>
+    <span><b>14</b> figures</span>
+    <span><b>5</b> simulated machines</span>
+    <span><b>4</b> databases (50 MB to 103 GB)</span>
+  </div>
+</div>
+
+<section id="verdict">
+  <div class="kicker">Overview</div>
+  <h2>The verdict in seven numbers</h2>
+  <p class="sub">"Speedup" everywhere on this page means <b>stock kraken2 cycles ÷ variant cycles</b>: above 1.0 the variant is faster, below 1.0 it is slower. Stock kraken2 is called <b>S0</b>. The variant is our software cache table (called <b>S2</b>), usually 4-way.</p>
+  <div class="tiles">
+    <div class="tile win"><div class="big" id="tWin">…</div><div class="cap"><span class="pill win">WIN</span>4-way vs stock on the 8, 16 and 103 GB databases at 50 reads (Luna). Best of the widths at every size.</div></div>
+    <div class="tile win"><div class="big" id="tWin2">…</div><div class="cap"><span class="pill win">WIN</span>Best case: 10 reads on the 8 GB database, your laptop's cache setup. Small workloads only.</div></div>
+    <div class="tile loss"><div class="big" id="tLoss">…</div><div class="cap"><span class="pill loss">LOSS</span>The same cache at 500 long reads on 8 GB. The win shrinks as the workload grows and flips between about 1.9 M and 4.7 M total bases.</div></div>
+    <div class="tile loss"><div class="big" id="tLoss2">…</div><div class="cap"><span class="pill loss">LOSS</span>On the 50 MB database the cache never wins, at any width, size or workload we tried (Luna, 50 reads).</div></div>
+    <div class="tile nul"><div class="big">±1%</div><div class="cap"><span class="pill nul">NO EFFECT</span>Changing the CPU's L3 associativity from 1 to 30-way, on 50 MB, 8 GB and 16 GB. 36 runs.</div></div>
+    <div class="tile nul"><div class="big">±0.7%</div><div class="cap"><span class="pill nul">NO EFFECT</span>Changing the software cache size 512-fold. One isolated spike at exactly 65,536 sets, on every database.</div></div>
+    <div class="tile"><div class="big" id="tFlat">…</div><div class="cap"><span class="pill info">MODEL</span>Modeling Luna's L3 as one flat bank instead of per-core mesh slices makes it slower. The topology model matters.</div></div>
+  </div>
+
+  <div class="callout warn"><b class="t">Nothing here is measured on real hardware</b>
+  <p>Everything is simulated, on one thread. The last real-hardware benchmark (Aug 30, three databases, six thread counts) found no speedup from the cache at all. So the wins above are simulated wins at small workloads. Whether they survive production-size runs is still open.</p></div>
+
+  <div class="callout note"><b class="t">What "no cache" really means</b>
+  <p>Stock kraken2 already has a one-entry memory: it remembers the last minimizer and its answer, and skips the table search when the next window repeats it. <b>S0 keeps that.</b> Our S2 build keeps it too and puts a real table (many entries, several slots per group) in front of the hash-table search. So "S0" is "no S2 table", not "zero caching". Details in <a href="#internals">what is inside S2</a>.</p></div>
+
+  <h3>Scorecard</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Question</th><th>Answer</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td class="wrap">Does the S2 cache speed up kraken2 on big databases?</td><td class="wrap"><span class="pill win">YES, at small workloads</span>1.8 to 2.1× at 50 reads, up to 3.6× at 10 reads</td><td><a href="#dbsize">Database size</a>, <a href="#laptop">Laptop sweep</a></td></tr>
+      <tr><td class="wrap">Does it help on a small (50 MB) database?</td><td class="wrap"><span class="pill loss">NO</span>10% slower at 50 reads; 1.3× slower at 2,000 reads</td><td><a href="#dbsize">Database size</a>, <a href="#r2000">2,000 reads</a></td></tr>
+      <tr><td class="wrap">Does the win survive bigger workloads?</td><td class="wrap"><span class="pill loss">NO</span>Crossover at about 2 to 5 M total bases; read length is not the cause</td><td><a href="#laptop">Laptop sweep</a>, <a href="#longread">Long reads</a></td></tr>
+      <tr><td class="wrap">Which width is best?</td><td class="wrap"><span class="pill win">4-way</span>Best or tied at every database size on cycles</td><td><a href="#dbsize">Database size</a></td></tr>
+      <tr><td class="wrap">Does a bigger or smaller cache help?</td><td class="wrap"><span class="pill nul">NO</span>Flat across 2,048 to 1,048,576 sets, apart from one anomaly</td><td><a href="#size">Cache size</a></td></tr>
+      <tr><td class="wrap">Does hardware L3 associativity matter?</td><td class="wrap"><span class="pill nul">NO</span>Under 1% spread on every database</td><td><a href="#hwassoc">Hardware associativity</a></td></tr>
+      <tr><td class="wrap">Does the L3 model (flat vs mesh) matter?</td><td class="wrap"><span class="pill info">YES</span>Flat is 17 to 31% slower</td><td><a href="#flat">Flat L3</a></td></tr>
+      <tr><td class="wrap">Does it work on real hardware?</td><td class="wrap"><span class="pill warn">UNKNOWN</span>Last real benchmark found no speedup</td><td><a href="#open">Open questions</a></td></tr>
+    </tbody></table></div>
+</section>
+
+<section id="how">
+  <div class="kicker">Read this first</div>
+  <h2>How to read the numbers</h2>
+  <h3>Simulator terms</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><b>Sniper</b></td><td class="wrap">A CPU simulator. It runs the real compiled kraken2 and models the core, the caches and the memory cycle by cycle. Its settings change the <i>simulated machine</i>, not kraken2 itself.</td></tr>
+      <tr><td><b>Detailed mode</b></td><td class="wrap">Full timing model: cycles, IPC, cache hit rates. <b>Every result on this page is detailed mode.</b> It runs roughly 25 to 200 times slower than fast-forward.</td></tr>
+      <tr><td><b>Fast-forward mode</b></td><td class="wrap">Runs the program without timing. Fast, and its printed IPC is meaningless. Used only for setup checks (the smoke test and the first tracing).</td></tr>
+      <tr><td><b>Cycles</b></td><td class="wrap">The simulated CPU clock ticks a run took. This is the real-time proxy: cycles ÷ clock speed = simulated time.</td></tr>
+      <tr><td><b>Wall-clock / elapsed</b></td><td class="wrap">How long <i>Sniper itself</i> took on the host. It tracks instruction count, drifts between sessions and is <b>not</b> program speed. Early results used it by mistake; see the <a href="#fixes">corrections</a>.</td></tr>
+      <tr><td><b>IPC</b></td><td class="wrap">Instructions per cycle. Higher means fewer stalls per instruction. Checked on every row: cycles ÷ instructions must equal the reported IPC.</td></tr>
+      <tr><td><b>Ways / sets / line</b></td><td class="wrap">A cache is split into <i>sets</i>; each set has several <i>ways</i> (slots) that one address may occupy; a <i>line</i> is 64 bytes moved at a time. More ways means fewer collisions but more slots to check.</td></tr>
+      <tr><td><b>Unique cache lines</b></td><td class="wrap">How many distinct 64-byte lines the run touched. A footprint measure.</td></tr>
+      <tr><td><b>NUCA</b></td><td class="wrap">Non-uniform cache architecture: the shared L3 is modeled as one slice per core on a mesh, not one block. Luna's L3 (105 MB) becomes 96 slices of 1,125 KB.</td></tr>
+    </tbody></table></div>
+
+  <h3>The three things called "cache"</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Name</th><th>What it is</th><th>Size</th><th>In stock kraken2 (S0)?</th></tr></thead>
+    <tbody>
+      <tr><td><b>One-entry memory</b></td><td class="wrap">Last minimizer and its answer</td><td class="n">16 bytes</td><td>Yes</td></tr>
+      <tr><td><b>S2 software cache</b></td><td class="wrap">Our table of many recent minimizer answers, private to each thread, checked before the hash table</td><td class="wrap">96 KB to 1.5 MB (width tests), 128 KB to 64 MB (size tests)</td><td>No, this is what we added</td></tr>
+      <tr><td><b>Hardware caches</b></td><td class="wrap">L1, L2, L3 inside the CPU</td><td class="wrap">Set by the simulated machine</td><td>Yes, always</td></tr>
+    </tbody></table></div>
+  <div class="callout note"><b class="t">Software or hardware?</b>
+  <p>Any chart labeled "1-way, 4-way, 8-way, 16-way" is about the <b>software</b> S2 cache. The hardware caches stay fixed in those charts. Only the "Hardware" section changes the hardware.</p></div>
+</section>
+
+<section id="setup">
+  <div class="kicker">Foundation</div>
+  <h2>Setup: modeling Luna</h2>
+  <p class="sub">Luna is a Dell R760 with two Intel Xeon Platinum 8468 (Sapphire Rapids) processors, 96 cores per socket. Its cache layout was read straight from the machine (<code>/sys/devices/system/cpu/cpu0/cache/index*/</code>) rather than from a spec sheet, because a wrong spec-sheet claim had already burned the project once.</p>
+  <h3>Luna's real cache geometry</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Level</th><th class="n">Size</th><th class="n">Ways</th><th class="n">Sets</th><th class="n">Line</th></tr></thead>
+    <tbody>
+      <tr><td>L1 data (per core)</td><td class="n">48 KB</td><td class="n">12</td><td class="n">64</td><td class="n">64 B</td></tr>
+      <tr><td>L1 instruction (per core)</td><td class="n">32 KB</td><td class="n">8</td><td class="n">64</td><td class="n">64 B</td></tr>
+      <tr><td>L2 (per core)</td><td class="n">2 MB</td><td class="n">16</td><td class="n">2,048</td><td class="n">64 B</td></tr>
+      <tr><td>L3 (shared by 96 cores)</td><td class="n">105 MB</td><td class="n">15</td><td class="n">114,688</td><td class="n">64 B</td></tr>
+    </tbody></table></div>
+
+  <h3>Every simulated machine</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Machine</th><th class="n">Clock</th><th>L1 (i / d)</th><th>L2 per core</th><th>L3 / SLC</th><th>Basis</th></tr></thead>
+    <tbody>
+      <tr><td><b>Luna</b> (<code>luna.cfg</code>)</td><td class="n">2.1 GHz</td><td>32 KB 8-way / 48 KB 12-way</td><td>2 MB 16-way</td><td class="wrap">105 MB 15-way, as 96 slices of 1,125 KB</td><td class="wrap">Read from the machine; clock is Intel's base spec</td></tr>
+      <tr><td><b>Desktop</b> (<code>desktop.cfg</code>)</td><td class="n">3.7 GHz</td><td>32 KB 8-way / 32 KB 8-way</td><td>512 KB 8-way</td><td class="wrap">32 MB 16-way over 6 cores (5,461 KB slices)</td><td class="wrap">AMD Ryzen 5 5600X published spec</td></tr>
+      <tr><td><b>Orin-sized</b> (<code>orion_sizes.cfg</code>)</td><td class="n">2.2 GHz</td><td>64 KB 4-way / 64 KB 4-way</td><td>256 KB 8-way</td><td class="wrap">4 MB over 12 cores (342 KB slices), 16-way is a placeholder</td><td class="wrap">Jetson AGX Orin sizes; associativity unverified</td></tr>
+      <tr><td><b>Laptop</b> (<code>laptop.cfg</code>)</td><td class="n">3.2 GHz</td><td>32 KB 8-way / 32 KB 8-way</td><td>512 KB 8-way</td><td class="wrap">16 MB 16-way, 8 slices of 2,048 KB</td><td class="wrap">Ryzen 7 5800H: sizes and clock read from your machine, ways from AMD's spec</td></tr>
+      <tr><td><b>Flat L3</b> (<code>luna_flatl3.cfg</code>)</td><td class="n">2.1 GHz</td><td colspan="2">same as Luna</td><td class="wrap">107,520 KB in one bank, 15-way, 114,688 sets</td><td class="wrap">Same latencies as the mesh model, only the topology differs</td></tr>
+    </tbody></table></div>
+  <div class="callout warn"><b class="t">What is real and what is a placeholder</b>
+  <p><b>Real:</b> cache sizes, ways and line size for Luna and (partly) the laptop. <b>Placeholder or borrowed:</b> the L3 speed (tag 15 / data 20 cycles), the L3 replacement policy (LRU, though the real chip differs), memory timing (a generic DDR4-2400 model), and the CPU core model (inherited from a different chip; Sniper has no Sapphire Rapids core). Every machine here uses the <i>same</i> stand-in x86 core, so machine comparisons test cache configuration, not real ARM or AMD behavior.</p></div>
+
+  <h3>Four bugs found getting the config to load</h3>
+  <ol>
+    <li><b>Wrong <code>-c</code> syntax.</b> A path (<code>config/luna.cfg</code>) silently fell back to defaults. The correct form is the bare name, <code>-c luna</code>.</li>
+    <li><b>Comma-joined flags.</b> <code>-c base,luna</code> triggers Sniper's heterogeneous per-core mode instead of chaining files. Two separate <code>-c</code> flags are needed, base first.</li>
+    <li><b>Cache-size validation abort.</b> Sniper requires size = sets × ways × line exactly. A 1,120 KB target had to be rounded to 1,125 KB (1,200 sets).</li>
+    <li><b>Crash with a non-power-of-2 set count.</b> The default <code>xor_mod</code> hash goes out of range when sets is not a power of 2. Switching the L3 to plain <code>mod</code> fixed it. The same check later caught the flat-L3 config (114,688 sets is not a power of 2).</li>
+  </ol>
+  <p class="sub">There was also a false start: kraken2 is a Perl wrapper script, so pointing Sniper at it instrumented Perl's start-up and showed near-zero work. Finding the real compiled <code>classify</code> binary (with <code>strace</code>) and its raw arguments fixed it.</p>
+</section>

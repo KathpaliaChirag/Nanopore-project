@@ -1,0 +1,123 @@
+
+<section id="assoc10" data-nav="Width sweep, 10 reads" data-group="Software cache">
+  <div class="kicker">Software cache · Luna hardware · steps 9 to 11</div>
+  <h2>Width sweep: 4 to 64 ways at 10 reads</h2>
+  <div class="expt">
+    <header><div class="id">First real comparative experiment · 50 MB database · 10 reads</div>
+      <h3>Does a wider software cache cost more or help?</h3>
+      <span class="pill nul">WIDER IS WORSE</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Ran six kraken2 builds through Sniper on the same 10-read workload, changing only how many slots (ways) each set of the software cache has: 4, 8, 16, 32 and 64, plus one row called "baseline".</dd></div>
+        <div><dt>Why</dt><dd>An earlier sweep on real hardware found more ways was slower, but its cache kept global atomic hit/miss counters that made threads fight. The "noatomics" builds delete those counters, so any slowdown left belongs to the width itself.</dd></div>
+        <div><dt>Result</dt><dd>Instructions, cycles and cache lines touched all rise with width. 64-way needs 11% more cycles than 4-way and touches 4.3× more cache lines. IPC stays flat (1.76 to 1.80), so the extra cost is more instructions, not more stalls.</dd></div>
+        <div><dt>What we learned</dt><dd>The real-hardware trend (more ways is worse) reproduces with the thread-locking overhead removed, so it is not an artifact of that overhead. It is consistent with wider caches simply having more slots to touch and check.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">Caveat: the "baseline" row is not stock kraken2</b>
+      <p>That build already contained an early version of our S2 cache (its numbers are almost identical to 4-way, so it is probably a 4-way). The true stock build (S0) was identified in the next step. So this sweep compares S2 widths against each other only. It is also a tiny 10-read workload, where start-up work dominates.</p></div>
+      <div class="controls"><span class="lab">Metric</span>
+        <div class="seg" id="assocMetric" role="group"></div></div>
+      <div class="chartbox short"><canvas id="cAssoc10" role="img" aria-label="Width sweep chart"></canvas></div>
+      <p class="figcap">Luna cache setup, 10 reads (7,862 bases), 50 MB database, single thread. Source: <code>associativity_sweep_2026-09-08_summary.csv</code>. Chart figure: fig1 (which shows simulator time, not cycles).</p>
+      <div class="tw"><table id="tAssoc10"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="dbsize" data-nav="Database size (fair batch)" data-group="Software cache">
+  <div class="kicker">Software cache · Luna hardware · steps 12 to 20</div>
+  <h2>Database size: the cache's value flips with the database</h2>
+  <div class="expt">
+    <header><div class="id">Five variants × four databases · 50 reads · 20 runs in one batch</div>
+      <h3>Does the S2 cache help, and at which width, as the database grows?</h3>
+      <span class="pill win">WINS ON 8 GB+</span><span class="pill loss">LOSES ON 50 MB</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Ran stock kraken2 (S0) and four S2 widths (1, 4, 8, 16-way) on four databases: 50 MB, 8 GB, 16 GB and 103 GB, all on the same 50-read workload with Luna's cache setup. A 1-way (direct-mapped) build did not exist, so it was built from scratch and its output checked identical to S0.</dd></div>
+        <div><dt>Why</dt><dd>A small database's table mostly stays warm, so a lookup is cheap and a cache has little to save. A huge database's table is scattered, mostly cold memory, so a lookup is expensive and a cache that intercepts repeats should pay off. We wanted to see where the split falls.</dd></div>
+        <div><dt>Result</dt><dd>On 50 MB every width is slower than stock (0.85 to 0.91×). On 8, 16 and 103 GB every width is faster (1.8 to 2.05×), and 4-way is best or tied everywhere. On 8 GB the stock run needs 68.1 M instructions at IPC 1.32; 4-way needs 51.9 M at IPC 1.84.</dd></div>
+        <div><dt>What we learned</dt><dd>The value of a software cache depends on the database, not on the cache. 4-way is the sweet spot: 16-way adds cost and touches far more memory for no gain. The benefit rises to 16 GB then dips slightly at 103 GB (1.97× vs 2.05×), so it may be approaching a ceiling.</dd></div>
+      </dl>
+      <div class="callout fix"><b class="t">Three corrections made on the way to this table</b>
+      <p><b>1. Wall-clock contamination.</b> The 1-way and 8-way runs overlapped other jobs, so 1-way looked 122% slower than 4-way at the same cycles. Their wall-clock was discarded and re-run. <b>2. Cross-batch drift.</b> Batches run hours apart ran at 14 vs 8 seconds per million cycles, so wall-clock cannot be compared across batches. One "final fair batch" ran everything together. <b>3. Wrong metric.</b> Sniper's wall-clock measures the simulator, not the program. By that measure 1-way "wins"; by cycles (the right measure) 4-way wins. Use the metric selector below to see both.</p></div>
+      <div class="controls">
+        <span class="lab">Metric</span><div class="seg" id="fairMetric" role="group"></div>
+        <span class="lab">Variants</span><span id="fairVars"></span>
+      </div>
+      <div class="chartbox tall"><canvas id="cFair" role="img" aria-label="Fair batch chart"></canvas></div>
+      <p class="figcap">Luna cache setup, 50 reads (91,372 bases). Databases: 50 MB (<code>sample_targeted</code>), 8 GB (<code>standard_8gb</code>), 16 GB, 103 GB. Source: <code>final_fair_batch_2026-09-09_5variant_all_db.csv</code>. Charts: fig2, fig3, fig4, fig5, fig6.</p>
+      <div class="tw"><table id="tFair"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="profiles" data-nav="Other machines" data-group="Software cache">
+  <div class="kicker">Software cache on different hardware · steps 20 to 21</div>
+  <h2>Does the win depend on the machine's caches?</h2>
+  <div class="expt">
+    <header><div class="id">Luna · desktop · Orin-sized · your laptop · 4-way vs stock</div>
+      <h3>Same software cache, four simulated machines</h3>
+      <span class="pill info">NOT MONOTONIC IN CACHE SIZE</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Rebuilt the simulated machine with other cache setups (config-only overlays: cache sizes, ways, clock) and reran stock and 4-way on the same 50-read workload. Luna and the desktop and Orin configs ran 50 MB and 8 GB; your laptop config came from the laptop sweep (8 GB only).</dd></div>
+        <div><dt>Why</dt><dd>To check the 50 MB result is not an accident of Luna's cache geometry, and to see whether smaller CPU caches make a software cache more or less valuable.</dd></div>
+        <div><dt>Result</dt><dd>50 MB is a small loss on every machine (0.90 to 0.92×). On 8 GB the win is 1.83× (Luna), 1.94× (desktop), 1.65× (Orin-sized), 1.94× (laptop).</dd></div>
+        <div><dt>What we learned</dt><dd>Consistent in direction everywhere, so the pattern is not a Luna quirk. But the size of the win does not follow cache size: the desktop (smaller L2) gains more than Luna, and Orin (smallest caches) gains least. Orin's stock run is already cheaper (55.9 M vs the desktop's 60.6 M cycles), possibly because of its larger L1, but that is a guess.</dd></div>
+      </dl>
+      <div class="callout warn"><b class="t">Caveat</b><p>These are config-only stand-ins on the same x86 core model, not real ARM or AMD behavior, and Orin's L3 associativity is a placeholder. Each machine changes several things at once (sizes, ways, clock), so no single knob can be blamed.</p></div>
+      <div class="controls"><span class="lab">Show</span><div class="seg" id="profMetric" role="group"></div></div>
+      <div class="chartbox short"><canvas id="cProf" role="img" aria-label="Machine comparison chart"></canvas></div>
+      <p class="figcap">Luna: fair batch. Desktop and Orin: <code>hwsize_comparison_2026-09-09.csv</code>. Laptop: laptop sweep at 50 reads, 8 GB. Chart: fig7.</p>
+      <div class="tw"><table id="tProf"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="r2000" data-nav="2,000 reads on 50 MB" data-group="Software cache">
+  <div class="kicker">Software cache · Luna hardware · steps 22 to 24</div>
+  <h2>2,000 reads: does the small-database loss fade with more data?</h2>
+  <div class="expt">
+    <header><div class="id">50 MB database · 2,000 reads (35.1 M bases) · five variants · 12 to 15 hours each</div>
+      <h3>Was the 50 MB loss just a warm-up effect of a tiny workload?</h3>
+      <span class="pill loss">LOSS HOLDS AND GROWS</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Ran the same 50 MB database at 2,000 reads, 40 times the earlier 50-read run, for stock and all four widths.</dd></div>
+        <div><dt>Why</dt><dd>At 50 reads the cache lost by about 10% on this database. The obvious excuse was that 50 reads is too little for a cache to warm up.</dd></div>
+        <div><dt>Result</dt><dd>Every width loses to stock, and by more than before: 4-way 1.28× slower, 1-way 1.31×, 8-way 1.34×, 16-way 1.39×. Cost rises steadily past 4-way.</dd></div>
+        <div><dt>What we learned</dt><dd>Not a warm-up problem. Two mechanisms show: 1-way suffers conflict misses (too few slots), while 8 and 16-way pay for checking more slots per lookup even though their hit rate rises. 4-way sits between the two costs.</dd></div>
+      </dl>
+      <div class="callout fix"><b class="t">Correction to our own explanation</b>
+      <p>This job was first described as showing "the earlier ~2× speedup was a small-workload artifact". That was wrong: this job uses the 50 MB database, which was already losing at 50 reads. The ~2× win lives on the 8 GB+ databases, which this job never tested at scale. The finding is only that the small-database loss holds at 40× the data.</p></div>
+      <div class="controls"><span class="lab">Compare</span><div class="seg" id="r2000Mode" role="group"></div></div>
+      <div class="chartbox short"><canvas id="cR2000" role="img" aria-label="2000 read chart"></canvas></div>
+      <p class="figcap">Luna cache setup, 50 MB database. 50-read values from the fair batch; 2,000-read values from <code>2000reads_live_summary_2026-09-09.csv</code>. Charts: fig9, fig10, fig11.</p>
+      <div class="tw"><table id="tR2000"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="timemodel" data-nav="Simulation time" data-group="Software cache">
+  <div class="kicker">How long runs take · step 24 (fig8)</div>
+  <h2>How long a simulated run takes</h2>
+  <div class="expt">
+    <header><div class="id">Stock kraken2 · 50 MB · Luna · wall-clock of Sniper itself</div>
+      <h3>Simulation time grows with total bases, not read count</h3>
+      <span class="pill info">PLANNING TOOL</span></header>
+    <div class="body">
+      <dl class="qa">
+        <div><dt>What we did</dt><dd>Plotted how long stock-kraken2 simulations took against the total bases in the workload, and fitted a fixed-plus-variable cost line from two measured points (50 reads and 2,000 reads).</dd></div>
+        <div><dt>Result</dt><dd>Fixed cost about 72 s (database and taxonomy load) plus about 1.27 ms per base on 50 MB. It predicts the measured 100 and 500-read runs to within about 6%. The 8 GB database costs roughly 2.7× more per base.</dd></div>
+        <div><dt>Why it matters</dt><dd>The full 104,832-read file (357.6 M bases) would take about 5.3 days for one stock run on 50 MB, which is why the project uses subsets.</dd></div>
+        <div><dt>Caveat</dt><dd>This is simulator time, not program speed. Numbers for 10,000 reads and the full file are extrapolations, never run.</dd></div>
+      </dl>
+      <div class="controls"><span class="lab">Estimate</span>
+        <label class="chk" for="tmBases">total bases (millions)</label>
+        <input id="tmBases" type="range" min="0.01" max="360" step="0.01" value="35" style="width:200px">
+        <b class="mono" id="tmOut"></b></div>
+      <div class="chartbox short"><canvas id="cTime" role="img" aria-label="Simulation time versus bases"></canvas></div>
+      <p class="figcap">Points: stock kraken2 on 50 MB, Luna setup (the four hardware-sweep workloads at 15-way plus the 2,000-read run). Line: the two-point fit. Chart: fig8.</p>
+    </div>
+  </div>
+</section>

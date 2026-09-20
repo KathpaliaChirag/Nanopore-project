@@ -1,0 +1,64 @@
+
+<section id="internals" data-nav="What is inside S2" data-group="Reference">
+  <div class="kicker">Reference · measured from the binaries and the source</div>
+  <h2>What is inside the S2 cache</h2>
+  <p class="sub">Each kraken2 lookup goes through up to three stages. The S2 table is only the middle one.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Stage</th><th>What happens</th><th>Where the data lives</th></tr></thead>
+    <tbody>
+      <tr><td><b>1. One-entry memory</b></td><td class="wrap">Same minimizer as the previous window? Reuse the stored answer. Stock kraken2 has this; our builds make it per-thread so it survives across reads.</td><td class="wrap">Two variables, 16 bytes: register or L1</td></tr>
+      <tr><td><b>2. S2 table</b> (ours)</td><td class="wrap">Different minimizer: look in a set-associative table of recent answers. On a miss, do stage 3 and insert the result.</td><td class="wrap">Ordinary RAM, private to each thread; the CPU pulls hot parts into L1, L2, L3</td></tr>
+      <tr><td><b>3. Hash table</b></td><td class="wrap">The real search of the database's hash table.</td><td class="wrap">The database: 50 MB to 103 GB of mostly cold memory</td></tr>
+    </tbody></table></div>
+  <div class="callout note"><b class="t">A correctness rule built into the code</b>
+  <p>The S2 table only decides whether stage 3 must run again. Hit counting and species counts stay tied to "different from the immediately preceding minimizer", exactly as stock kraken2 does. Otherwise the cache would silently change the classification report. Every build's output was checked identical to stock.</p></div>
+
+  <h3>Two different S2 designs were used</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Build</th><th>Per-thread memory (measured)</th><th>Layout</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td>Stock (S0)</td><td class="n">0 B</td><td class="wrap">No S2 table; one-entry memory is a local variable</td><td class="wrap">Every "stock / no S2" number</td></tr>
+      <tr><td>1-way</td><td class="n">98,312 B (96 KB)</td><td class="wrap" rowspan="4">Original S2: 4,096 sets × ways × 24-byte entries (tag, taxon, last-used stamp); LRU eviction; raw low bits pick the set; fixed array; atomic counters removed</td><td class="wrap" rowspan="4">Width sweep, fair batch, 2,000 reads, laptop sweep, hardware associativity, long-read scaling</td></tr>
+      <tr><td>4-way</td><td class="n">393,224 B (384 KB)</td></tr>
+      <tr><td>8-way</td><td class="n">786,440 B (768 KB)</td></tr>
+      <tr><td>16-way</td><td class="n">1,572,872 B (1.5 MB)</td></tr>
+      <tr><td>Size-sweep builds</td><td class="n">128 KB at 2,048 sets to 64 MiB at 1,048,576 sets</td><td class="wrap">Current S2: heap-allocated (zero-filled), 16-byte entries, round-robin eviction, hashed set index, 4-way, size pinned at compile time</td><td class="wrap">Cache size sweep only</td></tr>
+    </tbody></table></div>
+  <div class="callout fix"><b class="t">Correction logged 2026-09-19</b>
+  <p>An earlier log entry said the fair-batch 4-way binary "is already the 262,144-set point". Measuring each binary's per-thread memory showed it is 4,096 sets. So the width tests and the size test use different implementations of S2.</p></div>
+
+  <h3>The sizing formula</h3>
+  <p>Current S2 sets the number of sets to <code>floor(0.25 × 105 MiB ÷ (ways × 16 B × threads))</code>, rounded down to a power of 2 and clamped to 4,096 to 262,144. At one thread and 4 ways that gives 262,144 sets (16 MiB). Two real bugs were fixed on the way: a crash at large sizes with 16+ threads, and a slowdown cliff at 1,048,576+ sets from touching every entry at start-up. Neither ever triggers at the sizes the formula picks, and the full real-hardware benchmark (three databases, six thread counts, three runs) found stock, early S2 and final S2 statistically indistinguishable. Our size sweep found no size that beats the others at one thread.</p>
+
+  <h3>The set-index fix</h3>
+  <p>The original index used the minimizer's raw low bits. Measured on the 8 GB database, one set absorbed 225× the average load while another was never touched. Mixing the bits with MurmurHash3 first raised the hit rate from 0.40% to 3.58% at the same capacity, but changed no wall-clock time on real hardware.</p>
+
+  <h3>What "noatomics" means</h3>
+  <p>The first S2 kept global hit and miss counters updated with atomic operations from every thread. With 32 to 96 real threads they fought over one memory location and caused a 2 to 3× artifact on the 50 MB database. The noatomics builds remove only those counters. What the cache stores is unchanged. Our Sniper runs use one thread, so it mostly keeps instruction counts clean.</p>
+
+  <h3>Is S2 the only difference from stock?</h3>
+  <div class="callout warn"><b class="t">Not strictly</b>
+  <p>The source audit found that stock (S0) and our S2 tree are different snapshots of kraken2. The S2 tree's base has program structure S0 lacks (for example a daemon mode), <code>classify.cc</code> differs by about 490 lines even before any S2 code, and the S2 tree also carries the project's other patches: per-thread one-entry memory, the S2 table, the sizing formula and heap allocation, the set-index hash fix, and a prefetch-batching patch. The minimizer lookup loop itself is identical, the hash-table code differs by about 3 lines, and classification output is byte-identical, so most of any difference is very likely the S2 table. But it has not been proven. A clean test builds S0's own source with only the S2 table added.</p></div>
+</section>
+
+<section id="workloads" data-nav="Workloads (FASTQ files)" data-group="Reference">
+  <div class="kicker">Reference · every input file</div>
+  <h2>The FASTQ workloads</h2>
+  <p class="sub">All nine test workloads are the first N reads of a bigger file. The front of that file has unusually long reads, so they are not typical of the data.</p>
+  <div class="controls"><span class="lab">Show</span><div class="seg" id="wlMode" role="group"></div></div>
+  <div class="chartbox short"><canvas id="cWl" role="img" aria-label="Workload sizes chart"></canvas></div>
+  <div class="tw"><table id="tWl"></table></div>
+  <h3>What else exists on Luna</h3>
+  <p class="sub">A search of the whole filesystem found 86 FASTQ files, 85 GB in total, all in our own account. They are one sequencing run (16 raw-signal files basecalled three ways) plus copies and tiny examples.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Set</th><th class="n">Files</th><th class="n">Size</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td>Basecalled run: fast, hac, sup</td><td class="n">16 each</td><td class="n">about 12 GB each</td><td class="wrap">Same reads at three accuracies. One file: 141,109 reads, 450 M bases, 3.2 kbp average, so roughly 2 M reads per quality.</td></tr>
+      <tr><td>Per-file copy and merged files</td><td class="n">16 + 3</td><td class="n">12 GB + 36 GB</td><td class="wrap">Copies and merges of the same reads</td></tr>
+      <tr><td><code>reads_fast/hac/sup.fastq</code></td><td class="n">3</td><td class="n">about 0.7 GB each</td><td class="wrap">104,832 reads (357.6 M bases, 3.4 kbp average). The source of every long-read workload.</td></tr>
+      <tr><td>Tool example reads</td><td class="n">4</td><td class="n">under 2 MB</td><td class="wrap">5,000 short read pairs from a public set, and a tiny example</td></tr>
+      <tr><td>Raw signal (<code>pod5</code>)</td><td class="n">22</td><td class="n">65.5 GB</td><td class="wrap">Already basecalled</td></tr>
+    </tbody></table></div>
+  <div class="callout note"><b class="t">The better sample</b>
+  <p>A random sample drawn across all 16 files would have a realistic 3.2 kbp average length. It has not been built or run yet.</p></div>
+</section>
