@@ -219,3 +219,15 @@ cycle order at 50 reads: 8gb (373M) < 50mb (446M) < 16gb (471M). 16gb is not the
 per-core instructions: core 0 = 503.0M, core 2 = 188.0M, cores 1 and 3 = 8.4M (idle spinning). so only 2 of 4 threads got real work, split ~73/27. cycles reported = the slowest core (348.9M = 503M / 1.44 IPC).
 total instructions +4.5% vs 1-core (677.5M) = spin/sync overhead.
 L3 hit share of loads fell to 0.26% (1-core 0.45%), unexplained, not investigated.
+
+---
+
+### [15] 2026-09-21 00:37 IST - second deadlock (4c_r50_16gb), watchdog rule fixed
+
+**4 cores, 50 reads, 8gb done** (`4c_r50_8gb`, 3845 s): 317.1M cycles vs 373.3M on 1 core = 1.18x; per-core instr 523.7M / 179.1M / 8.4M / 8.4M (two working threads, ~74/26); 98% classified. 50mb was 1.28x (348.9M vs 446.1M).
+
+**`4c_r50_16gb` hung:** started 23:24, at 00:36 (72 min) the simulator had used only 20 CPU-s, classify 14 s, run-sniper 31 s, log ending at "Thread 3 (app 0) started". same signature as the first hang (`4c_r10_50mb`). 2 hangs in 14 four-core runs; 0 in the 9 one-core runs. cause still unknown, looks like a race at multi-thread startup.
+
+**watchdog failed to catch it:** the first rule ("total session CPU unchanged for 900 s") never fired because the `run-sniper` python wrapper wakes every few seconds and keeps total CPU time creeping up. new rule: every `HANG_S`=900 s compare session CPU with the value 900 s earlier; if it grew < `MIN_CPU`=60 CPU-s the run is hung (healthy ~850 CPU-s per 900 s). deployed via temp file + mv.
+
+**killed by PID** (parent `run_one.sh` first, so no blank CSV row is written, then `kill -- -<sid>`). queue moved on to `4c_r100_50mb` on its own (00:37:25), healthy. `4c_r50_16gb` has no sim.stats, so re-launching the queue after it finishes will retry it (do NOT relaunch while the queue is running).

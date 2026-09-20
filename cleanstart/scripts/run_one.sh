@@ -41,19 +41,25 @@ setsid ./run-sniper -c address_translation_schemes/baseline -c laptop -c cleanst
   -p $cores -T 0 -O $R/$CFG/${name}_out.txt -Q 0 -R $R/$CFG/${name}_report.txt -g 2 $W/reads_$reads.fastq \
   > $LOG 2>&1 < /dev/null &
 RS=$!
-# hang watchdog: a healthy run burns CPU continuously (simulator ~95%). if total CPU time of every process in the
-# run's session does not advance for HANG_S seconds, it is deadlocked (seen once: 4c_r10_50mb, 9 h at 0% CPU).
-HANG_S=${HANG_S:-900}; idle=0; last=-1; HUNG=0
+# hang watchdog: a healthy run burns CPU continuously (simulator ~95% = ~850 CPU-s per 900 s). every HANG_S seconds
+# compare total CPU time of all processes in the run's session with the value HANG_S ago; if it grew by less than
+# MIN_CPU CPU-seconds, the run is deadlocked. (seen twice in 14 four-core runs: 4c_r10_50mb, 4c_r50_16gb, both stuck
+# right after "Thread 3 started". a plain "no CPU at all" test does NOT work: the run-sniper python wrapper wakes
+# every few seconds, so total CPU never sits perfectly still.)
+HANG_S=${HANG_S:-900}; MIN_CPU=${MIN_CPU:-60}; HUNG=0; base=0; base_t=$(date +%s)
 while kill -0 $RS 2>/dev/null; do
   sleep 30
-  cpu=$(ps -s $RS -o cputimes= 2>/dev/null | awk '{s+=$1}END{print s+0}')
-  if [ "$cpu" = "$last" ]; then idle=$((idle+30)); else idle=0; last=$cpu; fi
-  if [ $idle -ge $HANG_S ]; then HUNG=1; kill -TERM -- -$RS 2>/dev/null; sleep 5; kill -KILL -- -$RS 2>/dev/null; break; fi
+  now=$(date +%s)
+  if [ $(( now - base_t )) -ge $HANG_S ]; then
+    cpu=$(ps -s $RS -o cputimes= 2>/dev/null | awk '{s+=$1}END{print s+0}')
+    if [ $(( cpu - base )) -lt $MIN_CPU ]; then HUNG=1; kill -TERM -- -$RS 2>/dev/null; sleep 5; kill -KILL -- -$RS 2>/dev/null; break; fi
+    base=$cpu; base_t=$now
+  fi
 done
 wait $RS 2>/dev/null
 WALL=$(( $(date +%s) - WS ))
 if [ $HUNG = 1 ]; then
-  echo "HUNG $CFG/$name (no CPU progress for ${HANG_S}s, killed after ${WALL}s)"
+  echo "HUNG $CFG/$name (<${MIN_CPU} CPU-s in ${HANG_S}s, killed after ${WALL}s)"
   echo "$CFG,$cores,$reads,$dbname,HUNG,HUNG,HUNG,HUNG,HUNG,HUNG,HUNG,HUNG,HUNG,HUNG,$WALL" >> $SUMMARY
   exit 3
 fi
