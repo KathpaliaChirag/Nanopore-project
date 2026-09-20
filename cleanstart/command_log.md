@@ -208,3 +208,14 @@ cycle order at 50 reads: 8gb (373M) < 50mb (446M) < 16gb (471M). 16gb is not the
 2. **`grep -a`:** multicore logs contain binary bytes, plain `grep` printed "binary file matches" and the parser would have written blank rows for every multicore run.
 
 **relaunched** the same queue script (1-core runs skip, 9 done). `4c_r10_50mb` started 20:33:48: simulator 95% CPU, classify 40% CPU after 90 s (healthy, unlike the hung run's 0%).
+
+---
+
+### [14] 2026-09-20 22:20 IST - 4 cores: 10 reads done (3 dbs), 50 reads 50mb done
+
+**4 cores, 10 reads** (cycles, 1-core -> 4-core): 50mb 86.0M -> 89.3M (+3.8%), 8gb 80.3M -> 84.0M (+4.6%), 16gb 99.4M -> 105.1M (+5.7%). no speedup: core 0 did ~125M of 148M instructions, cores 1-3 spun (6-8M instr, IPC ~0.08). 10 reads = one kraken2 batch = one working thread.
+
+**4 cores, 50 reads, 50mb** (`4c_r50_50mb`, wall 3754 s): 707.9M instr total, **348.9M cycles vs 446.1M on 1 core = 0.78x (1.28x speedup)**, IPC 2.03 (aggregate over 4 cores), 84% classified (same as 1-core).
+per-core instructions: core 0 = 503.0M, core 2 = 188.0M, cores 1 and 3 = 8.4M (idle spinning). so only 2 of 4 threads got real work, split ~73/27. cycles reported = the slowest core (348.9M = 503M / 1.44 IPC).
+total instructions +4.5% vs 1-core (677.5M) = spin/sync overhead.
+L3 hit share of loads fell to 0.26% (1-core 0.45%), unexplained, not investigated.
