@@ -177,3 +177,22 @@ baseline `L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`, S0, detailed mode, 1 core, 
 | 16gb | 783.1 | 470.8 | 1.66 | 700,624 | 99.31% | 0.15% | 0.42% | 98% | 0.98M | 4221 s |
 
 cycle order at 50 reads: 8gb (373M) < 50mb (446M) < 16gb (471M). 16gb is not the fastest, so the 50mb anomaly is not simply "small db = slow" and not simply "big db = slow" either: 8gb is the odd one out. the nearly-full-hash-table hypothesis for 50mb (see [10]) is still untested. next: 1c r100 x 3 dbs (started 02:54, ~2 h each expected).
+
+---
+
+### [12] 2026-09-20 - 1-core baseline complete (9/27); first 4-core run DEADLOCKED, queue stopped
+
+**1-core baseline, all 9 runs done** (`L3-16MB_L2-512KB_L1-32KB_L1w8_L2w8_L3w16`, S0, detailed, `measurements/summary_all.csv`):
+
+| reads | db | instr (M) | cycles (M) | IPC | wall |
+|---|---|---|---|---|---|
+| 10 | 50mb / 8gb / 16gb | 124.9 / 132.6 / 154.1 | 86.0 / 80.3 / 99.4 | 1.45 / 1.65 / 1.55 | 12-15 min |
+| 50 | 50mb / 8gb / 16gb | 677.5 / 685.0 / 783.1 | 446.1 / 373.3 / 470.8 | 1.52 / 1.84 / 1.66 | 60-70 min |
+| 100 | 50mb / 8gb | 1583.6 / 1640.7 | 1017.1 / 880.9 | 1.56 / 1.86 | 2 h 15-21 min |
+| 100 | 16gb | (see csv) | (see csv) | (see csv) | 2 h 42 min (9732 s) |
+
+**4-core run `4c_r10_50mb` deadlocked:** started 10:13, still "running" 9 h later at 0.0% CPU. all 4 processes (run-sniper, lib/sniper, record-trace, classify) in sleeping state; log shows "Thread 0..3 started" and 3x "Creating new application with app id = 0" within the first minute, then nothing; `sim.stats` never written. killed manually 19:14 by PID (queue script first). no result was lost (nothing had been produced).
+
+**gotcha:** `ssh host 'pkill -f "pattern"'` kills its own remote shell (the pattern is in that shell's command line) -> ssh exit 255 before the rest runs. use PIDs.
+
+**likely cause (NOT verified):** the `address_translation_schemes/baseline` scheme does not support a multi-threaded app; the fork ships separate `address_translation_schemes/multicore/parametric_baseline_{2,4,8,16}c.cfg` schemes (which set `total_cores` themselves). the 1-core baseline is unaffected. the 17 other multicore runs would all hang the same way if launched unchanged, so the 4/8-core groups are on hold.
