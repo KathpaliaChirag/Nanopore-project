@@ -75,3 +75,60 @@ stock at 32 threads on the small dbs used only ~22 of 32 cores. fixing one wall 
 ## reproduce
 
 trees are under `~/tools/kraken2-src-sN` on luna (each built from the previous with `scripts/s6plus/sN_patch.py`), binaries under `~/tools/kraken2-fresh-bin-sN`. `bench.sh` (interleaved timing), `check.sh` (byte compare), `matrix.sh` (full matrix).
+
+---
+
+# update 2 (same day): S16 to S19, small-machine test, mode coverage
+
+goal of this round: improvements that hold on any machine, without changing results. Orion (jetson) was not reachable (`ping` and tcp 22 time out from this pc and from luna; only the address and account are documented, no password is stored), so portability was tested by pinning luna to few cores.
+
+## new stages (each byte-identical, checked with `modes.sh`)
+
+| stage | change | measured effect |
+|---|---|---|
+| S16 | software-pipelined prefetch: scan and prefetch batch n+1 before resolving batch n | 103GB 19.18s to 17.21s (-10%), 16GB -1.4%, 8GB tied (3 reps each) |
+| S17 | rolling reverse complement in the scanner (one shift and or per base instead of a 5-stage bit swap); `__int128` guard so FastMod falls back to `%` on compilers without it | 50MB 8.72s to 8.40s (-3.7%), 8GB 8.17s to 7.92s (-3%), user cpu -5% at 8 cores |
+| S18 | ring buffer that writes `candidate` and `pos` straight into the slot. perf annotate of S17 showed one `movdqa` (a 16-byte load right after two 8-byte stores, a store-forwarding stall) at 21% of `NextMinimizer`. S11 kept the stack temp so it hit the same stall, which is why it measured null | 50MB -2%, 8GB -3%, user cpu -1.2%. the stall instruction fell from 21% to 3.9% |
+| S19 | `#ifdef MADV_HUGEPAGE` around the huge-page hint, so the build does not fail on os/headers without it | portability only |
+
+`modes.sh` compares stock against the candidate for 12 modes: default, `--confidence 0.2`, `--minimum-hit-groups 3`, `--quick`, `--minimum-base-quality 10`, `--use-names`, `--report-zero-counts`, fasta input, `--paired`, 3-file input, 1 thread, 7 threads. it compares kraken output, report and the classified/unclassified output files (sorted). S15 to S19 pass 12 of 12 on the 50MB db; S19 also passes 12 of 12 on 8GB.
+
+## final matrix, S19 vs stock (all 4 dbs x all 4 read counts, 32 threads, one run per cell, output and report byte-compared)
+
+| db | reads | S0 | S19 | speedup | output vs stock |
+|---|---|---|---|---|---|
+| 50MB | 10 | 0.40s* | 0.06s | see note | identical |
+| 50MB | 1,000 | 0.30s | 0.23s | 1.3x | identical |
+| 50MB | 104,918 | 1.31s | 0.84s | 1.6x | identical |
+| 50MB | 1,872,777 | 16.71s | 8.88s | 1.9x | identical |
+| 8GB | 10 | 4.52s | 0.46s | 9.8x | identical |
+| 8GB | 1,000 | 4.58s | 0.45s | 10.2x | identical |
+| 8GB | 104,918 | 5.72s | 1.08s | 5.3x | identical |
+| 8GB | 1,872,777 | 21.17s | 9.18s | 2.3x | identical |
+| 16GB | 10 | 8.40s | 0.77s | 10.9x | identical |
+| 16GB | 1,000 | 8.25s | 0.67s | 12.3x | identical |
+| 16GB | 104,918 | 10.35s | 1.39s | 7.4x | identical |
+| 16GB | 1,872,777 | 25.81s | 10.94s | 2.4x | identical |
+| 103GB | 10 | 58.20s | 3.79s | 15.4x | identical |
+| 103GB | 1,000 | 55.68s | 3.95s | 14.1x | identical |
+| 103GB | 104,918 | 57.20s | 4.50s | 12.7x | identical |
+| 103GB | 1,872,777 | 95.62s | 20.08s | 4.8x | identical |
+
+\* the first stock cell read 0.40s; stock measured 0.08s for this cell in the earlier matrix, so this is a cold-start outlier. against 0.08s the speedup is about 1.3x.
+
+## small-machine test (luna pinned with `taskset`, threads = cores, 1,872,777 reads, S0 vs S15)
+
+only the 1.87M-read cell of 50MB, 8GB and 16GB was run here. 103GB and the smaller read counts were not.
+
+| cores | 50MB | 8GB | 16GB | 103GB |
+|---|---|---|---|---|
+| 16 | 22.84s to 16.18s (1.41x) | 21.34s to 14.91s (1.43x) | 30.62s to 16.93s (1.81x) | not run |
+| 8 | 42.48s to 31.37s (1.35x) | 35.21s to 28.83s (1.22x) | 49.55s to 32.92s (1.50x) | not run |
+| 4 | 82.10s to 61.80s (1.33x) | 64.18s to 57.03s (1.13x) | 88.58s to 64.91s (1.36x) | not run |
+
+with few cores the run is compute-bound, so the streaming and parallel-load gains matter less; the win there comes from the cpu-reduction stages (huge pages, no division, run-length counts, and from S17/S18 on). S17 and S18 were measured on 8 cores after this table (50MB: 31.05s to 29.63s to 29.31s for S16, S17, S18).
+
+## not done
+
+- orion (arm64) not tested: unreachable. the code has no x86-specific flags or intrinsics (`__builtin_prefetch`, `posix_memalign`, `pread`, `madvise` and a guarded `__int128`), so an aarch64 build should compile, but that is untested.
+- cold page cache, a second x86 cpu, paired-end timing, and the smaller read counts on small core counts.
