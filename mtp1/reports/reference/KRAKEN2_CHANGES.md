@@ -222,7 +222,7 @@ refactor, verified byte-identical.
 
 The cache works — up to 26.2% of lookups avoid DRAM — and the program still gets
 slower, because the probe cost grows faster than the memory saving. Full numbers
-in `../results/lookaside_sweep/REPORT.md` and `LOOKASIDE_REPORT.md`.
+in `result/run_sweep/REPORT.md` and `LOOKASIDE_REPORT.md`.
 
 ---
 
@@ -264,15 +264,29 @@ sources so the effect is isolated from the cache work.
 **Motivation, measured:** MLP 1.24 of ~12 sustainable; 0.933 DRAM accesses per
 lookup x ~200 cycles = ~187 of 868 cycles/lookup exposed to latency.
 
-**Results** (pod5_2, `-p 16`, mean of 3 interleaved reps):
+**Results** (pod5_2, `-p 16`, cooldown protocol: 3 runs per config, 240 s idle
+between configs; temperature held 59–65 °C, sd 0.004–0.021 s, 0 crashes in 99):
 
-| config | elapsed | vs stock | DRAM/lookup | cyc/lookup | ins/lookup | IPC |
-|---|---:|---:|---:|---:|---:|---:|
-| stock | 2.700 | — | 0.942 | 892.4 | 983.6 | 1.10 |
-| `-B 1` | 2.922 | +8.22% | 0.186 | 957.8 | 1156.5 | 1.21 |
-| `-B 8` | 2.663 | −1.37% | 0.138 | 780.5 | 1102.3 | 1.41 |
-| `-B 16` | 2.575 | −4.62% | 0.139 | 751.9 | 1098.4 | 1.46 |
-| **`-B 32`** | **2.538** | **−5.99%** | 0.141 | **735.4** | 1096.4 | **1.49** |
+| config | elapsed | vs stock | cache-misses | LLC-ld-miss | IPC |
+|---|---:|---:|---:|---:|---:|
+| stock | 2.349 | — | 454.9 M | 152.5 M | 1.04 |
+| `-B 1` | 2.475 | +5.37% | 461.4 M | 31.5 M | 1.15 |
+| `-B 4` | 2.131 | −9.28% | 442.3 M | 24.7 M | 1.28 |
+| `-B 8` | 1.992 | −15.20% | 411.4 M | 24.7 M | 1.36 |
+| `-B 16` | 1.913 | −18.56% | 402.8 M | 25.0 M | 1.42 |
+| `-B 20` | 1.885 | −19.75% | 402.1 M | 25.1 M | 1.44 |
+| **`-B 30`** | **1.871** | **−20.34%** | 399.4 M | 25.2 M | 1.44 |
+
+An earlier interleaved sweep put the best at −11.8%; that was measured through
+10–15% machine noise. A 20-run test showed the same binary taking 1.850 s and
+2.898 s while executing instruction counts within 0.09% of each other — the work
+is reproducible, the clock is not. The cooldown protocol removes it.
+
+**`cache-misses` vs `LLC-load-misses`.** The former falls only 12%, the latter
+83%. Prefetch does not remove a DRAM trip, it changes which instruction makes it:
+the prefetch takes the miss, so the later demand load never reaches L3.
+`cache-misses` counts all L3 misses and is the honest measure; `llc%` falling
+59.58% → 31.07% is re-attribution, not improved cache behaviour.
 
 **Correctness: byte-identical to stock** at `-B` 1/8/16/32, `-p` 1/16, on
 pod5_15 and pod5_2 — 16/16 exact.
