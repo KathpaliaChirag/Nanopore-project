@@ -1,0 +1,395 @@
+# kraken2 - runtime-selectable minimizer->taxon lookaside table
+# Diff is against this project's FORKED tree (kraken2/src, which carries the
+# 16/20/24/40-bit cell-size work), NOT against upstream stock 2.17.1.
+# Apply from the kraken2/ directory:  patch -p1 < scripts/kraken2_lookaside.patch
+#
+#   -L l1|l2|l3       enable the table, sized for that cache tier (4KB/256KB/4MB)
+#   -F exact|compact  entry format (default compact)
+#   -N 1|2|4|8|16     associativity (default 1 = direct mapped)
+#   -A <file>         frequency profile to load
+#   -W <file>         write a frequency profile instead (requires -p 1)
+#   -Z                report probe/hit statistics
+#
+# Cell-size compatibility: -F exact works on every cell width (16/20/24/32/40).
+# -F compact is only safe at 32-bit; it inherits the DB fingerprint width and
+# corrupts 263/3159/16175 of 30378 reads at 24/20/16-bit respectively.
+#
+--- a/src/classify.cc
++++ b/src/classify.cc
+@@ -34,6 +34,164 @@
+ static const taxid_t READING_FRAME_BORDER_TAXON = TAXID_MAX - 1;
+ static const taxid_t AMBIGUOUS_SPAN_TAXON = TAXID_MAX - 2;
+ 
++// ================= runtime-selectable lookaside table =================
++//   -L l1|l2|l3   pick the cache tier the table should fit in
++//   -F exact|compact   entry format (default compact)
++//   -A <file>     frequency profile to populate the table from
++//   -W <file>     write a frequency profile instead (forces -p 1)
++//   -Z            report lookaside hit statistics
++// Tier sizes are defined in BYTES (L1 4 KB, L2 256 KB, L3 4 MB); the entry
++// count follows from the format, so `compact` gets 4x the slots of `exact`.
++#include <unordered_map>
++#include <algorithm>
++
++enum LAFormat { LA_FMT_EXACT = 0, LA_FMT_COMPACT = 1 };
++struct LAEntry { uint64_t key; uint32_t val; };
++static const uint64_t LA_EMPTY_KEY = ~(uint64_t)0;
++
++static bool      la_on        = false;
++static LAFormat  la_fmt       = LA_FMT_COMPACT;
++static int       la_tier      = 0;          // 1, 2 or 3
++static size_t    la_mask      = 0;      // slot mask  (1-way)
++static size_t    la_setmask   = 0;      // set  mask  (N-way)
++static int       la_ways      = 1;
++static uint32_t *la_c         = nullptr;    // compact table
++static LAEntry  *la_e         = nullptr;    // exact table
++static uint64_t  la_kbits = 0, la_vbits = 0;
++static uint32_t  la_vmask     = 0;
++static string    la_profile_in, la_profile_out;
++static bool      la_profiling = false;
++static bool      la_stats_on  = false;
++
++static std::unordered_map<uint64_t, uint32_t> la_prof;
++struct alignas(64) LACount { uint64_t probes; uint64_t hits; uint64_t pad[6]; };
++static LACount la_ct[128];
++
++static size_t la_tier_bytes(int tier) {
++  switch (tier) {
++    case 1: return 4u   << 10;   // 4 KB   - L1d is 48 KB/core
++    case 2: return 256u << 10;   // 256 KB - L2 is 512 KB/core
++    case 3: return 4u   << 20;   // 4 MB   - L3 is 16 MB shared
++  }
++  errx(EX_USAGE, "lookaside tier must be l1, l2 or l3");
++}
++
++// slot from the LOW bits, fingerprint from the TOP key_bits.  These two ranges
++// must not overlap: taking the slot from hc>>32 leaves the compact format only
++// ~12 discriminating bits and it returns wrong taxa for ~10% of reads.
++static inline size_t la_slot(uint64_t hc) { return (size_t)(hc & la_mask); }
++
++// A set is WAYS consecutive entries.  With the compact format 16 ways is
++// 16 x 4 B = 64 B = exactly one cache line, so associativity is free in memory
++// traffic: the same single line is fetched either way, only the tag compares
++// grow.  WAYS is a template parameter so each probe unrolls fully.
++template<int WAYS>
++static inline bool la_probe_compact(size_t set, uint32_t fp, taxid_t &taxon) {
++  const uint32_t *p = la_c + set * WAYS;
++  for (int w = 0; w < WAYS; w++) {
++    uint32_t e = p[w];
++    if (e && (e >> la_vbits) == fp) { taxon = e & la_vmask; return true; }
++  }
++  return false;
++}
++
++template<int WAYS>
++static inline bool la_probe_exact(size_t set, uint64_t key, taxid_t &taxon) {
++  const LAEntry *p = la_e + set * WAYS;
++  for (int w = 0; w < WAYS; w++) {
++    if (p[w].key == key) { taxon = p[w].val; return true; }
++  }
++  return false;
++}
++
++static void la_init(KeyValueStore *hash, uint64_t kbits, uint64_t vbits) {
++  la_kbits = kbits; la_vbits = vbits;
++  la_vmask = (vbits >= 32) ? 0xffffffffu : ((1u << vbits) - 1);
++
++  // The compact entry packs the DB's own fingerprint+value into 32 bits, so it
++  // needs key_bits + value_bits <= 32 (true for 16/20/24/32-bit cells, not 40).
++  // It also inherits the DB's fingerprint width: at 16-bit cells that is only
++  // 10 bits, and roughly 1 lookup in 1024 falsely matches and returns a wrong
++  // taxon.  Measured on pod5_15 with -L l3 -N 4: 0 reads changed at 32-bit,
++  // 263 at 24-bit, 3159 at 20-bit, 16175 of 30378 at 16-bit.  Use -F exact,
++  // which stores the whole minimizer and is width-independent.
++  if (la_fmt == LA_FMT_COMPACT) {
++    if (kbits + vbits > 32)
++      errx(EX_USAGE, "-F compact needs key_bits+value_bits <= 32 (this DB has "
++                     "%lu+%lu); use -F exact",
++           (unsigned long) kbits, (unsigned long) vbits);
++    if (kbits < 26)
++      warnx("-F compact on a %lu-bit cell DB: only %lu fingerprint bits, "
++            "expect wrong taxa on ~1 lookup in %lu; -F exact is safe",
++            (unsigned long) (kbits + vbits), (unsigned long) kbits,
++            (unsigned long) (1UL << kbits));
++  }
++
++  size_t bytes    = la_tier_bytes(la_tier);
++  size_t esize    = (la_fmt == LA_FMT_COMPACT) ? sizeof(uint32_t) : sizeof(LAEntry);
++  size_t slots    = bytes / esize;
++  if (slots & (slots - 1)) errx(EX_SOFTWARE, "lookaside slot count not a power of 2");
++  la_mask = slots - 1;
++
++  size_t nsets = slots / (size_t) la_ways;
++  if (nsets == 0) errx(EX_USAGE, "-N %d: too many ways for the %s tier (%zu slots)",
++                       la_ways, (la_fmt == LA_FMT_COMPACT ? "compact" : "exact"), slots);
++  if (nsets & (nsets - 1)) errx(EX_SOFTWARE, "lookaside set count not a power of 2");
++  la_setmask = nsets - 1;
++
++  // 64-byte alignment keeps every set inside one cache line
++  void *mem = aligned_alloc(64, ((bytes + 63) / 64) * 64);
++  if (! mem) errx(EX_OSERR, "lookaside: cannot allocate %zu bytes", bytes);
++  if (la_fmt == LA_FMT_COMPACT) {
++    la_c = (uint32_t *) mem;
++    memset(la_c, 0, bytes);
++  }
++  else {
++    la_e = (LAEntry *) mem;
++    for (size_t i = 0; i < slots; i++) la_e[i].key = LA_EMPTY_KEY;
++  }
++
++  FILE *f = fopen(la_profile_in.c_str(), "rb");
++  if (! f) errx(EX_NOINPUT, "lookaside: cannot open profile %s", la_profile_in.c_str());
++  uint64_t key; uint32_t cnt;
++  size_t filled = 0, considered = 0, unrepresentable = 0;
++  // records are sorted by DESCENDING frequency, so first writer wins and the
++  // hottest minimizer mapping to a slot keeps it
++  while (fread(&key, sizeof(key), 1, f) == 1 && fread(&cnt, sizeof(cnt), 1, f) == 1) {
++    considered++;
++    uint64_t hc = MurmurHash3(key);
++    size_t base = (hc & la_setmask) * (size_t) la_ways;
++    // records arrive hottest-first, so take the first free way and drop the
++    // rest: associativity only ever adds room, never displaces a hotter entry
++    int w = 0;
++    if (la_fmt == LA_FMT_COMPACT) {
++      while (w < la_ways && la_c[base + w]) w++;
++      if (w == la_ways) continue;                        // set full
++      uint32_t fp = (uint32_t)(hc >> (64 - la_kbits));
++      uint32_t packed = (fp << la_vbits) | (uint32_t) hash->GetWithHash(key, hc);
++      if (packed == 0) { unrepresentable++; continue; }  // 0 marks an empty slot
++      la_c[base + w] = packed;
++    }
++    else {
++      while (w < la_ways && la_e[base + w].key != LA_EMPTY_KEY) w++;
++      if (w == la_ways) continue;                        // set full
++      la_e[base + w].key = key;
++      la_e[base + w].val = (uint32_t) hash->GetWithHash(key, hc);
++    }
++    filled++;
++  }
++  fclose(f);
++  cerr << "lookaside: L" << la_tier << " tier, "
++       << (la_fmt == LA_FMT_COMPACT ? "compact" : "exact") << " format, "
++       << la_ways << "-way, " << (bytes >> 10) << " KB, "
++       << slots << " slots in " << nsets << " sets, "
++       << filled << " filled (" << (100.0 * filled / (la_mask + 1)) << "%) from "
++       << considered << " profiled minimizers";
++  if (unrepresentable) cerr << "; " << unrepresentable << " unrepresentable";
++  cerr << endl;
++}
++// =====================================================================
++
+ // template <typename Cell>
+ // using IndexData = std::tuple<IndexOptions, Taxonomy, CompactHashTable<Cell> *>;
+ 
+@@ -318,6 +476,14 @@
+   OutputStreamData outputs = { false, false, nullptr, nullptr, nullptr, nullptr, &std::cout };
+   // taxon_counters.reserve(taxonomy.node_count());
+   struct timeval tv1, tv2;
++  if (la_on) {
++    uint64_t hdr[4];   // {capacity, size, key_bits, value_bits}
++    FILE *hf = fopen(opts.index_filename.c_str(), "rb");
++    if (! hf || fread(hdr, sizeof(uint64_t), 4, hf) != 4)
++      errx(EX_NOINPUT, "cannot read header of %s", opts.index_filename.c_str());
++    fclose(hf);
++    la_init(hash_ptr, hdr[2], hdr[3]);
++  }
+   gettimeofday(&tv1, nullptr);
+   if (opts.filenames.empty()) {
+     if (opts.paired_end_processing && ! opts.single_file_pairs)
+@@ -342,6 +508,32 @@
+   // delete hash_ptr;
+ 
+   ReportStats(tv1, tv2, stats);
++  if (la_stats_on) {
++    uint64_t pr = 0, hi = 0;
++    for (int i = 0; i < 128; i++) { pr += la_ct[i].probes; hi += la_ct[i].hits; }
++    fprintf(stderr, "lookaside: probes=%lu hits=%lu hit_rate=%.4f%%\n",
++            (unsigned long) pr, (unsigned long) hi, pr ? 100.0 * hi / pr : 0.0);
++  }
++  if (la_profiling) {
++    std::vector<std::pair<uint64_t,uint32_t>> v(la_prof.begin(), la_prof.end());
++    std::sort(v.begin(), v.end(),
++              [](const std::pair<uint64_t,uint32_t> &a,
++                 const std::pair<uint64_t,uint32_t> &b) {
++                if (a.second != b.second) return a.second > b.second;
++                return a.first < b.first;    // deterministic tie-break
++              });
++    FILE *f = fopen(la_profile_out.c_str(), "wb");
++    if (! f) errx(EX_CANTCREAT, "cannot write %s", la_profile_out.c_str());
++    uint64_t total = 0;
++    for (size_t i = 0; i < v.size(); i++) {
++      fwrite(&v[i].first,  sizeof(v[i].first),  1, f);
++      fwrite(&v[i].second, sizeof(v[i].second), 1, f);
++      total += v[i].second;
++    }
++    fclose(f);
++    fprintf(stderr, "lookaside: profile distinct=%zu lookups=%lu -> %s\n",
++            v.size(), (unsigned long) total, la_profile_out.c_str());
++  }
+   if (! opts.report_filename.empty()) {
+     if (opts.mpa_style_report)
+       ReportMpaStyle(opts.report_filename, opts.report_zero_counts, taxonomy,
+@@ -843,8 +1035,43 @@
+                 skip_lookup = true;
+             }
+             taxon = 0;
+-            if (! skip_lookup)
+-              taxon = hash->Get(*minimizer_ptr);
++            if (! skip_lookup) {
++              if (la_on) {
++                uint64_t la_hc  = MurmurHash3(*minimizer_ptr);
++                size_t   la_set = la_hc & la_setmask;
++                bool     la_hit = false;
++                if (la_fmt == LA_FMT_COMPACT) {
++                  uint32_t la_fp = (uint32_t)(la_hc >> (64 - la_kbits));
++                  switch (la_ways) {
++                    case 1:  la_hit = la_probe_compact< 1>(la_set, la_fp, taxon); break;
++                    case 2:  la_hit = la_probe_compact< 2>(la_set, la_fp, taxon); break;
++                    case 4:  la_hit = la_probe_compact< 4>(la_set, la_fp, taxon); break;
++                    case 8:  la_hit = la_probe_compact< 8>(la_set, la_fp, taxon); break;
++                    default: la_hit = la_probe_compact<16>(la_set, la_fp, taxon); break;
++                  }
++                }
++                else {
++                  switch (la_ways) {
++                    case 1:  la_hit = la_probe_exact< 1>(la_set, *minimizer_ptr, taxon); break;
++                    case 2:  la_hit = la_probe_exact< 2>(la_set, *minimizer_ptr, taxon); break;
++                    case 4:  la_hit = la_probe_exact< 4>(la_set, *minimizer_ptr, taxon); break;
++                    case 8:  la_hit = la_probe_exact< 8>(la_set, *minimizer_ptr, taxon); break;
++                    default: la_hit = la_probe_exact<16>(la_set, *minimizer_ptr, taxon); break;
++                  }
++                }
++                if (! la_hit)
++                  taxon = hash->GetWithHash(*minimizer_ptr, la_hc);
++                if (la_stats_on) {
++                  LACount &c = la_ct[omp_get_thread_num() & 127];
++                  c.probes++; if (la_hit) c.hits++;
++                }
++              }
++              else {
++                taxon = hash->Get(*minimizer_ptr);
++              }
++              if (la_profiling)
++                la_prof[*minimizer_ptr]++;
++            }
+             last_taxon = taxon;
+             last_minimizer = *minimizer_ptr;
+             // Increment this only if (a) we have DB hit and
+@@ -1063,8 +1290,45 @@
+ void ParseCommandLine(int argc, char **argv, Options &opts) {
+   int opt;
+ 
+-  while ((opt = getopt(argc, argv, "h?H:t:o:T:p:R:C:U:O:Q:g:nmzqPSMKD")) != -1) {
++  while ((opt = getopt(argc, argv, "h?H:t:o:T:p:R:C:U:O:Q:g:L:F:A:W:N:ZnmzqPSMKD")) != -1) {
+     switch (opt) {
++      case 'L' : {
++        string t(optarg);
++        for (size_t i = 0; i < t.size(); i++) t[i] = tolower(t[i]);
++        if      (t == "l1" || t == "1") la_tier = 1;
++        else if (t == "l2" || t == "2") la_tier = 2;
++        else if (t == "l3" || t == "3") la_tier = 3;
++        else errx(EX_USAGE, "-L expects l1, l2 or l3 (got '%s')", optarg);
++        la_on = true;
++        break;
++      }
++      case 'F' : {
++        string f(optarg);
++        for (size_t i = 0; i < f.size(); i++) f[i] = tolower(f[i]);
++        if      (f == "compact") la_fmt = LA_FMT_COMPACT;
++        else if (f == "exact")   la_fmt = LA_FMT_EXACT;
++        else errx(EX_USAGE, "-F expects exact or compact (got '%s')", optarg);
++        break;
++      }
++      case 'N' : {
++        string w(optarg);
++        if (! w.empty() && (w[0] == 's' || w[0] == 'S')) w = w.substr(1);
++        la_ways = atoi(w.c_str());
++        if (la_ways != 1 && la_ways != 2 && la_ways != 4 &&
++            la_ways != 8 && la_ways != 16)
++          errx(EX_USAGE, "-N expects 1, 2, 4, 8 or 16 ways (got '%s')", optarg);
++        break;
++      }
++      case 'A' :
++        la_profile_in = optarg;
++        break;
++      case 'W' :
++        la_profile_out = optarg;
++        la_profiling = true;
++        break;
++      case 'Z' :
++        la_stats_on = true;
++        break;
+       case 'h' : case '?' :
+         usage(0);
+         break;
+@@ -1150,6 +1414,19 @@
+     usage();
+   }
+ 
++  if (la_on && la_profile_in.empty()) {
++    warnx("-L requires -A <frequency profile> (build one with -W)");
++    usage();
++  }
++  if (la_profiling && opts.num_threads != 1) {
++    warnx("-W (profiling) requires -p 1: the frequency map is not thread-safe");
++    usage();
++  }
++  if (la_on && la_profiling) {
++    warnx("-L and -W are mutually exclusive");
++    usage();
++  }
++
+   for (int i = optind; i < argc; i++) {
+     opts.filenames.push_back(argv[i]);
+   }
+@@ -1180,6 +1457,16 @@
+        << "  -U filename      Filename/format to have unclassified sequences" << endl
+        << "  -O filename      Output file for normal Kraken output" << endl
+        << "  -K               In comb. w/ -R, provide minimizer information in report" << endl
+-       << "  -D               Start a daemon, this options is intended to be used with wrappers" << std::endl;
++       << "  -D               Start a daemon, this options is intended to be used with wrappers" << endl
++       << "  -L l1|l2|l3      Enable minimizer->taxon lookaside table sized for that" << endl
++       << "                   cache tier (L1 4KB, L2 256KB, L3 4MB). Requires -A." << endl
++       << "  -F exact|compact Lookaside entry format (def. compact). exact is 16B per" << endl
++       << "                   entry and never changes results; compact is 4B, 4x denser," << endl
++       << "                   and can return a wrong taxon on a fingerprint collision." << endl
++       << "  -N 1|2|4|8|16    Lookaside associativity (def. 1 = direct mapped). With" << endl
++       << "                   -F compact, 16 ways is one 64-byte cache line per set." << endl
++       << "  -A filename      Frequency profile used to populate the lookaside table" << endl
++       << "  -W filename      Write a frequency profile instead of using one (needs -p 1)" << endl
++       << "  -Z               Report lookaside probe/hit statistics" << std::endl;
+   exit(exit_code);
+ }
+--- a/src/compact_hash.h
++++ b/src/compact_hash.h
+@@ -208,6 +208,7 @@
+   ~CompactHashTable();
+ 
+   hvalue_t Get(hkey_t key) const;
++  hvalue_t GetWithHash(hkey_t key, uint64_t hc) const;
+   bool FindIndex(hkey_t key, size_t *idx) const;
+ 
+   // How CompareAndSet works:
+@@ -353,7 +354,11 @@
+ 
+ template<typename Cell>
+ hvalue_t CompactHashTable<Cell>::Get(hkey_t key) const {
+-  uint64_t hc = MurmurHash3(key);
++  return GetWithHash(key, MurmurHash3(key));
++}
++
++template<typename Cell>
++hvalue_t CompactHashTable<Cell>::GetWithHash(hkey_t key, uint64_t hc) const {
+   uint64_t compacted_key = hc >> (64 - key_bits_);
+   size_t idx = hc % capacity_;
+   size_t first_idx = idx;
+--- a/src/kv_store.h
++++ b/src/kv_store.h
+@@ -29,6 +29,7 @@
+ class KeyValueStore {
+   public:
+   virtual hvalue_t Get(hkey_t key) const = 0;
++  virtual hvalue_t GetWithHash(hkey_t key, uint64_t hc) const = 0;
+   virtual ~KeyValueStore() {}
+ 
+   // static CellType GetKVCellType(std::string &filename);

@@ -1,0 +1,255 @@
+diff --git a/src/build_db.cc b/src/build_db.cc
+index f2c67cc..de19e07 100644
+--- a/src/build_db.cc
++++ b/src/build_db.cc
+@@ -83,10 +83,20 @@ int main(int argc, char **argv) {
+     actual_capacity = opts.maximum_capacity;
+   }
+ 
+-  if (opts.cht_cell_size == 32) {
+-    build<CompactHashCell40>(taxonomy, ID_to_taxon_map, opts, actual_capacity, bits_for_taxid);
++  if (opts.cht_cell_size == 16) {
++    std::cerr << "Using 16-bit cells" << std::endl;
++    build<CompactHashCell16>(taxonomy, ID_to_taxon_map, opts, actual_capacity, bits_for_taxid);
++  } else if (opts.cht_cell_size == 20) {
++    std::cerr << "Using 20-bit cells" << std::endl;
++    build<CompactHashCell20>(taxonomy, ID_to_taxon_map, opts, actual_capacity, bits_for_taxid);
++  } else if (opts.cht_cell_size == 24) {
++    std::cerr << "Using 24-bit cells" << std::endl;
++    build<CompactHashCell24>(taxonomy, ID_to_taxon_map, opts, actual_capacity, bits_for_taxid);
++  } else if (opts.cht_cell_size == 32) {
++    std::cerr << "Using 32-bit cells" << std::endl;
++    build<CompactHashCell>(taxonomy, ID_to_taxon_map, opts, actual_capacity, bits_for_taxid);
+   } else if (opts.cht_cell_size == 40) {
+-    std::cerr << "Using 40 bits" << std::endl;
++    std::cerr << "Using 40-bit cells" << std::endl;
+     build<CompactHashCell40>(taxonomy, ID_to_taxon_map, opts, actual_capacity, bits_for_taxid);
+   } else {
+     errx(EX_DATAERR, "Unsupported CHT cell size");
+@@ -267,8 +277,8 @@ void ParseCommandLine(int argc, char **argv, Options &opts) {
+         break;
+       case 'C':
+         sig = atoll(optarg);
+-        if (sig != 32 && sig != 40)
+-          errx(EX_USAGE, "CHT cell size should be either 32 or 40 bits");
++        if (sig != 16 && sig != 20 && sig != 24 && sig != 32 && sig != 40)
++          errx(EX_USAGE, "CHT cell size should be 16, 20, 24, 32 or 40 bits");
+         opts.cht_cell_size = sig;
+         break;
+     }
+@@ -325,6 +335,6 @@ void usage(int exit_code) {
+        << "  -B INT        Read block size\n"
+        << "  -b INT        Read subblock size\n"
+        << "  -r INT        Bit storage requested for taxid\n"
+-       << "  -C INT        CHT cell size (default: 32)" << endl;
++       << "  -C INT        CHT cell size: 16, 20, 24, 32 or 40 (default: 32)" << endl;
+   exit(exit_code);
+ }
+diff --git a/src/build_db.h b/src/build_db.h
+index 4c81f8c..7843715 100644
+--- a/src/build_db.h
++++ b/src/build_db.h
+@@ -57,7 +57,10 @@ void build(const Taxonomy &tax, map<string, taxid_t> &ID_to_taxon_map, const Opt
+ template <typename Cell>
+ void build(const Taxonomy &taxonomy, map<string, taxid_t> &ID_to_taxon_map,
+            const Options &opts, size_t actual_capacity, size_t bits_for_taxid) {
+-  size_t total_bits = sizeof(Cell) * 8;
++  // Logical cell width, which may be narrower than the physical storage
++  // (e.g. a 20-bit cell lives in a 3-byte/24-bit word). For 16/24/32/40 this
++  // equals sizeof(Cell)*8; for 20 it is 20 while sizeof(Cell)*8 is 24.
++  size_t total_bits = opts.cht_cell_size;
+   CompactHashTable<Cell> kraken_index(actual_capacity, total_bits - bits_for_taxid,
+       bits_for_taxid);
+   std::cerr << "CHT created with " << bits_for_taxid << " bits reserved for taxid." << std::endl;
+diff --git a/src/classify.cc b/src/classify.cc
+index bdddb42..d434f80 100644
+--- a/src/classify.cc
++++ b/src/classify.cc
+@@ -279,6 +279,15 @@ IndexData load_index(Options &opts) {
+ 
+   KeyValueStore *cht;
+   switch (GetKVStoreCellType(opts.index_filename)) {
++  case CompactHash16:
++    cht = new CompactHashTable<CompactHashCell16>(opts.index_filename, opts.use_memory_mapping);
++    break;
++  case CompactHash20:
++    cht = new CompactHashTable<CompactHashCell20>(opts.index_filename, opts.use_memory_mapping);
++    break;
++  case CompactHash24:
++    cht = new CompactHashTable<CompactHashCell24>(opts.index_filename, opts.use_memory_mapping);
++    break;
+   case CompactHash32:
+     cht = new CompactHashTable<CompactHashCell>(opts.index_filename, opts.use_memory_mapping);
+     break;
+diff --git a/src/compact_hash.h b/src/compact_hash.h
+index 7555752..58c25a2 100644
+--- a/src/compact_hash.h
++++ b/src/compact_hash.h
+@@ -42,6 +42,101 @@ struct CompactHashCell {
+   uint32_t data;
+ };
+ 
++// 16-bit cell: identical layout to CompactHashCell but backed by a 16-bit word
++// (e.g. value_bits=6 -> key_bits=10). Same access pattern; only the width differs.
++struct CompactHashCell16 {
++  inline hkey_t hashed_key(size_t value_bits) {
++    return (hkey_t) (data >> value_bits);
++  }
++
++  inline hvalue_t value(size_t value_bits) {
++    return (hvalue_t) (data & ((1 << value_bits) - 1));
++  }
++
++  void populate(hkey_t compacted_key, hvalue_t val, size_t key_bits, size_t value_bits) {
++    if (key_bits + value_bits != 16)
++      errx(EX_SOFTWARE, "key len of %u and value len of %u don't sum to 16",
++           (unsigned int) key_bits, (unsigned int) value_bits);
++    if (! key_bits || ! value_bits)
++      errx(EX_SOFTWARE, "key len and value len must be nonzero");
++    uint64_t max_value = (1llu << value_bits) - 1;
++    if (max_value < val)
++      errx(EX_SOFTWARE, "value len of %u too small for value of %llu",
++           (unsigned int) value_bits, (unsigned long long int) val);
++    data = (uint16_t) ((compacted_key << value_bits) | val);
++  }
++
++  uint16_t data;
++};
++
++// 24-bit cell: packed to exactly 3 bytes. Stored explicitly little-endian, and
++// the only code that ever touches the bytes is these accessors, so unaligned
++// mmap access on x86 is safe. value_bits=6 -> key_bits=18.
++struct CompactHashCell24 {
++  inline hkey_t hashed_key(size_t value_bits) {
++    uint32_t d = (uint32_t) b[0] | ((uint32_t) b[1] << 8) | ((uint32_t) b[2] << 16);
++    return (hkey_t) (d >> value_bits);
++  }
++
++  inline hvalue_t value(size_t value_bits) {
++    uint32_t d = (uint32_t) b[0] | ((uint32_t) b[1] << 8) | ((uint32_t) b[2] << 16);
++    return (hvalue_t) (d & ((1 << value_bits) - 1));
++  }
++
++  void populate(hkey_t compacted_key, hvalue_t val, size_t key_bits, size_t value_bits) {
++    if (key_bits + value_bits != 24)
++      errx(EX_SOFTWARE, "key len of %u and value len of %u don't sum to 24",
++           (unsigned int) key_bits, (unsigned int) value_bits);
++    if (! key_bits || ! value_bits)
++      errx(EX_SOFTWARE, "key len and value len must be nonzero");
++    uint64_t max_value = (1llu << value_bits) - 1;
++    if (max_value < val)
++      errx(EX_SOFTWARE, "value len of %u too small for value of %llu",
++           (unsigned int) value_bits, (unsigned long long int) val);
++    uint32_t d = (uint32_t) ((compacted_key << value_bits) | val);
++    b[0] = (uint8_t) (d & 0xff);
++    b[1] = (uint8_t) ((d >> 8) & 0xff);
++    b[2] = (uint8_t) ((d >> 16) & 0xff);
++  }
++
++  uint8_t b[3];
++} __attribute__((packed));
++
++// 20-bit cell: same 3-byte little-endian storage as CompactHashCell24, but only
++// the low 20 bits are used (key_bits + value_bits = 20; top 4 physical bits stay
++// zero). Fewer fingerprint bits than 24-bit -> more collisions, filling the FP
++// curve between 16- and 24-bit. File size equals the 24-bit DB; the header's
++// key_bits+value_bits (=20) is what distinguishes it. value_bits=6 -> key_bits=14.
++struct CompactHashCell20 {
++  inline hkey_t hashed_key(size_t value_bits) {
++    uint32_t d = (uint32_t) b[0] | ((uint32_t) b[1] << 8) | ((uint32_t) b[2] << 16);
++    return (hkey_t) (d >> value_bits);
++  }
++
++  inline hvalue_t value(size_t value_bits) {
++    uint32_t d = (uint32_t) b[0] | ((uint32_t) b[1] << 8) | ((uint32_t) b[2] << 16);
++    return (hvalue_t) (d & ((1 << value_bits) - 1));
++  }
++
++  void populate(hkey_t compacted_key, hvalue_t val, size_t key_bits, size_t value_bits) {
++    if (key_bits + value_bits != 20)
++      errx(EX_SOFTWARE, "key len of %u and value len of %u don't sum to 20",
++           (unsigned int) key_bits, (unsigned int) value_bits);
++    if (! key_bits || ! value_bits)
++      errx(EX_SOFTWARE, "key len and value len must be nonzero");
++    uint64_t max_value = (1llu << value_bits) - 1;
++    if (max_value < val)
++      errx(EX_SOFTWARE, "value len of %u too small for value of %llu",
++           (unsigned int) value_bits, (unsigned long long int) val);
++    uint32_t d = (uint32_t) ((compacted_key << value_bits) | val);
++    b[0] = (uint8_t) (d & 0xff);
++    b[1] = (uint8_t) ((d >> 8) & 0xff);
++    b[2] = (uint8_t) ((d >> 16) & 0xff);
++  }
++
++  uint8_t b[3];
++} __attribute__((packed));
++
+ struct CompactHashCell40 {
+   uint32_t a;
+   uint8_t b;
+@@ -159,8 +254,10 @@ CompactHashTable<Cell>::CompactHashTable(size_t capacity, size_t key_bits, size_
+     : capacity_(capacity), size_(0), key_bits_(key_bits), value_bits_(value_bits),
+       file_backed_(false), locks_initialized_(true)
+ {
+-  if (key_bits + value_bits != sizeof(*table_) * 8)
+-    errx(EX_SOFTWARE, "sum of key bits and value bits must equal %u",
++  // Logical width (key+value) must FIT in the physical cell, but need not fill
++  // it: a 20-bit cell (14+6) is stored in a 3-byte/24-bit word, so allow <=.
++  if (key_bits + value_bits > sizeof(*table_) * 8)
++    errx(EX_SOFTWARE, "sum of key bits and value bits must not exceed %u",
+         (unsigned int) (sizeof(*table_) * 8));
+   if (key_bits == 0)
+     errx(EX_SOFTWARE, "key bits cannot be zero");
+diff --git a/src/dump_table.cc b/src/dump_table.cc
+index 89c4899..55da9ea 100644
+--- a/src/dump_table.cc
++++ b/src/dump_table.cc
+@@ -95,6 +95,21 @@ int main(int argc, char **argv) {
+   omp_set_num_threads(opts.num_threads);
+ 
+   switch (GetKVStoreCellType(opts.hashtable_filename)) {
++  case CompactHash16: {
++    CompactHashTable<CompactHashCell16> kraken_index(opts.hashtable_filename, opts.memory_mapping);
++    dump_table<CompactHashCell16>(kraken_index, opts);
++    break;
++  }
++  case CompactHash20: {
++    CompactHashTable<CompactHashCell20> kraken_index(opts.hashtable_filename, opts.memory_mapping);
++    dump_table<CompactHashCell20>(kraken_index, opts);
++    break;
++  }
++  case CompactHash24: {
++    CompactHashTable<CompactHashCell24> kraken_index(opts.hashtable_filename, opts.memory_mapping);
++    dump_table<CompactHashCell24>(kraken_index, opts);
++    break;
++  }
+   case CompactHash32: {
+     CompactHashTable<CompactHashCell> kraken_index(opts.hashtable_filename, opts.memory_mapping);
+     dump_table<CompactHashCell>(kraken_index, opts);
+diff --git a/src/kv_store.h b/src/kv_store.h
+index d3d3655..a3d3561 100644
+--- a/src/kv_store.h
++++ b/src/kv_store.h
+@@ -18,6 +18,9 @@ typedef uint64_t hkey_t;
+ typedef uint32_t hvalue_t;
+ 
+ enum CellType {
++  CompactHash16,
++  CompactHash20,
++  CompactHash24,
+   CompactHash32,
+   CompactHash40,
+   Unknown,
+@@ -45,6 +48,12 @@ CellType inline GetKVStoreCellType(std::string &filename) {
+   ifs.read((char *)&value_bits, sizeof(value_bits));
+ 
+   switch (key_bits + value_bits) {
++  case 16:
++    return CompactHash16;
++  case 20:
++    return CompactHash20;
++  case 24:
++    return CompactHash24;
+   case 32:
+     return CompactHash32;
+   case 40:

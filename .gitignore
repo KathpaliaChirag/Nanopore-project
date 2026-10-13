@@ -12,21 +12,30 @@
 !kraken2opti/matrix_mul/*.svg
 
 # Allow the centrifuge pod5 sweep's raw perf captures and classification counts
-# (0.7 MB total; kept so every figure in centrifuge_pod5_report.md is reproducible)
-!mtp1/results/centrifuge_pod5/raw/*
-!mtp1/results/centrifuge_pod5/class/*
+# (0.7 MB total; kept so every figure in centrifuge_pod5_report.md is
+# reproducible). Centrifuge is no longer part of the project — moved to
+# mtp1/archive/ and retained as measured data.
+!mtp1/archive/centrifuge_pod5/raw/*
+!mtp1/archive/centrifuge_pod5/class/*
 
-# Allow the kraken2 software-prefetch patch (reproduces the -B results in
-# mtp1/reports/CHANGELOG.md and mtp1/reports/PREFETCH.md)
+# Allow the kraken2 source patches. Each reproduces the results of one report,
+# and together they replace the compiled binaries that used to be tracked under
+# mtp1/scratch_lookaside/bin/.
+#   prefetch    -> -B results in reports/memory/PREFETCH.md
+#   cellsize_v2 -> 16/20/24/32-bit cell widths, reports/database/CELLWIDTH_DB_BUILD.md
+#   lookaside   -> -L/-F/-N results in reports/memory/CACHE_TABLE_ANALYSIS.md (Addendum 4)
 !mtp1/scripts/kraken2_prefetch.patch
-
-# Allow the stale-files record (cleanup manifest kept for reference, see
-# mtp1/stale/)
-!mtp1/stale/to_be_erased_2026-08-30.txt
+!mtp1/scripts/kraken2_cellsize_v2.patch
+!mtp1/scripts/kraken2_lookaside.patch
 
 # Allow the built lookaside/prefetch classify binaries (67 MB, rebuildable
-# from mtp1/scripts/kraken2_prefetch.patch, kept as-is on request)
+# from the patches above, kept as-is on request)
 !mtp1/scratch_lookaside/bin/*
+
+# Allow the stale-files record (cleanup manifest kept for reference, see
+# mtp1/archive/)
+!mtp1/archive/to_be_erased_2026-08-30.txt
+
 
 # Allow .gitignore itself
 !.gitignore
