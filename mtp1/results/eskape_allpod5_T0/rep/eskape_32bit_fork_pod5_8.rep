@@ -1,0 +1,37 @@
+ 15.94	19563	19563	U	0	unclassified
+ 84.06	103201	0	R	1	root
+ 84.06	103201	0	R1	131567	  cellular organisms
+ 84.06	103201	5	D	2	    Bacteria
+ 84.05	103189	0	K	3379134	      Pseudomonadati
+ 84.05	103189	0	P	1224	        Pseudomonadota
+ 84.05	103189	5	C	1236	          Gammaproteobacteria
+ 51.99	63822	0	O	72274	            Pseudomonadales
+ 51.99	63822	0	F	135621	              Pseudomonadaceae
+ 51.99	63822	0	G	286	                Pseudomonas
+ 51.99	63822	0	G1	136841	                  Pseudomonas aeruginosa group
+ 51.99	63822	0	S	287	                    Pseudomonas aeruginosa
+ 51.99	63822	63822	S1	208964	                      Pseudomonas aeruginosa PAO1
+ 32.06	39362	0	O	91347	            Enterobacterales
+ 32.06	39362	100	F	543	              Enterobacteriaceae
+ 21.87	26845	0	G	561	                Escherichia
+ 21.87	26845	0	S	562	                  Escherichia coli
+ 21.87	26845	0	S1	83333	                    Escherichia coli K-12
+ 21.87	26845	26845	S2	511145	                      Escherichia coli str. K-12 substr. MG1655
+  9.69	11899	0	G	570	                Klebsiella
+  9.69	11899	0	G1	3390273	                  Klebsiella pneumoniae complex
+  9.69	11899	0	S	573	                    Klebsiella pneumoniae
+  9.69	11899	0	S1	72407	                      Klebsiella pneumoniae subsp. pneumoniae
+  9.69	11899	11899	S2	1125630	                        Klebsiella pneumoniae subsp. pneumoniae HS11286
+  0.42	518	0	G	547	                Enterobacter
+  0.42	518	0	G1	354276	                  Enterobacter cloacae complex
+  0.42	518	0	S	550	                    Enterobacter cloacae
+  0.42	518	0	S1	336306	                      Enterobacter cloacae subsp. cloacae
+  0.42	518	518	S2	716541	                        Enterobacter cloacae subsp. cloacae ATCC 13047
+  0.01	7	0	K	1783272	      Bacillati
+  0.01	7	0	P	1239	        Bacillota
+  0.01	7	0	C	91061	          Bacilli
+  0.01	7	0	O	186826	            Lactobacillales
+  0.01	7	0	F	81852	              Enterococcaceae
+  0.01	7	0	G	1350	                Enterococcus
+  0.01	7	0	S	1352	                  Enterococcus faecium
+  0.01	7	7	S1	333849	                    Enterococcus faecium DO

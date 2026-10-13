@@ -1,0 +1,34 @@
+  6.90	7569	7569	U	0	unclassified
+ 93.10	102159	0	R	1	root
+ 93.10	102159	0	R1	131567	  cellular organisms
+ 93.10	102159	10	D	2	    Bacteria
+ 93.09	102147	0	K	3379134	      Pseudomonadati
+ 93.09	102147	0	P	1224	        Pseudomonadota
+ 93.09	102147	536	C	1236	          Gammaproteobacteria
+ 57.24	62811	0	O	72274	            Pseudomonadales
+ 57.24	62811	0	F	135621	              Pseudomonadaceae
+ 57.24	62811	0	G	286	                Pseudomonas
+ 57.24	62811	0	G1	136841	                  Pseudomonas aeruginosa group
+ 57.24	62811	62811	S	287	                    Pseudomonas aeruginosa
+ 35.31	38745	0	O	91347	            Enterobacterales
+ 35.31	38745	789	F	543	              Enterobacteriaceae
+ 24.04	26380	0	G	561	                Escherichia
+ 24.04	26380	26380	S	562	                  Escherichia coli
+ 10.39	11406	0	G	570	                Klebsiella
+ 10.39	11406	0	G1	3390273	                  Klebsiella pneumoniae complex
+ 10.39	11406	11406	S	573	                    Klebsiella pneumoniae
+  0.15	170	0	G	547	                Enterobacter
+  0.15	170	0	G1	354276	                  Enterobacter cloacae complex
+  0.15	170	170	S	550	                    Enterobacter cloacae
+  0.05	55	0	O	2887326	            Moraxellales
+  0.05	55	0	F	468	              Moraxellaceae
+  0.05	55	0	G	469	                Acinetobacter
+  0.05	55	0	G1	909768	                  Acinetobacter calcoaceticus/baumannii complex
+  0.05	55	55	S	470	                    Acinetobacter baumannii
+  0.00	2	0	K	1783272	      Bacillati
+  0.00	2	0	P	1239	        Bacillota
+  0.00	2	0	C	91061	          Bacilli
+  0.00	2	0	O	1385	            Caryophanales
+  0.00	2	0	F	90964	              Staphylococcaceae
+  0.00	2	0	G	1279	                Staphylococcus
+  0.00	2	2	S	1280	                  Staphylococcus aureus

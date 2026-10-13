@@ -1,0 +1,27 @@
+  5.17	5632	5632	U	0	unclassified
+ 94.83	103388	0	R	1	root
+ 94.83	103388	0	R1	131567	  cellular organisms
+ 94.83	103388	4	D	2	    Bacteria
+ 94.83	103384	0	K	3379134	      Pseudomonadati
+ 94.83	103384	0	P	1224	        Pseudomonadota
+ 94.83	103384	485	C	1236	          Gammaproteobacteria
+ 57.99	63221	0	O	72274	            Pseudomonadales
+ 57.99	63221	0	F	135621	              Pseudomonadaceae
+ 57.99	63221	0	G	286	                Pseudomonas
+ 57.99	63221	0	G1	136841	                  Pseudomonas aeruginosa group
+ 57.99	63221	63221	S	287	                    Pseudomonas aeruginosa
+ 36.34	39615	0	O	91347	            Enterobacterales
+ 36.34	39615	746	F	543	              Enterobacteriaceae
+ 24.45	26651	0	G	561	                Escherichia
+ 24.45	26651	26651	S	562	                  Escherichia coli
+ 10.97	11964	0	G	570	                Klebsiella
+ 10.97	11964	0	G1	3390273	                  Klebsiella pneumoniae complex
+ 10.97	11964	11964	S	573	                    Klebsiella pneumoniae
+  0.23	254	0	G	547	                Enterobacter
+  0.23	254	0	G1	354276	                  Enterobacter cloacae complex
+  0.23	254	254	S	550	                    Enterobacter cloacae
+  0.06	63	0	O	2887326	            Moraxellales
+  0.06	63	0	F	468	              Moraxellaceae
+  0.06	63	0	G	469	                Acinetobacter
+  0.06	63	0	G1	909768	                  Acinetobacter calcoaceticus/baumannii complex
+  0.06	63	63	S	470	                    Acinetobacter baumannii

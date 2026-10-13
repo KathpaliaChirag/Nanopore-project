@@ -1,0 +1,29 @@
+ 16.51	17998	17998	U	0	unclassified
+ 83.49	91022	0	R	1	root
+ 83.49	91022	0	R1	131567	  cellular organisms
+ 83.49	91022	11	D	2	    Bacteria
+ 83.48	91011	0	K	3379134	      Pseudomonadati
+ 83.48	91011	0	P	1224	        Pseudomonadota
+ 83.48	91011	3	C	1236	          Gammaproteobacteria
+ 51.70	56364	0	O	72274	            Pseudomonadales
+ 51.70	56364	0	F	135621	              Pseudomonadaceae
+ 51.70	56364	0	G	286	                Pseudomonas
+ 51.70	56364	0	G1	136841	                  Pseudomonas aeruginosa group
+ 51.70	56364	0	S	287	                    Pseudomonas aeruginosa
+ 51.70	56364	56364	S1	208964	                      Pseudomonas aeruginosa PAO1
+ 31.78	34644	0	O	91347	            Enterobacterales
+ 31.78	34644	96	F	543	              Enterobacteriaceae
+ 21.53	23474	0	G	561	                Escherichia
+ 21.53	23474	0	S	562	                  Escherichia coli
+ 21.53	23474	0	S1	83333	                    Escherichia coli K-12
+ 21.53	23474	23474	S2	511145	                      Escherichia coli str. K-12 substr. MG1655
+  9.70	10577	0	G	570	                Klebsiella
+  9.70	10577	0	G1	3390273	                  Klebsiella pneumoniae complex
+  9.70	10577	0	S	573	                    Klebsiella pneumoniae
+  9.70	10577	0	S1	72407	                      Klebsiella pneumoniae subsp. pneumoniae
+  9.70	10577	10577	S2	1125630	                        Klebsiella pneumoniae subsp. pneumoniae HS11286
+  0.46	497	0	G	547	                Enterobacter
+  0.46	497	0	G1	354276	                  Enterobacter cloacae complex
+  0.46	497	0	S	550	                    Enterobacter cloacae
+  0.46	497	0	S1	336306	                      Enterobacter cloacae subsp. cloacae
+  0.46	497	497	S2	716541	                        Enterobacter cloacae subsp. cloacae ATCC 13047

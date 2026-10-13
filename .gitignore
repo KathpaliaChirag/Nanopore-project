@@ -36,6 +36,12 @@
 # mtp1/archive/)
 !mtp1/archive/to_be_erased_2026-08-30.txt
 
+# Allow the 16-file ESKAPE sweep's raw kraken reports and rate table
+# (260 KB; every figure in results/eskape_allpod5_T0/REPORT.md and
+# PER_FILE_TABLES.md is reproducible from these)
+!mtp1/results/eskape_allpod5_T0/rep/*.rep
+!mtp1/results/eskape_allpod5_T0/raw.tsv
+
 
 # Allow .gitignore itself
 !.gitignore
