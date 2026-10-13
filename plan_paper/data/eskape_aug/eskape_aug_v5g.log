@@ -1,0 +1,13 @@
+student: capacity 12861805 keys 8873809 occupancy 0.689935 nodes 107
+new table: key bits 25, value bits 7, taxonomy nodes 107
+rebuild from genomes: 17 sequences (0 without taxid), keys 8869535 vs original 8873809, capacity 13000000, validation: 0 of 0 minimizer lookups differ
+allowed genera: 7, family/order ancestors: 10
+genome pass: 8869535 distinct genome minimizers, 8717877 generalized, 32865 already equal, 118793 absent in teacher
+reads 0  minimizers 0  distinct 0
+  absent in teacher (errors / unseen): 0
+  rejected by genus gate (non-ESKAPE):  0
+  already identical in student:         0
+  existing entries generalized (LCA up):0
+  new entries added:                    0
+  new entries skipped (-P):             0
+student after: keys 8869535 occupancy 0.682272

@@ -1,0 +1,12 @@
+student: capacity 12861805 keys 8873809 occupancy 0.689935 nodes 42
+rebuild from genomes: 17 sequences (0 without taxid), keys 8869535 vs original 8873809, capacity 12861805, validation: 125 of 28060427 minimizer lookups differ
+allowed genera: 6, family/order ancestors: 8
+reads 104918  minimizers 351788683  distinct 32782212
+  absent in teacher (errors / unseen): 22577663
+  rejected by genus gate (non-ESKAPE):  1444725
+  already identical in student:         14138
+  existing entries generalized (LCA up):4260561
+  new entries added:                    0
+  new entries skipped (-P):             4485125
+student after: keys 8869535 occupancy 0.689603
+V1 wall=72.97 rss=110011300KB
