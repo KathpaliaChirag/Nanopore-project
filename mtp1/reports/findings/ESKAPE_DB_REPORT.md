@@ -18,7 +18,11 @@ Not by extracting from it — that is impossible, for reasons explained in §3. 
 we rebuilt it properly from NCBI, and the result is better than expected:
 
 > **A new 48 MB database — exactly the same size as the one we have now —
-> classifies 8.5% more reads and runs 25% faster.**
+> classifies 9.28 points more reads and runs ~25% faster.**
+> Verified across all 16 pod5 files, 1,872,777 reads: range +9.02 to +9.57,
+> and it recovers 173,398 reads the current database calls unknown. It also
+> introduces 948 spurious *A. baumannii* calls — a 183:1 gain-to-error ratio.
+> See §7.2.
 
 **2. Does the same read produce the same hash and the same key in the 50 MB and
 16 GB databases?**
@@ -317,7 +321,7 @@ That is reassuring for correctness, and it is exactly why §2.3 matters only for
 
 ---
 
-## 7. Two cautions
+## 7. Cautions and verification
 
 ### 7.1 Heavy skipping breaks the confidence threshold
 
@@ -348,20 +352,69 @@ The effect is sharply non-linear:
 **Practical rule: never evaluate a subsampled database at `-T 0` only.** There
 is a safe range up to roughly 80% skipping, and a cliff beyond it.
 
-### 7.2 What we have not yet checked
+### 7.2 Verified across all 16 files, and one real false-positive source
 
-Everything in §5 is **classification rate** — the share of reads that got an
-answer. We have **not** checked whether those answers are correct.
+Both items flagged here earlier have now been measured. All 16 pod5 files,
+1,872,777 reads, 6,036 Mbp. Full tables in
+`../../results/eskape_allpod5_T0/`.
 
-The earlier `-M 4000000` work tracked *Staphylococcus aureus* false positives
-and found zero. **That check has not been repeated on any of the three new
-databases.** A database that classifies more reads might simply be making more
-mistakes, and with 25 strains per species plus the full NCBI taxonomy there is
-more room to be wrong.
+**The gain generalises, and the figure is larger than first reported.** Measured
+against `eskape_32bit_fork` (the actual baseline, 83.73% mean) rather than
+`eskape_32bit_spaced`, the 48 MB build gains **+9.28 points on average, range
++9.02 to +9.57 across 16 independent files.** The ordering
+208 MB > 48 MB > 16 MB > old is identical in every file.
 
-**The +8.5 point result should not be presented as final until this is done.**
+| | old 49 MB | new 208 MB | new 48 MB | new 16 MB |
+|---|---:|---:|---:|---:|
+| mean classified | 83.73% | 94.97% | **93.01%** | 87.68% |
+| unclassified reads | 304,104 | 94,000 | **130,706** | 230,745 |
 
-Also: all results are from one file, `pod5_15.fastq`. The other 15 are untested.
+**173,398 reads that the current database calls "unknown" are identifiable
+ESKAPE organisms**, concentrated exactly where the sample is dense:
+*P. aeruginosa* +93,964, *E. coli* +47,921, *K. pneumoniae* +13,591.
+
+**But the controls are not clean, and this corrects an earlier claim in this
+document.** False-positive counts summed over all 16 files:
+
+| control | old 49 MB | new 208 MB | new 48 MB | new 16 MB |
+|---|---:|---:|---:|---:|
+| *S. aureus* | 12 | 18 | 16 | 13 |
+| *E. faecium* | 48 | 2 | **1** | 3 |
+| *A. baumannii* | — | **1,048** | **948** | 629 |
+
+*S. aureus* stays in the same band and *E. faecium* improves 48 -> 1. But
+*A. baumannii* produces **948 calls in the 48 MB build where `standard_16gb`
+finds about one read per file.** On `pod5_15` alone this looked like 20 reads and
+was dismissed as negligible; across all 16 files it is systematic.
+
+**The cause is forced assignment, not hash collision.** A seven-species database
+has nowhere to put a read except one of its seven species or "unclassified". The
+sample contains ~430 reads of organisms with no ESKAPE home at all — *Homo
+sapiens* 253, *Phikmvvirus* phage 52, *Streptomyces* 41, *Salmonella* 22,
+*Shigella* 58 — plus non-*aeruginosa* *Pseudomonas* (621) and *K. variicola* /
+*K. quasipneumoniae* (75). With *A. baumannii* newly present and no outgroup,
+those reads land on it.
+
+**Net verdict: still strongly positive.** 173,398 reads correctly recovered
+against 948 spuriously assigned — a ratio of **183:1**. But a decoy set (human +
+phage, §8) is now a requirement rather than an optional refinement.
+
+### 7.3 Still open
+
+- ***Enterobacter* is the wrong species.** The database carries 9.3 M minimizers
+  labelled *E. cloacae* (taxid 550), but the sample's dominant *Enterobacter* is
+  ***E. hormaechei*** — 83 reads against *cloacae*'s 36, per `standard_16gb`.
+  *E. hormaechei* has 668 complete RefSeq genomes to *cloacae*'s 82 and is now
+  recognised as the commonest clinical *Enterobacter*, long misidentified as
+  *cloacae*. *Enterobacter* counts fall 7,915 -> 3,112 with the new database;
+  part of that is a genuine correction, part is real *Enterobacter* now going
+  unclassified rather than misfiled.
+- **No labelled ground truth.** Agreement between independent databases is the
+  proxy throughout. Strong, and standard, but not a mock community of known
+  composition.
+- **Runtimes are indicative only.** The 16-file sweep ran sequentially, so
+  thermal drift applies. The 25% speedup needs an interleaved A/B on a cool
+  machine before it goes in a write-up.
 
 ---
 
@@ -369,8 +422,10 @@ Also: all results are from one file, `pod5_15.fastq`. The other 15 are untested.
 
 | # | action | effort |
 |---|---|---|
-| 1 | **Check false positives on the three new databases** before relying on §5 | small |
-| 2 | **Confirm the +8.5 point result on the other 15 pod5 files** | small, unattended |
+| 1 | ~~Check false positives~~ — **done, §7.2.** Revealed 948 spurious *A. baumannii* calls | done |
+| 2 | ~~Confirm on the other 15 pod5 files~~ — **done, §7.2.** +9.28 pp mean, holds in all 16 | done |
+| 1b | **Add a decoy set (human + phage)** to absorb the ~430 homeless reads driving §7.2 | medium |
+| 2b | **Add *E. hormaechei* and the rest of the *Enterobacter* genus** (§7.3) | medium |
 | 3 | **Adopt `eskape_big_M12000000` as the working database** — same size, faster, more sensitive at both thresholds | done, ready |
 | 4 | Either add *A. baumannii* to the old database or stop calling it ESKAPE | — |
 | 5 | Use `eskape_32bit_spaced`, not `eskape_32bit_fork`, for any cross-database comparison | — |

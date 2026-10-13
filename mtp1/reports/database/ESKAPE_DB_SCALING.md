@@ -458,3 +458,101 @@ Consequences:
 3. Sweep `-M` between 8 M and 16 M cells to locate the threshold cliff in 7.2.
 4. Build a `spaced_seed_mask = 0` variant of `eskape_big` if the cell-width
    series is to be extended to the larger library.
+
+---
+
+## 8. Verification across all 16 pod5 files
+
+§7 measured one file. This section measures all sixteen — 1,872,777 reads,
+6,036 Mbp, `-T 0 -p 16 -g 2`. Per-file tables, the 64 raw kraken reports and the
+machine-readable rates are in `../../results/eskape_allpod5_T0/`.
+
+The baseline here is `eskape_32bit_fork`, the project's actual benchmark base,
+rather than `eskape_32bit_spaced` as in §7 — which is why the headline figure is
++9.28 rather than +8.5.
+
+| file | reads | old 49 MB | new 208 MB | new 48 MB | new 16 MB | 48 vs old |
+|---|---:|---:|---:|---:|---:|---:|
+| pod5_0 | 132,074 | 83.97% | 95.30% | 93.43% | 87.78% | +9.46 |
+| pod5_1 | 141,195 | 84.05% | 95.26% | 93.39% | 88.01% | +9.34 |
+| pod5_2 | 151,591 | 84.26% | 95.25% | 93.46% | 88.27% | +9.20 |
+| pod5_3 | 141,365 | 83.77% | 95.07% | 92.98% | 87.53% | +9.21 |
+| pod5_4 | 131,822 | 83.84% | 95.07% | 93.03% | 87.82% | +9.19 |
+| pod5_5 | 130,448 | 83.30% | 94.49% | 92.32% | 87.17% | +9.02 |
+| pod5_6 | 120,965 | 83.50% | 94.82% | 92.71% | 87.50% | +9.21 |
+| pod5_7 | 119,216 | 83.88% | 94.98% | 93.06% | 87.90% | +9.18 |
+| pod5_8 | 122,764 | 84.06% | 95.10% | 93.09% | 87.91% | +9.03 |
+| pod5_9 | 109,728 | 84.00% | 94.94% | 93.10% | 87.68% | +9.10 |
+| pod5_10 | 104,918 | 83.85% | 95.03% | 93.27% | 88.13% | +9.42 |
+| pod5_11 | 123,458 | 83.18% | 94.50% | 92.39% | 86.84% | +9.21 |
+| pod5_12 | 109,020 | 83.49% | 94.83% | 92.93% | 87.39% | +9.44 |
+| pod5_13 | 106,781 | 83.87% | 95.25% | 93.44% | 88.09% | +9.57 |
+| pod5_14 | 97,054 | 83.25% | 94.63% | 92.58% | 86.88% | +9.33 |
+| pod5_15 | 30,378 | 83.39% | 94.99% | 92.93% | 87.98% | +9.54 |
+| **MEAN** | **1,872,777** | **83.73%** | **94.97%** | **93.01%** | **87.68%** | **+9.28** |
+
+The ordering 208 MB > 48 MB > 16 MB > old holds in **all sixteen files**, and the
+48 MB gain varies by only 0.55 pp across them. Not a single-file artefact.
+
+### 8.1 Where the reads come from
+
+48 MB build against the old baseline, summed over all 16 files:
+
+| taxon | old 49 MB | new 48 MB | change |
+|---|---:|---:|---:|
+| *P. aeruginosa* | 975,003 | 1,068,967 | **+93,964** |
+| *E. coli* | 404,484 | 452,405 | **+47,921** |
+| *K. pneumoniae* | 179,332 | 192,923 | **+13,591** |
+| *Enterobacter* | 7,915 | 3,112 | −4,803 |
+| *A. baumannii* | 0 | 948 | +948 |
+| *S. aureus* | 12 | 16 | +4 |
+| *E. faecium* | 48 | 1 | −47 |
+| sum of species | | | +151,578 |
+| resolved at higher rank only | | | +21,820 |
+| **classified** | **1,568,673** | **1,742,071** | **+173,398** |
+| **unclassified** | **304,104** | **130,706** | **−173,398** |
+
+### 8.2 False positives: one real source, and it is not the hash table
+
+| control | old 49 MB | new 208 MB | new 48 MB | new 16 MB |
+|---|---:|---:|---:|---:|
+| *S. aureus* | 12 | 18 | 16 | 13 |
+| *E. faecium* | 48 | 2 | **1** | 3 |
+| *A. baumannii* | — | **1,048** | **948** | 629 |
+| total, % of 1.87 M reads | 0.0032% | 0.0570% | 0.0515% | 0.0344% |
+
+*S. aureus* is unchanged and *E. faecium* improves 48 -> 1, so the fingerprint is
+not degrading. *A. baumannii* is the whole of the increase, and `standard_16gb`
+puts its true abundance at roughly **1 read per file**.
+
+**The mechanism is forced assignment.** A seven-species database can only answer
+with one of its seven species or "unclassified". `standard_16gb` shows what the
+sample actually holds that has no ESKAPE home:
+
+| organism | reads | in `eskape_big`? |
+|---|---:|---|
+| *Homo sapiens* | 253 | no |
+| non-*aeruginosa* *Pseudomonas* | 621 | no |
+| *Shigella* | 58 | no |
+| *Phikmvvirus* (phage) | 52 | no |
+| *Streptomyces* | 41 | no |
+| *K. variicola* / *K. quasipneumoniae* | 75 | no |
+| *Salmonella* | 22 | no |
+| *A. baumannii* (true) | **1** | yes |
+
+With *A. baumannii* present and no outgroup to absorb them, those reads land on
+it. A decoy set is therefore a requirement, not a refinement — and the per-file
+counts scale with file size, which is the signature of systematic bias rather
+than noise.
+
+**Net: 173,398 recovered against 948 spurious — 183:1.**
+
+### 8.3 Runtime, with a caveat
+
+| | old 49 MB | new 208 MB | new 48 MB | new 16 MB |
+|---|---:|---:|---:|---:|
+| total over 16 files | 32.94 s | 41.20 s | **28.62 s** | **22.33 s** |
+
+**Indicative only.** The sweep ran sequentially, so thermal drift applies — the
+same effect that produced a spurious 24% result earlier in this project. The
+~25% speedup needs an interleaved A/B on a cool machine before publication.
