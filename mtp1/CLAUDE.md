@@ -122,7 +122,7 @@ it backs. Commit messages use the **`mtp1:`** prefix.
 | `eskape_650mb` | 142 MB | 37.0 M | 0% | |
 | `eskape_32bit_spaced` | 47 MB | 12.2 M | 0% | **cross-database baseline** |
 | `eskape_32bit_fork` | 47 MB | 12.2 M | 0% | cell-width baseline, seed mask 0 |
-| `eskape_big_M12000000` | 48 MB | 12.0 M | 76.9% | **best drop-in: +8.5 pp, 25% faster** |
+| `eskape_big_M12000000` | 48 MB | 12.0 M | 76.9% | **best drop-in: +9.28 pp over 16 files** |
 | `eskape_24bit`/`20bit` | 35 MB | 12.2 M | 0% | cell-width series |
 | `eskape_16bit` | 24 MB | 12.2 M | 0% | cell-width series |
 | `eskape_big_M4000000` | 16 MB | 4.0 M | 92.3% | L3-resident, unusable above `-T 0` |
@@ -170,8 +170,13 @@ The spaced-seed template is `"1"x(l-2*spaces) + "01"x spaces` with `spaces = 7`
 
 **Established.** `-M` subsampling, not database size, is why big databases win
 (lookups run at IPC 0.218 vs 1.714 for everything else). A 48 MB database built
-from 175 genomes beats the 6-genome one of the same size by 8.5 points while
-running 25% faster — breadth beats completeness at fixed memory.
+from 175 genomes beats the 6-genome one of the same size by **9.28 points**
+(83.73% -> 93.01%, all 16 files, ordering holds in every file, spread 0.55 pp)
+while storing *fewer* minimizers — breadth beats completeness at fixed memory.
+False positives measured: +173,398 reads classified against 948 spurious
+*A. baumannii* calls, **183:1**, caused by forced assignment in a 7-species
+database, not hash collisions (*E. faecium* FPs fell 48 -> 1). See
+`MEETING_UPDATE_2026-10-20.md`.
 `CompactHashTable::Get` is 43.4% of cycles; DRAM stalls 27%; MLP is 1.26 of ~12.
 
 **Rejected by measurement.** Minimizer→taxon lookaside cache (best −1.3%, needs
@@ -179,10 +184,19 @@ an unobtainable profile). L1/L2 cache pinning. Replacing the hash table — at
 0.96 DRAM accesses per lookup it is already at the floor.
 
 **Open.**
-- **False positives have not been measured** on `eskape_big*`. All reported
-  numbers are classification *rate*, not correctness. The +8.5 pp headline is
-  not safe to present as final.
-- `eskape_big*` results are from `pod5_15` only; 15 files untested.
+- **Still no labelled ground truth.** All numbers are classification *rate*;
+  correctness is bounded only by inter-database agreement, with
+  `standard_16gb` (97.60%) used as arbiter. Ask whether the sample is a known
+  mock community.
+- **No decoy set** — 948 spurious *A. baumannii* calls remain. Fix: add human
+  GRCh38 (already on disk in `eskape_human_4gb`) + a *Pseudomonas* phage.
+- ***Enterobacter* is the wrong species.** 9.3 M minimizers labelled
+  *E. cloacae* (550), but the sample's dominant *Enterobacter* is
+  *E. hormaechei* (83 reads vs 36) with 668 complete assemblies to cloacae's 82
+  and **0 in the database**. Five lines in the `SPECIES` map.
+- **Runtimes indicative only** — the 16-file sweep was sequential on a
+  heat-soaking box. The ~13% speedup needs an interleaved A/B when cool.
+- `-T 0.05` cliff measured on `pod5_15` only.
 - Huge pages (`madvise(MADV_HUGEPAGE)` on the hash table) untested. At 16 GB
   every lookup misses the TLB (1.00 page walk per lookup, 3.9 M 4 KB pages vs a
   2,048-entry STLB); in 2 MB pages it would be 7,630 pages.

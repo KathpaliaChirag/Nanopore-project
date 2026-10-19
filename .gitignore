@@ -43,5 +43,25 @@
 !mtp1/results/eskape_allpod5_T0/raw.tsv
 
 
+# Allow the analysis tools that back reports/reference/FLOW.md. All three link
+# or drive kraken2's own object files, so every number in FLOW.md is produced by
+# the code classify runs, not a reimplementation.
+#   trace_minimizer.cc -> FLOW.md section 1-3, the minimizer -> taxid walkthrough
+#   dump_minimizers.cc -> dumps minimizer+hash pairs for the section 7 analysis
+#   hash_uniformity.py -> FLOW.md section 7, "why hash at all" measurement
+!mtp1/scripts/trace_minimizer.cc
+!mtp1/scripts/dump_minimizers.cc
+!mtp1/scripts/hash_uniformity.py
+
+# Allow the ESKAPE 175-genome build script. The download had only ever been run
+# inline; this closes that reproducibility gap for reports/database/
+# ESKAPE_DB_SCALING.md and reports/findings/ESKAPE_DB_REPORT.md.
+!mtp1/scripts/build_eskape_big.sh
+
+# Allow the hash-uniformity measurement output (4 KB) that backs FLOW.md
+# section 7. The raw minimizer/hash dump it was computed from is 438 MB-scale
+# and stays local; this is the summary.
+!mtp1/results/hash_uniformity/RESULT.txt
+
 # Allow .gitignore itself
 !.gitignore

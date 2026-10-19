@@ -1,0 +1,21 @@
+3,280,281 minimizer occurrences, 2,727,687 distinct
+
+(a) SLOT = value % 12,000,000
+    theoretical slots occupied if perfectly uniform: 2,439,888
+    raw minimizer  slots   602,438 ( 24.7% of ideal)  max  25/slot  chi2/dof  6.62
+    MurmurHash3    slots 2,439,465 (100.0% of ideal)  max   6/slot  chi2/dof  1.00
+
+(b) FINGERPRINT = top 26 bits
+    raw minimizer  2,246,682 distinct  ( 82.4% of keys separable)
+    MurmurHash3    2,673,050 distinct  ( 98.0% of keys separable)
+
+(c) -M GATE: skip if value < 0xc4ec4ec4ec4ec000  (target 76.92%)
+    max possible raw minimizer (2^62) =  4,611,686,018,427,387,904
+    threshold                         = 14,189,803,133,622,730,752   (3.08x larger)
+    gate on raw minimizer: skips 100.00%  -> unusable
+    gate on hash         : skips  76.95%  -> ok
+
+(d) slot/fingerprint independence (low 26 vs high 26 bits)
+    raw minimizer  r = +0.0008
+    MurmurHash3    r = -0.0033
+    -> near zero for BOTH; independence was never the benefit.
