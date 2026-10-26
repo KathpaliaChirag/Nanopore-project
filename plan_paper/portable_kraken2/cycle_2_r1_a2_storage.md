@@ -28,12 +28,10 @@ agent: a2_storage. i read `cycle_1_conclusion.md`, `FINAL.md`, and every cycle-1
 
 1. **M13 out of the top 10, M30 in at rank 4.**
    - M13's main use case was a cold emmc load on orin. the agx orin dev kit has an M.2 M-key slot for an NVMe SSD, plus usb 3.2 gen 2 ports [external: src 3].
-   - an orin nano NVMe read 1.55 GB/s against 0.25 GB/s for the emmc 5.1 class [external, via a4 cycle-1 src 5 and 3]. that is ~6x on a cold copy [arith] for a ~$50 part and zero code (M33). M13 gives 1.37-2x [arith] and fights the map path.
+   - an orin nano NVMe read 1.55 GB/s against 0.25 GB/s for the emmc 5.1 class [external, via a4 cycle-1 src 5 and 3]. that is ~6x on a cold copy [arith] with no code (M33). M13 gives 1.37-2x [arith] and fights the map path.
    - M30 (below) closes the weakest point the vote found in M9: few-read cold faults run at queue depth 1.
 2. **M10 stays at 9, with one more benefit on its row.**
-   - THP cuts teardown ~10x: 16 GB took 282 ms at 4 KB and 27.68 ms with THP [external: src 4].
-   - scaled to 111 GB, that is ~1.96 s vs ~0.19 s [arith, other machine].
-   - so wherever S14 or RC1's huge pages fail to land, the exit tax comes back as well as the TLB misses. part A fixes both. the kernel scope (6.1+) still limits it, so no move.
+   - THP cuts teardown ~10x: 16 GB 282 ms at 4 KB vs 27.68 ms with THP [external: src 4]; scaled to 111 GB, ~1.96 s vs ~0.19 s [arith, other machine]. so where huge pages fail to land, the exit tax returns along with the TLB misses, and part A fixes both. kernel 6.1+ still limits it, so no move.
 
 ### still wrong or missing in the conclusion
 
