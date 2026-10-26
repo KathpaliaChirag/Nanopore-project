@@ -1,0 +1,577 @@
+=== s0 / 50MB / 10 ===
+Loading database information... done.
+10 sequences (0.43 Mbp) processed in 0.032s (18.6 Kseq/m, 800.51 Mbp/m).
+  10 sequences classified (100.00%)
+  0 sequences unclassified (0.00%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/sample_targeted --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_10.fastq':
+
+          8,66,218      LLC-loads                                                             
+          6,12,134      LLC-load-misses                  #   70.67% of all LL-cache accesses  
+
+       0.088339077 seconds time elapsed
+
+       0.308310000 seconds user
+       0.076334000 seconds sys
+
+
+WALLTIME 0.12
+=== s0 / 50MB / 1000 ===
+Loading database information... done.
+1000 sequences (28.92 Mbp) processed in 0.240s (250.5 Kseq/m, 7244.96 Mbp/m).
+  780 sequences classified (78.00%)
+  220 sequences unclassified (22.00%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/sample_targeted --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_1000.fastq':
+
+       1,09,69,195      LLC-loads                                                             
+         20,22,646      LLC-load-misses                  #   18.44% of all LL-cache accesses  
+
+       0.295438553 seconds time elapsed
+
+       1.929549000 seconds user
+       0.230631000 seconds sys
+
+
+WALLTIME 0.30
+=== s0 / 50MB / 104918 ===
+Loading database information... done.
+104918 sequences (355.36 Mbp) processed in 1.149s (5477.0 Kseq/m, 18550.42 Mbp/m).
+  88973 sequences classified (84.80%)
+  15945 sequences unclassified (15.20%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/sample_targeted --threads 32 --output /dev/null /home/student/chirag_K/results/basecalling/reads_hac.fastq':
+
+      14,59,95,917      LLC-loads                                                             
+       1,62,59,943      LLC-load-misses                  #   11.14% of all LL-cache accesses  
+
+       1.255865736 seconds time elapsed
+
+      20.197032000 seconds user
+       1.241046000 seconds sys
+
+
+WALLTIME 1.27
+=== s0 / 50MB / 1872777 ===
+Loading database information... done.
+1872777 sequences (6036.15 Mbp) processed in 15.562s (7220.6 Kseq/m, 23272.59 Mbp/m).
+  1586721 sequences classified (84.73%)
+  286056 sequences unclassified (15.27%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/sample_targeted --threads 32 --output /dev/null /home/student/chirag_K/results/per_pod5_fastq/pod5_0.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_1.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_2.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_3.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_4.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_5.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_6.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_7.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_8.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_9.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_10.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_11.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_12.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_13.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_14.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_15.fastq':
+
+    2,44,55,30,600      LLC-loads                                                             
+      25,24,67,291      LLC-load-misses                  #   10.32% of all LL-cache accesses  
+
+      15.688977626 seconds time elapsed
+
+     339.067677000 seconds user
+       6.803515000 seconds sys
+
+
+WALLTIME 15.70
+=== s0 / 8GB / 10 ===
+Loading database information... done.
+10 sequences (0.43 Mbp) processed in 0.021s (29.2 Kseq/m, 1257.42 Mbp/m).
+  10 sequences classified (100.00%)
+  0 sequences unclassified (0.00%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/standard_8gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_10.fastq':
+
+       7,08,84,172      LLC-loads                                                             
+       6,86,91,271      LLC-load-misses                  #   96.91% of all LL-cache accesses  
+
+       4.518280039 seconds time elapsed
+
+       0.428462000 seconds user
+       4.506310000 seconds sys
+
+
+WALLTIME 4.53
+=== s0 / 8GB / 1000 ===
+Loading database information... done.
+1000 sequences (28.92 Mbp) processed in 0.205s (292.1 Kseq/m, 8448.10 Mbp/m).
+  988 sequences classified (98.80%)
+  12 sequences unclassified (1.20%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/standard_8gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_1000.fastq':
+
+       7,45,66,268      LLC-loads                                                             
+       7,15,39,386      LLC-load-misses                  #   95.94% of all LL-cache accesses  
+
+       4.616875733 seconds time elapsed
+
+       1.638527000 seconds user
+       4.577472000 seconds sys
+
+
+WALLTIME 4.63
+=== s0 / 8GB / 104918 ===
+Loading database information... done.
+104918 sequences (355.36 Mbp) processed in 1.062s (5927.8 Kseq/m, 20077.27 Mbp/m).
+  100481 sequences classified (95.77%)
+  4437 sequences unclassified (4.23%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/standard_8gb --threads 32 --output /dev/null /home/student/chirag_K/results/basecalling/reads_hac.fastq':
+
+      11,13,45,347      LLC-loads                                                             
+       9,27,89,171      LLC-load-misses                  #   83.33% of all LL-cache accesses  
+
+       5.558445567 seconds time elapsed
+
+      14.520299000 seconds user
+       5.591046000 seconds sys
+
+
+WALLTIME 5.57
+=== s0 / 8GB / 1872777 ===
+Loading database information... done.
+1872777 sequences (6036.15 Mbp) processed in 15.049s (7466.8 Kseq/m, 24066.16 Mbp/m).
+  1785213 sequences classified (95.32%)
+  87564 sequences unclassified (4.68%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/standard_8gb --threads 32 --output /dev/null /home/student/chirag_K/results/per_pod5_fastq/pod5_0.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_1.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_2.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_3.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_4.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_5.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_6.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_7.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_8.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_9.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_10.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_11.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_12.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_13.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_14.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_15.fastq':
+
+      78,00,93,907      LLC-loads                                                             
+      46,57,20,539      LLC-load-misses                  #   59.70% of all LL-cache accesses  
+
+      19.726884364 seconds time elapsed
+
+     241.786933000 seconds user
+      13.685184000 seconds sys
+
+
+WALLTIME 19.74
+=== s0 / 16GB / 10 ===
+Loading database information... done.
+10 sequences (0.43 Mbp) processed in 0.024s (24.7 Kseq/m, 1062.23 Mbp/m).
+  10 sequences classified (100.00%)
+  0 sequences unclassified (0.00%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/standard_16gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_10.fastq':
+
+      13,54,21,347      LLC-loads                                                             
+      13,13,05,994      LLC-load-misses                  #   96.96% of all LL-cache accesses  
+
+       8.449841671 seconds time elapsed
+
+       0.374515000 seconds user
+       8.451631000 seconds sys
+
+
+WALLTIME 8.46
+=== s0 / 16GB / 1000 ===
+Loading database information... done.
+1000 sequences (28.92 Mbp) processed in 0.247s (243.2 Kseq/m, 7034.16 Mbp/m).
+  995 sequences classified (99.50%)
+  5 sequences unclassified (0.50%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/standard_16gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_1000.fastq':
+
+      13,92,74,800      LLC-loads                                                             
+      13,44,02,348      LLC-load-misses                  #   96.50% of all LL-cache accesses  
+
+       8.549674195 seconds time elapsed
+
+       1.978464000 seconds user
+       8.460879000 seconds sys
+
+
+WALLTIME 8.56
+=== s0 / 16GB / 104918 ===
+Loading database information... done.
+104918 sequences (355.36 Mbp) processed in 1.118s (5633.2 Kseq/m, 19079.46 Mbp/m).
+  102580 sequences classified (97.77%)
+  2338 sequences unclassified (2.23%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/standard_16gb --threads 32 --output /dev/null /home/student/chirag_K/results/basecalling/reads_hac.fastq':
+
+      20,06,86,385      LLC-loads                                                             
+      16,95,22,306      LLC-load-misses                  #   84.47% of all LL-cache accesses  
+
+       9.502550523 seconds time elapsed
+
+      18.751696000 seconds user
+       9.540547000 seconds sys
+
+
+WALLTIME 9.51
+=== s0 / 16GB / 1872777 ===
+Loading database information... done.
+1872777 sequences (6036.15 Mbp) processed in 15.522s (7239.2 Kseq/m, 23332.80 Mbp/m).
+  1826646 sequences classified (97.54%)
+  46131 sequences unclassified (2.46%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/standard_16gb --threads 32 --output /dev/null /home/student/chirag_K/results/per_pod5_fastq/pod5_0.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_1.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_2.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_3.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_4.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_5.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_6.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_7.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_8.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_9.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_10.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_11.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_12.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_13.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_14.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_15.fastq':
+
+    1,30,67,64,562      LLC-loads                                                             
+      75,99,30,745      LLC-load-misses                  #   58.15% of all LL-cache accesses  
+
+      24.259114730 seconds time elapsed
+
+     306.664660000 seconds user
+      20.074054000 seconds sys
+
+
+WALLTIME 24.27
+=== s0 / 103GB / 10 ===
+Loading database information... done.
+10 sequences (0.43 Mbp) processed in 0.066s (9.2 Kseq/m, 393.55 Mbp/m).
+  10 sequences classified (100.00%)
+  0 sequences unclassified (0.00%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_10.fastq':
+
+      93,43,00,015      LLC-loads                                                             
+      91,33,28,925      LLC-load-misses                  #   97.76% of all LL-cache accesses  
+
+      61.720129960 seconds time elapsed
+
+       0.447046000 seconds user
+      61.662435000 seconds sys
+
+
+WALLTIME 61.73
+=== s0 / 103GB / 1000 ===
+Loading database information... done.
+1000 sequences (28.92 Mbp) processed in 0.482s (124.4 Kseq/m, 3598.86 Mbp/m).
+  998 sequences classified (99.80%)
+  2 sequences unclassified (0.20%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_1000.fastq':
+
+      95,00,25,730      LLC-loads                                                             
+      92,70,91,699      LLC-load-misses                  #   97.59% of all LL-cache accesses  
+
+      60.560213521 seconds time elapsed
+
+       3.933128000 seconds user
+      60.524195000 seconds sys
+
+
+WALLTIME 60.57
+=== s0 / 103GB / 104918 ===
+Loading database information... done.
+104918 sequences (355.36 Mbp) processed in 1.877s (3352.9 Kseq/m, 11356.26 Mbp/m).
+  103727 sequences classified (98.86%)
+  1191 sequences unclassified (1.14%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 32 --output /dev/null /home/student/chirag_K/results/basecalling/reads_hac.fastq':
+
+    1,22,45,17,024      LLC-loads                                                             
+    1,10,29,90,831      LLC-load-misses                  #   90.08% of all LL-cache accesses  
+
+      62.595390809 seconds time elapsed
+
+      45.827330000 seconds user
+      63.282647000 seconds sys
+
+
+WALLTIME 62.61
+=== s0 / 103GB / 1872777 ===
+Loading database information... done.
+1872777 sequences (6036.15 Mbp) processed in 29.061s (3866.6 Kseq/m, 12462.37 Mbp/m).
+  1850859 sequences classified (98.83%)
+  21918 sequences unclassified (1.17%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s0/kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 32 --output /dev/null /home/student/chirag_K/results/per_pod5_fastq/pod5_0.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_1.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_2.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_3.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_4.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_5.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_6.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_7.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_8.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_9.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_10.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_11.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_12.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_13.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_14.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_15.fastq':
+
+    6,13,47,35,217      LLC-loads                                                             
+    4,30,81,54,298      LLC-load-misses                  #   70.23% of all LL-cache accesses  
+
+      85.704773584 seconds time elapsed
+
+     759.382543000 seconds user
+      75.074168000 seconds sys
+
+
+WALLTIME 85.71
+=== s1 / 50MB / 10 ===
+Loading database information... done.
+10 sequences (0.43 Mbp) processed in 0.033s (17.9 Kseq/m, 770.72 Mbp/m).
+  10 sequences classified (100.00%)
+  0 sequences unclassified (0.00%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/sample_targeted --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_10.fastq':
+
+          8,79,176      LLC-loads                                                             
+          6,30,499      LLC-load-misses                  #   71.71% of all LL-cache accesses  
+
+       0.098245987 seconds time elapsed
+
+       0.344291000 seconds user
+       0.068477000 seconds sys
+
+
+WALLTIME 0.11
+=== s1 / 50MB / 1000 ===
+Loading database information... done.
+1000 sequences (28.92 Mbp) processed in 0.224s (267.8 Kseq/m, 7746.23 Mbp/m).
+  780 sequences classified (78.00%)
+  220 sequences unclassified (22.00%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/sample_targeted --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_1000.fastq':
+
+       1,11,82,925      LLC-loads                                                             
+         21,75,247      LLC-load-misses                  #   19.45% of all LL-cache accesses  
+
+       0.282933280 seconds time elapsed
+
+       1.940830000 seconds user
+       0.222980000 seconds sys
+
+
+WALLTIME 0.29
+=== s1 / 50MB / 104918 ===
+Loading database information... done.
+104918 sequences (355.36 Mbp) processed in 0.918s (6859.5 Kseq/m, 23232.91 Mbp/m).
+  88973 sequences classified (84.80%)
+  15945 sequences unclassified (15.20%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/sample_targeted --threads 32 --output /dev/null /home/student/chirag_K/results/basecalling/reads_hac.fastq':
+
+      14,65,27,278      LLC-loads                                                             
+       1,67,12,096      LLC-load-misses                  #   11.41% of all LL-cache accesses  
+
+       1.044751791 seconds time elapsed
+
+      19.755039000 seconds user
+       1.284547000 seconds sys
+
+
+WALLTIME 1.05
+=== s1 / 50MB / 1872777 ===
+Loading database information... done.
+1872777 sequences (6036.15 Mbp) processed in 13.006s (8639.3 Kseq/m, 27845.49 Mbp/m).
+  1586721 sequences classified (84.73%)
+  286056 sequences unclassified (15.27%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/sample_targeted --threads 32 --output /dev/null /home/student/chirag_K/results/per_pod5_fastq/pod5_0.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_1.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_2.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_3.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_4.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_5.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_6.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_7.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_8.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_9.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_10.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_11.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_12.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_13.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_14.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_15.fastq':
+
+    2,47,18,98,310      LLC-loads                                                             
+      25,50,27,995      LLC-load-misses                  #   10.32% of all LL-cache accesses  
+
+      13.149113913 seconds time elapsed
+
+     330.299860000 seconds user
+       7.080947000 seconds sys
+
+
+WALLTIME 13.16
+=== s1 / 8GB / 10 ===
+Loading database information... done.
+10 sequences (0.43 Mbp) processed in 0.020s (29.5 Kseq/m, 1270.49 Mbp/m).
+  10 sequences classified (100.00%)
+  0 sequences unclassified (0.00%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/standard_8gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_10.fastq':
+
+       7,20,77,137      LLC-loads                                                             
+       6,90,75,095      LLC-load-misses                  #   95.83% of all LL-cache accesses  
+
+       4.561064164 seconds time elapsed
+
+       0.395674000 seconds user
+       4.556248000 seconds sys
+
+
+WALLTIME 4.57
+=== s1 / 8GB / 1000 ===
+Loading database information... done.
+1000 sequences (28.92 Mbp) processed in 0.196s (306.0 Kseq/m, 8850.34 Mbp/m).
+  988 sequences classified (98.80%)
+  12 sequences unclassified (1.20%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/standard_8gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_1000.fastq':
+
+       7,51,77,585      LLC-loads                                                             
+       7,14,68,663      LLC-load-misses                  #   95.07% of all LL-cache accesses  
+
+       4.654235427 seconds time elapsed
+
+       1.625978000 seconds user
+       4.628866000 seconds sys
+
+
+WALLTIME 4.66
+=== s1 / 8GB / 104918 ===
+Loading database information... done.
+104918 sequences (355.36 Mbp) processed in 0.872s (7222.3 Kseq/m, 24461.95 Mbp/m).
+  100481 sequences classified (95.77%)
+  4437 sequences unclassified (4.23%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/standard_8gb --threads 32 --output /dev/null /home/student/chirag_K/results/basecalling/reads_hac.fastq':
+
+      11,28,43,718      LLC-loads                                                             
+       9,25,75,483      LLC-load-misses                  #   82.04% of all LL-cache accesses  
+
+       5.386382222 seconds time elapsed
+
+      14.411644000 seconds user
+       5.672233000 seconds sys
+
+
+WALLTIME 5.40
+=== s1 / 8GB / 1872777 ===
+Loading database information... done.
+1872777 sequences (6036.15 Mbp) processed in 11.259s (9980.0 Kseq/m, 32166.41 Mbp/m).
+  1785213 sequences classified (95.32%)
+  87564 sequences unclassified (4.68%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/standard_8gb --threads 32 --output /dev/null /home/student/chirag_K/results/per_pod5_fastq/pod5_0.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_1.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_2.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_3.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_4.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_5.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_6.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_7.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_8.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_9.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_10.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_11.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_12.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_13.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_14.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_15.fastq':
+
+      77,90,19,459      LLC-loads                                                             
+      45,90,57,580      LLC-load-misses                  #   58.93% of all LL-cache accesses  
+
+      15.917627750 seconds time elapsed
+
+     237.353565000 seconds user
+      13.258053000 seconds sys
+
+
+WALLTIME 15.93
+=== s1 / 16GB / 10 ===
+Loading database information... done.
+10 sequences (0.43 Mbp) processed in 0.025s (24.0 Kseq/m, 1031.48 Mbp/m).
+  10 sequences classified (100.00%)
+  0 sequences unclassified (0.00%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/standard_16gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_10.fastq':
+
+      13,51,78,104      LLC-loads                                                             
+      13,06,87,159      LLC-load-misses                  #   96.68% of all LL-cache accesses  
+
+       8.575392714 seconds time elapsed
+
+       0.398397000 seconds user
+       8.557050000 seconds sys
+
+
+WALLTIME 8.59
+=== s1 / 16GB / 1000 ===
+Loading database information... done.
+1000 sequences (28.92 Mbp) processed in 0.235s (255.7 Kseq/m, 7395.51 Mbp/m).
+  995 sequences classified (99.50%)
+  5 sequences unclassified (0.50%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/standard_16gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_1000.fastq':
+
+      14,01,26,689      LLC-loads                                                             
+      13,47,50,505      LLC-load-misses                  #   96.16% of all LL-cache accesses  
+
+       8.572906101 seconds time elapsed
+
+       1.969733000 seconds user
+       8.512204000 seconds sys
+
+
+WALLTIME 8.59
+=== s1 / 16GB / 104918 ===
+Loading database information... done.
+104918 sequences (355.36 Mbp) processed in 0.912s (6903.6 Kseq/m, 23382.53 Mbp/m).
+  102580 sequences classified (97.77%)
+  2338 sequences unclassified (2.23%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/standard_16gb --threads 32 --output /dev/null /home/student/chirag_K/results/basecalling/reads_hac.fastq':
+
+      20,14,88,955      LLC-loads                                                             
+      16,91,07,910      LLC-load-misses                  #   83.93% of all LL-cache accesses  
+
+       9.395168590 seconds time elapsed
+
+      18.316006000 seconds user
+       9.658710000 seconds sys
+
+
+WALLTIME 9.40
+=== s1 / 16GB / 1872777 ===
+Loading database information... done.
+1872777 sequences (6036.15 Mbp) processed in 12.077s (9304.5 Kseq/m, 29989.47 Mbp/m).
+  1826646 sequences classified (97.54%)
+  46131 sequences unclassified (2.46%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/standard_16gb --threads 32 --output /dev/null /home/student/chirag_K/results/per_pod5_fastq/pod5_0.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_1.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_2.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_3.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_4.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_5.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_6.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_7.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_8.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_9.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_10.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_11.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_12.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_13.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_14.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_15.fastq':
+
+    1,29,80,85,780      LLC-loads                                                             
+      74,49,31,530      LLC-load-misses                  #   57.39% of all LL-cache accesses  
+
+      20.749154034 seconds time elapsed
+
+     296.595818000 seconds user
+      19.032833000 seconds sys
+
+
+WALLTIME 20.76
+=== s1 / 103GB / 10 ===
+Loading database information... done.
+10 sequences (0.43 Mbp) processed in 0.063s (9.6 Kseq/m, 412.81 Mbp/m).
+  10 sequences classified (100.00%)
+  0 sequences unclassified (0.00%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_10.fastq':
+
+      93,21,32,384      LLC-loads                                                             
+      91,33,94,309      LLC-load-misses                  #   97.99% of all LL-cache accesses  
+
+      61.300717279 seconds time elapsed
+
+       0.472895000 seconds user
+      61.222526000 seconds sys
+
+
+WALLTIME 61.31
+=== s1 / 103GB / 1000 ===
+Loading database information... done.
+1000 sequences (28.92 Mbp) processed in 0.441s (136.2 Kseq/m, 3938.89 Mbp/m).
+  998 sequences classified (99.80%)
+  2 sequences unclassified (0.20%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 32 --output /dev/null /home/student/chirag_K/results/readcount_bench/reads_1000.fastq':
+
+      95,62,45,256      LLC-loads                                                             
+      93,04,51,075      LLC-load-misses                  #   97.30% of all LL-cache accesses  
+
+      60.701630867 seconds time elapsed
+
+       3.731195000 seconds user
+      60.693387000 seconds sys
+
+
+WALLTIME 60.71
+=== s1 / 103GB / 104918 ===
+Loading database information... done.
+104918 sequences (355.36 Mbp) processed in 1.702s (3697.6 Kseq/m, 12523.61 Mbp/m).
+  103727 sequences classified (98.86%)
+  1191 sequences unclassified (1.14%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 32 --output /dev/null /home/student/chirag_K/results/basecalling/reads_hac.fastq':
+
+    1,22,22,50,248      LLC-loads                                                             
+    1,10,12,04,653      LLC-load-misses                  #   90.10% of all LL-cache accesses  
+
+      62.467102935 seconds time elapsed
+
+      41.530842000 seconds user
+      63.448453000 seconds sys
+
+
+WALLTIME 62.48
+=== s1 / 103GB / 1872777 ===
+Loading database information... done.
+1872777 sequences (6036.15 Mbp) processed in 26.020s (4318.5 Kseq/m, 13919.07 Mbp/m).
+  1850859 sequences classified (98.83%)
+  21918 sequences unclassified (1.17%)
+
+ Performance counter stats for '/home/student/tools/kraken2-fresh-bin-s1/kraken2 --db /home/student/AccuracyDrift/databases/pluspf_103gb --threads 32 --output /dev/null /home/student/chirag_K/results/per_pod5_fastq/pod5_0.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_1.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_2.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_3.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_4.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_5.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_6.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_7.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_8.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_9.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_10.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_11.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_12.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_13.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_14.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_15.fastq':
+
+    5,95,34,69,653      LLC-loads                                                             
+    4,20,12,25,372      LLC-load-misses                  #   70.57% of all LL-cache accesses  
+
+      87.922496136 seconds time elapsed
+
+     698.504105000 seconds user
+      76.080783000 seconds sys
+
+
+WALLTIME 87.93
+DONE
