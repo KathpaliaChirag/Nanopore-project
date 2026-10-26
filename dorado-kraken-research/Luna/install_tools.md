@@ -1,8 +1,8 @@
-# Luna — Tool Installs
+# Luna - Tool Installs
 
-> Native Linux (no Hyper-V) — full hardware PMU counters available without workarounds.
+> Native Linux (no Hyper-V), so full hardware PMU counters are available without workarounds.
 > btop installed 2026-05-28 | numactl not yet installed
->  perf_event_paranoid = 4 (verified 2026-05-28) — hardware counters blocked for non-root. Fix below is #1 priority.
+> perf_event_paranoid = 4 (verified 2026-05-28) - hardware counters blocked for non-root. Fix below is #1 priority.
 
 ---
 
@@ -110,7 +110,7 @@ tar -xzf dorado-1.4.0-linux-x64.tar.gz
 ## Luna-Specific: AVX-512 + AMX matrix multiply variants
 
 Luna's Xeon Platinum 8468 supports AVX-512 (8 doubles/instruction vs AVX2's 4)
-and AMX (hardware matrix tile multiply unit). Worth building extra variants:
+and AMX (a hardware matrix tile multiply unit), so it's worth building extra variants:
 
 ```bash
 # AVX-512 version of matmul (see avx512_manual.c when written)

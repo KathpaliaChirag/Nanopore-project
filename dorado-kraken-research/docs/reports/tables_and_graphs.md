@@ -1,10 +1,10 @@
 # Nanopore Pipeline — All Stats, Tables & Graphs
 **Chirag Kathpalia · IIT Delhi · Prof. Kolin Paul · 2026-05-28**
 
-> Mermaid charts render on GitHub. Colour heatmaps work everywhere.
-> Every number is real measured data — no estimates unless labelled.
+> mermaid charts render on GitHub. colour heatmaps work everywhere.
+> every number here is real measured data, no estimates unless labelled.
 >
-> **Scope note (2026-06-15):** This file is a snapshot as of 2026-05-28. Section 1 (Kraken-2 gprof breakdown) uses WSL2 data with the 650 MB ESKAPE DB — CompactHashTable::Get shown at 67% is a gprof user-space-only figure from that context. Luna bare-metal results (cachegrind, flamegraph, Steps 1–51+) and AccuracyDrift data are not in this file. See `Luna/profiling/results_kraken2.md` and `AccuracyDrift/` for current data.
+> **scope note (2026-06-15):** this file is a snapshot as of 2026-05-28. section 1 (Kraken-2 gprof breakdown) uses WSL2 data with the 650 MB ESKAPE DB, so the CompactHashTable::Get figure of 67% is a gprof user-space-only number from that context, not a Luna bare-metal one. Luna bare-metal results (cachegrind, flamegraph, Steps 1-51+) and AccuracyDrift data aren't in this file. see `Luna/profiling/results_kraken2.md` and `AccuracyDrift/` for current data.
 
 ---
 
@@ -79,7 +79,7 @@ xychart-beta
     bar [2.26, 0.55]
 ```
 
-> IPC < 1.0 = memory-bound. The real value is **0.55** — the CPU executes less than one instruction per clock tick because it's stalled waiting for RAM on every `CompactHashTable::Get()` call.
+> IPC < 1.0 means memory-bound. the real value here is **0.55**: the CPU executes less than one instruction per clock tick because it's stalled waiting for RAM on every `CompactHashTable::Get()` call.
 
 ### 1.4 Cache Miss Rate in Context
 
@@ -140,7 +140,7 @@ pie title CUDA API Time — CPU-side calls (27,283 batches)
 | `cudaLaunchKernel` | 0.5% | 190,891 | 43.5 µs | Kernel dispatch |
 | `cudaMemcpyAsync` | 0.3% | 27,304 | 186 µs | Data movement |
 
-> 27,283 × 56.6 ms = **~1,544 s** of CPU doing nothing. GPU is the bottleneck, not CPU.
+> 27,283 × 56.6 ms = **~1,544 s** of CPU doing nothing. the GPU is the bottleneck here, not the CPU.
 
 ---
 
@@ -160,7 +160,7 @@ pie title Memory Transfers — 25.7 GB total over full run
 | GPU internal | 25.1% | 11,427 MB | 9,107 | ~1.25 MB |
 | GPU VRAM → CPU RAM | 15.0% | 2,856 MB | 9,085 | ~0.31 MB |
 
-> Transfers are a **minor fraction** of total runtime. GPU is not data-starved — it's compute-bound.
+> transfers are a **minor fraction** of total runtime. the GPU isn't data-starved, it's compute-bound.
 
 ---
 
@@ -240,7 +240,7 @@ xychart-beta
     bar [1.23, 1.64, 1.94, 1.97, 2.12, 2.24, 2.26, 2.92, 3.04, 3.70, 18.53]
 ```
 
-> **tiled_avx2 outlier:** 18.53% L3 miss rate despite being the 2nd fastest. TILE=64 footprint (3 tiles × 64² × 8B = 98 KB) overflows L1 cache (48 KB) at large N. Fix: use TILE=32 (3 × 32² × 8B = 24 KB — fits L1).
+> **tiled_avx2 outlier:** 18.53% L3 miss rate despite being the 2nd fastest. the TILE=64 footprint (3 tiles × 64² × 8B = 98 KB) overflows L1 cache (48 KB) at large N. fix: use TILE=32 (3 × 32² × 8B = 24 KB, fits L1).
 
 ---
 
@@ -267,7 +267,7 @@ xychart-beta
     line [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8]
 ```
 
-> **Line = expected 8× (O(N³)).** Below line = cache-friendly (tile stays in L2 regardless of N). Above line = access pattern degrades super-linearly.
+> **the line marks the expected 8× (O(N³)).** below it means cache-friendly, the tile stays in L2 regardless of N. above it means the access pattern degrades super-linearly.
 
 | Binary | Ratio | vs O(N³) |
 |---|:---:|---|
@@ -292,7 +292,7 @@ xychart-beta
     line [116.4, 116.4, 116.4, 116.4, 116.4, 116.4, 116.4, 116.4, 116.4, 116.4]
 ```
 
-> **omp_tiled = 29× (vs expected 116×)** — 4× better than theory. At 2.4 GB working set, 4 threads pipeline DRAM requests independently. This is where OpenMP finally earns its keep.
+> **omp_tiled = 29× (vs expected 116×)**, 4× better than theory. at a 2.4 GB working set, 4 threads pipeline DRAM requests independently. this is where OpenMP finally earns its keep.
 
 ---
 
@@ -333,7 +333,7 @@ pie title prefetch_ikj — Why Fewer Misses Means Slower Code
 | L2 miss % | 1.9% | **0.4%** | 4.8× better |
 | Branch miss % | 0.27% | **0.08%** | 3.4× better |
 
-> Lesson: reducing miss rates ≠ going faster when instruction overhead exceeds the latency savings. Hardware prefetcher already handles sequential B-row access perfectly — `__builtin_prefetch()` is redundant here. It IS useful for random access patterns like `CompactHashTable::Get()`.
+> lesson: reducing miss rates doesn't mean going faster, not when the instruction overhead exceeds the latency savings. the hardware prefetcher already handles sequential B-row access perfectly, so `__builtin_prefetch()` is redundant here. it is still useful for random access patterns like `CompactHashTable::Get()`.
 
 ---
 
@@ -366,7 +366,7 @@ xychart-beta
     bar [0.78, 0.76, 0.63, 0.63, 0.32, 0.18, 0.11, 0.06, 0.04, 0.04, 0.02, 0.04]
 ```
 
-> `avx2_manual` and `unrolled_ikj` have high branch miss at N=1024 due to tail-loop (N % 4 remainder). At N=2048 (divisible by 8), both drop to ~0.02% — confirming this is tail-loop artefact only.
+> `avx2_manual` and `unrolled_ikj` have high branch miss at N=1024 because of the tail-loop (N % 4 remainder). at N=2048 (divisible by 8), both drop to ~0.02%, confirming this is a tail-loop artefact only.
 
 ---
 
@@ -382,7 +382,7 @@ xychart-beta
 | 10,000 | 800 MB | 2,400 MB | RAM |
 | 25,000 | 5 GB | 15 GB | Near machine limit (14 GB) |
 
-> Every benchmark in this report (N ≥ 1024) is **RAM-bound from the start**. Tiling helps because the tile (64×64×8B = 32 KB) fits in L2 (512 KB) — the *tile* is cache-resident, even though the full matrix is not.
+> every benchmark in this report (N ≥ 1024) is **RAM-bound from the start**. tiling helps because the tile (64×64×8B = 32 KB) fits in L2 (512 KB): the *tile* is cache-resident, even though the full matrix isn't.
 
 ---
 
@@ -471,7 +471,7 @@ xychart-beta
     line [1, 1, 1, 1, 1]
 ```
 
-> Line = 1× (equal). Every bar above the line = Luna advantage. Luna wins **every dimension**. Minerva disk is 100% full — no new profiling data can be written there.
+> the line marks 1× (equal). every bar above it is a Luna advantage. Luna wins **every dimension**. Minerva's disk is 100% full, so no new profiling data can be written there.
 
 ---
 
@@ -520,7 +520,7 @@ pie title Accuracy gain: fast→hac vs hac→sup
     "hac → sup gain (+0.1 to 1%)" : 0.55
 ```
 
-> `hac` is the clear sweet spot. The jump from fast→hac gives 3–8% more classified reads. The jump from hac→sup gives only 0.1–1% and is 6× slower (T4) — or OOM on a 4 GB GPU.
+> `hac` is the clear sweet spot. the jump from fast to hac gives 3-8% more classified reads. the jump from hac to sup gives only 0.1-1% and is 6× slower on the T4, or OOM on a 4 GB GPU.
 
 ---
 
@@ -587,7 +587,7 @@ xychart-beta
 | 30% | 2.96M | 89M | 8.9 s | 5.6% |
 | 50% | 4.93M | 148M | 14.8 s | 9.3% |
 
-> Assumes each LRU hit eliminates all ~30 L3 misses for that call. Total run = 159.4 s. Needs empirical validation via k-mer reuse measurement on actual FASTQ.
+> this assumes each LRU hit eliminates all ~30 L3 misses for that call. total run = 159.4 s. still needs empirical validation via k-mer reuse measurement on real FASTQ.
 
 ---
 
@@ -609,7 +609,7 @@ xychart-beta
 | **30%** | **24.6%** | **Target estimate** |
 | 50% | 41.0% | Upper bound if cache perfectly accurate |
 
-> Cache must run **GPU-side** (CUDA shared memory + LSH) — CPU is blocked on `cudaStreamSynchronize` and cannot do useful work during GPU execution.
+> the cache has to run **GPU-side** (CUDA shared memory + LSH): the CPU is blocked on `cudaStreamSynchronize` and can't do useful work while the GPU is executing.
 
 ---
 
@@ -680,7 +680,7 @@ xychart-beta
 
 ## 8. Master Reference Table
 
-All key numbers from every profiling run in one place.
+this section exists so you don't have to hunt back through the whole file. all key numbers from every profiling run, in one place.
 
 ### Kraken-2 CPU
 

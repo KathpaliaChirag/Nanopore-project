@@ -1,8 +1,8 @@
-# Tables & Graphs (Basic) — Nanopore Pipeline Profiling
+# Tables & Graphs (Basic) - Nanopore Pipeline Profiling
 **Chirag Kathpalia | IIT Delhi | All data as of 2026-05-28**
 
-Plain ASCII bar charts and tables — no Mermaid, works in any text viewer.
-All bars scale the longest value to 40 chars. See `tables_and_graphs.md` for Mermaid/chart version.
+this is the plain-text companion to `tables_and_graphs.md`: same data, but every chart is an ASCII bar so it renders in any text viewer, no Mermaid required.
+bars scale the longest value in each chart to 40 characters.
 
 ---
 
@@ -554,7 +554,7 @@ Scale: 40 chars = 48.2× (tiled_avx2)
 
 ### 3.9 Branch Miss Rates (%)
 
-Low across the board — branches not the bottleneck.
+branch misses stay low across the board here, so branching isn't the bottleneck for any of these variants.
 
 | Binary | N=1024 | N=2048 | N=10000 | Notes |
 |---|---|---|---|---|

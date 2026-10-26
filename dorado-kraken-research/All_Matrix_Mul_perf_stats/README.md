@@ -1,6 +1,6 @@
 # Matrix Multiplication Performance Benchmark Suite
 
-A collection of matrix multiplication implementations designed for `perf stat` analysis. Each variant isolates a specific optimisation technique so you can directly compare cache behaviour, IPC, vectorisation, and parallelism.
+a collection of matrix multiplication implementations designed for `perf stat` analysis. each variant isolates a specific optimisation technique so you can directly compare cache behaviour, IPC, vectorisation, and parallelism.
 
 **WSL2 results** (wall time, cache miss rates, N=1024/2048/10000): `All_Matrix_Mul_perf_stats/PERF_REPORT.md`
 
@@ -14,18 +14,18 @@ A collection of matrix multiplication implementations designed for `perf stat` a
 
 | Binary | Source | Technique | Key perf insight |
 |---|---|---|---|
-| `naive_ijk` | `naive_ijk.c` | Plain ijk loop order | Baseline. B is accessed column-by-column (strided) — worst LLC miss rate |
+| `naive_ijk` | `naive_ijk.c` | Plain ijk loop order | Baseline. B is accessed column-by-column (strided), worst LLC miss rate |
 | `ikj_order` | `ikj_order.c` | Loop reordered to ikj | A[i][k] held in a register; B-row streamed sequentially → big drop in cache misses |
 | `kij_order` | `kij_order.c` | Loop reordered to kij | Both C and B rows streamed; A has strided access across outer k loop |
 | `transpose_B` | `transpose_B.c` | Pre-transpose B, then ijk | Both A-row and Bt-row fully sequential; reveals cost of the extra O(N²) transpose pass |
 | `tiled` | `tiled.c` | Cache blocking (default 64×64 tiles) | Sub-matrices fit in L2; compare L1/LLC miss% vs ikj |
 | `omp_parallel` | `omp_parallel.c` | OpenMP ikj, outer loop parallelised | Scales linearly with cores; watch for false sharing and memory bandwidth saturation |
 | `omp_tiled` | `omp_tiled.c` | OpenMP + cache blocking | Best combination for multi-core + cache hierarchy |
-| `unrolled_ikj` | `unrolled_ikj.c` | 4× manual inner-loop unroll | Reduces loop overhead; more ILP exposed — compare IPC and branch-miss% |
+| `unrolled_ikj` | `unrolled_ikj.c` | 4× manual inner-loop unroll | Reduces loop overhead; more ILP exposed, compare IPC and branch-miss% |
 | `avx2_manual` | `avx2_manual.c` | Explicit AVX2 `_mm256_fmadd_pd` | Forces 4-wide SIMD FMA; compare throughput vs compiler auto-vec |
 | `auto_vec_O3` | `auto_vec_O3.c` | `restrict` pointers + `-O3 -march=native` | Compiler-generated SIMD; check if GCC matches the hand-written AVX2 version |
 | `tiled_avx2` | `tiled_avx2.c` | Cache blocking + explicit AVX2 FMA | Peak single-thread throughput target |
-| `prefetch_ikj` | `prefetch_ikj.c` | IKJ + `__builtin_prefetch` | Compares software prefetch vs hardware prefetcher — look at `hw-prefetch-misses` |
+| `prefetch_ikj` | `prefetch_ikj.c` | IKJ + `__builtin_prefetch` | Compares software prefetch vs hardware prefetcher, look at `hw-prefetch-misses` |
 
 ---
 
@@ -122,8 +122,8 @@ LLC-load-misses,LLC-loads,instructions,cycles,branches,branch-misses \
 | **LLC miss %** | How well the access pattern fits in cache. High = lots of DRAM traffic |
 | **L1 miss %** | Inner-loop cache behaviour. High in naive_ijk due to column-stride access on B |
 | **IPC** | Instructions per cycle. Low IPC = stalls (memory-bound). High = compute-bound |
-| **Branch miss %** | Should be near zero for all variants — confirms loop structure is predictable |
-| **Time (ms)** | Wall-clock execution time — the bottom line |
+| **Branch miss %** | Should be near zero for all variants, confirms loop structure is predictable |
+| **Time (ms)** | Wall-clock execution time, the bottom line |
 
 ### Expected ranking (fastest → slowest, single thread)
 ```

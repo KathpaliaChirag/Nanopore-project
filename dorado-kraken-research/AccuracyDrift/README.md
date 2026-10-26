@@ -1,12 +1,12 @@
 # AccuracyDrift
 
-Test how Kraken2 classification accuracy and cache behavior change across different database sizes and machines.
+test how Kraken2 classification accuracy and cache behavior change across different database sizes and machines.
 
 ## Companion Files
 
 | File | Contents |
 |------|----------|
-| [RESULTS.md](RESULTS.md) | All measured data — classified%, LLC miss rate, wall time, IPC per run |
+| [RESULTS.md](RESULTS.md) | All measured data, classified%, LLC miss rate, wall time, IPC per run |
 | [OBSERVATIONS.md](OBSERVATIONS.md) | Analysis and findings (3 behavioral classes, cache cliff, Orion comparison) |
 | [COMMANDS.md](COMMANDS.md) | Exact commands run on each machine |
 | [AccuracyChase.md](AccuracyChase.md) | PlusPF 103 GB gold-standard accuracy ceiling (Luna, cold runs) |
@@ -25,18 +25,18 @@ Test how Kraken2 classification accuracy and cache behavior change across differ
 
 | Name | Actual Size | Type | Status on Luna |
 |------|-------------|------|----------------|
-| sample_targeted | 50 MB | Custom build — 6 reference genomes matching this sample exactly (P. aeruginosa PAO1, E. coli K-12, K. pneumoniae HS11286, E. faecium 62415, S. aureus MRSA252, E. cloacae ATCC 13047) | done |
+| sample_targeted | 50 MB | Custom build, 6 reference genomes matching this sample exactly (P. aeruginosa PAO1, E. coli K-12, K. pneumoniae HS11286, E. faecium 62415, S. aureus MRSA252, E. cloacae ATCC 13047) | done |
 | eskape_650mb | 142 MB | ESKAPE pathogens only, custom build | done |
 | eskape_human_4gb | 3.8 GB | ESKAPE + human, custom build | done |
 | standard_8gb | 7.6 GB | Pre-built standard | done |
 | standard_16gb | 15 GB | Pre-built standard | done |
-| pluspf_103gb | 103.4 GB | Pre-built PlusPF — Standard + protozoa + fungi; gold-standard accuracy ceiling. Cannot run on Orion (64 GB RAM insufficient). | done |
+| pluspf_103gb | 103.4 GB | Pre-built PlusPF, Standard + protozoa + fungi; gold-standard accuracy ceiling. Cannot run on Orion (64 GB RAM insufficient). | done |
 
 All 6 databases are ready on Luna at `~/AccuracyDrift/databases/`.
 
 ## Transferring to other machines
 
-Each database is just 3 files — fully portable, no rebuild needed:
+Each database is just 3 files, fully portable, no rebuild needed:
 
 ```bash
 # Copy a database to another machine
@@ -69,9 +69,9 @@ pip3 install --user ncbi-genome-download
 # binary will be at ~/.local/bin/ncbi-genome-download
 ```
 
-**Notes for Luna:**
-- rsync is blocked — `kraken2-build --download-taxonomy` and `--download-library human` will fail, use wget instead
-- genome files must be gunzipped before adding to library — kraken2-build does not handle .fna.gz
+**notes for Luna:**
+- rsync is blocked, so `kraken2-build --download-taxonomy` and `--download-library human` will fail. use wget instead.
+- genome files must be gunzipped before adding to library - kraken2-build does not handle .fna.gz
 - taxonomy folder (~14 GB) and library folder can be deleted after build, only hash.k2d / taxo.k2d / opts.k2d are needed
 
 ESKAPE taxids: E.faecium=1352, S.aureus=1280, K.pneumoniae=573, A.baumannii=470, P.aeruginosa=287, Enterobacter=547

@@ -1,4 +1,4 @@
-# perf Events Reference — Luna (Sapphire Rapids, Xeon Platinum 8468)
+# perf events reference - Luna (Sapphire Rapids, Xeon Platinum 8468)
 
 Last updated: 2026-05-29
 Verified by running `perf list` on student@dell-R760.
@@ -7,10 +7,9 @@ Verified by running `perf list` on student@dell-R760.
 
 ## Why stalled-cycles-backend does not work
 
-`stalled-cycles-backend` is a generic perf alias that Intel dropped on Sapphire Rapids.
-On older CPUs it mapped to `CYCLE_ACTIVITY.STALLS_TOTAL`. On Sapphire Rapids, Intel
-replaced it with more granular per-cache-level stall events and TMA metrics.
-It shows as `<not supported>` on this machine and can be ignored.
+If you try the usual `stalled-cycles-backend` event on Luna, it shows as `<not supported>` - this section explains why, so you don't waste time debugging it as a config problem.
+
+`stalled-cycles-backend` is a generic perf alias that Intel dropped on Sapphire Rapids. On older CPUs it mapped to `CYCLE_ACTIVITY.STALLS_TOTAL`. On Sapphire Rapids, Intel replaced it with more granular per-cache-level stall events and TMA metrics. It's safe to ignore the `<not supported>` line and use the replacements below instead.
 
 ---
 
@@ -24,9 +23,9 @@ It shows as `<not supported>` on this machine and can be ignored.
 | `cycle_activity.stalls_l1d_miss` | Stall cycles while waiting on L1 cache miss |
 | `cycle_activity.stalls_l2_miss` | Stall cycles while waiting on L2 cache miss |
 | `cycle_activity.stalls_l3_miss` | Stall cycles while waiting on L3 cache miss |
-| `memory_activity.stalls_l1d_miss` | Stall cycles (memory subsystem) — L1 miss |
-| `memory_activity.stalls_l2_miss` | Stall cycles (memory subsystem) — L2 miss |
-| `memory_activity.stalls_l3_miss` | Stall cycles (memory subsystem) — L3 miss |
+| `memory_activity.stalls_l1d_miss` | Stall cycles (memory subsystem), L1 miss |
+| `memory_activity.stalls_l2_miss` | Stall cycles (memory subsystem), L2 miss |
+| `memory_activity.stalls_l3_miss` | Stall cycles (memory subsystem), L3 miss |
 | `resource_stalls.sb` | Stall cycles due to store buffer full |
 | `uops_executed.stalls` | Cycles where no uops were executed |
 | `uops_retired.stalls` | Cycles where no uops were retired |
@@ -34,10 +33,9 @@ It shows as `<not supported>` on this machine and can be ignored.
 | `icache_data.stalls` | Cycles stalled on L1 instruction cache miss |
 | `icache_tag.stalls` | Cycles stalled on L1 instruction cache tag miss |
 
-### TMA (Top-down Microarchitecture Analysis) metrics
+### TMA (top-down microarchitecture analysis) metrics
 
-Sapphire Rapids has full TMA Level 1 and Level 2 support via perf metrics.
-These give percentage breakdowns of where cycles are being wasted.
+Sapphire Rapids has full TMA Level 1 and Level 2 support via perf metrics, so you get percentage breakdowns of where cycles are being wasted instead of raw counts.
 
 | Event | What it measures |
 |---|---|
@@ -74,9 +72,9 @@ These give percentage breakdowns of where cycles are being wasted.
 
 | Event | Reason |
 |---|---|
-| `stalled-cycles-backend` | Generic alias removed on Sapphire Rapids — use `cycle_activity.stalls_*` instead |
-| Tracepoint events | `Error: failed to open tracing events directory` — requires root or paranoid <= 0 |
-| `mem-loads`, `mem-stores` | Require PEBS and paranoid <= 0 — may work with sudo |
+| `stalled-cycles-backend` | Generic alias removed on Sapphire Rapids, use `cycle_activity.stalls_*` instead |
+| Tracepoint events | `Error: failed to open tracing events directory`, requires root or paranoid <= 0 |
+| `mem-loads`, `mem-stores` | Require PEBS and paranoid <= 0, may work with sudo |
 
 ---
 
@@ -102,16 +100,14 @@ perf stat \
   ~/results/basecalling/reads_hac.fastq
 ```
 
-Note: perf multiplexes events when more than ~8 are specified. Results are still
-accurate enough for relative comparisons. For exact counts, split into separate runs
-of 4-6 events each.
+Note: perf multiplexes events when more than ~8 are specified. Results are still accurate enough for relative comparisons. For exact counts, split into separate runs of 4-6 events each.
 
 ---
 
 ## Per-core utilization
 
 ```bash
-# mpstat shows per-core CPU usage — tells us if kraken2 uses all 96 cores.
+# mpstat shows per-core CPU usage - tells us if kraken2 uses all 96 cores.
 sudo apt install -y sysstat
 mpstat -P ALL 1
 ```
@@ -120,6 +116,4 @@ mpstat -P ALL 1
 
 ## Note on paranoid setting
 
-perf_event_paranoid is currently 0 (set 2026-05-29).
-Hardware PMU events work for all users.
-Tracepoint events still require root (separate kernel permission).
+perf_event_paranoid is currently 0 (set 2026-05-29). Hardware PMU events work for all users. Tracepoint events still require root (separate kernel permission).

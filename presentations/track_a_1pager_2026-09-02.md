@@ -1,6 +1,6 @@
-# Track A — One-Page Recap
+# Track A: one-page recap
 
-**Since Meeting 11 (2026-08-19):** finished building the adaptive k-mer cache you asked for — 4-way, hardware-sized, tested for a smart eviction rule — and found three real bugs along the way, one of which reversed our own headline eviction result. No Meeting 12 record exists; treat this as the first full report-back.
+**Since Meeting 11 (2026-08-19):** we finished building the adaptive k-mer cache you asked for, 4-way, hardware-sized, tested for a smart eviction rule, and found three real bugs along the way. One of those bugs reversed our own headline eviction result. No Meeting 12 record exists, so treat this as the first full report-back.
 
 ## The stages, one line each
 
@@ -16,16 +16,16 @@
 
 ## What this means
 
-- Every "no benefit" result has a diagnosed, evidenced cause — not a shrug.
+- Every "no benefit" result has a diagnosed, evidenced cause, not a shrug.
 - The eviction win that justified S4's design turned out to be a hash bug wearing a disguise. We found this ourselves, before it went further.
-- The single biggest untested lever right now is S5 (prefetch-batching) — 2–3 Luna days from a real number.
-- **Track B: zero commits**, by your explicit sequencing call, not neglect. Two live corrections: B2 (bitmask) doesn't need B1 (double hashing) first — confirmed at source level; B1 is a real function to write plus a DB rebuild, not a flag flip. ESKAPE panel is structurally capped at 4 of 6 species.
+- The single biggest untested lever right now is S5 (prefetch-batching), 2-3 Luna days from a real number.
+- **Track B: zero commits**, by your explicit sequencing call, not neglect. Two live corrections: B2 (bitmask) doesn't need B1 (double hashing) first, confirmed at source level. B1 is a real function to write plus a DB rebuild, not a flag flip. The ESKAPE panel is structurally capped at 4 of 6 species.
 
 ## Decisions needed from you
 
-1. **Pace** — how much more Track A time before we shift fully to Track B? (~12 days left to Sept 13.)
-2. **Scope** — is double hashing required, or stretch? You named 3 items at Meeting 11; it wasn't one.
-3. **ESKAPE** — report as a 4-organism result, or chase the other 2 first?
-4. **Prefetch spike** — spend 2–3 Luna days getting S5.0 a real number?
+1. **Pace**, how much more Track A time before we shift fully to Track B? (~12 days left to Sept 13.)
+2. **Scope**, is double hashing required, or stretch? You named 3 items at Meeting 11; it wasn't one.
+3. **ESKAPE**, report as a 4-organism result, or chase the other 2 first?
+4. **Prefetch spike**, spend 2-3 Luna days getting S5.0 a real number?
 
 *Full detail: `presentations/track_a_progress_2026-09-02.md`. Every stat: `presentations/track_a_appendix_2026-09-02.md`.*

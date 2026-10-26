@@ -1,19 +1,21 @@
-# Nanopore Pipeline — Profiling Report
+# Nanopore Pipeline: Profiling Report
 **Chirag Kathpalia | IIT Delhi | Under Prof. Kolin Paul**
 **Date: 2026-05-28**
 
-> **Scope note:** This is a snapshot report as of 2026-05-28, covering WSL2 + early Luna profiling data (Steps 1–12). It uses WSL2 gprof numbers (CompactHashTable::Get = 67% of runtime, IPC = 0.55) which are from the 650 MB ESKAPE DB on local hardware. Authoritative Luna bare-metal results (cachegrind, flamegraph, NUMA, Steps 1–51+) and the AccuracyDrift experiment (2026-05-30 to 2026-06-13) are not reflected here. For current findings see `Luna/profiling/results_kraken2.md` and `AccuracyDrift/`.
+> **Scope note:** this is a snapshot report as of 2026-05-28, covering WSL2 and early Luna profiling data (Steps 1-12). the WSL2 gprof numbers here (CompactHashTable::Get = 67% of runtime, IPC = 0.55) come from the 650 MB ESKAPE DB on local hardware, not from Luna. the authoritative Luna bare-metal results (cachegrind, flamegraph, NUMA, Steps 1-51+) and the AccuracyDrift experiment (2026-05-30 to 2026-06-13) are not reflected here. for current findings see `Luna/profiling/results_kraken2.md` and `AccuracyDrift/`.
 
 ---
 
 ## The Pipeline (30 seconds)
+
+before the numbers, here's the pipeline the numbers describe:
 
 ```
 Patient sample → POD-5 file → Dorado (GPU, basecaller) → BAM → samtools → FASTQ → Kraken-2 (CPU, species ID) → Report
 ```
 
 **Research goal:** build a caching layer that makes this pipeline faster and less memory-hungry.  
-**Profiling goal:** find exactly where time goes so the cache targets the right place.
+**Profiling goal:** find exactly where time goes, so the cache targets the right place.
 
 ---
 
@@ -27,9 +29,11 @@ Patient sample → POD-5 file → Dorado (GPU, basecaller) → BAM → samtools 
 | Dorado (GPU) | Nsight Systems | **82% of GPU time is GEMM** (Tensor Cores, FP16) | compute-bound |
 | Dorado (GPU) | Nsight Systems | **cudaStreamSynchronize = 98.9% of CUDA API time** | synchronous pipeline |
 
+Kraken-2 is memory-bound, Dorado is compute-bound. that split drives the rest of this report: Part 1 digs into the CPU side, Part 2 into the GPU side.
+
 ---
 
-## Part 1 — Kraken-2 CPU Profile
+## Part 1: Kraken-2 CPU Profile
 
 ### Hardware & Setup
 
@@ -41,11 +45,11 @@ Patient sample → POD-5 file → Dorado (GPU, basecaller) → BAM → samtools 
 | Input | barcode02.fastq — 104,829 reads, 357.62 Mbp |
 | Database | k2_standard_08gb (8 GB pre-built standard DB) |
 
-WSL2 caveat: Hyper-V blocks LLC-specific hardware counters (`LLC-load-misses`). IPC from perf is unreliable (clock reports 0.734 GHz vs real 3.2 GHz). IPC from AMD uProf (native Ryzen profiler, runs outside Hyper-V) is accurate.
+before trusting any number below, know this: WSL2 runs on Hyper-V, and Hyper-V blocks LLC-specific hardware counters (`LLC-load-misses`) and distorts the clock. perf reports 0.734 GHz where the real clock is 3.2 GHz, so IPC from perf is unreliable here. AMD uProf is a native Ryzen profiler that runs outside Hyper-V, so its IPC number is the one to trust.
 
 ---
 
-### Tool 1 — perf stat
+### Tool 1: perf stat
 
 ```bash
 perf stat -e task-clock,cache-misses,cache-references,instructions,cycles \
@@ -64,15 +68,15 @@ perf stat -e task-clock,cache-misses,cache-references,instructions,cycles \
 | wall time | 159.4 s | ~2.7 minutes |
 | sys time | 52.5 s | 33% kernel — heavy memory mapping |
 
-**Normal cache miss rate: 1–5%. We got 34.24%.**
+**Normal cache miss rate: 1-5%. we got 34.24%.**
 
-Why: the 8 GB hash table is 500× larger than the Ryzen L3 cache (16 MB). Every k-mer lookup is a random jump into RAM. The CPU issues the lookup and stalls for ~100 ns waiting for the data. With 301M misses per run, this dominates runtime.
+why so high: the 8 GB hash table is 500 times larger than the Ryzen L3 cache (16 MB, the last on-chip pool before a lookup has to go to RAM). every k-mer lookup is a random jump into RAM, so the CPU issues the lookup and stalls for about 100 ns waiting for the data. with 301 million misses per run, this stall dominates runtime.
 
 ---
 
-### Tool 2 — gprof (function-level time breakdown)
+### Tool 2: gprof (function-level time breakdown)
 
-Kraken-2 compiled from source with `-pg`. barcode02.fastq + 8 GB standard DB.
+perf stat tells us the CPU is stalling on memory, but not which function causes it. that's what gprof is for: it breaks runtime down by function. we compiled Kraken-2 from source with `-pg` (the gprof instrumentation flag) and ran it against barcode02.fastq with the 8 GB standard DB.
 
 | % time | self (s) | calls | function |
 |---|---|---|---|
@@ -85,32 +89,32 @@ Kraken-2 compiled from source with `-pg`. barcode02.fastq + 8 GB standard DB.
 
 **Total runtime: 105.87 seconds**
 
-**`CompactHashTable::Get()` = the exact target.**
+**`CompactHashTable::Get()` is the exact target.**
 
-67% of all runtime, 9.87 million calls. This is the k-mer hash table lookup function. Each call: hash the 35-mer → compute bucket address → read from RAM. gprof combined with perf tells us exactly where the 301M cache misses land.
+it accounts for 67% of all runtime across 9.87 million calls. this is the k-mer hash table lookup function: each call hashes the 35-mer, computes a bucket address, then reads from RAM. gprof combined with perf tells us exactly where the 301 million cache misses land.
 
-`MinimizerScanner::NextMinimizer()` = 18.74%, 354M calls. Pure CPU arithmetic (rolling hash, bit manipulation). Secondary target for SIMD/AVX-512.
+`MinimizerScanner::NextMinimizer()` comes second at 18.74%, 354 million calls. it's pure CPU arithmetic (rolling hash, bit manipulation), not a memory bottleneck, which makes it a secondary target for SIMD/AVX-512 rather than caching.
 
-**Top two functions = 86% of runtime.**
+**the top two functions account for 86% of runtime.**
 
 ---
 
-### Tool 3 — AMD uProf (accurate IPC)
+### Tool 3: AMD uProf (accurate IPC)
 
-AMD uProf is a native Ryzen profiler that bypasses Hyper-V. It reads hardware counters directly from the CPU without going through WSL2's virtualization layer.
+perf's IPC number is unreliable under WSL2 (see the caveat above), so we need a second tool to get the real figure. AMD uProf is a native Ryzen profiler that bypasses Hyper-V: it reads hardware counters directly from the CPU without going through WSL2's virtualization layer.
 
 | Metric | Value | Notes |
 |---|---|---|
 | **IPC** | **0.55** | accurate — no Hyper-V distortion |
 | Interpretation | < 1.0 | **memory-bound** (CPU stalls waiting for data) |
 
-IPC = instructions per cycle. A value of 0.55 means the CPU is executing less than one instruction per clock tick — it spends most of its time stalled, waiting for RAM to respond to a cache miss.
+IPC (instructions per cycle) is the count of instructions the CPU finishes per clock tick. a value of 0.55 means the CPU executes less than one instruction per tick, so it spends most of its time stalled, waiting for RAM to respond to a cache miss.
 
-Contrast: perf reported IPC = 2.26 (unreliable). AMD uProf gives the real number: 0.55. The pipeline is memory-bound.
+for contrast: perf reported IPC = 2.26, and we already know that number is unreliable. AMD uProf gives the real figure, 0.55. the pipeline is memory-bound.
 
 ---
 
-### Kraken-2 — Three-Tool Summary
+### Kraken-2: Three-Tool Summary
 
 | Tool | Finding | Implication |
 |---|---|---|
@@ -118,17 +122,19 @@ Contrast: perf reported IPC = 2.26 (unreliable). AMD uProf gives the real number
 | gprof | 67% of time in `CompactHashTable::Get()`, 9.87M calls | Exact function to cache |
 | AMD uProf | IPC = 0.55 | CPU stalls on every hash lookup |
 
-**Cache design justification:**
-- One LRU hit = one RAM lookup avoided = ~100 ns saved
-- Clinical samples have dominant species → same k-mers repeat heavily across reads in one barcode
-- 301M total L3 misses ÷ 9.87M calls = ~30 L3 misses per `Get()` call on average
-- A 20% hit rate on 9.87M calls = ~2M calls skipped; each hit avoids ~30 L3 misses → ~60M fewer RAM accesses
-- At ~100 ns per miss: 60M × 100 ns ≈ **~6 seconds saved per run** (assumes one LRU hit eliminates all misses for that call — will validate with k-mer reuse measurement on actual FASTQ)
-- Cache lives in front of `CompactHashTable::Get()`. Hot k-mers stay in L3 cache. Cold k-mers fall through to the hash table as normal.
+**why an LRU cache is the right fix, and what it should buy us:**
+- one LRU hit means one RAM lookup avoided, so about 100 ns saved
+- clinical samples have a dominant species, so the same k-mers repeat heavily across reads in one barcode
+- 301 million total L3 misses divided by 9.87 million calls is about 30 L3 misses per `Get()` call on average
+- a 20% hit rate on 9.87 million calls skips about 2 million calls; each hit avoids about 30 L3 misses, so that's about 60 million fewer RAM accesses
+- at about 100 ns per miss, 60 million times 100 ns is roughly **6 seconds saved per run** (this assumes one LRU hit eliminates all misses for that call, an assumption we still need to validate with a k-mer reuse measurement on actual FASTQ)
+- the cache sits in front of `CompactHashTable::Get()`: hot k-mers stay in L3 cache, cold k-mers fall through to the hash table as normal
+
+that's the CPU side. Part 2 does the same walk for the GPU.
 
 ---
 
-## Part 2 — Dorado GPU Profile
+## Part 2: Dorado GPU Profile
 
 ### Hardware & Setup
 
@@ -142,7 +148,7 @@ Contrast: perf reported IPC = 2.26 (unreliable). AMD uProf gives the real number
 
 ---
 
-### CUDA GPU Kernels — Where GPU Time Goes
+### CUDA GPU Kernels: Where GPU Time Goes
 
 | % GPU time | total time | avg/call | kernel |
 |---|---|---|---|
@@ -155,13 +161,13 @@ Contrast: perf reported IPC = 2.26 (unreliable). AMD uProf gives the real number
 | 1.3% | 20.7 s | 2.3 ms | decode_step |
 | 1.3% | 20.2 s | 2.2 ms | compute_posts_step |
 
-**GEMM = 82% of all GPU time.** (68.5% + 13.5%)
+**GEMM (general matrix multiply) accounts for 82% of all GPU time** (68.5% + 13.5%).
 
-These are the transformer attention and linear projection layers running on CUTLASS-optimized Tensor Core kernels (FP16, 8×8×4 tiles). This is the neural network doing the actual basecalling math.
+these two kernels are the transformer attention and linear projection layers, running on CUTLASS-optimized Tensor Core kernels (FP16, 8x8x4 tiles). this is the neural network doing the actual basecalling math, so GEMM dominating GPU time is expected, not a bug to chase.
 
 ---
 
-### CUDA API — What the CPU Does
+### CUDA API: What the CPU Does
 
 | % time | calls | avg/call | API |
 |---|---|---|---|
@@ -169,7 +175,7 @@ These are the transformer attention and linear projection layers running on CUTL
 | 0.5% | 190,891 | 43.5 µs | `cudaLaunchKernel` |
 | 0.3% | 27,304 | 186 µs | `cudaMemcpyAsync` |
 
-The CPU launches each batch of kernels then immediately calls `cudaStreamSynchronize` and blocks for 56.6 ms. The CPU is idle the entire time the GPU is computing. 27,283 × 56.6 ms = ~1,544 s of CPU sitting idle. This is an expected synchronous pipeline design — GPU is the bottleneck.
+the CPU launches each batch of kernels, then immediately calls `cudaStreamSynchronize` and blocks for 56.6 ms. it sits idle the entire time the GPU computes: 27,283 calls times 56.6 ms is about 1,544 s of CPU idle time. that's an expected synchronous pipeline design, not a flaw, since the GPU is the bottleneck here, not the CPU.
 
 ---
 
@@ -181,11 +187,11 @@ The CPU launches each batch of kernels then immediately calls `cudaStreamSynchro
 | 25.1% | 11,427 MB | GPU internal |
 | 15.0% | 2,856 MB | GPU VRAM → CPU RAM (reads out) |
 
-~25.7 GB total. ~1.25 MB per batch in, ~0.31 MB out. **Transfers are a small fraction of total time. GPU is not memory-starved.**
+that's about 25.7 GB total, roughly 1.25 MB per batch in and 0.31 MB out. **transfers are a small fraction of total time, so the GPU is not memory-starved.**
 
 ---
 
-### Dorado — Verdict
+### Dorado: Verdict
 
 | Evidence | Value | Meaning |
 |---|---|---|
@@ -193,20 +199,22 @@ The CPU launches each batch of kernels then immediately calls `cudaStreamSynchro
 | Memory transfers | minor | GPU not waiting for data |
 | `cudaStreamSynchronize` | 98.9% CUDA API | CPU waiting on GPU, not the other way around |
 
-**Compute-bound.** The neural network is the bottleneck.
+**compute-bound.** the neural network itself is the bottleneck, not memory or the CPU-GPU handoff.
 
-**Signal-to-Base cache justification:**
-- If the cache recognises a signal window it has seen before, it skips the entire GEMM forward pass
-- GEMM = 82% of GPU time → 30% cache hit rate ≈ **~25% total GPU time saved**
-- Cache lookup must be faster than one GEMM call (avg 19.6 ms) — otherwise no benefit
-- Must run GPU-side (CUDA shared memory + LSH) — CPU is blocked waiting on GPU, no CPU-side window
-- GTX 1650: 64 KB shared memory per SM — cache must stay small and hot
+**why a Signal-to-Base cache makes sense here, and what it should buy us:**
+- if the cache recognises a signal window it has already seen, it skips the entire GEMM forward pass for that window
+- GEMM is 82% of GPU time, so even a 30% cache hit rate works out to roughly **25% total GPU time saved**
+- the cache lookup has to be faster than one GEMM call (19.6 ms average), otherwise it costs more than it saves
+- it has to run GPU-side (CUDA shared memory + LSH), because the CPU is blocked waiting on the GPU and gets no window to do lookup work of its own
+- the GTX 1650 only gives 64 KB of shared memory per SM, so the cache has to stay small and hot
+
+that closes out the GPU side. Part 3 steps back to a separate matmul benchmark that validates the cache-blocking theory both Parts 1 and 2 lean on.
 
 ---
 
-## Part 3 — Matrix Multiply Benchmark Study
+## Part 3: Matrix Multiply Benchmark Study
 
-Built 12 C implementations in `All_Matrix_Mul_perf_stats/` to empirically validate cache-blocking theory. Profiled with `perf stat` (WSL2) at N=1024, 2048, and 10000.
+Parts 1 and 2 both assume that keeping data in a fast, small cache beats going to RAM. to check that assumption empirically rather than just asserting it, we built 12 C implementations in `All_Matrix_Mul_perf_stats/` and profiled them with `perf stat` (WSL2) at N=1024, 2048, and 10000.
 
 ### N=10000 Results (wall time, ranked)
 
@@ -226,48 +234,52 @@ Built 12 C implementations in `All_Matrix_Mul_perf_stats/` to empirically valida
 
 ### Key Findings
 
-**1. omp_tiled wins at large N — but only at large N:**
-- N=1024/2048: OpenMP is *slower* than single-thread (thread spawn overhead exceeds benefit)
-- N=10000 (2.4 GB working set): 2.1× faster than tiled_avx2 — 4 threads pipeline independent DRAM requests
+**1. omp_tiled wins at large N, but only at large N:**
+- at N=1024/2048, OpenMP runs *slower* than single-thread, because thread spawn overhead exceeds the benefit
+- at N=10000 (2.4 GB working set), it runs 2.1x faster than tiled_avx2, because 4 threads pipeline independent DRAM requests
 
 **2. tiled_avx2 at N=10000: TILE=64 causes L3 overflow (18.53% miss rate)**
-- TILE=64 means 3 tiles (A, B, C) × 64² × 4B ≈ 49 KB per core → exceeds 48 KB L1 → L3 eviction at large N
-- Fix: TILE=32 keeps all three tiles in L1
+- TILE=64 means 3 tiles (A, B, C) at 64² x 4B come to about 49 KB per core, which exceeds the 48 KB L1 cache and forces L3 eviction at large N
+- the fix: TILE=32 keeps all three tiles in L1
 
-**3. The prefetch paradox:**
-- `prefetch_ikj` has the *lowest* L3 miss rate (1.23%) but is 2.2× *slower* than ikj_order
-- Reason: 9.3× more instructions (5.39 trillion vs 579 billion) — `__builtin_prefetch()` for stride-1 sequential access adds overhead the hardware prefetcher already handles
-- **Lesson: reducing miss rate ≠ going faster if instruction overhead exceeds the latency savings**
+**3. the prefetch paradox:**
+- you'd expect the lowest L3 miss rate to win, but it doesn't: `prefetch_ikj` has the *lowest* L3 miss rate (1.23%) and is still 2.2x *slower* than ikj_order
+- the reason is instruction count, not cache behavior: prefetch_ikj runs 9.3x more instructions (5.39 trillion vs 579 billion), because `__builtin_prefetch()` for stride-1 sequential access adds overhead the hardware prefetcher already handles for free
+- **lesson: reducing miss rate does not mean going faster, if the instruction overhead exceeds the latency savings**
 
 **4. O(N³) scaling observed:**
-- 1024→2048: tiled shows ~4.6× slowdown (vs expected 8×) — tile stays in L2
-- 2048→10000: omp_tiled shows only 29× slowdown (vs expected 116×) — parallelism hides DRAM latency
+- 1024 to 2048: tiled shows about 4.6x slowdown against an expected 8x, because the tile stays in L2
+- 2048 to 10000: omp_tiled shows only 29x slowdown against an expected 116x, because parallelism hides DRAM latency
 
-### Relevance to Kraken-2 cache design
+### Relevance to Kraken-2 Cache Design
 
-`CompactHashTable::Get()` is a *random* access pattern — hash → RAM address is unpredictable. Software prefetch could help here (unlike the sequential matmul case). The benchmark confirms: keeping the hot working set in L2/L3 is the decisive factor. The LRU cache achieves exactly this by keeping recently-seen k-mers in fast memory instead of going to the 8 GB hash table.
+this benchmark matters for Part 1 because it tells us which lever actually works. `CompactHashTable::Get()` has a *random* access pattern: hash to RAM address is unpredictable, unlike the sequential matmul case, so software prefetch could help here where it hurt prefetch_ikj above. the benchmark confirms the decisive factor is keeping the hot working set in L2/L3. the LRU cache proposed in Part 1 does exactly that: it keeps recently-seen k-mers in fast memory instead of going to the 8 GB hash table.
 
 ---
 
-## Part 4 — Lab Servers
+## Part 4: Lab Servers
 
-Both servers are documented and accessible. Luna is the primary server going forward.
+the WSL2 and lab-desktop numbers above are useful for a first pass, but the real profiling work moves to dedicated lab servers. both are documented and accessible; Luna is the primary server going forward.
 
 | Server | CPU | L3 | RAM | GPU | Disk | perf counters |
 |---|---|---|---|---|---|---|
 | **Minerva** | Xeon Gold 6330, 56c/112t @ 2 GHz | 66 MB | 251 GB | 2× A40 (45 GB) | **100% full** |  (set paranoid=1) |
 | **Luna** | Xeon Platinum 8468, 96c/192t @ 3.8 GHz | **210 MB** | **503 GB** | **2× L40S (46 GB)** | 74% (236 GB free) |  paranoid=1 confirmed |
 
-Luna advantages: 3.2× larger L3 cache (210 MB — can potentially hold much of the Kraken-2 working set), AVX-512 + AMX (hardware tile matrix multiply unit on Sapphire Rapids), full TMA (Top-down Microarchitecture Analysis) hardware events available natively.
+Luna's advantages over the WSL2 setup used above: a 3.2x larger L3 cache (210 MB, large enough to potentially hold much of the Kraken-2 working set), AVX-512 plus AMX (a hardware tile matrix multiply unit on Sapphire Rapids), and full TMA (Top-down Microarchitecture Analysis) hardware events available natively, none of which Hyper-V exposes.
 
 **Next steps on Luna:**
-1. Re-run matmul benchmark suite — get accurate IPC (no Hyper-V), compare Intel Sapphire Rapids vs AMD Zen3 cache behaviour
-2. Run Kraken-2 perf + gprof + TMA — confirm IPC ≈ 0.55, get real LLC miss rate, classify bottleneck tier (L1/L2/L3/DRAM)
-3. Run Nsight Compute on Dorado GEMM kernel on L40S — SM throughput %, arithmetic intensity
+1. re-run the matmul benchmark suite to get accurate IPC (no Hyper-V) and compare Intel Sapphire Rapids against AMD Zen3 cache behaviour
+2. run Kraken-2 perf, gprof, and TMA together to confirm IPC is still around 0.55, get the real LLC miss rate, and classify the bottleneck tier (L1/L2/L3/DRAM)
+3. run Nsight Compute on the Dorado GEMM kernel on L40S for SM throughput % and arithmetic intensity
+
+with those three steps done, the summary below can be re-checked against Luna's real numbers instead of the WSL2 ones.
 
 ---
 
 ## Summary: What We Know and What It Justifies
+
+everything above builds toward one thing: a case for two caches, one per pipeline stage. the tables below tie each measured number to the design decision it justifies.
 
 ### Kraken-2 (CPU)
 

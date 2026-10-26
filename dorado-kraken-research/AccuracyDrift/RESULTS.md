@@ -11,9 +11,9 @@ Two perf events that sound similar but measure very different things:
 | `LLC-load-misses` | Only retired demand load instructions that missed LLC (MEM_LOAD_RETIRED.L3_MISS) | No | No |
 | `LLC-loads` | Only retired demand load instructions that accessed LLC | No | No |
 
-On this machine (Luna, 1T run): `cache-misses` = 317M vs `LLC-load-misses` = 57M — ~5.6x difference. The extra ~260M in `cache-misses` are speculative loads (fetched by CPU but never actually used by the program) and hardware prefetcher activity.
+On this machine (Luna, 1T run): `cache-misses` = 317M vs `LLC-load-misses` = 57M, ~5.6x difference. The extra ~260M in `cache-misses` are speculative loads (fetched by CPU but never actually used by the program) and hardware prefetcher activity.
 
-**We use `LLC-load-misses / LLC-loads` throughout this experiment** because it measures actual program-driven DRAM accesses — the ones we want to minimize with a prefetcher. Speculative and prefetch activity is not what we are optimizing.
+**We use `LLC-load-misses / LLC-loads` throughout this experiment** because it measures actual program-driven DRAM accesses, the ones we want to minimize with a prefetcher. Speculative and prefetch activity is not what we are optimizing.
 
 ---
 
@@ -28,7 +28,7 @@ Goal: Understand how Kraken2 classification accuracy and cache behavior change a
 - **Metrics per run:** classified%, unclassified%, cache miss rate% (LLC), time (s)
 - **Species breakdown:** collected after all runs on each machine
 
-**Note:** "Accuracy" here = % classified. True accuracy (correct species assignment) requires ground truth — species-level breakdown is a separate analysis done after all runs complete.
+**Note:** "Accuracy" here = % classified. True accuracy (correct species assignment) requires ground truth, species-level breakdown is a separate analysis done after all runs complete.
 
 ---
 
@@ -46,7 +46,7 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
 
 Both metrics tracked:
 - **Cache Miss Rate%** = cache-misses / cache-references × 100 (includes speculative + prefetch activity)
-- **LLC Miss Rate%** = LLC-load-misses / LLC-loads × 100 (retired demand loads only — the real DRAM traffic)
+- **LLC Miss Rate%** = LLC-load-misses / LLC-loads × 100 (retired demand loads only, the real DRAM traffic)
 
 ---
 
@@ -62,13 +62,13 @@ Both metrics tracked:
 - [x] reads_hac × standard_16gb × all thread counts
 - [x] reads_hac × pluspf_103gb × 32T (cold run done, 2026-06-13)
 - [ ] reads_hac × pluspf_103gb × warm run + thread scaling
-- [x] reads_sup × all DBs × 1T (species/report only, no perf stat — quick model comparison)
-- [x] reads_sup × all DBs × 1T perf stat — DONE 2026-06-13
-- [x] reads_sup × sample_targeted × all thread counts (perf stat) — DONE 2026-06-13
-- [x] reads_sup × eskape_650mb × all thread counts (perf stat) — DONE 2026-06-13
-- [x] reads_sup × eskape_human_4gb × all thread counts (perf stat) — DONE 2026-06-13
-- [x] reads_sup × standard_8gb × all thread counts (perf stat) — DONE 2026-06-13
-- [x] reads_sup × standard_16gb × all thread counts (perf stat) — DONE 2026-06-13
+- [x] reads_sup × all DBs × 1T (species/report only, no perf stat, quick model comparison)
+- [x] reads_sup × all DBs × 1T perf stat, DONE 2026-06-13
+- [x] reads_sup × sample_targeted × all thread counts (perf stat), DONE 2026-06-13
+- [x] reads_sup × eskape_650mb × all thread counts (perf stat), DONE 2026-06-13
+- [x] reads_sup × eskape_human_4gb × all thread counts (perf stat), DONE 2026-06-13
+- [x] reads_sup × standard_8gb × all thread counts (perf stat), DONE 2026-06-13
+- [x] reads_sup × standard_16gb × all thread counts (perf stat), DONE 2026-06-13
 - [x] reads_sup × pluspf_103gb × 32T (cold run done, 2026-06-13)
 - [ ] reads_sup × pluspf_103gb × warm run + thread scaling
 - [ ] reads_fast × sample_targeted × all thread counts
@@ -124,7 +124,7 @@ Both metrics tracked:
 
 ## Sample-Targeted Database Construction
 
-After analyzing the species breakdown, we built a custom Kraken2 DB containing only the organisms present in this sample. This gives a 5th data point — smaller than eskape_650mb but with much better accuracy.
+After analyzing the species breakdown, we built a custom Kraken2 DB containing only the organisms present in this sample. This gives a 5th data point, smaller than eskape_650mb but with much better accuracy.
 
 **Motivation:** eskape_650mb (142 MB) classifies 65.28% of reads but misassigns ~33k E. coli/K. pneumoniae reads as P. aeruginosa (no competing references). We know from standard DBs exactly what species are present, so we can build a minimal but correct DB.
 
@@ -146,7 +146,7 @@ Note: *Acinetobacter baumannii* (GCF_000012085.1) was suppressed on NCBI and cou
 # 1. Download genomes via ncbi-genome-download
 ncbi-genome-download bacteria -A <accessions> -F fasta -o .../library/added/ --flat-output
 
-# 2. Download taxonomy (rsync blocked by IITD proxy — used wget instead)
+# 2. Download taxonomy (rsync blocked by IITD proxy: used wget instead)
 wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdmp.zip          # ~60 MB
 wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_gb.accession2taxid.gz   # 13 GB compressed
 wget https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/nucl_wgs.accession2taxid.gz  # 38 GB compressed
@@ -156,7 +156,7 @@ for f in library/added/*.fna; do kraken2-build --add-to-library $f --db sample_t
 kraken2-build --build --db sample_targeted --threads 32  # completes in 22s
 ```
 
-**Result:** hash.k2d = 50 MB. Scanned 231M accession IDs to map 17 sequences. The 51 GB taxonomy files are build-only — deleted after construction.
+**Result:** hash.k2d = 50 MB. Scanned 231M accession IDs to map 17 sequences. The 51 GB taxonomy files are build-only, deleted after construction.
 
 ---
 
@@ -172,7 +172,7 @@ Columns: threads | classified% | unclassified% | cache miss rate% | time (s)
 **Specs:** 503 GB RAM, 96 threads (dell-R760)
 **Thread counts tested:** 1, 2, 4, 8, 16, 32, 64, 96
 
-#### reads_hac — eskape_650mb
+#### reads_hac: eskape_650mb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -187,7 +187,7 @@ Columns: threads | classified% | unclassified% | cache miss rate% | time (s)
 
 Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache-misses/cache-references (includes speculative+prefetch). LLC Miss Rate% = LLC-load-misses/LLC-loads (retired demand loads only).
 
-#### reads_hac — eskape_human_4gb
+#### reads_hac: eskape_human_4gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -200,7 +200,7 @@ Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache
 | 64 | 66.13 | 33.87 | 81.70 | 58.73 | 2.823  | 10.57x | 1.03 |
 | 96 | 66.13 | 33.87 | 81.48 | 58.94 | 2.947  | 10.12x | 0.98 |
 
-#### reads_hac — standard_8gb
+#### reads_hac: standard_8gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -213,7 +213,7 @@ Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache
 | 64 | 95.77 | 4.23 | 87.08 | 82.93 | 4.949  | 3.39x | 1.57 |
 | 96 | 95.77 | 4.23 | 86.00 | 82.58 | 5.119  | 3.28x | 1.50 |
 
-#### reads_hac — standard_16gb
+#### reads_hac: standard_16gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -226,7 +226,7 @@ Note: all runs use numactl --cpunodebind=0 --membind=0. Cache Miss Rate% = cache
 | 64 | 97.77 | 2.23 | 89.63 | 85.04 | 8.253  | 2.90x | 1.43 |
 | 96 | 97.77 | 2.23 | 88.98 | 84.93 | 8.385  | 2.85x | 1.37 |
 
-#### reads_hac — sample_targeted
+#### reads_hac: sample_targeted
 
 Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. pneumoniae HS11286, E. faecium 62415, S. aureus MRSA252, E. cloacae ATCC 13047). hash.k2d = 50 MB. Built using taxonomy from standard_8gb build; no Amdahl overhead (sys time ~0.2s).
 
@@ -241,7 +241,7 @@ Custom DB built from 6 reference genomes (E. coli K-12, P. aeruginosa PAO1, K. p
 | 64 | 84.80 | 15.20 | 17.29 | 15.23 | 0.947  | 20.83x | 1.39 |
 | 96 | 84.80 | 15.20 | 18.22 | 15.72 | 1.105  | 17.85x | 1.34 |
 
-#### reads_hac — pluspf_103gb
+#### reads_hac: pluspf_103gb
 
 PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.k2d = 103.4 GB. Warm runs (3-run average per thread count, numactl --cpunodebind=0 --membind=0, DB page-cached).
 
@@ -260,7 +260,7 @@ Peak speedup ~1.72x at 96T. LLC miss rate >90% across all thread counts: 103 GB 
 
 ---
 
-#### reads_fast — sample_targeted
+#### reads_fast: sample_targeted
 
 Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB. Warm runs (3-run average, numactl --cpunodebind=0 --membind=0).
 
@@ -275,22 +275,9 @@ Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB. 
 | 64 | 80.94 | 19.06 | 14.14 | 14.53 | 0.923  | 21.20x | 1.31 |
 | 96 | 80.94 | 19.06 | 14.98 | 14.96 | 1.107  | 17.67x | 1.27 |
 
-reads_fast classified% = 80.94% vs reads_hac 84.80% — lower-quality basecalling k-mers fail to match even this targeted 6-genome DB. Pre-cliff behaviour intact: LLC miss rate stays 9–15%, peak speedup 21.64x at 32T.
+reads_fast classified% = 80.94% vs reads_hac 84.80%, lower-quality basecalling k-mers fail to match even this targeted 6-genome DB. Pre-cliff behaviour intact: LLC miss rate stays 9–15%, peak speedup 21.64x at 32T.
 
-#### reads_fast — eskape_650mb
-
-| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
-|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
-| 1  | - | - | - | - | - | - | - |
-| 2  | - | - | - | - | - | - | - |
-| 4  | - | - | - | - | - | - | - |
-| 8  | - | - | - | - | - | - | - |
-| 16 | - | - | - | - | - | - | - |
-| 32 | - | - | - | - | - | - | - |
-| 64 | - | - | - | - | - | - | - |
-| 96 | - | - | - | - | - | - | - |
-
-#### reads_fast — eskape_human_4gb
+#### reads_fast: eskape_650mb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -303,7 +290,20 @@ reads_fast classified% = 80.94% vs reads_hac 84.80% — lower-quality basecallin
 | 64 | - | - | - | - | - | - | - |
 | 96 | - | - | - | - | - | - | - |
 
-#### reads_fast — standard_8gb
+#### reads_fast: eskape_human_4gb
+
+| Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
+|---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
+| 1  | - | - | - | - | - | - | - |
+| 2  | - | - | - | - | - | - | - |
+| 4  | - | - | - | - | - | - | - |
+| 8  | - | - | - | - | - | - | - |
+| 16 | - | - | - | - | - | - | - |
+| 32 | - | - | - | - | - | - | - |
+| 64 | - | - | - | - | - | - | - |
+| 96 | - | - | - | - | - | - | - |
+
+#### reads_fast: standard_8gb
 
 Warm runs (3-run average, numactl --cpunodebind=0 --membind=0).
 
@@ -318,9 +318,9 @@ Warm runs (3-run average, numactl --cpunodebind=0 --membind=0).
 | 64 | 82.66 | 17.34 | 87.68 | 83.31 | 5.246  | 3.21x | 1.43 |
 | 96 | 82.66 | 17.34 | 87.17 | 83.86 | 5.335  | 3.16x | 1.40 |
 
-reads_fast classified% = 82.66% vs reads_hac 95.77% on standard_8gb — significant accuracy drop for fast model. Amdahl-limited: peak speedup 3.31x at 32T (matches hac/sup pattern). LLC miss rate 80–84% throughout.
+reads_fast classified% = 82.66% vs reads_hac 95.77% on standard_8gb, significant accuracy drop for fast model. Amdahl-limited: peak speedup 3.31x at 32T (matches hac/sup pattern). LLC miss rate 80–84% throughout.
 
-#### reads_fast — standard_16gb
+#### reads_fast: standard_16gb
 
 Warm runs (3-run average, numactl --cpunodebind=0 --membind=0). Note: 1T run 1 was a cold-start outlier (35.58s vs ~23.8s for runs 2–3; LLC miss rate 29% vs 83%+ for runs 2–3 due to DB loading filling cache during run 1). 3-run average includes the cold outlier; speedup column uses the 3-run average 1T time (27.719s).
 
@@ -335,9 +335,9 @@ Warm runs (3-run average, numactl --cpunodebind=0 --membind=0). Note: 1T run 1 w
 | 64 | 90.44 | 9.56 | 90.45 | 86.36 | 8.421   | 3.29x | 1.27 |
 | 96 | 90.44 | 9.56 | 89.93 | 86.48 | 8.570   | 3.23x | 1.25 |
 
-†3-run avg skewed by cold run 1 (35.58s). Warm-only (runs 2+3) avg = 23.791s; warm-only speedup at 32T ≈ 2.86x. reads_fast classified% = 90.44% vs reads_hac 97.77% — meaningful accuracy gap at standard_16gb scale.
+†3-run avg skewed by cold run 1 (35.58s). Warm-only (runs 2+3) avg = 23.791s; warm-only speedup at 32T ≈ 2.86x. reads_fast classified% = 90.44% vs reads_hac 97.77%, meaningful accuracy gap at standard_16gb scale.
 
-#### reads_fast — pluspf_103gb
+#### reads_fast: pluspf_103gb
 
 PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.k2d = 103.4 GB. Warm runs (3-run average per thread count, numactl --cpunodebind=0 --membind=0, DB page-cached).
 
@@ -352,9 +352,9 @@ PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.
 | 64 | 96.79 | 3.21 | 93.73 | 89.76 | 57.537  | 1.75x | 0.85 |
 | 96 | 96.79 | 3.21 | 93.44 | 89.56 | 57.508  | 1.75x | 0.81 |
 
-Peak speedup ~1.75x at 64–96T. LLC miss rate ~90% throughout — same DRAM saturation pattern as reads_hac/sup. reads_fast classified% (96.79%) is ~2 pp lower than reads_sup (99.24%), consistent with lower basecalling quality.
+Peak speedup ~1.75x at 64–96T. LLC miss rate ~90% throughout, same DRAM saturation pattern as reads_hac/sup. reads_fast classified% (96.79%) is ~2 pp lower than reads_sup (99.24%), consistent with lower basecalling quality.
 
-#### reads_sup — eskape_650mb
+#### reads_sup: eskape_650mb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -367,7 +367,7 @@ Peak speedup ~1.75x at 64–96T. LLC miss rate ~90% throughout — same DRAM sat
 | 64 | 65.87 | 34.13 | 39.58 | 32.16 | 0.997 | 21.71x | 1.23 |
 | 96 | 65.87 | 34.13 | 41.09 | 33.44 | 1.159 | 18.67x | 1.16 |
 
-#### reads_sup — eskape_human_4gb
+#### reads_sup: eskape_human_4gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -382,7 +382,7 @@ Peak speedup ~1.75x at 64–96T. LLC miss rate ~90% throughout — same DRAM sat
 
 †Speedup denominator is the 3-run average 1T time (31.294s), which includes an anomalous run 2 (34.471s) caused by a system load spike on shared Luna. The clean 2-run average (runs 1+3 only) is 29.706s. True speedups using the clean 1T time are ~5% higher: 2T=1.96x, 4T=3.29x, 8T=5.42x, 16T=7.88x, 32T=9.95x, 64T=10.54x, 96T=9.99x. Architectural conclusions are unchanged.
 
-#### reads_sup — standard_8gb
+#### reads_sup: standard_8gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -395,7 +395,7 @@ Peak speedup ~1.75x at 64–96T. LLC miss rate ~90% throughout — same DRAM sat
 | 64 | 97.09 | 2.91 | 86.06 | 82.03 | 4.947 | 3.43x | 1.59 |
 | 96 | 97.09 | 2.91 | 85.16 | 81.78 | 5.139 | 3.31x | 1.54 |
 
-#### reads_sup — standard_16gb
+#### reads_sup: standard_16gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -408,7 +408,7 @@ Peak speedup ~1.75x at 64–96T. LLC miss rate ~90% throughout — same DRAM sat
 | 64 | 98.48 | 1.52 | 88.87 | 84.34 | 8.249 | 2.94x | 1.46 |
 | 96 | 98.48 | 1.52 | 88.22 | 84.36 | 8.454 | 2.87x | 1.39 |
 
-#### reads_sup — sample_targeted
+#### reads_sup: sample_targeted
 
 Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB.
 
@@ -423,7 +423,7 @@ Custom DB built from 6 reference genomes (same as reads_hac). hash.k2d = 50 MB.
 | 64 | 85.40 | 14.60 | 18.80 | 15.85 | 0.921 | 21.50x | 1.42 |
 | 96 | 85.40 | 14.60 | 19.87 | 16.25 | 1.111 | 17.82x | 1.35 |
 
-#### reads_sup — pluspf_103gb
+#### reads_sup: pluspf_103gb
 
 PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.k2d = 103.4 GB. Warm runs (3-run average per thread count, numactl --cpunodebind=0 --membind=0, DB page-cached).
 
@@ -438,9 +438,9 @@ PlusPF: archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi. hash.
 | 64 | 99.24 | 0.76 | 94.19 | 90.90 | 56.236 | 1.69x | 0.96 |
 | 96 | 99.24 | 0.76 | 94.01 | 90.79 | 56.337 | 1.69x | 0.92 |
 
-Peak speedup ~1.69x at 64T. Same DRAM saturation pattern as reads_hac. reads_sup classifies 99.24% vs 98.86% for reads_hac — marginal accuracy gain from superior basecalling.
+Peak speedup ~1.69x at 64T. Same DRAM saturation pattern as reads_hac. reads_sup classifies 99.24% vs 98.86% for reads_hac, marginal accuracy gain from superior basecalling.
 
-Note (eskape_human_4gb): run 2 = 34.471s vs runs 1+3 = 29.675s/29.736s — system load spike on shared Luna machine. LLC miss rates were identical across all 3 runs (55.83/55.85/55.88%), confirming no cache effect. Average of all 3 runs = 31.294s.
+Note (eskape_human_4gb): run 2 = 34.471s vs runs 1+3 = 29.675s/29.736s, system load spike on shared Luna machine. LLC miss rates were identical across all 3 runs (55.83/55.85/55.88%), confirming no cache effect. Average of all 3 runs = 31.294s.
 
 ---
 
@@ -449,7 +449,7 @@ Note (eskape_human_4gb): run 2 = 34.471s vs runs 1+3 = 29.675s/29.736s — syste
 **Specs:** TBD
 **Thread counts tested:** TBD (powers of 2 up to max)
 
-*(same table structure as Luna — fill in after specs confirmed)*
+*(same table structure as Luna, fill in after specs confirmed)*
 
 ---
 
@@ -458,7 +458,7 @@ Note (eskape_human_4gb): run 2 = 34.471s vs runs 1+3 = 29.675s/29.736s — syste
 **Specs:** TBD
 **Thread counts tested:** TBD (powers of 2 up to max)
 
-*(same table structure as Luna — fill in after specs confirmed)*
+*(same table structure as Luna, fill in after specs confirmed)*
 
 ---
 
@@ -468,8 +468,8 @@ Note (eskape_human_4gb): run 2 = 34.471s vs runs 1+3 = 29.675s/29.736s — syste
 **JetPack:** R35.4.1, Ubuntu 20.04, kernel 5.10.120-tegra
 **Thread counts tested:** 1, 2, 4, 6, 8, 10, 12
 **perf binary:** `sudo /usr/lib/linux-tools-5.4.0-26/perf` (5.4 binary works on 5.10 kernel, requires sudo)
-**No numactl** — single NUMA node (unified memory), binding flags not applicable
-**kraken2:** `~/tools/kraken2/kraken2` (2.1.3, explicit path required — sudo strips PATH)
+**No numactl**, single NUMA node (unified memory), binding flags not applicable
+**kraken2:** `~/tools/kraken2/kraken2` (2.1.3, explicit path required, sudo strips PATH)
 
 Perf command:
 ```bash
@@ -480,7 +480,7 @@ sudo /usr/lib/linux-tools-5.4.0-26/perf stat -e cache-misses,cache-references,LL
   ~/reads/reads_hac.fastq
 ```
 
-#### reads_hac — sample_targeted
+#### reads_hac: sample_targeted
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -493,9 +493,9 @@ sudo /usr/lib/linux-tools-5.4.0-26/perf stat -e cache-misses,cache-references,LL
 | 12 | 84.80 | 15.20 | 0.640 | 82.80 | 4.15   | 11.44x | 1.01 |
 
 sys time: 1T=0.274s, 2T=0.269s, 4T=0.318s, 6T=0.347s, 8T=0.430s, 10T=0.399s, 12T=0.461s.
-cache-references ~47B (L1D accesses, not LLC — not comparable to Luna). LLC-loads ~588M per run regardless of thread count.
+cache-references ~47B (L1D accesses, not LLC, not comparable to Luna). LLC-loads ~588M per run regardless of thread count.
 
-#### reads_hac — eskape_650mb
+#### reads_hac: eskape_650mb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -509,7 +509,7 @@ cache-references ~47B (L1D accesses, not LLC — not comparable to Luna). LLC-lo
 
 sys time: 1T=0.307s, 2T=0.299s, 4T=0.361s, 6T=0.386s, 8T=0.377s, 10T=0.417s, 12T=0.453s.
 
-#### reads_hac — eskape_human_4gb
+#### reads_hac: eskape_human_4gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -522,9 +522,9 @@ sys time: 1T=0.307s, 2T=0.299s, 4T=0.361s, 6T=0.386s, 8T=0.377s, 10T=0.417s, 12T
 | 12 | 66.13 | 33.87 | 0.602 | 80.42 | 4.88   | 9.39x  | 1.07 |
 
 sys time: 1T=1.226s, 2T=1.207s, 4T=1.168s, 6T=1.280s, 8T=1.255s, 10T=1.291s, 12T=1.355s.
-DB loading (~1.2s constant) is the Amdahl floor. Classification-phase-only speedup at 12T: (45.82-1.23)/(4.88-1.36) = 44.59/3.52 = 12.67x — near-ideal.
+DB loading (~1.2s constant) is the Amdahl floor. Classification-phase-only speedup at 12T: (45.82-1.23)/(4.88-1.36) = 44.59/3.52 = 12.67x, near-ideal.
 
-#### reads_hac — standard_8gb
+#### reads_hac: standard_8gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -537,9 +537,9 @@ DB loading (~1.2s constant) is the Amdahl floor. Classification-phase-only speed
 | 12 | 95.77 | 4.23 | 0.486 | 76.55 | 3.823  | 5.54x  | 2.10 |
 
 sys time: 1T=2.35s, 2T=2.18s, 4T=2.26s, 6T=2.23s, 8T=2.24s, 10T=2.28s, 12T=2.34s.
-Note: 1T run 1 cold (23.17s wall); runs 2–3 warm averaged 20.20s. Average of all 3 = 21.19s. Amdahl ceiling: 21.19/2.35 ≈ 9.0x max wall speedup. IPC ~2.24 is markedly higher than ESKAPE DBs (0.93–1.08) — standard DB has more compute-intensive lookup patterns.
+Note: 1T run 1 cold (23.17s wall); runs 2–3 warm averaged 20.20s. Average of all 3 = 21.19s. Amdahl ceiling: 21.19/2.35 ≈ 9.0x max wall speedup. IPC ~2.24 is markedly higher than ESKAPE DBs (0.93–1.08), standard DB has more compute-intensive lookup patterns.
 
-#### reads_hac — standard_16gb
+#### reads_hac: standard_16gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -552,9 +552,9 @@ Note: 1T run 1 cold (23.17s wall); runs 2–3 warm averaged 20.20s. Average of a
 | 12 | 97.77 | 2.23 | 0.595 | 78.64 | 6.323  | 4.50x  | 1.80 |
 
 sys time: 1T=4.23s, 2T=4.03s, 4T=4.04s, 6T=4.06s, 8T=4.16s, 10T=4.19s, 12T=4.17s.
-All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RAM from prior runs. Amdahl ceiling: 28.42/4.23 ≈ 6.7x max wall speedup. Peak 4.50x at 12T — lowest of all DBs on Orion.
+All 3 runs at every thread count consistent, 15 GB DB page-cached in 64 GB RAM from prior runs. Amdahl ceiling: 28.42/4.23 ≈ 6.7x max wall speedup. Peak 4.50x at 12T, lowest of all DBs on Orion.
 
-#### reads_sup — sample_targeted
+#### reads_sup: sample_targeted
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -568,7 +568,7 @@ All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RA
 
 3 runs averaged per thread count. LLC-loads ~585M per run, consistent with reads_hac.
 
-#### reads_sup — eskape_650mb
+#### reads_sup: eskape_650mb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -580,7 +580,7 @@ All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RA
 | 10 | 65.87 | 34.13 | 0.614 | 82.90 | 4.841  | 9.65x  | 0.97 |
 | 12 | 65.87 | 34.13 | 0.616 | 83.54 | 4.087  | 11.43x | 0.96 |
 
-#### reads_sup — eskape_human_4gb
+#### reads_sup: eskape_human_4gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -594,7 +594,7 @@ All 3 runs at every thread count consistent — 15 GB DB page-cached in 64 GB RA
 
 sys time: ~1.2s constant (DB loading). Pattern matches reads_hac eskape_human_4gb.
 
-#### reads_sup — standard_8gb
+#### reads_sup: standard_8gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -606,9 +606,9 @@ sys time: ~1.2s constant (DB loading). Pattern matches reads_hac eskape_human_4g
 | 10 | 97.09 | 2.91 | 0.468 | 75.14 | 4.072  | 4.99x  | 2.20 |
 | 12 | 97.09 | 2.91 | 0.469 | 76.37 | 3.785  | 5.37x  | 2.17 |
 
-sys time: ~2.2s constant (DB loading). IPC drops with threads as LLC miss rate climbs — more DRAM pressure per unit of parallel work. Amdahl ceiling from 2.2s load floor limits scaling.
+sys time: ~2.2s constant (DB loading). IPC drops with threads as LLC miss rate climbs, more DRAM pressure per unit of parallel work. Amdahl ceiling from 2.2s load floor limits scaling.
 
-#### reads_sup — standard_16gb
+#### reads_sup: standard_16gb
 
 | Threads | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | Time (s) | Speedup vs 1T | IPC  |
 |---------|-------------|---------------|-----------------|----------------|----------|---------------|------|
@@ -628,7 +628,7 @@ Note: 1T run 1 cold (40.91s wall); runs 2–3 warm (28.83s, 28.52s). Average of 
 
 Comparison at 1T and max-T across all machines. Fixed read model and DB to isolate machine effect.
 
-### 2.1 LLC Miss Rate% at 1 Thread — reads_hac
+### 2.1 LLC Miss Rate% at 1 Thread: reads_hac
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
@@ -638,7 +638,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | standard_8gb (7.6 GB) | 76.59 | - | - | 68.19 |
 | standard_16gb (15 GB) | 80.15 | - | - | 71.36 |
 
-### 2.2 LLC Miss Rate% at Max Thread — reads_hac
+### 2.2 LLC Miss Rate% at Max Thread: reads_hac
 
 | DB | Luna (96T) | Minerva (TBD) | Lab Desktop (TBD) | Orion (12T) |
 |----|-----------|---------------|------------------|------------|
@@ -648,7 +648,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | standard_8gb (7.6 GB) | 82.58 | - | - | 76.55 |
 | standard_16gb (15 GB) | 84.93 | - | - | 78.64 |
 
-### 2.3 Time (s) at 1 Thread — reads_hac
+### 2.3 Time (s) at 1 Thread: reads_hac
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
@@ -658,7 +658,7 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | standard_8gb (7.6 GB) | 16.778 | - | - | 21.19 |
 | standard_16gb (15 GB) | 23.914 | - | - | 28.42 |
 
-### 2.4 Classified% at 32T — reads_hac
+### 2.4 Classified% at 32T: reads_hac
 
 (pluspf_103gb run at 32T only; classified% is thread-independent)
 
@@ -671,9 +671,9 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | standard_16gb (15 GB) | 97.77 | - | - | 97.77 |
 | **pluspf_103gb (103.4 GB)** | **98.86** | - | - | N/A† |
 
-†Orion has 64 GB RAM; pluspf_103gb (103.4 GB) does not fit — cannot run.
+†Orion has 64 GB RAM; pluspf_103gb (103.4 GB) does not fit, cannot run.
 
-### 2.5 Classified% at 32T — reads_sup
+### 2.5 Classified% at 32T: reads_sup
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
@@ -684,9 +684,9 @@ Comparison at 1T and max-T across all machines. Fixed read model and DB to isola
 | standard_16gb (15 GB) | 98.48 | - | - | 98.48 |
 | **pluspf_103gb (103.4 GB)** | **99.24** | - | - | N/A |
 
-reads_sup classification rates are 0.6–1.3 pp higher than reads_hac across all DBs, consistent with the higher-quality basecalling producing k-mers that more precisely match reference sequences. Orion matches Luna exactly — classification is machine-independent.
+reads_sup classification rates are 0.6–1.3 pp higher than reads_hac across all DBs, consistent with the higher-quality basecalling producing k-mers that more precisely match reference sequences. Orion matches Luna exactly, classification is machine-independent.
 
-### 2.6 Classified% at 32T — reads_fast
+### 2.6 Classified% at 32T: reads_fast
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
@@ -697,9 +697,9 @@ reads_sup classification rates are 0.6–1.3 pp higher than reads_hac across all
 | standard_16gb (15 GB) | - | - | - | - |
 | **pluspf_103gb (103.4 GB)** | **96.79** | - | - | N/A |
 
-### 2.7 LLC Miss Rate% at 32T — reads_hac
+### 2.7 LLC Miss Rate% at 32T: reads_hac
 
-(pluspf cold run — warm value may differ slightly but LLC miss rate is not I/O sensitive)
+(pluspf cold run, warm value may differ slightly but LLC miss rate is not I/O sensitive)
 
 | DB | Luna | Minerva | Lab Desktop | Orion |
 |----|------|---------|-------------|-------|
@@ -716,7 +716,7 @@ reads_sup classification rates are 0.6–1.3 pp higher than reads_hac across all
 
 How classification rate changes as DB grows. Expected: more classified with larger DB.
 
-### reads_hac — all machines, 32T (or max available)
+### reads_hac: all machines, 32T (or max available)
 
 | DB | Luna (32T) | Minerva | Lab Desktop | Orion (12T) |
 |----|------|---------|-------------|-------|
@@ -727,7 +727,7 @@ How classification rate changes as DB grows. Expected: more classified with larg
 | standard_16gb (15 GB) | 97.77% | - | - | 97.77% |
 | **pluspf_103gb (103.4 GB)** | **98.86%** | - | - | N/A |
 
-### reads_sup — all machines, 32T (or max available)
+### reads_sup: all machines, 32T (or max available)
 
 | DB | Luna (32T) | Minerva | Lab Desktop | Orion (12T) |
 |----|-----------|---------|-------------|------------|
@@ -738,7 +738,7 @@ How classification rate changes as DB grows. Expected: more classified with larg
 | standard_16gb (15 GB) | 98.48% | - | - | 98.48% |
 | **pluspf_103gb (103.4 GB)** | **99.24%** | - | - | N/A |
 
-### reads_fast — Luna only (32T)
+### reads_fast: Luna only (32T)
 
 | DB | Luna (32T) |
 |----|-----------|
@@ -764,17 +764,17 @@ ESKAPE species taxids for reference:
 - Pseudomonas aeruginosa: 287
 - Enterobacter spp.: 547
 
-### 4.1 Species Breakdown — Luna, reads_hac, 32T
+### 4.1 Species Breakdown: Luna, reads_hac, 32T
 
-Only species reaching >1% in at least one DB get a row. Homo sapiens included because it hits 1.28% in eskape_human_4gb; sub-1% values shown for completeness. "—" means the species is not in that DB's reference set.
+Only species reaching >1% in at least one DB get a row. Homo sapiens included because it hits 1.28% in eskape_human_4gb; sub-1% values shown for completeness. ", " means the species is not in that DB's reference set.
 
 | Species | sample_targeted | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
 |---------|----------------|-------------|-----------------|--------------|---------------|
 | *Pseudomonas aeruginosa* | 52.50% (55,077) | 65.28% (68,493) | 64.82% (68,008) | 31.41% (32,956) | 35.62% (37,373) |
-| *Escherichia coli* | 21.79% (22,860) | — | — | 14.45% (15,159) | 16.54% (17,350) |
-| *Klebsiella pneumoniae* | 9.92% (10,411) | — | — | 4.52% (4,739) | 5.50% (5,774) |
-| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.13% (2,237) | 2.21% (2,315) |
-| *Homo sapiens* | — | — | 1.28% (1,344) | 0.66% (695) | 0.77% (803) |
+| *Escherichia coli* | 21.79% (22,860) | - | - | 14.45% (15,159) | 16.54% (17,350) |
+| *Klebsiella pneumoniae* | 9.92% (10,411) | - | - | 4.52% (4,739) | 5.50% (5,774) |
+| *Pseudomonas* sp. p1(2021b) | - | - | - | 2.13% (2,237) | 2.21% (2,315) |
+| *Homo sapiens* | - | - | 1.28% (1,344) | 0.66% (695) | 0.77% (803) |
 | Other classified (<1% each) | 0.59% (625) | 0% (0) | ~0.03% (28) | 42.60% (44,695) | 37.14% (38,965) |
 | Unclassified | 15.20% (15,945) | 34.72% (36,425) | 33.87% (35,538) | 4.23% (4,437) | 2.23% (2,338) |
 
@@ -782,34 +782,34 @@ sample_targeted "other classified" breakdown: *E. cloacae* ATCC 13047 = 0.48% (5
 
 ---
 
-### 4.2 Cross-DB Species Comparison — % of All Reads (Luna, reads_hac, 32T)
+### 4.2 Cross-DB Species Comparison: % of All Reads (Luna, reads_hac, 32T)
 
 How the apparent composition of the same read pool changes purely as a function of which reference database is used.
 
 | Species | sample_targeted | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
 |---------|:--------------:|:-----------:|:---------------:|:-----------:|:------------:|
 | *P. aeruginosa* | 52.50% | 65.28% | 64.82% | 31.41% | 35.62% |
-| *E. coli* | 21.79% | — | — | 14.45% | 16.54% |
-| *K. pneumoniae* | 9.92% | — | — | 4.52% | 5.50% |
-| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.13% | 2.21% |
-| *Homo sapiens* | — | — | 1.28% | 0.66% | 0.77% |
+| *E. coli* | 21.79% | - | - | 14.45% | 16.54% |
+| *K. pneumoniae* | 9.92% | - | - | 4.52% | 5.50% |
+| *Pseudomonas* sp. p1(2021b) | - | - | - | 2.13% | 2.21% |
+| *Homo sapiens* | - | - | 1.28% | 0.66% | 0.77% |
 | Other classified | 0.59% | 0% | ~0.03% | 42.60% | 37.14% |
 | Unclassified | 15.20% | 34.72% | 33.87% | 4.23% | 2.23% |
 
-### 4.3 Cross-DB Species Comparison — % of Classified Reads (Luna, reads_hac, 32T)
+### 4.3 Cross-DB Species Comparison: % of Classified Reads (Luna, reads_hac, 32T)
 
 Normalises out the unclassified fraction so DB width effects on apparent composition are visible directly.
 
 | Species | sample_targeted (88,973 cl.) | eskape_650mb (68,493 cl.) | eskape_human_4gb (69,380 cl.) | standard_8gb (100,481 cl.) | standard_16gb (102,580 cl.) |
 |---------|:---------------------------:|:------------------------:|:----------------------------:|:-------------------------:|:--------------------------:|
 | *P. aeruginosa* | 61.90% | 100.00% | 98.02% | 32.80% | 36.43% |
-| *E. coli* | 25.69% | — | — | 15.09% | 16.91% |
-| *K. pneumoniae* | 11.70% | — | — | 4.72% | 5.63% |
-| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.23% | 2.26% |
-| *Homo sapiens* | — | — | 1.94% | 0.69% | 0.78% |
+| *E. coli* | 25.69% | - | - | 15.09% | 16.91% |
+| *K. pneumoniae* | 11.70% | - | - | 4.72% | 5.63% |
+| *Pseudomonas* sp. p1(2021b) | - | - | - | 2.23% | 2.26% |
+| *Homo sapiens* | - | - | 1.94% | 0.69% | 0.78% |
 | Other classified | 0.70% | 0% | 0.04% | 44.48% | 38.00% |
 
-Key insight: in eskape_650mb, 100% of classified reads are called P. aeruginosa — a complete artefact of the narrow DB having no competing references. In standard_8gb, P. aeruginosa drops to 32.80% of classified reads, which is closer to its true abundance. The classified-reads view makes the artefact unmistakable.
+Key insight: in eskape_650mb, 100% of classified reads are called P. aeruginosa, a complete artefact of the narrow DB having no competing references. In standard_8gb, P. aeruginosa drops to 32.80% of classified reads, which is closer to its true abundance. The classified-reads view makes the artefact unmistakable.
 
 *(Repeat sections 4.1–4.3 for reads_fast once data is collected)*
 
@@ -817,7 +817,7 @@ Note: section 4.4 covers the PlusPF 103 GB gold-standard cross-model comparison.
 
 ---
 
-### 4.4 Species Breakdown — PlusPF 103 GB, All Models (Luna, 32T)
+### 4.4 Species Breakdown: PlusPF 103 GB, All Models (Luna, 32T)
 
 Gold-standard species calls using the largest practical Kraken2 DB. Cross-model comparison for the same read pool.
 
@@ -828,8 +828,8 @@ Gold-standard species calls using the largest practical Kraken2 DB. Cross-model 
 | *K. pneumoniae* | 9.22% (9,677) | 9.14% (9,599) | 7.95% (8,330) |
 | *A. baumannii* | 0.33% (341) | 0.36% (382) | 0.16% (165) |
 | *E. cloacae* | 0.07% (76) | 0.09% (94) | 0.02% (26) |
-| *S. aureus* | 0.00% (1) | 0.00% (1) | — |
-| *E. faecium* | — | — | — |
+| *S. aureus* | 0.00% (1) | 0.00% (1) | - |
+| *E. faecium* | - | - | - |
 | Other classified | ~26.86% (~28,393) | ~27.92% (~29,566) | ~26.56% (~26,846) |
 | Unclassified | 1.14% (1,191) | 0.76% (797) | 3.21% (3,361) |
 
@@ -837,21 +837,21 @@ Key findings:
 - **Acinetobacter baumannii confirmed** at 0.16–0.36% across all models. This was present in standard DB long tails but never shown in prior species tables (below 1% threshold). Its absence from sample_targeted was a DB gap (NCBI genome suppressed), not a biology gap.
 - **S. aureus absent** (0–1 reads). **E. faecium absent** (0 reads). Both ESKAPE species not in this infection.
 - **reads_fast shows lower K. pneumoniae (7.95% vs ~9.2%)** and lower A. baumannii (0.16% vs 0.33–0.36%) than hac/sup. Lower basecalling quality causes more ambiguous k-mers to fail to match or go to wrong species at species level.
-- **Major species counts higher than standard_16gb** despite only +1pp gain in total classified reads. P. aeruginosa: 43,630 (PlusPF) vs 37,373 (standard_16gb), E. coli: 21,609 vs 17,350, K. pneumoniae: 9,677 vs 5,774. The other classified long tail shrank from ~37% to ~27% — reads that were ambiguous at genus/family level in standard_16gb now resolve to specific species in PlusPF due to different reference competition from the fungal/protozoan genomes changing LCA calls.
+- **Major species counts higher than standard_16gb** despite only +1pp gain in total classified reads. P. aeruginosa: 43,630 (PlusPF) vs 37,373 (standard_16gb), E. coli: 21,609 vs 17,350, K. pneumoniae: 9,677 vs 5,774. The other classified long tail shrank from ~37% to ~27%, reads that were ambiguous at genus/family level in standard_16gb now resolve to specific species in PlusPF due to different reference competition from the fungal/protozoan genomes changing LCA calls.
 
 ---
 
-### 4.5 Species Breakdown — Luna, reads_sup, 1T
+### 4.5 Species Breakdown: Luna, reads_sup, 1T
 
 Quick 1-thread run to compare species calls across DBs under the highest-quality basecalling model. Same read pool as reads_hac (104,980 reads, 723 MB).
 
 | Species | sample_targeted | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
 |---------|----------------|-------------|-----------------|--------------|---------------|
 | *Pseudomonas aeruginosa* | 52.86% (55,495) | 65.87% (69,149) | 65.35% (68,603) | 32.06% (33,655) | 36.03% (37,824) |
-| *Escherichia coli* | 21.94% (23,028) | — | — | 14.17% (14,879) | 16.13% (16,931) |
-| *Klebsiella pneumoniae* | 10.01% (10,512) | — | — | 4.52% (4,746) | 5.42% (5,688) |
-| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.17% (2,275) | 2.23% (2,337) |
-| *Homo sapiens* | — | — | 1.31% (1,372) | 0.66% (696) | 0.75% (786) |
+| *Escherichia coli* | 21.94% (23,028) | - | - | 14.17% (14,879) | 16.13% (16,931) |
+| *Klebsiella pneumoniae* | 10.01% (10,512) | - | - | 4.52% (4,746) | 5.42% (5,688) |
+| *Pseudomonas* sp. p1(2021b) | - | - | - | 2.17% (2,275) | 2.23% (2,337) |
+| *Homo sapiens* | - | - | 1.31% (1,372) | 0.66% (696) | 0.75% (786) |
 | Other classified (<1% each) | 0.53% (561) | 0% (0) | ~0.02% (22) | 43.51% (45,671) | 38.52% (40,454) |
 | Unclassified | 14.60% (15,322) | 34.13% (35,831) | 33.32% (34,983) | 2.91% (3,058) | 1.52% (1,600) |
 
@@ -859,36 +859,36 @@ sample_targeted "other classified" breakdown: *E. cloacae* ATCC 13047 = 0.48% (5
 
 ---
 
-### 4.6 Cross-DB Species Comparison — % of All Reads (Luna, reads_sup, 1T)
+### 4.6 Cross-DB Species Comparison: % of All Reads (Luna, reads_sup, 1T)
 
 | Species | sample_targeted | eskape_650mb | eskape_human_4gb | standard_8gb | standard_16gb |
 |---------|:--------------:|:-----------:|:---------------:|:-----------:|:------------:|
 | *P. aeruginosa* | 52.86% | 65.87% | 65.35% | 32.06% | 36.03% |
-| *E. coli* | 21.94% | — | — | 14.17% | 16.13% |
-| *K. pneumoniae* | 10.01% | — | — | 4.52% | 5.42% |
-| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.17% | 2.23% |
-| *Homo sapiens* | — | — | 1.31% | 0.66% | 0.75% |
+| *E. coli* | 21.94% | - | - | 14.17% | 16.13% |
+| *K. pneumoniae* | 10.01% | - | - | 4.52% | 5.42% |
+| *Pseudomonas* sp. p1(2021b) | - | - | - | 2.17% | 2.23% |
+| *Homo sapiens* | - | - | 1.31% | 0.66% | 0.75% |
 | Other classified | 0.53% | 0% | ~0.02% | 43.51% | 38.52% |
 | Unclassified | 14.60% | 34.13% | 33.32% | 2.91% | 1.52% |
 
-### 4.7 Cross-DB Species Comparison — % of Classified Reads (Luna, reads_sup, 1T)
+### 4.7 Cross-DB Species Comparison: % of Classified Reads (Luna, reads_sup, 1T)
 
 | Species | sample_targeted (89,658 cl.) | eskape_650mb (69,149 cl.) | eskape_human_4gb (69,997 cl.) | standard_8gb (101,922 cl.) | standard_16gb (103,380 cl.) |
 |---------|:---------------------------:|:------------------------:|:----------------------------:|:-------------------------:|:--------------------------:|
 | *P. aeruginosa* | 61.90% | 100.00% | 98.01% | 33.02% | 36.58% |
-| *E. coli* | 25.69% | — | — | 14.60% | 16.38% |
-| *K. pneumoniae* | 11.73% | — | — | 4.66% | 5.50% |
-| *Pseudomonas* sp. p1(2021b) | — | — | — | 2.23% | 2.26% |
-| *Homo sapiens* | — | — | 1.96% | 0.68% | 0.76% |
+| *E. coli* | 25.69% | - | - | 14.60% | 16.38% |
+| *K. pneumoniae* | 11.73% | - | - | 4.66% | 5.50% |
+| *Pseudomonas* sp. p1(2021b) | - | - | - | 2.23% | 2.26% |
+| *Homo sapiens* | - | - | 1.96% | 0.68% | 0.76% |
 | Other classified | 0.63% | 0% | 0.03% | 44.81% | 39.13% |
 
-Key insight: reads_sup classified-reads pattern is essentially identical to reads_hac (e.g., P. aeruginosa in standard_16gb: 36.43% hac vs 36.58% sup). The basecalling model (hac vs sup) has negligible effect on species composition calls at the Kraken2 level — the small gain in classification rate (98.48% vs 97.77%) does not shift which species get credited.
+Key insight: reads_sup classified-reads pattern is essentially identical to reads_hac (e.g., P. aeruginosa in standard_16gb: 36.43% hac vs 36.58% sup). The basecalling model (hac vs sup) has negligible effect on species composition calls at the Kraken2 level, the small gain in classification rate (98.48% vs 97.77%) does not shift which species get credited.
 
 ---
 
 ## Per-Pod5 Classification Results (2026-06-22)
 
-Single perf stat run per pod5 file's reads, 1T, numactl --cpunodebind=0 --membind=0. Pod5 index 15 is the smallest file (~5s on sample_targeted, ~67s on pluspf_103gb) — wall times scale with read count, so inter-pod5 variance reflects file size differences, not cache effects.
+Single perf stat run per pod5 file's reads, 1T, numactl --cpunodebind=0 --membind=0. Pod5 index 15 is the smallest file (~5s on sample_targeted, ~67s on pluspf_103gb), wall times scale with read count, so inter-pod5 variance reflects file size differences, not cache effects.
 
 ### fast × sample_targeted
 

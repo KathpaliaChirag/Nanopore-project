@@ -1,4 +1,4 @@
-# Matrix Multiplication — `perf stat` Analysis Report
+# Matrix Multiplication: `perf stat` Analysis Report
 
 **Machine:** WSL2 (AMD Ryzen 7 5800H, 8 cores @ 3.2–4.4 GHz) | RAM: 14 GB  
 **Kernel:** 6.6.87.2-microsoft-standard-WSL2  
@@ -14,12 +14,12 @@
 
 This is the same issue documented for the Kraken-2 and Dorado profiling runs (see `results_kraken2.md`, KB §15.4). WSL2 runs inside Hyper-V, which throttles the CPU cycle counter to roughly **7–23% of the real rate**. Because IPC = instructions ÷ cycles, and the denominator (cycles) is under-counted, the reported IPC is inflated by ~4–14×.
 
-**Concrete example from Kraken-2:** perf showed IPC = 2.26. Corrected for throttled clock (0.734 GHz reported vs 3.2 GHz real), real IPC ≈ 0.52 — confirming memory-bound behaviour that 2.26 would have hidden.
+**Concrete example from Kraken-2:** perf showed IPC = 2.26. Corrected for throttled clock (0.734 GHz reported vs 3.2 GHz real), real IPC ≈ 0.52, confirming memory-bound behaviour that 2.26 would have hidden.
 
 | Counter | Status in WSL2 | Notes |
 |---|---|---|
 | `instructions` |  Correct | Hardware PMU counter, not throttled |
-| `cycles` |  Wrong | ~7–23% of real — Hyper-V throttles this |
+| `cycles` |  Wrong | ~7–23% of real, Hyper-V throttles this |
 | **IPC = insn/cycles** |  Wrong | Inflated by 4–14× |
 | `cache-misses`, `cache-references` |  Correct | Real PMU event, ratio-safe |
 | `task-clock` wall ms |  Correct | OS software timer |
@@ -28,7 +28,7 @@ This is the same issue documented for the Kraken-2 and Dorado profiling runs (se
 | `branch-misses` |  Correct | Ratio of two real PMU events |
 
 **Safe to compare:** wall time, cache miss counts, L1/L2/L3 miss rates, branch miss %.  
-**On Minerva:** native Linux hardware counters work — IPC will be accurate there.
+**On Minerva:** native Linux hardware counters work, IPC will be accurate there.
 
 ---
 
@@ -38,20 +38,20 @@ Each benchmark allocates **3 matrices** of N×N `double` (8 bytes each): A, B, C
 
 | N | Per matrix | **3 matrices total** | Fits in… |
 |---|---|---|---|
-| 1,024 | 8 MB | **24 MB** | Exceeds L3 (16 MB) — already memory-bound |
+| 1,024 | 8 MB | **24 MB** | Exceeds L3 (16 MB), already memory-bound |
 | 2,048 | 32 MB | **96 MB** | RAM easily |
 | 10,000 | 800 MB | **2.24 GB** | RAM (need ≥4 GB free) |
-| 25,000 | 5 GB | **14.9 GB** | Needs ≥16 GB — will page on this 14 GB machine |
-| 100,000 | 80 GB | **223.5 GB** | Minerva only (251 GB RAM — just fits) |
+| 25,000 | 5 GB | **14.9 GB** | Needs ≥16 GB, will page on this 14 GB machine |
+| 100,000 | 80 GB | **223.5 GB** | Minerva only (251 GB RAM, just fits) |
 
 > **Formula:** RAM (bytes) = 3 × N² × 8  
 > **L3 threshold:** matrices exceed Ryzen 7 5800H's 16 MB L3 at N ≥ 816. Every test size here is memory-bound from the start.
 
 ---
 
-## Results — N = 1024
+## Results: N = 1024
 
-### Table 1-A — Timing + Pipeline
+### Table 1-A: Timing + Pipeline
 
 | Binary | **Time (ms)** | IPC† | Cache Misses | BrMiss% |
 |---|---|---|---|---|
@@ -68,9 +68,9 @@ Each benchmark allocates **3 matrices** of N×N `double` (8 bytes each): A, B, C
 | `tiled_avx2` | 335 | 3.04† | 38,740,316 | 0.11% |
 | `prefetch_ikj` | 961 | 3.37† | 11,871,223 | 0.63% |
 
-† IPC unreliable — cycles counter throttled by Hyper-V. Do not use for comparison.
+† IPC unreliable, cycles counter throttled by Hyper-V. Do not use for comparison.
 
-### Table 1-B — Cache Hierarchy (L2 + L3) with Time
+### Table 1-B: Cache Hierarchy (L2 + L3) with Time
 
 | Binary | **Time (ms)** | L2 Requests | L2 Miss% | L3 Refs | L3 Miss% |
 |---|---|---|---|---|---|
@@ -91,9 +91,9 @@ Each benchmark allocates **3 matrices** of N×N `double` (8 bytes each): A, B, C
 
 ---
 
-## Results — N = 2048
+## Results: N = 2048
 
-### Table 2-A — Timing + Pipeline
+### Table 2-A: Timing + Pipeline
 
 | Binary | **Time (ms)** | IPC† | Cache Misses | BrMiss% |
 |---|---|---|---|---|
@@ -110,7 +110,7 @@ Each benchmark allocates **3 matrices** of N×N `double` (8 bytes each): A, B, C
 | `tiled_avx2` | **2,500** | 2.96† | 394,164,831 | 0.12% |
 | `prefetch_ikj` | 8,173 | 3.07† | 64,532,420 | 0.35% |
 
-### Table 2-B — Cache Hierarchy (L2 + L3) with Time
+### Table 2-B: Cache Hierarchy (L2 + L3) with Time
 
 | Binary | **Time (ms)** | L2 Requests | L2 Miss% | L3 Refs | L3 Miss% |
 |---|---|---|---|---|---|
@@ -129,13 +129,13 @@ Each benchmark allocates **3 matrices** of N×N `double` (8 bytes each): A, B, C
 
 ---
 
-## Results — N = 10000
+## Results: N = 10000
 
-> **naive_ijk excluded** — O(N³) scaling from N=2048 gives ~4 hrs runtime.  
-> **Status:** all 11 binaries complete. `perf_results/N10000/` — 22 result files.  
+> **naive_ijk excluded**, O(N³) scaling from N=2048 gives ~4 hrs runtime.  
+> **Status:** all 11 binaries complete. `perf_results/N10000/`, 22 result files.  
 > L3 Miss% = cache-misses ÷ cache-references (same metric as Tables 1-B, 2-B).
 
-### Table 3-A — Timing + Cache (N=10000)
+### Table 3-A: Timing + Cache (N=10000)
 
 | Binary | **Time (ms)** | Cache Misses | L2 Miss% | L3 Miss% | BrMiss% |
 |---|---|---|---|---|---|
@@ -155,13 +155,13 @@ Each benchmark allocates **3 matrices** of N×N `double` (8 bytes each): A, B, C
 
 ## Cross-Size Comparison Tables
 
-### Comparison Table 1 — Wall Time (ms) Side-by-Side
+### Comparison Table 1: Wall Time (ms) Side-by-Side
 
 Expected O(N³) scaling: 1024→2048 = **8×**, 2048→10000 = **116.4×**
 
 | Binary | N=1024 | N=2048 | N=10000 | Slowdown 1024→2048 | Slowdown 2048→10000 |
 |---|---|---|---|---|---|
-| `naive_ijk` | 9,961 | 120,536 | (skipped) | **12.1×** | — |
+| `naive_ijk` | 9,961 | 120,536 | (skipped) | **12.1×** | - |
 | `ikj_order` | 393 | 3,620 | 420,796 | 9.2× | 116.2×  |
 | `kij_order` | 472 | 8,556 | 1,177,606 | **18.1×** | **137.6×** |
 | `transpose_B` | 1,717 | 13,774 | 1,636,624 | 8.0× | 118.8× |
@@ -176,10 +176,10 @@ Expected O(N³) scaling: 1024→2048 = **8×**, 2048→10000 = **116.4×**
 
 > **Speedup `naive_ijk` vs `tiled_avx2`:** 9,961 ÷ 335 = **29.7×** at N=1024, 120,536 ÷ 2,500 = **48.2×** at N=2048, estimated ~3,500× at N=10000 (naive skipped; projected from scaling).  
 >  = matches expected O(N³). ↓ = sub-linear scaling = getting *proportionally faster* at larger N.  
-> **omp_tiled** is the standout: 29.0× slowdown vs 116× expected — at N=10000 it's **2.1× faster than tiled_avx2** (112,506ms vs 236,546ms). This is where OpenMP finally earns its keep: 2.4 GB working set means all 4 threads can maintain independent DRAM requests, whereas at small N the memory bus was the bottleneck for all threads combined.  
-> `kij_order` degrades super-linearly (137.6× vs 116.4×) — outer-k loop's write-back conflicts with C-rows worsen as N grows.
+> **omp_tiled** is the standout: 29.0× slowdown vs 116× expected, at N=10000 it's **2.1× faster than tiled_avx2** (112,506ms vs 236,546ms). This is where OpenMP finally earns its keep: 2.4 GB working set means all 4 threads can maintain independent DRAM requests, whereas at small N the memory bus was the bottleneck for all threads combined.  
+> `kij_order` degrades super-linearly (137.6× vs 116.4×), outer-k loop's write-back conflicts with C-rows worsen as N grows.
 
-### Comparison Table 2 — L3 Cache Misses Side-by-Side
+### Comparison Table 2: L3 Cache Misses Side-by-Side
 
 | Binary | N=1024 | N=2048 | Growth ratio |
 |---|---|---|---|
@@ -196,9 +196,9 @@ Expected O(N³) scaling: 1024→2048 = **8×**, 2048→10000 = **116.4×**
 | `tiled_avx2` | 38,740,316 | 394,164,831 | 10.2× |
 | `prefetch_ikj` | 11,871,223 | 64,532,420 | 5.4× |
 
-> `kij_order` and `naive_ijk` both show ~17× cache miss growth vs the expected 8× — their access patterns degrade non-linearly as N grows. `omp_parallel` and `unrolled_ikj` show sub-8× growth, meaning thread-level parallelism and unrolling happen to spread cache pressure.
+> `kij_order` and `naive_ijk` both show ~17× cache miss growth vs the expected 8×, their access patterns degrade non-linearly as N grows. `omp_parallel` and `unrolled_ikj` show sub-8× growth, meaning thread-level parallelism and unrolling happen to spread cache pressure.
 
-### Comparison Table 3 — L2 and L3 Miss Rates Side-by-Side (%)
+### Comparison Table 3: L2 and L3 Miss Rates Side-by-Side (%)
 
 | Binary | L2% 1024 | L2% 2048 | L3% 1024 | L3% 2048 |
 |---|---|---|---|---|
@@ -215,9 +215,9 @@ Expected O(N³) scaling: 1024→2048 = **8×**, 2048→10000 = **116.4×**
 | `tiled_avx2` | **0.7%** | **0.9%** | 12.3% | 15.9% |
 | `prefetch_ikj` | 5.7% | 1.6% | 4.2% | 2.0% |
 
-> Notable trend: `naive_ijk` L2 miss rate **doubles** from 23.5% → 43.9% as N doubles — at N=10000 this will approach 70%+. `tiled` and `tiled_avx2` hold flat (0.9–1.0% L2) because their tile size doesn't change; tiles always fit in L2.
+> Notable trend: `naive_ijk` L2 miss rate **doubles** from 23.5% → 43.9% as N doubles, at N=10000 this will approach 70%+. `tiled` and `tiled_avx2` hold flat (0.9–1.0% L2) because their tile size doesn't change; tiles always fit in L2.
 
-### Comparison Table 4 — Branch Miss Rate Side-by-Side (%)
+### Comparison Table 4: Branch Miss Rate Side-by-Side (%)
 
 | Binary | N=1024 | N=2048 | Trend |
 |---|---|---|---|
@@ -234,53 +234,53 @@ Expected O(N³) scaling: 1024→2048 = **8×**, 2048→10000 = **116.4×**
 | `tiled_avx2` | 0.11% | 0.12% | flat |
 | `prefetch_ikj` | 0.63% | 0.35% | ↓ |
 
-> Branch miss % is universally low (<1%) — all variants have predictable loop bounds. The high values for `unrolled_ikj` and `avx2_manual` at N=1024 come from the **tail loop** (handling remainder when N % 4 ≠ 0); at N=2048 (divisible by 4/8) the tail loop never runs and miss% drops to near zero.
+> Branch miss % is universally low (<1%), all variants have predictable loop bounds. The high values for `unrolled_ikj` and `avx2_manual` at N=1024 come from the **tail loop** (handling remainder when N % 4 ≠ 0); at N=2048 (divisible by 4/8) the tail loop never runs and miss% drops to near zero.
 
 ---
 
 ## Analysis
 
-### A. naive_ijk — catastrophic column-stride access
+### A. naive_ijk: catastrophic column-stride access
 
-`naive_ijk` is 25–48× slower than `tiled_avx2`. The innermost loop accesses `B[k*N + j]` — stepping k (not j) on each iteration means each step jumps N×8 bytes. At N=1024 that's an 8 KB stride; at N=2048 it's 16 KB. Every access is a guaranteed cache miss.
+`naive_ijk` is 25–48× slower than `tiled_avx2`. The innermost loop accesses `B[k*N + j]`, stepping k (not j) on each iteration means each step jumps N×8 bytes. At N=1024 that's an 8 KB stride; at N=2048 it's 16 KB. Every access is a guaranteed cache miss.
 
 Evidence: 22% L3 miss rate at N=1024 → 27.6% at N=2048. At N=10000 this will push above 60%. The 17.2× cache miss growth vs the expected 8× confirms the degradation is super-linear.
 
-### B. Loop reordering — cheapest possible fix (25× speedup, zero complexity)
+### B. Loop reordering: cheapest possible fix (25× speedup, zero complexity)
 
 `ikj_order` hoists `A[i][k]` into a register and streams B-row sequentially. The hardware prefetcher can predict sequential access and pre-load cache lines, slashing cache misses 30×. L3 miss rate drops from 22% → 6% at N=1024.
 
 `kij_order` gets even lower miss counts (1.9% L2, 2.2% L3 at N=1024) but degrades badly at N=2048 (6.3% L2, 4.3% L3, 8,556ms vs ikj's 3,620ms). The outer k-loop's C-row writes cause cross-iteration conflicts that worsen with larger N.
 
-### C. transpose_B — best miss rate, expensive setup, good at large N
+### C. transpose_B: best miss rate, expensive setup, good at large N
 
-Fewest L3 misses (1.7–1.8% across both sizes) because both A-row and Bt-row are fully sequential. But the O(N²) transpose pass itself costs time and cache bandwidth — at N=1024 this overhead (1,717ms) dwarfs the benefit vs ikj (393ms). At very large N where O(N³) computation dominates, transpose becomes the right trade-off.
+Fewest L3 misses (1.7–1.8% across both sizes) because both A-row and Bt-row are fully sequential. But the O(N²) transpose pass itself costs time and cache bandwidth, at N=1024 this overhead (1,717ms) dwarfs the benefit vs ikj (393ms). At very large N where O(N³) computation dominates, transpose becomes the right trade-off.
 
-### D. Tiling — sub-linear scaling, best strategy for large N
+### D. Tiling: sub-linear scaling, best strategy for large N
 
-`tiled` and `tiled_avx2` are the only variants with **sub-8× slowdown** from N=1024→2048 (7.4× and 7.5×). Their L2 miss rate is identical at both sizes (0.9–1.0%) because the 64×64 tile always fits in L2 regardless of total matrix size. This is the defining advantage of cache blocking — performance scales with the tile size, not N.
+`tiled` and `tiled_avx2` are the only variants with **sub-8× slowdown** from N=1024→2048 (7.4× and 7.5×). Their L2 miss rate is identical at both sizes (0.9–1.0%) because the 64×64 tile always fits in L2 regardless of total matrix size. This is the defining advantage of cache blocking, performance scales with the tile size, not N.
 
 At N=10000, expect `tiled_avx2` and `tiled` to widen their lead further over non-blocked variants.
 
-### E. OpenMP — bandwidth-limited at these sizes
+### E. OpenMP: bandwidth-limited at these sizes
 
-`omp_parallel` is slower than single-threaded `ikj_order` at both N=1024 and N=2048 (460ms vs 393ms; 6,177ms vs 3,620ms). All 4 threads share the same 16 MB L3 and memory bus — the bottleneck is memory bandwidth, not compute. Adding threads doesn't help; it adds scheduling overhead and increases L3 contention.
+`omp_parallel` is slower than single-threaded `ikj_order` at both N=1024 and N=2048 (460ms vs 393ms; 6,177ms vs 3,620ms). All 4 threads share the same 16 MB L3 and memory bus, the bottleneck is memory bandwidth, not compute. Adding threads doesn't help; it adds scheduling overhead and increases L3 contention.
 
-`omp_tiled` performs better (3,878ms at N=2048) because tiling reduces per-thread memory pressure. At N=10000 with a 2.24 GB working set, OpenMP may finally see benefit — enough data to keep all threads' memory requests in-flight simultaneously.
+`omp_tiled` performs better (3,878ms at N=2048) because tiling reduces per-thread memory pressure. At N=10000 with a 2.24 GB working set, OpenMP may finally see benefit, enough data to keep all threads' memory requests in-flight simultaneously.
 
-### F. AVX2 — vectorisation narrows the gap
+### F. AVX2: vectorisation narrows the gap
 
-`avx2_manual` and `auto_vec_O3` deliver the same benefit at N=1024 (324ms vs 389ms). The compiler's auto-vectoriser with `-O3 -march=native -fopt-info-vec` produces 32-byte AVX2 vector loads — confirmed in the build output: `loop vectorized using 32 byte vectors`.
+`avx2_manual` and `auto_vec_O3` deliver the same benefit at N=1024 (324ms vs 389ms). The compiler's auto-vectoriser with `-O3 -march=native -fopt-info-vec` produces 32-byte AVX2 vector loads, confirmed in the build output: `loop vectorized using 32 byte vectors`.
 
-`tiled_avx2` (2,500ms at N=2048) is the fastest at large N — it combines blocked cache access (0.9% L2 miss) with 4-wide FMA throughput. Its L3 miss rate rising from 12.3% → 15.9% at N=2048 is a warning: consider `make tile32` (TILE=32) to reduce tile footprint and keep sub-blocks better isolated in L3.
+`tiled_avx2` (2,500ms at N=2048) is the fastest at large N, it combines blocked cache access (0.9% L2 miss) with 4-wide FMA throughput. Its L3 miss rate rising from 12.3% → 15.9% at N=2048 is a warning: consider `make tile32` (TILE=32) to reduce tile footprint and keep sub-blocks better isolated in L3.
 
-### G. prefetch_ikj — software prefetch hurts sequential access (but does reduce misses)
+### G. prefetch_ikj: software prefetch hurts sequential access (but does reduce misses)
 
 Highest IPC† (3.37) but 2.3× slower than plain `ikj_order` at N=1024, and **2.2× slower** at N=10000 (927,112ms vs 420,796ms). The hardware prefetcher already handles sequential B-row access perfectly.
 
-At N=10000 the prefetch instructions *do* work as intended — L1 miss% is **8.34%** vs ikj_order's **24.24%**, and L3 miss% is **1.23%** vs **2.12%** (lowest L3 miss rate of all single-threaded variants). But the cost is catastrophic: **5.4 trillion instructions** vs ikj_order's **577 billion** — a **9.3× instruction blowup** from emitting one `__builtin_prefetch` per inner-loop iteration. The CPU spends all its time issuing prefetch micro-ops that weren't needed in the first place.
+At N=10000 the prefetch instructions *do* work as intended, L1 miss% is **8.34%** vs ikj_order's **24.24%**, and L3 miss% is **1.23%** vs **2.12%** (lowest L3 miss rate of all single-threaded variants). But the cost is catastrophic: **5.4 trillion instructions** vs ikj_order's **577 billion**, a **9.3× instruction blowup** from emitting one `__builtin_prefetch` per inner-loop iteration. The CPU spends all its time issuing prefetch micro-ops that weren't needed in the first place.
 
-`__builtin_prefetch` is only useful for **irregular** access patterns (hash tables, pointer chasing) — exactly what we'd see in Kraken-2's `CompactHashTable::Get()`, not sequential matrix rows the hardware prefetcher already handles.
+`__builtin_prefetch` is only useful for **irregular** access patterns (hash tables, pointer chasing), exactly what we'd see in Kraken-2's `CompactHashTable::Get()`, not sequential matrix rows the hardware prefetcher already handles.
 
 ---
 
@@ -319,9 +319,9 @@ tiled_avx2 (2500ms) < tiled (3125ms) < auto_vec_O3 (3645ms) < ikj_order (3620ms)
 | `ikj_order` | Zero-cost 25× speedup | Miss rate degrades at very large N |
 | `tiled` | Large N, cache-friendly | No vectorisation; L3 miss still present |
 | `avx2_manual` / `auto_vec_O3` | Compute throughput, small–mid N | Memory-bound at large N |
-| `tiled_avx2` | **Peak perf at large N** | L3 pressure at N=2048+ — try TILE=32 |
+| `tiled_avx2` | **Peak perf at large N** | L3 pressure at N=2048+, try TILE=32 |
 | `omp_tiled` | Multi-core + cache combined | Overhead beats benefit at small N |
-| `transpose_B` | Lowest L3 miss rate | O(N²) setup cost — only wins at huge N |
+| `transpose_B` | Lowest L3 miss rate | O(N²) setup cost, only wins at huge N |
 
 ---
 

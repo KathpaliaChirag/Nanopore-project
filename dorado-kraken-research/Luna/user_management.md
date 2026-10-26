@@ -1,4 +1,4 @@
-# Luna — User Management Guide
+# Luna - User Management Guide
 
 > System: Ubuntu 22.04 LTS | Server: dell-R760 (luna)
 > Maintained by: chayanika (sudo account)
@@ -8,7 +8,7 @@
 ## Overview
 
 All admin commands require the sudo account (`chayanika`).
-Luna has more resources than Minerva (503 GB RAM, 2× L40S, 210 MB L3) but the same
+Luna has more resources than Minerva (503 GB RAM, 2x L40S, 210 MB L3), but the same
 user management process applies.
 
 ---
@@ -39,7 +39,7 @@ sudo chmod 700 /home/<username>
 sudo chown -R <username>:<username> /home/<username>
 ```
 
-`chmod 700` = only owner can read/write/enter. No visibility for other users.
+`chmod 700` means only the owner can read/write/enter. No visibility for other users.
 
 ### Step 4: Verify no sudo
 
@@ -103,7 +103,7 @@ Fix (one-time, as chayanika):
 sudo sysctl -w kernel.perf_event_paranoid=1
 echo 'kernel.perf_event_paranoid=1' | sudo tee /etc/sysctl.d/99-perf.conf
 ```
-Once done, `student` gets full hardware counters — LLC-load-misses, stalled-cycles-backend, TMA. No per-user change needed.
+Once done, `student` gets full hardware counters, LLC-load-misses, stalled-cycles-backend, TMA. No per-user change needed.
 
 ### Resource Limits (Optional)
 To prevent runaway jobs from eating all 503 GB RAM:
@@ -170,7 +170,7 @@ echo "=== Sudo check ===" && sudo -l 2>&1 | head -5
 echo "=== Perf smoke test ===" && perf stat ls 2>&1 | tail -10
 ```
 
-Paste the output here → add to `luna_stats.md` under a "Student Account — Tool Inventory" section.
+Paste the output here, then add it to `luna_stats.md` under a "Student Account - Tool Inventory" section.
 
 ---
 

@@ -1,22 +1,22 @@
-# Week 1 Report: Centrifuge, Kraken2, and the Flag Nobody Had Tried
+# week 1 report: Centrifuge, Kraken2, and the flag nobody had tried
 
-*Two DNA classifiers went head-to-head on a 96-core server, one of them collapsed, and a single overlooked flag turned out to matter more than a whole optimization patch.*
+*two DNA classifiers went head-to-head on a 96-core server, one of them collapsed, and a single overlooked flag turned out to matter more than a whole optimization patch.*
 
-This document is the single reference for two connected sessions of work: benchmarking Centrifuge against Kraken2 on Luna, and finally applying a long-overdue CPU optimization patch to Kraken2. It's written for Kolin sir and for CK, the two people who need to act on it next — one deciding what's meeting-worthy, the other deciding what to build next. It's worth reading end to end at least once because the two sessions turned up one deliberate, hard-won result (the 96-thread collapse) and one accidental, much bigger one (the memory-mapping flag) — and both change what the next thesis steps should look like. No background in bioinformatics or CPU performance is assumed anywhere below.
+this document is the single reference for two connected sessions of work: benchmarking Centrifuge against Kraken2 on Luna, and finally applying a long-overdue CPU optimization patch to Kraken2. it's written for Kolin sir and for me (CK), the two people who need to act on it next, one deciding what's meeting-worthy, the other deciding what to build next. it's worth reading end to end at least once, because the two sessions turned up one deliberate, hard-won result (the 96-thread collapse) and one accidental, much bigger one (the memory-mapping flag), and both change what the next thesis steps should look like. no background in bioinformatics or CPU performance is assumed anywhere below.
 
 > [!TIP]
-> **If you read nothing else, read this.**
-> - **Centrifuge is 5-18x slower than Kraken2 at 32 and 96 threads**, and it isn't close: at 32 threads it's about 5.5x slower, and past 32 threads it falls apart entirely, ending up 14-18x slower at 96 threads. (At 1 thread the gap is smaller and more variable, 2-6x depending on database size — the story really is about what happens as threads scale up.) The cause looks like thread contention — threads getting in each other's way — not a memory or cache problem, which was the opposite of what the theory predicted going in.
-> - **A single flag change (`-M`, memory-mapping) that nobody in this project had ever used gives up to 12-14x speedup on Kraken2's large databases** — bigger than the entire hand-written CPU optimization patch this session set out to test.
-> - Both findings are real, reproducible, and change priorities for the two thesis pieces this work is building toward.
+> **if you read nothing else, read this.**
+> - **Centrifuge is 5-18x slower than Kraken2 at 32 and 96 threads**, and it isn't close: at 32 threads it's about 5.5x slower, and past 32 threads it falls apart entirely, ending up 14-18x slower at 96 threads. (at 1 thread the gap is smaller and more variable, 2-6x depending on database size, the story really is about what happens as threads scale up.) the cause looks like thread contention, threads getting in each other's way, not a memory or cache problem, which was the opposite of what the theory predicted going in.
+> - **a single flag change (`-M`, memory-mapping) that nobody in this project had ever used gives up to 12-14x speedup on Kraken2's large databases**, bigger than the entire hand-written CPU optimization patch this session set out to test.
+> - both findings are real, reproducible, and change priorities for the two thesis pieces this work is building toward.
 
-## Why compare these two tools at all
+## why compare these two tools at all
 
-Both thesis pieces need a fair opponent to measure against, and Centrifuge is that opponent. Kolin sir's two thesis directions both improve Kraken2 — an adaptive k-mer cache that resizes itself around each CPU's cache hardware, and a redesign of Kraken2's hash table (narrower cells, double hashing) to shrink both memory use and false positives. Neither improvement means anything in isolation; you need a second, independently-built classifier to show the gains are real and not just "Kraken2 got faster than its own earlier self." Centrifuge is that second tool: same job (identify which organism a DNA read came from), completely different internal design (Part A explains exactly how). That's why Week 1 exists at all, and why the patch session that follows it matters for the same two theses.
+both thesis pieces need a fair opponent to measure against, and Centrifuge is that opponent. Kolin sir's two thesis directions both improve Kraken2: an adaptive k-mer cache that resizes itself around each CPU's cache hardware, and a redesign of Kraken2's hash table (narrower cells, double hashing) to shrink both memory use and false positives. neither improvement means anything in isolation. we need a second, independently-built classifier to show the gains are real and not just "Kraken2 got faster than its own earlier self." Centrifuge is that second tool: same job (identify which organism a DNA read came from), completely different internal design (Part A explains exactly how). that's why Week 1 exists at all, and why the patch session that follows it matters for the same two theses.
 
-## Setting the timeline
+## setting the timeline
 
-Both sessions happened back to back, in the same week, feeding the same downstream work — the diagram below lays out what happened when, before any of the findings get explained in detail.
+both sessions happened back to back, in the same week, feeding the same downstream work. the diagram below lays out what happened when, before any of the findings get explained in detail.
 
 ```mermaid
 gantt
@@ -41,64 +41,64 @@ gantt
     Fill Section 6 of optimisation report         :done, r1, 2026-08-03, 2d
 ```
 
-Read left to right, it's really one investigation, not two: the Centrifuge session (Aug 1) established what "good" looks like on Luna, and the patch session (Aug 3) picked that baseline back up two days later, hand-applied a patch that had been sitting untouched for months, and stumbled onto a bigger finding than the patch itself while doing it.
+read left to right, it's really one investigation, not two: the Centrifuge session (Aug 1) established what "good" looks like on Luna, and the patch session (Aug 3) picked that baseline back up two days later, hand-applied a patch that had been sitting untouched for months, and stumbled onto a bigger finding than the patch itself while doing it.
 
-## How to read this document
+## how to read this document
 
-Jump straight to whichever part you need — each stands on its own, but they read best in order.
+jump straight to whichever part you need, each stands on its own, but they read best in order.
 
-- **Part A — Centrifuge vs Kraken2 architecture.** What each tool actually does under the hood, and why comparing them is a fair fight rather than apples-to-oranges.
-- **Part B — the genome-download saga & building the baseline.** How a missing genome library, an unset network proxy, and an NCBI download ceiling turned "download some genomes" into most of a session — and how the baseline got built anyway.
-- **Part C — benchmark results & the 96-thread collapse.** The numbers behind the headline finding: where Centrifuge holds up, where it falls apart, and how far the investigation got toward explaining why.
-- **Part D — applying the Kraken2 optimization patch.** What the four-part patch was supposed to do, and every way the real source tree on Luna didn't match what the patch assumed.
-- **Part E — the 48-cell benchmark sweep & the memory-mapping discovery.** The full results grid, and the accidental discovery that dwarfs everything else in this report.
-- **Part F — what's next & appendix.** The open threads left on the table, a piece of background reading (Fibonacci hashing) that was assigned weeks ago and never done until now, plus reproducibility details (paths, commands, machine setup) for anyone rerunning this work.
+- **Part A, Centrifuge vs Kraken2 architecture.** what each tool actually does under the hood, and why comparing them is a fair fight rather than apples-to-oranges.
+- **Part B, the genome-download saga and building the baseline.** how a missing genome library, an unset network proxy, and an NCBI download ceiling turned "download some genomes" into most of a session, and how the baseline got built anyway.
+- **Part C, benchmark results and the 96-thread collapse.** the numbers behind the headline finding: where Centrifuge holds up, where it falls apart, and how far the investigation got toward explaining why.
+- **Part D, applying the Kraken2 optimization patch.** what the four-part patch was supposed to do, and every way the real source tree on Luna didn't match what the patch assumed.
+- **Part E, the 48-cell benchmark sweep and the memory-mapping discovery.** the full results grid, and the accidental discovery that dwarfs everything else in this report.
+- **Part F, what's next and appendix.** the open threads left on the table, a piece of background reading (Fibonacci hashing) that was assigned weeks ago and never done until now, plus reproducibility details (paths, commands, machine setup) for anyone rerunning this work.
 
 Part A picks up right where the TL;DR left off: the actual mechanics of why Kraken2 and Centrifuge behave so differently under load.
 
 ---
 
-## Part A: Kraken2 vs Centrifuge — the architecture difference
+## Part A: Kraken2 vs Centrifuge, the architecture difference
 
-### The question everything else in this report answers
+### the question everything else in this report answers
 
-Say a nanopore sequencer hands you a fragment of DNA and nothing else. No label, no species name, no hint. Just a string of letters — A, C, G, T — a few hundred to a few thousand characters long. How do you figure out which organism it came from?
+say a nanopore sequencer hands you a fragment of DNA and nothing else. no label, no species name, no hint. just a string of letters, A, C, G, T, a few hundred to a few thousand characters long. how do you figure out which organism it came from?
 
-This is **taxonomic classification**: assigning each DNA fragment to a spot in the tree of life by comparing it against a database of known organisms' genomes. It's the same problem as matching a fingerprint at a crime scene against a database of known people — except the "fingerprint" is a chunk of DNA, and the "match" identifies a species instead of a suspect. Kraken2 and Centrifuge are two different tools built to answer exactly this question, fast, at the scale of hundreds of thousands of fragments per run.
+this is **taxonomic classification**: assigning each DNA fragment to a spot in the tree of life by comparing it against a database of known organisms' genomes. it's the same problem as matching a fingerprint at a crime scene against a database of known people, except the "fingerprint" is a chunk of DNA, and the "match" identifies a species instead of a suspect. Kraken2 and Centrifuge are two different tools built to answer exactly this question, fast, at the scale of hundreds of thousands of fragments per run.
 
-### Where the fragments come from
+### where the fragments come from
 
-A nanopore sequencer doesn't read a whole genome in one pass — genomes run to billions of letters, and the machine physically can't hold that much DNA still long enough. Instead it threads DNA strands through a microscopic pore one at a time and measures changes in electrical current as each base slides through. A separate step, basecalling, converts that raw electrical signal into A/C/G/T letters. The result is a pile of fragments called **reads** — like getting a shredded document back as a stack of paper strips, each strip a read, and you still have to work out where each strip belongs.
+a nanopore sequencer doesn't read a whole genome in one pass. genomes run to billions of letters, and the machine physically can't hold that much DNA still long enough. instead it threads DNA strands through a microscopic pore one at a time and measures changes in electrical current as each base slides through. a separate step, basecalling, converts that raw electrical signal into A/C/G/T letters. the result is a pile of fragments called **reads**, like getting a shredded document back as a stack of paper strips, each strip a read, and you still have to work out where each strip belongs.
 
-Those reads get stored in a **FASTQ file**: four lines per read — an identifier, the letter sequence, a separator, and a per-letter confidence score, because sequencers make mistakes and every downstream tool needs to know how much to trust each letter. FASTQ files are the raw input to both Kraken2 and Centrifuge. Neither tool cares how the reads were produced — this report just needs you to know that a "read" is a fragment of unlabeled DNA text, and classification is what puts a label on it.
+those reads get stored in a **FASTQ file**: four lines per read, an identifier, the letter sequence, a separator, and a per-letter confidence score, because sequencers make mistakes and every downstream tool needs to know how much to trust each letter. FASTQ files are the raw input to both Kraken2 and Centrifuge. neither tool cares how the reads were produced. this report just needs you to know that a "read" is a fragment of unlabeled DNA text, and classification is what puts a label on it.
 
 ### Kraken2: chop it up, hash it, look it up
 
-Kraken2's strategy is blunt and effective. It slices every read into overlapping fixed-length chunks called **k-mers** (typically 31 letters each) — sliding a window one letter at a time so a single sequencing error only corrupts the few windows that touch it, not the whole read. To cut the work further, Kraken2 doesn't even keep every k-mer: it picks one representative **minimizer** per window of k-mers, the same way a news aggregator shows one headline per story cluster instead of every near-duplicate article.
+Kraken2's strategy is blunt and effective. it slices every read into overlapping fixed-length chunks called **k-mers** (typically 31 letters each), sliding a window one letter at a time so a single sequencing error only corrupts the few windows that touch it, not the whole read. to cut the work further, Kraken2 doesn't even keep every k-mer: it picks one representative **minimizer** per window of k-mers, the same way a news aggregator shows one headline per story cluster instead of every near-duplicate article.
 
-Each minimizer then gets run through a hash function and looked up in a giant table built ahead of time from every reference genome Kraken2 knows about. A **hash table** is what makes this lookup fast in the first place — the hash function converts the minimizer into a numeric address, and the table returns whatever's stored there (here, a species ID, or **taxid**) in roughly constant time, the same way a coat-check ticket number tells the attendant which hook to check without searching every hook in the room.
+each minimizer then gets run through a hash function and looked up in a giant table built ahead of time from every reference genome Kraken2 knows about. a **hash table** is what makes this lookup fast in the first place. the hash function converts the minimizer into a numeric address, and the table returns whatever's stored there (here, a species ID, or **taxid**) in roughly constant time, the same way a coat-check ticket number tells the attendant which hook to check without searching every hook in the room.
 
-This is why Kraken2 is fast: every minimizer's lookup is completely independent of every other minimizer's lookup. There's no step that has to wait for a previous step to finish. Hand different reads to different CPU cores and they classify in parallel with nothing to coordinate — an embarrassingly parallel workload, in the literal technical sense of that phrase.
+this is why Kraken2 is fast: every minimizer's lookup is completely independent of every other minimizer's lookup. there's no step that has to wait for a previous step to finish. hand different reads to different CPU cores and they classify in parallel with nothing to coordinate, an embarrassingly parallel workload, in the literal technical sense of that phrase.
 
-It's also why Kraken2 is memory-hungry. A reference database covering thousands of species can hold billions of k-mers, and the hash table storing them runs to gigabytes, sometimes hundreds of gigabytes. That table does not fit in any on-chip CPU cache. So most lookups — one per minimizer, millions of times per run — pay the full cost of a trip out to main memory (DRAM), which is roughly two orders of magnitude slower than a cache hit. Kraken2 trades memory footprint for parallel, independent, cheap-per-lookup work. This is the design laid out in the original Kraken2 paper, [Wood, Lu & Langmead (2019), "Improved metagenomic analysis with Kraken 2," *Genome Biology*](https://doi.org/10.1186/s13059-019-1891-0).
+it's also why Kraken2 is memory-hungry. a reference database covering thousands of species can hold billions of k-mers, and the hash table storing them runs to gigabytes, sometimes hundreds of gigabytes. that table does not fit in any on-chip CPU cache. so most lookups, one per minimizer, millions of times per run, pay the full cost of a trip out to main memory (DRAM), which is roughly two orders of magnitude slower than a cache hit. Kraken2 trades memory footprint for parallel, independent, cheap-per-lookup work. this is the design laid out in the original Kraken2 paper, [Wood, Lu & Langmead (2019), "Improved metagenomic analysis with Kraken 2," *Genome Biology*](https://doi.org/10.1186/s13059-019-1891-0).
 
-### The wrong intuition about Centrifuge
+### the wrong intuition about Centrifuge
 
-Here's the natural assumption once you've understood Kraken2: "Centrifuge probably does the same thing, just implemented differently — same k-mer-hashing idea, different codebase, maybe a few tuning knobs moved around."
+here's the natural assumption once you've understood Kraken2: "Centrifuge probably does the same thing, just implemented differently, same k-mer-hashing idea, different codebase, maybe a few tuning knobs moved around."
 
-That assumption is wrong. Centrifuge doesn't hash k-mers into a table at all. It uses a fundamentally different data structure, built on a fundamentally different algorithm, with a trade-off that runs in the opposite direction from Kraken2's. These aren't two implementations of the same idea — they're two different bets on how to search DNA fast.
+that assumption is wrong. Centrifuge doesn't hash k-mers into a table at all. it uses a fundamentally different data structure, built on a fundamentally different algorithm, with a trade-off that runs in the opposite direction from Kraken2's. these aren't two implementations of the same idea, they're two different bets on how to search DNA fast.
 
 ### Centrifuge: compress the whole reference, then search it one letter at a time
 
-Instead of building a table of chunks, Centrifuge compresses each entire reference genome into a single structure called an **FM-index**. The FM-index is built on the **Burrows-Wheeler Transform (BWT)** — the same underlying idea that powers bzip2 compression. BWT rearranges a text's characters into an order that groups similar surrounding context together, which makes the result far more compressible than the original while still letting you reconstruct the original exactly. Stack an FM-index on top of that transform and you get something that can answer "does this substring exist in the genome, and where" almost instantly, without ever decompressing the genome back to plain text. The BWT itself comes from [Burrows & Wheeler's 1994 technical report, "A Block-sorting Lossless Data Compression Algorithm"](https://www.cs.jhu.edu/~langmea/resources/burrows_wheeler.pdf); the FM-index that makes it searchable comes from [Ferragina & Manzini's 2000 paper, "Opportunistic Data Structures with Applications" (FOCS 2000)](https://people.unipmn.it/manzini/papers/focs00.html).
+instead of building a table of chunks, Centrifuge compresses each entire reference genome into a single structure called an **FM-index**. the FM-index is built on the **Burrows-Wheeler Transform (BWT)**, the same underlying idea that powers bzip2 compression. BWT rearranges a text's characters into an order that groups similar surrounding context together, which makes the result far more compressible than the original while still letting you reconstruct the original exactly. stack an FM-index on top of that transform and you get something that can answer "does this substring exist in the genome, and where" almost instantly, without ever decompressing the genome back to plain text. the BWT itself comes from [Burrows & Wheeler's 1994 technical report, "A Block-sorting Lossless Data Compression Algorithm"](https://www.cs.jhu.edu/~langmea/resources/burrows_wheeler.pdf); the FM-index that makes it searchable comes from [Ferragina & Manzini's 2000 paper, "Opportunistic Data Structures with Applications" (FOCS 2000)](https://people.unipmn.it/manzini/papers/focs00.html).
 
-Searching an FM-index uses an algorithm called **backward search**: you match a read against the index one character at a time, starting from the *end* of the read and working toward the start, narrowing down a range of candidate matching positions with every letter you add. Think of it like narrowing a dictionary search by prepending one letter at a time and re-checking which page range could still contain the word — each letter shrinks the plausible range further.
+searching an FM-index uses an algorithm called **backward search**: you match a read against the index one character at a time, starting from the *end* of the read and working toward the start, narrowing down a range of candidate matching positions with every letter you add. think of it like narrowing a dictionary search by prepending one letter at a time and re-checking which page range could still contain the word, each letter shrinks the plausible range further.
 
-The catch: each backward-search step needs the result of the step before it. You can't compute step 5 until you know the outcome of step 4. That's a serial dependency chain, not a set of independent lookups. Where Kraken2 can throw a thousand unrelated minimizer lookups at a thousand cores with nothing to coordinate, Centrifuge's search for a single read is one long chain of steps that must happen in order.
+the catch: each backward-search step needs the result of the step before it. you can't compute step 5 until you know the outcome of step 4. that's a serial dependency chain, not a set of independent lookups. where Kraken2 can throw a thousand unrelated minimizer lookups at a thousand cores with nothing to coordinate, Centrifuge's search for a single read is one long chain of steps that must happen in order.
 
-This is Centrifuge's trade: compressing the reference into an FM-index gives it a dramatically smaller memory footprint than Kraken2's hash table, because BWT-based compression squeezes the reference genome itself, not just an index pointing at it. What it gives up is the embarrassingly parallel access pattern that makes Kraken2's per-lookup cost so cheap to hide. This is the design Centrifuge introduces in [Kim, Song, Breitwieser & Salzberg (2016), "Centrifuge: rapid and sensitive classification of metagenomic sequences," *Genome Research*](https://genome.cshlp.org/content/26/12/1721).
+this is Centrifuge's trade: compressing the reference into an FM-index gives it a dramatically smaller memory footprint than Kraken2's hash table, because BWT-based compression squeezes the reference genome itself, not just an index pointing at it. what it gives up is the embarrassingly parallel access pattern that makes Kraken2's per-lookup cost so cheap to hide. this is the design Centrifuge introduces in [Kim, Song, Breitwieser & Salzberg (2016), "Centrifuge: rapid and sensitive classification of metagenomic sequences," *Genome Research*](https://genome.cshlp.org/content/26/12/1721).
 
-### The shape of the difference
+### the shape of the difference
 
 ```mermaid
 flowchart LR
@@ -113,9 +113,9 @@ flowchart LR
     end
 ```
 
-Kraken2's branch is wide and flat — many independent lookups fanning out with nothing waiting on anything else. Centrifuge's branch is a loop — each step feeding the next, one at a time. That shape difference is the whole story of why these two tools perform differently, and it's worth holding onto before the numbers show up later in this report.
+Kraken2's branch is wide and flat, many independent lookups fanning out with nothing waiting on anything else. Centrifuge's branch is a loop, each step feeding the next, one at a time. that shape difference is the whole story of why these two tools perform differently, and it's worth holding onto before the numbers show up later in this report.
 
-A quick side-by-side of the properties this architecture difference implies:
+a quick side-by-side of the properties this architecture difference implies:
 
 | Property | Kraken2 (hash table) | Centrifuge (FM-index / BWT) |
 |---|---|---|
@@ -125,68 +125,68 @@ A quick side-by-side of the properties this architecture difference implies:
 | Natural parallelism | Embarrassingly parallel across reads/minimizers | Constrained by the per-read dependency chain |
 | Expected bottleneck | Waiting on DRAM (cache misses) | Waiting on the next serial step (limited ILP — instruction-level parallelism, how many instructions the CPU can have in flight at once) |
 
-Read this table as two opposite bets, not a "better tool / worse tool" scorecard: Kraken2 bets that cheap, independent, parallel lookups outweigh a huge memory footprint; Centrifuge bets that a small, compressed structure is worth giving up parallel independence for.
+read this table as two opposite bets, not a "better tool / worse tool" scorecard: Kraken2 bets that cheap, independent, parallel lookups outweigh a huge memory footprint; Centrifuge bets that a small, compressed structure is worth giving up parallel independence for.
 
-### The prediction — and the tease
+### the prediction, and the tease
 
-Put the two architectures side by side and the theoretical prediction writes itself: Kraken2 should be **fast but memory-hungry**, spending its time waiting on trips to DRAM. Centrifuge should be **memory-light but serial**, spending its time working through dependency chains rather than waiting on memory at all.
+put the two architectures side by side and the theoretical prediction writes itself: Kraken2 should be **fast but memory-hungry**, spending its time waiting on trips to DRAM. Centrifuge should be **memory-light but serial**, spending its time working through dependency chains rather than waiting on memory at all.
 
-Hold onto that prediction. It's clean, it follows directly from the data structures, and it's the prediction this project actually went and measured against real hardware counters. What came back was a more interesting story than either tool "winning" outright — cache behavior that ran opposite to what the FM-index literature would suggest, and a bottleneck that showed up somewhere neither architecture's description points to directly. That result is coming later in this report; for now, just carry the prediction forward as the thing to check.
+hold onto that prediction. it's clean, it follows directly from the data structures, and it's the prediction this project actually went and measured against real hardware counters. what came back was a more interesting story than either tool "winning" outright: cache behavior that ran opposite to what the FM-index literature would suggest, and a bottleneck that showed up somewhere neither architecture's description points to directly. that result is coming later in this report. for now, just carry the prediction forward as the thing to check.
 
-### Two more pieces of vocabulary worth planting here
+### two more pieces of vocabulary worth planting here
 
-Kraken2's hash table isn't a textbook hash table — it's squeezed to fit databases with billions of entries into a machine's available RAM. That squeeze matters again later in this report, when a patch-application session works directly inside this structure, so it's worth naming now.
+Kraken2's hash table isn't a textbook hash table, it's squeezed to fit databases with billions of entries into a machine's available RAM. that squeeze matters again later in this report, when a patch-application session works directly inside this structure, so it's worth naming now.
 
-Kraken2 uses a **compact hash table**: each entry gets packed into a small fixed-width "cell" (32, 24, or 16 bits) holding a truncated version of the k-mer's identity plus its taxid, instead of a full key and pointer. That's a direct trade of a little lookup precision for a lot of memory savings. When two different k-mers happen to hash to the same slot — a collision — Kraken2 resolves it with **linear probing**: check the next slot, then the next, in a straight line, until an empty one turns up. It's like parking in the next open spot down the row when yours is taken; under heavy traffic, taken spots cluster and searches get longer. How "full" the table is at any point is its **load factor** — the fraction of slots occupied. A parking garage at 70% full is quick to search; near 100%, you're circling.
+Kraken2 uses a **compact hash table**: each entry gets packed into a small fixed-width "cell" (32, 24, or 16 bits) holding a truncated version of the k-mer's identity plus its taxid, instead of a full key and pointer. that's a direct trade of a little lookup precision for a lot of memory savings. when two different k-mers happen to hash to the same slot, a collision, Kraken2 resolves it with **linear probing**: check the next slot, then the next, in a straight line, until an empty one turns up. it's like parking in the next open spot down the row when yours is taken; under heavy traffic, taken spots cluster and searches get longer. how "full" the table is at any point is its **load factor**, the fraction of slots occupied. a parking garage at 70% full is quick to search; near 100%, you're circling.
 
-And because those compact cells only store a truncated version of each k-mer's true identity, two genuinely different k-mers can occasionally collide onto the same cell and look like a match when they aren't one — a **false positive**. It's the same failure mode as a keycard reader that only checks the last four digits of your ID: occasionally someone else's last four digits match, and the door opens for the wrong person. Shrinking the cell width saves more memory but raises this false-positive rate — there's no free lunch here, only a curve to sit on deliberately, and that curve is exactly what one of this project's two thesis directions is built around.
+and because those compact cells only store a truncated version of each k-mer's true identity, two genuinely different k-mers can occasionally collide onto the same cell and look like a match when they aren't one, a **false positive**. it's the same failure mode as a keycard reader that only checks the last four digits of your ID: occasionally someone else's last four digits match, and the door opens for the wrong person. shrinking the cell width saves more memory but raises this false-positive rate. there's no free lunch here, only a curve to sit on deliberately, and that curve is exactly what one of this project's two thesis directions is built around.
 
-With the two tools' architectures, their theoretical trade-off, and this vocabulary in hand, the rest of this report walks through what actually happened when both were built, indexed, and run head-to-head on real hardware — starting with a genome-download saga that had nothing to do with either tool's algorithm and everything to do with a deleted folder and a missing network proxy.
+with the two tools' architectures, their theoretical trade-off, and this vocabulary in hand, the rest of this report walks through what actually happened when both were built, indexed, and run head-to-head on real hardware, starting with a genome-download saga that had nothing to do with either tool's algorithm and everything to do with a deleted folder and a missing network proxy.
 
 ---
 
-## Part B: The Genome-Download Saga, or How Step 3 Ate the Week
+## Part B: the genome-download saga, or how step 3 ate the week
 
-Week 1's plan had a short to-do list. Step 1: install Centrifuge, the second classification tool you'd need to compare against Kraken2. Step 3: build a reference index from that tool — the pre-processed pile of known genomes it searches against when it's handed an unknown DNA read (see Part A if you need a refresher on what a reference database actually is). Both steps sound routine. Install a tool, point it at some data you already have, wait. That's not what happened.
+Week 1's plan had a short to-do list. step 1: install Centrifuge, the second classification tool needed to compare against Kraken2. step 3: build a reference index from that tool, the pre-processed pile of known genomes it searches against when it's handed an unknown DNA read (see Part A for a refresher on what a reference database actually is). both steps sound routine: install a tool, point it at some data you already have, wait. that's not what happened.
 
-### Step 1: the part that actually went fine
+### step 1: the part that actually went fine
 
-You clone Centrifuge from GitHub, run `make`, and it builds cleanly on the first try — no missing dependencies, no patched-up Makefile, just some harmless warnings about old C++ style. A quick version check confirms you're building the current tip of the codebase (labeled `1.0.5` internally), a step ahead of the last official tagged release (`v1.0.4.2`) — worth knowing so the comparison later in this report is against Centrifuge's actual current state, not a stale release. All five binaries (`centrifuge`, `centrifuge-build`, `centrifuge-class`, `centrifuge-inspect`, `centrifuge-download`) show up where they should. You add them to your PATH, and Step 1 is done. This is not where the story is — it's worth one paragraph precisely because nothing went wrong.
+clone Centrifuge from GitHub, run `make`, and it builds cleanly on the first try, no missing dependencies, no patched-up Makefile, just some harmless warnings about old C++ style. a quick version check confirms it's building the current tip of the codebase (labeled `1.0.5` internally), a step ahead of the last official tagged release (`v1.0.4.2`), worth knowing so the comparison later in this report is against Centrifuge's actual current state, not a stale release. all five binaries (`centrifuge`, `centrifuge-build`, `centrifuge-class`, `centrifuge-inspect`, `centrifuge-download`) show up where they should. add them to PATH, and step 1 is done. this is not where the story is, it's worth one paragraph precisely because nothing went wrong.
 
-### Step 3: the data you were counting on was just gone
+### step 3: the data we were counting on was just gone
 
-Step 3 should have been just as boring: point Centrifuge at the genome library that earlier work in this project had already downloaded and used to build Kraken2 databases, and reuse it. You go looking for that library — and it isn't there. Not "moved," not "renamed." Gone.
+step 3 should have been just as boring: point Centrifuge at the genome library that earlier work in this project had already downloaded and used to build Kraken2 databases, and reuse it. going looking for that library, it isn't there. not "moved," not "renamed." gone.
 
-A quick look at the project's own cleanup script explains part of it: the documented build process is *supposed* to delete a scratch folder called `eskape_genomes` once both databases are built, because that raw-genome data is only needed transiently for the build step. That part is working as designed.
+a quick look at the project's own cleanup script explains part of it: the documented build process is *supposed* to delete a scratch folder called `eskape_genomes` once both databases are built, because that raw-genome data is only needed transiently for the build step. that part is working as designed.
 
-But that same script only ever deletes the `taxonomy/` and `library/` subfolders *inside* each finished database folder — it never touches the top-level database folders themselves, or the actual `hash.k2d`/`taxo.k2d`/`opts.k2d` files that make a Kraken2 database usable. Those top-level folders and files are gone too. Nothing in the documented process explains that second loss. It isn't a bug in the cleanup script working slightly wrong — it's a separate disappearance the script was never responsible for in the first place.
+but that same script only ever deletes the `taxonomy/` and `library/` subfolders *inside* each finished database folder, it never touches the top-level database folders themselves, or the actual `hash.k2d`/`taxo.k2d`/`opts.k2d` files that make a Kraken2 database usable. those top-level folders and files are gone too. nothing in the documented process explains that second loss. it isn't a bug in the cleanup script working slightly wrong, it's a separate disappearance the script was never responsible for in the first place.
 
 > [!IMPORTANT]
-> The finished Kraken2 databases (`eskape_650mb`, `eskape_human_4gb`) are missing, and it is not explained by any documented process. Only their build logs survive. This is a real, unresolved loss — not scratch-file cleanup working as intended — and any future Kraken2 rerun against those two specific databases will need a full rebuild from scratch, not just a Centrifuge-side fix.
+> the finished Kraken2 databases (`eskape_650mb`, `eskape_human_4gb`) are missing, and no documented process explains it. only their build logs survive. this is a real, unresolved loss, not scratch-file cleanup working as intended, and any future Kraken2 rerun against those two specific databases will need a full rebuild from scratch, not just a Centrifuge-side fix.
 
-With no local copy and no backup found anywhere on the machine, the only option left is to re-download the raw genomes and rebuild everything. That decision is where the real story starts.
+with no local copy and no backup found anywhere on the machine, the only option left is to re-download the raw genomes and rebuild everything. that decision is where the real story starts.
 
-### The re-download: three ways to fail before it works
+### the re-download: three ways to fail before it works
 
-The tool for the job is `ncbi-genome-download`, already installed and ready to pull genome files straight from NCBI (the US National Center for Biotechnology Information, the standard public repository for this kind of data) for the six ESKAPE taxids you need. **ESKAPE** is shorthand for six genera of bacteria notorious for antibiotic resistance (Enterococcus, Staphylococcus, Klebsiella, Acinetobacter, Pseudomonas, Enterobacter) — a standard, clinically-relevant stress test for a classifier, the same reason it names every database in this report. The original download had pulled 1,149 complete bacterial assemblies, roughly 7GB uncompressed, as **FASTA** files — a plain-text format for raw DNA sequence (just the letters, no per-letter confidence score, unlike the FASTQ files sequencer reads come in). You need that again.
+the tool for the job is `ncbi-genome-download`, already installed and ready to pull genome files straight from NCBI (the US National Center for Biotechnology Information, the standard public repository for this kind of data) for the six ESKAPE taxids needed. **ESKAPE** is shorthand for six genera of bacteria notorious for antibiotic resistance (Enterococcus, Staphylococcus, Klebsiella, Acinetobacter, Pseudomonas, Enterobacter), a standard, clinically-relevant stress test for a classifier, the same reason it names every database in this report. the original download had pulled 1,149 complete bacterial assemblies, roughly 7GB uncompressed, as **FASTA** files, a plain-text format for raw DNA sequence (just the letters, no per-letter confidence score, unlike the FASTQ files sequencer reads come in). that data needed pulling again.
 
-**Attempt 1** does the obvious thing: download one genome at a time, in sequence. An hour in, only about 25MB of the ~7GB target has landed. At that rate, finishing would take days. You kill it.
+**attempt 1** does the obvious thing: download one genome at a time, in sequence. an hour in, only about 25MB of the ~7GB target has landed. at that rate, finishing would take days. kill it.
 
-**Attempt 2** fixes the obvious problem: run 25 downloads in parallel instead of one. More workers, more throughput, right? For a while, it looks like it's working — 25 real download processes, steady progress. Then the whole job quietly exits on its own, well short of done.
+**attempt 2** fixes the obvious problem: run 25 downloads in parallel instead of one. more workers, more throughput, right? for a while, it looks like it's working, 25 real download processes, steady progress. then the whole job quietly exits on its own, well short of done.
 
-Here's where it gets interesting. Digging into the log turns up dozens of "checksum mismatch" errors — the downloaded file's checksum (a short fingerprint used to verify a file wasn't corrupted in transit) doesn't match what NCBI says it should be. That alone isn't surprising; network downloads occasionally get corrupted. What's surprising is that every single failed download reports the *exact same* wrong checksum, `14aa54cecceebc1536a4d1ee4a5c08ec`, regardless of which genome it was supposed to be. Random corruption doesn't produce identical garbage every time. Identical garbage means every one of those requests got back the same canned response — not scrambled data, but a real answer to a request that shouldn't have succeeded that way. Something was rejecting or throttling the requests and serving a stand-in response instead of the actual file. Out of the roughly 1,149 genomes targeted, only 200 had landed as real, checksum-valid files before the run gave up.
+here's where it gets interesting. digging into the log turns up dozens of "checksum mismatch" errors, the downloaded file's checksum (a short fingerprint used to verify a file wasn't corrupted in transit) doesn't match what NCBI says it should be. that alone isn't surprising, network downloads occasionally get corrupted. what's surprising is that every single failed download reports the *exact same* wrong checksum, `14aa54cecceebc1536a4d1ee4a5c08ec`, regardless of which genome it was supposed to be. random corruption doesn't produce identical garbage every time. identical garbage means every one of those requests got back the same canned response, not scrambled data, but a real answer to a request that shouldn't have succeeded that way. something was rejecting or throttling the requests and serving a stand-in response instead of the actual file. out of the roughly 1,149 genomes targeted, only 200 had landed as real, checksum-valid files before the run gave up.
 
-You'd assume the fix is dialing back the parallelism — 25 connections was clearly too aggressive, so try 8 instead. That's a reasonable next move, and it does help a little (more data moves, further into the download), but the job still exits early with the same identical-checksum failures. Lowering concurrency alone doesn't fix it, which tells you this isn't purely a "too many connections at once" problem.
+the natural next move is dialing back the parallelism: 25 connections was clearly too aggressive, so try 8 instead. that's reasonable, and it does help a little (more data moves, further into the download), but the job still exits early with the same identical-checksum failures. lowering concurrency alone doesn't fix it, which points away from a simple "too many connections at once" problem.
 
-The actual root cause takes some real diagnostic work to find: a pair of `curl` tests reveals that outbound HTTPS traffic to NCBI is either timing out entirely or routing strangely, and nothing has proxy environment variables set. It turns out Luna — the machine this all runs on — sits behind IIT Delhi's institutional network proxy, and that proxy had simply never been configured for this session. Once the four proxy environment variables are set (pointing at `proxy62.iitd.ac.in:3128`) and persisted, a request that previously hung for three and a half minutes returns correctly in about a second.
+the actual root cause takes some real diagnostic work to find: a pair of `curl` tests reveals that outbound HTTPS traffic to NCBI is either timing out entirely or routing strangely, and nothing has proxy environment variables set. it turns out Luna, the machine this all runs on, sits behind IIT Delhi's institutional network proxy, and that proxy had simply never been configured for this session. once the four proxy environment variables are set (pointing at `proxy62.iitd.ac.in:3128`) and persisted, a request that previously hung for three and a half minutes returns correctly in about a second.
 
-This is the kind of failure that's genuinely worth naming as a trap: a missing institutional proxy setting looks exactly like NCBI rate-limiting you, or like the download tool being flaky, or like a bad network day. It presents as intermittent, unpredictable, tool-shaped noise. It is none of those things — it's one missing configuration line, and until you find it, every symptom points somewhere else.
+this is the kind of failure that's genuinely worth naming as a trap: a missing institutional proxy setting looks exactly like NCBI rate-limiting, or like the download tool being flaky, or like a bad network day. it presents as intermittent, unpredictable, tool-shaped noise. it is none of those things, it's one missing configuration line, and until you find it, every symptom points somewhere else.
 
-With the proxy fixed, you rerun the download. The corruption is completely gone — zero checksum mismatches this time, real data all the way through. Progress. Except the file count lands at exactly 200 genomes again. Same number as before the fix.
+with the proxy fixed, rerun the download. the corruption is completely gone, zero checksum mismatches this time, real data all the way through. progress. except the file count lands at exactly 200 genomes again. same number as before the fix.
 
-That's suspicious enough to chase properly. Three separate, independent changes get tried: lowering parallelism (already done), fixing the proxy (just done), and — suspecting a stale, possibly corrupted cache of NCBI's genome catalog left over from the earlier flaky-network attempts — wiping the download tool's cache entirely and adding automatic retries. Each of these is a plausible, distinct explanation for a hard ceiling. All three land on the identical 200-genome result. That rules out flakiness — this is deterministic, reproducible behavior, not bad luck. At that point, chasing it further stops being worth the time. The best working theory, never fully confirmed, is that the installed version of `ncbi-genome-download` (0.3.3) is too old to correctly parse how NCBI's current catalog structures its newer, higher-accession-number assemblies. The 200-genome ceiling gets accepted as a real wall, not a bug worth burning more of the week on.
+that's suspicious enough to chase properly. three separate, independent changes get tried: lowering parallelism (already done), fixing the proxy (just done), and, suspecting a stale, possibly corrupted cache of NCBI's genome catalog left over from the earlier flaky-network attempts, wiping the download tool's cache entirely and adding automatic retries. each of these is a plausible, distinct explanation for a hard ceiling. all three land on the identical 200-genome result. that rules out flakiness, this is deterministic, reproducible behavior, not bad luck. at that point, chasing it further stops being worth the time. the best working theory, never fully confirmed, is that the installed version of `ncbi-genome-download` (0.3.3) is too old to correctly parse how NCBI's current catalog structures its newer, higher-accession-number assemblies. the 200-genome ceiling gets accepted as a real wall, not a bug worth burning more of the week on.
 
-Here's the whole chain in one picture:
+here's the whole chain in one picture:
 
 ```mermaid
 flowchart TD
@@ -199,33 +199,33 @@ flowchart TD
     G --> H["Built 2 working indexes instead:<br/>sample_targeted (6 genomes)<br/>+ eskape_200 (200 genomes)"]
 ```
 
-### Meanwhile: the fast path that didn't wait around
+### meanwhile: the fast path that didn't wait around
 
-While the big download was busy failing in the background, a smaller, faster path was sitting in plain sight. Not everything had been lost — a folder called `sample_targeted` had survived intact, complete with its taxonomy files and 12 genome files inside it. Sorting out which of those were real and which were unrelated duplicates left exactly 6 usable genomes, covering 6 distinct ESKAPE-relevant organisms (including a bonus E. coli reference not in the strict ESKAPE list).
+while the big download was busy failing in the background, a smaller, faster path was sitting in plain sight. not everything had been lost, a folder called `sample_targeted` had survived intact, complete with its taxonomy files and 12 genome files inside it. sorting out which of those were real and which were unrelated duplicates left exactly 6 usable genomes, covering 6 distinct ESKAPE-relevant organisms (including a bonus E. coli reference not in the strict ESKAPE list).
 
-There was no reason to wait for 1,149 genomes to trickle in before doing anything. Those 6 genomes got concatenated into a single FASTA file and fed straight into `centrifuge-build` — with one small snag along the way (the build script's shebang line — the first line of a script, telling the system which program should run it — expected a `python` command, and Luna only ships `python3`, fixed with a one-line symlink). Once that was sorted, the build finished in 12 seconds. That's the first Centrifuge index this project ever produced, and it came from the small, already-available data — not the download that was still struggling. Not blocking on the slow path meant there was already something to run classification against long before the 200-genome question was settled.
+there was no reason to wait for 1,149 genomes to trickle in before doing anything. those 6 genomes got concatenated into a single FASTA file and fed straight into `centrifuge-build`, with one small snag along the way (the build script's shebang line, the first line of a script that tells the system which program should run it, expected a `python` command, and Luna only ships `python3`, fixed with a one-line symlink). once that was sorted, the build finished in 12 seconds. that's the first Centrifuge index this project ever produced, and it came from the small, already-available data, not the download that was still struggling. not blocking on the slow path meant there was already something to run classification against long before the 200-genome question was settled.
 
-### What actually got built
+### what actually got built
 
-The 1,149-genome index from the original plan never happened this week, and per the reasoning above, it isn't clear it will without either a tool upgrade or a different download strategy. What did happen: two working Centrifuge indexes, built at two different scales. The small one — 6 genomes, `sample_targeted`, 12-second build — was ready almost immediately. The mid-scale one — 200 genomes, the real re-downloaded data, roughly 40x more sequence — took a lot longer to build, just over an hour, which tracks: more raw data in, more compute to index it. Neither matches the original ~1,149-genome plan. Both are real, usable, and gave the project something concrete to classify reads against instead of nothing.
+the 1,149-genome index from the original plan never happened this week, and per the reasoning above, it isn't clear it will without either a tool upgrade or a different download strategy. what did happen: two working Centrifuge indexes, built at two different scales. the small one, 6 genomes, `sample_targeted`, 12-second build, was ready almost immediately. the mid-scale one, 200 genomes, the real re-downloaded data, roughly 40x more sequence, took a lot longer to build, just over an hour, which tracks: more raw data in, more compute to index it. neither matches the original ~1,149-genome plan. both are real, usable, and gave the project something concrete to classify reads against instead of nothing.
 
-So — two indexes, built the hard way. The next question is what actually happens when you run real sequencing reads through them, and how that compares to what Kraken2 already told you about the same data.
+so, two indexes, built the hard way. the next question is what actually happens when real sequencing reads run through them, and how that compares to what Kraken2 already told us about the same data.
 
 ---
 
-## Part C: Benchmark Results — and the 96-Thread Collapse
+## Part C: benchmark results, and the 96-thread collapse
 
-### What we measured
+### what we measured
 
-You now know how the two tools search (Part A). Here's what actually happened when we ran them — the measurement tools (`perf`, IPC, cache-miss rates) get explained as they come up below.
+we now know how the two tools search (Part A). here's what actually happened when we ran them, the measurement tools (`perf`, IPC, cache-miss rates) get explained as they come up below.
 
-Both tools classified the exact same input: 104,918 real nanopore sequencing reads, the project's standard test set. Both ran against comparable reference data — a small 6-genome database (`sample_targeted`) and a larger, more realistic one (Kraken2's `eskape_650mb`, Centrifuge's independently-rebuilt 200-genome `eskape_200`, both built around the same six ESKAPE pathogen species). Both ran at three thread counts: 1, 32, and 96. Every run was instrumented with `perf stat`, capturing wall-clock time, cache/LLC-miss rates, and IPC for each configuration.
+both tools classified the exact same input: 104,918 real nanopore sequencing reads, the project's standard test set. both ran against comparable reference data, a small 6-genome database (`sample_targeted`) and a larger, more realistic one (Kraken2's `eskape_650mb`, Centrifuge's independently-rebuilt 200-genome `eskape_200`, both built around the same six ESKAPE pathogen species). both ran at three thread counts: 1, 32, and 96. every run was instrumented with `perf stat`, capturing wall-clock time, cache/LLC-miss rates, and IPC for each configuration.
 
-That gives you a like-for-like comparison at two database scales and three thread counts — six runs per tool, twelve runs total, all on the same machine (Luna).
+that gives a like-for-like comparison at two database scales and three thread counts, six runs per tool, twelve runs total, all on the same machine (Luna).
 
-### The headline number: Centrifuge is several times slower
+### the headline number: Centrifuge is several times slower
 
-Here's the wall-clock time each tool actually took, in seconds, across both databases and all three thread counts:
+here's the wall-clock time each tool actually took, in seconds, across both databases and all three thread counts:
 
 | Threads | Kraken2 (`sample_targeted`) | Centrifuge (`sample_targeted`) | Kraken2 (`eskape_650mb`/`200`) | Centrifuge (`eskape_200`) |
 |---|---|---|---|---|

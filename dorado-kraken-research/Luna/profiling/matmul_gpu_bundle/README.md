@@ -1,9 +1,10 @@
 # matmul_gpu_bundle
 
-Self-contained GPU matrix-multiply benchmark suite for Luna.
-Mirrors the CPU bundle structure - send the whole folder, run `./run_all.sh`, pull `gpu_results/` back.
+Self-contained GPU matrix-multiply benchmark suite for Luna. Mirrors the CPU bundle structure: send the whole folder, run `./run_all.sh`, pull `gpu_results/` back.
 
 ## Prerequisites on Luna
+
+Check these before running anything, since a missing GPU is the one failure mode that isn't recoverable:
 
 ```bash
 nvidia-smi          # confirm a GPU exists and driver is loaded
@@ -11,7 +12,7 @@ nvcc --version      # CUDA toolkit
 which ncu nsys      # Nsight Compute + Nsight Systems (usually ship with CUDA)
 ```
 
-If `nvidia-smi` reports no device, Luna doesn't have a GPU attached and none of this will run - skip the GPU work and use the negative result ("the production server is CPU-only") as the slide for Kolin sir.
+If `nvidia-smi` reports no device, Luna doesn't have a GPU attached and none of this will run. Skip the GPU work and use the negative result ("the production server is CPU-only") as the slide for Kolin sir.
 
 ## Variants (7 total)
 
@@ -25,7 +26,7 @@ If `nvidia-smi` reports no device, Luna doesn't have a GPU attached and none of 
 | `cublas_tensor` | cuBLAS with TF32 Tensor Cores (Ampere+). Expected ~8x over `cublas_sgemm`. |
 | `wmma_manual` | Manual FP16 Tensor Core programming via the WMMA C++ API. Shows what cuBLAS does under the hood. |
 
-All variants use **single-precision (float)**. CPU baseline was double - documented intentional difference; modern GPU hardware (Tensor Cores) doesn't optimise for FP64.
+All variants use **single-precision (float)**. CPU baseline was double, a documented intentional difference: modern GPU hardware (Tensor Cores) doesn't optimise for FP64.
 
 ## How to run on Luna
 
@@ -65,7 +66,7 @@ make ARCH=sm_86   # RTX 30-series / A40
 
 ## What to compare against CPU
 
-Once `gpu_results/timing/all_timing.txt` is filled, the headline cross-platform comparison:
+This comparison is the actual point of the GPU bundle, so once `gpu_results/timing/all_timing.txt` is filled, build the headline cross-platform comparison:
 
 | N=10000 | CPU best (Luna pending) | GPU best (cublas_tensor) | Ratio |
 |---|---|---|---|

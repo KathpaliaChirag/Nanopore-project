@@ -1,14 +1,14 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+this file gives Claude Code (claude.ai/code) guidance for working with code in this repository.
 
 ---
 
 ## Project Purpose
 
-Research project profiling and optimising a clinical diagnostic pipeline for ESKAPE antibiotic-resistant pathogens from nanopore sequencing data. Two tools are profiled: **dorado** (GPU basecaller) and **kraken2** (CPU k-mer classifier). The primary optimisation target is `CompactHashTable::Get()` inside kraken2 - it generates 96.24% of all LLC misses despite being only 0.65% of instructions.
+this project profiles and optimises a clinical diagnostic pipeline for ESKAPE antibiotic-resistant pathogens, built from nanopore sequencing data. two tools get profiled: **dorado** (GPU basecaller) and **kraken2** (CPU k-mer classifier). the primary optimisation target is `CompactHashTable::Get()` inside kraken2: it generates 96.24% of all LLC misses despite being only 0.65% of instructions.
 
-All authoritative perf numbers come from **Luna** (bare metal Sapphire Rapids). WSL2 hardware counters are unreliable (Hyper-V inflates IPC 4–14×; LLC-load-misses unsupported).
+all authoritative perf numbers come from **Luna** (bare metal Sapphire Rapids). WSL2 hardware counters aren't reliable: Hyper-V inflates IPC 4–14×, and LLC-load-misses aren't supported.
 
 ---
 
@@ -20,13 +20,13 @@ All authoritative perf numbers come from **Luna** (bare metal Sapphire Rapids). 
 | Orion | `jetsonagx@10.154.233.173` | ARM64 Jetson AGX Orin 64 GB, campus network only |
 | Minerva | CK account | Blocked - disk 100% full |
 
-Luna account is **student** (shared). Orion account is **jetsonagx**. Our Minerva account is **CK** (not "chirag" - that is Chirag Suthar, a different person).
+Luna account is **student** (shared). Orion account is **jetsonagx**. our Minerva account is **CK** (not "chirag", that's Chirag Suthar, a different person).
 
-`perf_event_paranoid` on Luna is currently 0 - all hardware events available without root.
+`perf_event_paranoid` on Luna is currently 0, so all hardware events are available without root.
 
 ### Luna internet access (do this BEFORE any download/install that needs external internet)
 
-Luna needs **two separate things** for outbound internet - missing either one causes intermittent/hanging connections (some requests connect fine, others hang for minutes then time out) that look like a rate-limit or flaky-tool problem but aren't. Discovered 2026-07-01 after a long detour debugging `ncbi-genome-download` failures that were actually this.
+Luna needs **two separate things** for outbound internet. miss either one and connections turn intermittent: some requests connect fine, others hang for minutes then time out. that looks like a rate-limit or flaky-tool problem, but it isn't. we found this 2026-07-01 after a long detour debugging `ncbi-genome-download` failures that turned out to be this.
 
 ```bash
 tmux                                                              # persistent session - login daemon must keep running
@@ -40,7 +40,7 @@ export https_proxy=http://proxy62.iitd.ac.in:3128
 export http_proxy=http://proxy62.iitd.ac.in:3128
 ```
 
-Add the four `export` lines to `~/.bashrc` so they persist across logins. If external connections (wget/curl/pip/ncbi-genome-download/etc.) are hanging or intermittently failing on Luna, check this first before assuming the remote server or the tool is broken.
+add the four `export` lines to `~/.bashrc` so they persist across logins. if external connections (wget/curl/pip/ncbi-genome-download/etc.) hang or fail intermittently on Luna, check this first before assuming the remote server or the tool is broken.
 
 ---
 
@@ -73,12 +73,12 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
   /home/student/results/basecalling/reads_hac.fastq
 ```
 
-Optimal config: **32T + numactl node0** (baseline 4.405s). This gives 21.8% free improvement over 96T no-pin. Thread sweet spot is 32T - beyond that, cache thrashing and contention outweigh parallelism.
+optimal config: **32T + numactl node0** (baseline 4.405s). this gives a 21.8% free improvement over 96T no-pin. the thread sweet spot is 32T; beyond that, cache thrashing and contention outweigh parallelism.
 
 Key derived metrics:
 - `LLC Miss Rate% = LLC-load-misses / LLC-loads × 100`
 - `IPC = instructions / cycles`
-- Do NOT use `stalled-cycles-backend` - unsupported on Sapphire Rapids. Use `cycle_activity.stalls_l3_miss` instead.
+- Do NOT use `stalled-cycles-backend`, it's unsupported on Sapphire Rapids. use `cycle_activity.stalls_l3_miss` instead.
 
 ---
 
@@ -93,7 +93,7 @@ sudo /usr/lib/linux-tools-5.4.0-26/perf stat \
   ~/reads/reads_hac.fastq
 ```
 
-Orion thread counts: 1, 2, 4, 6, 8, 10, 12. No numactl (single NUMA node). Requires sudo for perf. On Orion, `cache-references` maps to L1D (not LLC) - `Cache Miss Rate%` column is not comparable to Luna. Use `LLC Miss Rate%` for cross-machine comparison.
+Orion thread counts: 1, 2, 4, 6, 8, 10, 12. no numactl (single NUMA node). requires sudo for perf. on Orion, `cache-references` maps to L1D (not LLC), so the `Cache Miss Rate%` column isn't comparable to Luna. use `LLC Miss Rate%` for cross-machine comparison.
 
 ---
 
@@ -120,7 +120,7 @@ GPU variants (in `Luna/profiling/matmul_gpu_bundle/`): build with `nvcc`, run `.
 
 ## Applying the Kraken2 Optimisation Patch
 
-The patch is at `Luna/experiments/kraken2_opt_v1.patch`. It implements 4 patches:
+the patch lives at `Luna/experiments/kraken2_opt_v1.patch`. it implements 4 patches:
 1. Makefile: `-march=sapphirerapids -flto -funroll-loops`
 2. `mmap_file.cc`: `MADV_HUGEPAGE + MADV_WILLNEED + MADV_RANDOM`
 3. `compact_hash.h Get()`: `__builtin_prefetch` one cache line ahead
@@ -139,7 +139,7 @@ git apply --whitespace=nowarn kraken2_opt_v1.patch
 cd src && make -s clean && make -s -j 96
 ```
 
-**M1–M7 are done (as of 2026-06-26), except M6.** Results: `Luna/profiling/pending/*.txt`, decisions in `AccuracyDrift/patches.md`, summary in `README.md` §12a. All four patches are a **go**, two revised upward from original estimates:
+**M1–M7 are done (as of 2026-06-26), except M6.** results are in `Luna/profiling/pending/*.txt`, decisions in `AccuracyDrift/patches.md`, summary in `README.md` §12a. all four patches are a **go**, two revised upward from original estimates:
 - M1: load factor ≈0.70 all DBs, 32-bit cells (sample_targeted is 26+6), PF_STRIDE=16 confirmed correct
 - M2: dTLB-load-miss 0.05–0.32% - Patch 2 (huge pages) still worth applying, smaller win than feared
 - M3: top LLC-miss line is the kernel page-fault/page-walk handler (33–75% of misses depending on DB size), not `Get()` itself (2–11%) - motivates huge pages more than expected
@@ -148,13 +148,13 @@ cd src && make -s clean && make -s -j 96
 - M6: **not run** - low priority (only matters if revisiting NUMA beyond 32T)
 - M7: 0 AVX-512, 0 AVX2, 1308 SSE instructions in the binary - no vectorisation at all → Patch 1 (compile flags) revised **−8% → −15–25%**
 
-**The patch itself has NOT been applied or benchmarked yet.** `run_kraken2_opt_v1.sh` has never been executed - the wall-time numbers in README.md §12a (4.405s → 1.92s) are projected from the M1–M7 estimates above, not measured. `docs/reports/kraken2_optimisation_report.md` Section 6 is still a TBD stub. Running the patch and filling Section 6 is the single highest-priority remaining task on the Kraken2 side.
+**the patch itself has NOT been applied or benchmarked yet.** `run_kraken2_opt_v1.sh` has never been executed, so the wall-time numbers in README.md §12a (4.405s → 1.92s) are projected from the M1–M7 estimates above, not measured. `docs/reports/kraken2_optimisation_report.md` Section 6 is still a TBD stub. running the patch and filling Section 6 is the single highest-priority remaining task on the kraken2 side.
 
 ---
 
 ## Building the Custom ESKAPE Database (scripts/)
 
-The three scripts in `scripts/` were used for the original 650 MB ESKAPE database on WSL2. Current databases on Luna are rebuilt - use `AccuracyDrift/README.md` for the current build procedure (requires `ncbi-genome-download`; rsync is blocked on Luna so taxonomy must be downloaded via wget).
+the three scripts in `scripts/` built the original 650 MB ESKAPE database on WSL2. current databases on Luna are rebuilt, so use `AccuracyDrift/README.md` for the current build procedure (requires `ncbi-genome-download`; rsync is blocked on Luna, so taxonomy has to come down via wget).
 
 ```bash
 # Tag genomes with taxids (old WSL2 workflow, kept for reference)
@@ -167,7 +167,7 @@ python3 scripts/fix_prelim_maps.py
 
 ## Repository Architecture
 
-This is a **research documentation repo**, not a software project. There is no build system at the repo root and no tests to run locally. Source code (.c, .cu, .py, .patch) is included for reference and to be deployed to Luna/Orion via rsync/scp.
+this is a **research documentation repo**, not a software project. there's no build system at the repo root and no tests to run locally. source code (.c, .cu, .py, .patch) is included for reference, and gets deployed to Luna/Orion via rsync/scp.
 
 Key document relationships:
 
@@ -216,7 +216,7 @@ Luna/
 | Amdahl-limited | standard_8gb, standard_16gb | Serial DB mmap load dominates, 3–3.5× ceiling |
 | DRAM-saturated | pluspf_103gb 103 GB | >90% LLC miss at any thread count, ~1.71× peak - near-zero headroom |
 
-Cache cliff on Luna is between 50 MB and 142 MB (LLC is 210 MB but random hash access exhausts effective capacity earlier). Every DB is post-cliff on Orion (SLC = 4 MB).
+the cache cliff on Luna sits between 50 MB and 142 MB (LLC is 210 MB, but random hash access exhausts effective capacity earlier). every DB is post-cliff on Orion (SLC = 4 MB).
 
 ---
 
@@ -236,7 +236,7 @@ Cache cliff on Luna is between 50 MB and 142 MB (LLC is 210 MB but random hash a
 
 ## What Is Not Done Yet
 
-**New direction (2026-07-25):** Kolin sir emailed asking to continue this work toward two thesis pieces, both benchmarked against **Centrifuge** (not evaluated anywhere in this repo yet). See root `CLAUDE.md` and `README.md` for the full context, and `docs/reports/kraken2opti_report.tex` §5 for the "three items of future work" sir referenced. Neither thesis has started:
+**new direction (2026-07-25):** Kolin sir emailed asking to continue this work toward two thesis pieces, both benchmarked against **Centrifuge** (not evaluated anywhere in this repo yet). see root `CLAUDE.md` and `README.md` for the full context, and `docs/reports/kraken2opti_report.tex` §5 for the "three items of future work" sir referenced. neither thesis has started:
 
 - **Thesis 1 - Hardware-Aware Adaptive K-mer Cache**: extends Patch 4 (below) into a 4-way set-associative baseline, LLC-topology-aware cache sizing, and a biology-dependent adaptive eviction policy.
 - **Thesis 2 - Cell-Width Reduction + Double Hashing**: extends the completed cell-width experiment (`docs/reports/kraken2opti_report.tex`) with its three unimplemented future-work items - (1) a merged latency-hiding lookup cache combining this thesis's design with Thesis 1's, (2) switching Kraken2's default linear probing to double hashing to shrink the false-positive cliff, (3) a 6-bit-per-organism bitmask cell.

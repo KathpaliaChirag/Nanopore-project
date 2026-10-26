@@ -1,4 +1,4 @@
-# Kraken2 CompactHashTable::Get() — Source-Verified Optimisation Patches
+# Kraken2 CompactHashTable::Get() - Source-Verified Optimisation Patches
 
 **Source read from:** https://github.com/DerrickWood/kraken2 (master, as of 2026-05-29)
 **Files used:** `src/compact_hash.h`, `src/kv_store.h`, `src/classify.cc`, `src/mmscanner.cc`, `src/mmap_file.cc`, `src/Makefile`
@@ -8,7 +8,7 @@
 
 ## 0. Three corrections to the inferred Get() in the goal
 
-The goal's pseudocode assumes 64-bit cells, linear probing, simple key comparison. The real code in `src/compact_hash.h` differs on three points that change what optimisations make sense:
+the goal's pseudocode assumes 64-bit cells, linear probing, simple key comparison. the real code in `src/compact_hash.h` differs on three points. those differences change what optimisations make sense:
 
 ### 0.1 Cells are 32-bit or 40-bit packed, not 64-bit
 ```cpp
@@ -17,37 +17,37 @@ struct CompactHashCell40 { uint32_t a; uint8_t b; } __attribute__((packed));  //
 ```
 - 32-bit cell → 16 cells per 64-byte cache line
 - 40-bit cell → 12 cells per 64-byte cache line (misaligned, packed)
-- The cell type is decided at DB-load time by `GetKVStoreCellType()` reading `key_bits + value_bits` from the header (32 or 40).
+- the cell type is decided at DB-load time by `GetKVStoreCellType()` reading `key_bits + value_bits` from the header (32 or 40)
 
-**Implication:** linear probing already touches many consecutive cells per cache line, so software prefetch needs to skip ≥1 cache line ahead (16 or 12 cells, not 1) to actually overlap with DRAM latency.
+**implication:** linear probing already touches many consecutive cells per cache line. software prefetch [a CPU hint that starts loading data before it's needed, so the wait is hidden] needs to skip ≥1 cache line ahead (16 or 12 cells, not 1) to actually overlap with DRAM latency.
 
 ### 0.2 The default Makefile already enables LINEAR_PROBING
 ```makefile
 CXXFLAGS = $(KRAKEN2_SKIP_FOPENMP) -Wall -std=c++11 -O3 -fPIC -g
 CXXFLAGS += -DLINEAR_PROBING
 ```
-`second_hash()` returns 1 under this flag. So adjacent probes are adjacent cells (HW prefetcher can help). If the DB was built with this flag — which is standard — switching it off would require rebuilding the DB.
+`second_hash()` returns 1 under this flag, so adjacent probes land on adjacent cells and the HW prefetcher [a CPU unit that predicts and preloads upcoming memory] can help. most DBs are built with this flag, which is standard. if yours is, switching it off would require rebuilding the DB.
 
-**Implication:** the "every probe is a random L3 miss" story in the goal is wrong. Most probes inside a cluster live on the same cache line as the prior probe. The 96.24 % cachegrind miss rate likely means: first probe of each Get() misses LLC, then several probes hit L1/L2 from the same line, then we cross a line and miss again. So ~30 misses/call ≈ ~30 cache-line crossings × very long probe chains under high load factor (need to confirm with `size_/capacity_`).
+**implication:** the "every probe is a random L3 miss" story in the goal is wrong. most probes inside a cluster live on the same cache line as the prior probe. the 96.24% cachegrind miss rate likely means this: the first probe of each Get() misses LLC [last-level cache, the biggest and slowest cache before DRAM], then several probes hit L1/L2 from that same line, then we cross a line and miss again. so ~30 misses per call is roughly ~30 cache-line crossings, multiplied by very long probe chains under high load factor (need to confirm with `size_/capacity_`).
 
 ### 0.3 `hash->Get()` is virtual through `KeyValueStore`
 ```cpp
 class KeyValueStore { virtual hvalue_t Get(hkey_t key) const = 0; };
 ```
-Every call from classify.cc pays one vtable load. Cheap fix is LTO; one-shot devirtualisation needs templating the classify loop on cell type.
+every call from classify.cc pays one vtable load [the lookup a program does to find the right virtual function at runtime, instead of knowing it at compile time]. LTO [link-time optimisation, letting the compiler see across files when it optimises] is the cheap fix for this. one-shot devirtualisation needs templating the classify loop on cell type instead.
 
 ### 0.4 classify.cc already has a 1-entry "cache"
 ```cpp
 if (*minimizer_ptr != last_minimizer) { ... taxon = hash->Get(*minimizer_ptr); ... }
 else { taxon = last_taxon; }
 ```
-The 9.87M Get() calls (gprof, 1T) are already after this skip. A bigger thread-local LRU must out-perform this same-as-last-minimizer skip to be worth it.
+the 9.87M Get() calls (gprof, 1T) are already after this skip. a bigger thread-local LRU [least-recently-used, a cache eviction policy that discards the entry accessed longest ago] cache has to outperform this same-as-last-minimizer skip to be worth adding.
 
 ---
 
 ## 1. Cheap measurements to run on Luna before patching
 
-These confirm cell type, load factor, and DTLB pressure — they decide whether prefetch stride should be 16 or 12, and whether huge pages will help.
+we need these numbers before touching any code, because they decide two of the patch parameters below: whether prefetch stride should be 16 or 12, and whether huge pages are worth adding. they confirm cell type, load factor, and DTLB [data translation lookaside buffer, a small CPU cache that maps memory addresses to physical pages] pressure.
 
 ```bash
 # 1. Read the hash.k2d header (capacity, size, key_bits, value_bits)
@@ -75,14 +75,14 @@ cat /sys/kernel/mm/transparent_hugepage/enabled
 # Want [always] or [madvise]
 ```
 
-If load factor > 0.95 → linear probing is producing long clusters → prefetch will help a lot.
-If DTLB-load-misses > 1 % of dTLB-loads → huge pages will help.
+if load factor > 0.95, linear probing is producing long clusters, so prefetch will help a lot.
+if DTLB-load-misses > 1% of dTLB-loads, huge pages will help.
 
 ---
 
-## 2. Patches — apply in this order, measure after each
+## 2. Patches - apply in this order, measure after each
 
-All patches target `~/kraken2-src/src/`. After every patch:
+all patches target `~/kraken2-src/src/`. after every patch:
 ```bash
 cd ~/kraken2-src/src && make clean && make -j 96
 cp classify ~/kraken2-build/
@@ -98,15 +98,15 @@ numactl --cpunodebind=0 --membind=0 \
   ~/kraken2-build/classify -H ... -p 32 -O /dev/null reads_hac.fastq
 ```
 
-Compare wall time to 4.405 s and LLC-load-misses to the prior best.
+compare wall time to 4.405 s and LLC-load-misses to the prior best.
 
 ---
 
-### Patch 1 — software prefetch in the probe loop (Proposal E)
+### Patch 1 - software prefetch in the probe loop (Proposal E)
 
-**Why it helps given the numbers:** 96 % of LLC misses are in Get(). With linear probing, probe N+stride is one cache line ahead. Issuing `__builtin_prefetch` for that line each iteration starts a DRAM read ~100 ns before the load that needs it; the load now hits L1 instead of stalling on L3 miss.
+**why it helps given the numbers:** 96% of LLC misses are in Get(). with linear probing, probe N+stride is one cache line ahead. issuing `__builtin_prefetch` for that line each iteration starts a DRAM read ~100 ns before the load that needs it, so the load now hits L1 instead of stalling on an L3 miss.
 
-**Edit `src/compact_hash.h`, replace the existing `Get()` body:**
+**edit `src/compact_hash.h`, replace the existing `Get()` body:**
 
 ```cpp
 template<typename Cell>
@@ -141,17 +141,17 @@ hvalue_t CompactHashTable<Cell>::Get(hkey_t key) const {
 }
 ```
 
-**Expected delta:** −5 % to −15 % wall time. The HW prefetcher already streams ahead under linear probing, but only ~2 lines; explicit prefetch extends that further and works around double-hashing if LINEAR_PROBING were ever turned off.
+**expected delta:** −5% to −15% wall time. the HW prefetcher already streams ahead under linear probing, but only ~2 lines. explicit prefetch extends that further, and it works around double hashing if LINEAR_PROBING were ever turned off.
 
-**Risk:** zero — same semantics, prefetch is a no-op hint.
+**risk:** zero. same semantics, prefetch is a no-op hint.
 
 ---
 
-### Patch 2 — MADV_HUGEPAGE + MADV_WILLNEED on the mmap'd hash table (Memory layout)
+### Patch 2 - MADV_HUGEPAGE + MADV_WILLNEED on the mmap'd hash table (Memory layout)
 
-**Why it helps:** 8 GB / 4 KB pages = 2 097 152 page entries; Sapphire Rapids DTLB has ~96 4 KB entries → constant DTLB misses on random-ish probes (each miss adds ~10 ns and possibly a page-walk LLC miss). 2 MB huge pages → 4096 page entries, fits comfortably in second-level TLB (1024–2048 entries). Each DTLB miss saved ≈ 1 cache line of page-walk traffic avoided too.
+**why it helps:** 8 GB over 4 KB pages works out to 2,097,152 page entries. Sapphire Rapids' DTLB only holds ~96 4 KB entries, so random-ish probes cause constant DTLB misses, and each miss adds ~10 ns and possibly a page-walk LLC miss on top. switching to 2 MB huge pages [larger memory pages that need far fewer TLB entries to cover the same data] cuts that to 4,096 page entries, which fits comfortably in the second-level TLB (1,024-2,048 entries). each DTLB miss saved also avoids roughly one cache line of page-walk traffic.
 
-**Edit `src/mmap_file.cc`, inside `OpenFile()` after the `mmap` call:**
+**edit `src/mmap_file.cc`, inside `OpenFile()` after the `mmap` [memory-map, mapping a file directly into a process's address space instead of reading it into a buffer] call:**
 
 ```cpp
   fptr_ = (char *) mmap(0, filesize_, prot_flags, map_flags, fd_, 0);
@@ -168,28 +168,28 @@ hvalue_t CompactHashTable<Cell>::Get(hkey_t key) const {
   valid_ = true;
 ```
 
-Order matters: `MADV_HUGEPAGE` first, then `WILLNEED`, then `RANDOM` (tells the kernel to skip its readahead because access is non-sequential). Add `#include <sys/mman.h>` if not already in this file (it is, via `kraken2_headers.h`).
+order matters here: `MADV_HUGEPAGE` first, then `WILLNEED`, then `RANDOM` (this tells the kernel to skip its readahead, since access is non-sequential). add `#include <sys/mman.h>` if it isn't already in this file (it is, via `kraken2_headers.h`).
 
-**Prereq on Luna:**
+**prereq on Luna:**
 ```bash
 cat /sys/kernel/mm/transparent_hugepage/enabled
 # If "never", run: echo madvise | sudo tee /sys/kernel/mm/transparent_hugepage/enabled
 ```
 
-**Expected delta:** −3 % to −8 % wall time, primarily from dTLB-load-misses dropping by 10–100×.
+**expected delta:** −3% to −8% wall time, mostly from dTLB-load-misses dropping by 10-100×.
 
-**Risk:** none for query path; build path also goes through MMapFile but is unaffected.
+**risk:** none for the query path. the build path also goes through MMapFile, but it's unaffected.
 
 ---
 
 ### Patch 3 — compiler flags: -march=sapphirerapids + LTO + -funroll-loops
 
-**Why it helps:**
-- `-march=sapphirerapids` enables BMI2 / AVX-512 / ADX, lets the compiler use `MULX`, fast `POPCNT`, and 512-bit ops in `MurmurHash3`. (MurmurHash is called once per Get() and dominates the compute-portion of cold misses.)
-- `-flto` lets the compiler inline `hash->Get()` across translation units (devirtualisation), eliminating the vtable load and probably inlining the whole Get() into ClassifySequence's inner loop.
-- `-funroll-loops` lets the compiler unroll the probe loop and overlap prefetch + compare cycles.
+**why it helps:**
+- `-march=sapphirerapids` enables BMI2 / AVX-512 / ADX, and lets the compiler use `MULX`, fast `POPCNT`, and 512-bit ops in `MurmurHash3`. MurmurHash is called once per Get() and dominates the compute portion of cold misses.
+- `-flto` lets the compiler inline `hash->Get()` across translation units (devirtualisation), which eliminates the vtable load and probably inlines the whole Get() into ClassifySequence's inner loop.
+- `-funroll-loops` lets the compiler unroll the probe loop and overlap prefetch and compare cycles.
 
-**Edit `src/Makefile`:**
+**edit `src/Makefile`:**
 
 ```makefile
 -CXXFLAGS = $(KRAKEN2_SKIP_FOPENMP) -Wall -std=c++11 -O3 -fPIC -g
@@ -201,27 +201,27 @@ cat /sys/kernel/mm/transparent_hugepage/enabled
 +LDFLAGS  += -flto=auto -fuse-linker-plugin
 ```
 
-If you want to keep portability across nodes, swap `-march=sapphirerapids` for `-march=native` on the build host.
+if you want to keep portability across nodes, swap `-march=sapphirerapids` for `-march=native` on the build host.
 
-**Expected delta:** −5 % to −12 % wall time (mostly from devirtualisation + tighter inner loop).
+**expected delta:** −5% to −12% wall time, mostly from devirtualisation and a tighter inner loop.
 
-**Risk:** none on Sapphire Rapids. The binary won't run on older Xeons — acceptable for a Luna-only build.
+**risk:** none on Sapphire Rapids. the binary won't run on older Xeons, which is fine for a Luna-only build.
 
 ---
 
 ### Patch 4 — thread-local direct-mapped k-mer cache (Proposal A, lean version)
 
-**Why it helps:** the existing same-as-last-minimizer skip catches sliding-window collisions but not cross-window or cross-read reuse. Microbial reads have heavy k-mer redundancy; a 16 K-entry direct-mapped cache costs 256 KB per thread (fits in L2 on Sapphire Rapids: 2 MB / core) and intercepts a meaningful fraction of Get() calls. Every hit avoids ~30 LLC misses ≈ ~3 µs of DRAM latency.
+**why it helps:** the existing same-as-last-minimizer skip catches sliding-window collisions, but not cross-window or cross-read reuse. microbial reads have heavy k-mer redundancy, and a 16K-entry direct-mapped cache costs only 256 KB per thread (fits in L2 on Sapphire Rapids: 2 MB/core), so it intercepts a meaningful fraction of Get() calls. every hit avoids ~30 LLC misses, roughly ~3 µs of DRAM latency.
 
-**Hit rate must be validated first** — use this awk script on a dump of all minimizer values for the hac input:
+**the hit rate has to be validated first.** run this awk script on a dump of all minimizer values for the hac input:
 ```bash
 ~/kraken2-build/classify ... 2>/dev/null | head -50000 > /dev/null   # placeholder
 # Better: instrument classify.cc to emit minimizers, then:
 sort minimizers.txt | uniq -c | awk '{n++; s+=$1; if ($1>1) r+=$1-1} END {print "unique="n, "total="s, "reuse_rate="r/s}'
 ```
-If `reuse_rate > 0.20`, patch is worth it.
+if `reuse_rate > 0.20`, the patch is worth it.
 
-**Edit `src/classify.cc`, add near top of file (after `using` declarations):**
+**edit `src/classify.cc`, add near top of file (after `using` declarations):**
 
 ```cpp
 namespace {
@@ -239,7 +239,7 @@ thread_local LRUEntry lru_cache[LRU_SIZE] = {};
 }  // namespace
 ```
 
-**Then in `ClassifySequence`, replace the inner Get() block:**
+**then in `ClassifySequence`, replace the inner Get() block:**
 
 ```cpp
           if (*minimizer_ptr != last_minimizer) {
@@ -267,30 +267,30 @@ thread_local LRUEntry lru_cache[LRU_SIZE] = {};
             last_minimizer = *minimizer_ptr;
 ```
 
-Notes:
-- We never store `key == 0` as a valid entry (the `e.key != 0` guard avoids treating a zero-initialised slot as a phantom hit if a real minimizer happened to be 0 — vanishingly unlikely but cheap to guard).
-- `thread_local` on a 256 KB array: the storage is per-thread but only initialised on first use of the thread. OpenMP threads persist for the whole run, so this is fine.
-- No synchronisation needed — each thread owns its slice.
+notes:
+- we never store `key == 0` as a valid entry. the `e.key != 0` guard exists so a zero-initialised slot never looks like a phantom hit if a real minimizer happens to be 0 (vanishingly unlikely, but cheap to guard against).
+- `thread_local` on a 256 KB array means the storage is per-thread but only initialised on first use of that thread. OpenMP threads persist for the whole run, so this is fine.
+- no synchronisation is needed, since each thread owns its slice.
 
-**Expected delta:** −10 % to −30 % wall time, conditional on reuse rate ≥ 20 %. Stacks with Patch 1 because the cache absorbs the cheapest calls and leaves the long-probe cases (which Patch 1 accelerates) for DRAM.
+**expected delta:** −10% to −30% wall time, conditional on reuse rate ≥ 20%. this stacks with Patch 1, because the cache absorbs the cheapest calls and leaves the long-probe cases, which Patch 1 accelerates, for DRAM.
 
-**Risk:** correctness preserved if `e.key == *minimizer_ptr` comparison is exact (it is, full 64-bit key compare). False hits impossible.
+**risk:** correctness is preserved as long as the `e.key == *minimizer_ptr` comparison is exact, and it is (full 64-bit key compare). false hits are impossible.
 
-**Tuning:** if profiling shows low hit rate, halve `LRU_BITS` to 13 (8 K entries, 128 KB / thread). If reuse is huge (cross-read dominant species), bump to 16 (64 K entries, 1 MB / thread — still fits L2).
+**tuning:** if profiling shows a low hit rate, halve `LRU_BITS` to 13 (8K entries, 128 KB/thread). if reuse is huge (a cross-read dominant species), bump it to 16 (64K entries, 1 MB/thread, still fits L2).
 
 ---
 
 ### Patch 5 — per-socket DB replica via interleave (NUMA, conditional)
 
-**Only apply if** `perf c2c` shows >10 % HITM events on the hash table region OR the 32T baseline is consistently better than 64T spread across both sockets (it is: 4.405 s @ node0-only vs ~5.6 s @ 96T). Skipping for now since current best is already node-bound.
+**only apply this if** `perf c2c` shows >10% HITM events on the hash table region, or the 32T baseline is consistently better than 64T spread across both sockets (it is: 4.405 s @ node0-only vs ~5.6 s @ 96T). skipping for now, since the current best is already node-bound.
 
-If we do want both sockets active at 64T+: mmap two copies (one per socket) and route threads to the local copy via `numa_alloc_local` after `numa_run_on_node`. That's a ~30-line patch to load_index + ProcessFiles — happy to write it once Patch 1–4 are measured.
+if we do want both sockets active at 64T+: mmap two copies (one per socket) and route threads to the local copy via `numa_alloc_local` [NUMA, non-uniform memory access, means each CPU socket has memory that's faster for it to reach than memory attached to the other socket] after `numa_run_on_node`. that's a ~30-line patch to load_index + ProcessFiles. happy to write it once Patch 1-4 are measured.
 
 ---
 
 ## 3. Expected combined result
 
-If each patch lands at the middle of its expected range and they stack independently (which they roughly do — different bottlenecks):
+if each patch lands at the middle of its expected range, and they stack independently (which they roughly do, since each targets a different bottleneck), this is what the run adds up to:
 
 | Patch | Mechanism | Independent delta | Cumulative |
 |---|---|---:|---:|
@@ -300,16 +300,16 @@ If each patch lands at the middle of its expected range and they stack independe
 | Patch 1 (prefetch) | DRAM latency hide | −10 % | 3.47 s |
 | Patch 4 (thread LRU) | skip DRAM entirely on hits | −20 % | 2.77 s |
 
-Target: ≤ 3.0 s wall, ≥ 30 % below the 4.405 s best. Stop if any patch lands at < 2 % delta.
+target: ≤3.0 s wall, ≥30% below the 4.405 s best. stop if any patch lands at <2% delta.
 
 ---
 
 ## 4. What I'm NOT proposing yet
 
-- **SIMD MinimizerScanner** — cachegrind shows zero LL misses there, gprof says 18.74 % of 1T runtime. Vectorising would help, but the queue-based sliding-window minimum is hard to SIMD-ify cleanly. Wait until Get() is no longer the bottleneck.
-- **Hash algorithm change (Robin Hood / cuckoo)** — requires rebuilding the 8 GB DB and changing on-disk format. Defer.
-- **DB compression** — would need uncore_imc cas_count first to confirm bandwidth-bound vs latency-bound. Right now indicators say latency-bound (low IPC + high stall %), so LRU/prefetch > compression.
-- **Sort minimizers by genomic locality before build** — DB build change, weeks of work.
+- **SIMD MinimizerScanner:** cachegrind shows zero LL misses there, and gprof says it's 18.74% of 1T runtime. vectorising would help, but the queue-based sliding-window minimum is hard to SIMD-ify [SIMD, single instruction multiple data, doing the same operation on several values at once] cleanly. wait until Get() is no longer the bottleneck.
+- **hash algorithm change (Robin Hood / cuckoo):** requires rebuilding the 8 GB DB and changing the on-disk format. defer.
+- **DB compression:** needs uncore_imc cas_count first, to confirm bandwidth-bound vs latency-bound. right now the indicators say latency-bound (low IPC, high stall %), so LRU and prefetch beat compression as the next move.
+- **sort minimizers by genomic locality before build:** a DB build change, weeks of work.
 
 ---
 
@@ -323,4 +323,4 @@ After each rebuild + run:
   if delta <  0  :   revert; investigate (compiler bug? cache thrash? false sharing?)
 ```
 
-Stop the whole programme when two consecutive patches both land below 2 % — diminishing returns; remaining wins are in DB-rebuild territory.
+stop the whole programme when two consecutive patches both land below 2%. at that point returns are diminishing, and any remaining wins live in DB-rebuild territory.

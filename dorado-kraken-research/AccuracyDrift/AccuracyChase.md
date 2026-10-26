@@ -1,6 +1,6 @@
 # AccuracyChase
 
-Goal: establish a gold-standard classification accuracy for each read model (reads_fast, reads_hac, reads_sup) using the largest practical Kraken2 database, then use those numbers as the accuracy ceiling when evaluating smaller or custom databases.
+goal: establish a gold-standard classification accuracy for each read model (reads_fast, reads_hac, reads_sup) using the largest practical Kraken2 database, then use those numbers as the accuracy ceiling when evaluating smaller or custom databases.
 
 ---
 
@@ -27,7 +27,7 @@ All hosted at `https://genome-idx.s3.amazonaws.com/kraken/`. Sizes are post-extr
 
 ## Target Database: PlusPF (103.4 GB)
 
-**Why PlusPF:** Standard covers the bacterial/viral/human scope already tested in AccuracyDrift. PlusPF adds protozoa and fungi — only 6.6 GB larger than Standard but ensures any fungal reads (e.g. Candida, common in nosocomial infections matching this sample's profile) are correctly classified rather than left unclassified or misassigned. For a gold-standard accuracy ceiling, missing an entire kingdom is not acceptable.
+**why PlusPF:** we need a gold-standard ceiling, so missing an entire kingdom isn't acceptable. Standard already covers the bacterial/viral/human scope tested in AccuracyDrift, but it has no protozoa or fungi. PlusPF adds both, for only 6.6 GB more than Standard, so it correctly classifies fungal reads (e.g. Candida, common in nosocomial infections matching this sample's profile) instead of leaving them unclassified or misassigned.
 
 **Contents:** archaea, bacteria, viral, plasmid, human, UniVec, protozoa, fungi (all from RefSeq).
 
@@ -47,7 +47,7 @@ tar -xzf k2_pluspf_20260226.tar.gz -C ~/AccuracyDrift/databases/pluspf_103gb/
 
 ## Results
 
-### Classification Accuracy — Gold-Standard Ceiling (Luna, 32T, cold run, 2026-06-13)
+### Classification Accuracy: Gold-Standard Ceiling (Luna, 32T, cold run, 2026-06-13)
 
 | Read model | Classified% | Unclassified% | Cache Miss Rate% | LLC Miss Rate% | IPC | Wall time (s) |
 |------------|-------------|---------------|-----------------|----------------|-----|---------------|
@@ -55,25 +55,25 @@ tar -xzf k2_pluspf_20260226.tar.gz -C ~/AccuracyDrift/databases/pluspf_103gb/
 | reads_hac  | 98.86 | 1.14 | 94.18 | 91.07 | 0.97 | 57.17 |
 | reads_sup  | 99.24 | 0.76 | 94.16 | 91.21 | 1.00 | 57.00 |
 
-**reads_sup at 32T is the definitive accuracy ceiling for this sample.** 99.24% classified represents the highest achievable classification rate with any RefSeq-based Kraken2 database of this scope — the remaining 0.76% unclassified is likely truly novel sequence absent from all RefSeq references. All smaller-DB accuracy figures should be evaluated against this ceiling.
+**reads_sup at 32T is the definitive accuracy ceiling for this sample.** 99.24% classified is the highest achievable classification rate with any RefSeq-based Kraken2 database of this scope. The remaining 0.76% unclassified is likely truly novel sequence, absent from all RefSeq references. We should evaluate all smaller-DB accuracy figures against this ceiling.
 
-**Cold-run caveat:** sys time was ~56s ≈ wall time across all three runs. With 32 threads and ~57s wall, only ~100 CPU-seconds were active — the other ~1,700 CPU-seconds of available thread time were idle, waiting on I/O. The 103 GB DB was being paged from disk during each run (first access after extraction). Wall times here reflect I/O-dominated cold starts. Warm repeats needed for steady-state classification speed (expect ~10–15s wall at 32T once 103 GB is page-cached in Luna's 503 GB RAM).
+**cold-run caveat:** sys time was ~56s, roughly equal to wall time, across all three runs. With 32 threads and ~57s wall, only ~100 CPU-seconds were active. The other ~1,700 CPU-seconds of available thread time sat idle, waiting on I/O, because the 103 GB DB was being paged from disk during each run (first access after extraction). So these wall times reflect I/O-dominated cold starts, not steady-state classification speed - we need warm repeats for that (expect ~10-15s wall at 32T once 103 GB is page-cached in Luna's 503 GB RAM).
 
-LLC miss rate 90–91% is the highest of any DB in the experiment, 9–10 pp above standard_16gb's 80–81%. IPC 0.90–1.00 is the lowest, confirming the most severe DRAM saturation observed.
+LLC miss rate of 90-91% is the highest of any DB in the experiment, 9-10 pp above standard_16gb's 80-81%. IPC of 0.90-1.00 is the lowest, confirming the most severe DRAM saturation we've observed.
 
 ### Comparison to standard_16gb (AccuracyDrift largest DB)
 
 | Read model | standard_16gb | pluspf_103gb | Gain |
 |------------|---------------|--------------|------|
-| reads_fast | — (not collected in AccuracyDrift) | 96.79% | — |
+| reads_fast | - (not collected in AccuracyDrift) | 96.79% | - |
 | reads_hac  | 97.77% | 98.86% | +1.09 pp (+1,146 reads classified) |
 | reads_sup  | 98.48% | 99.24% | +0.76 pp (+797 reads classified) |
 
-Note: reads_fast × standard_16gb was not run during AccuracyDrift thread-scaling experiments, so no direct gain figure is available. The PlusPF reads_fast result (96.79%) is the gold-standard floor for reads_fast accuracy.
+note: we didn't run reads_fast x standard_16gb during the AccuracyDrift thread-scaling experiments, so there's no direct gain figure for it. The PlusPF reads_fast result (96.79%) is the gold-standard floor for reads_fast accuracy instead.
 
-The ~1 pp gain from adding protozoa and fungi confirms a fraction of the standard_16gb unclassified reads are genuinely fungal/protozoan. The remaining 0.76–1.14% unclassified in PlusPF is likely truly novel sequence not in any RefSeq reference — this is the hard floor.
+The ~1 pp gain from adding protozoa and fungi confirms that a fraction of the standard_16gb unclassified reads are genuinely fungal/protozoan. The remaining 0.76-1.14% unclassified in PlusPF is likely truly novel sequence, not in any RefSeq reference - this is the hard floor.
 
-### Species Breakdown — PlusPF 103 GB (Luna, 32T)
+### Species Breakdown: PlusPF 103 GB (Luna, 32T)
 
 Extracted with:
 ```bash
@@ -88,14 +88,14 @@ awk '$4=="S"' reads_<model>_pluspf_103gb_32T_report.txt | \
 | *Klebsiella pneumoniae* | 9.22% (9,677) | 9.14% (9,599) | 7.95% (8,330) |
 | *Acinetobacter baumannii* | 0.33% (341) | 0.36% (382) | 0.16% (165) |
 | *Enterobacter cloacae* | 0.07% (76) | 0.09% (94) | 0.02% (26) |
-| *Staphylococcus aureus* | 0.00% (1) | 0.00% (1) | — |
-| *Enterococcus faecium* | — | — | — |
+| *Staphylococcus aureus* | 0.00% (1) | 0.00% (1) | - |
+| *Enterococcus faecium* | - | - | - |
 
-Key findings:
-- **A. baumannii confirmed at 0.16–0.36%** — was in the standard DB long tail but never tabulated (below 1% threshold). Its presence here confirms a small but real A. baumannii component, which was invisible in sample_targeted because the NCBI genome was suppressed and could not be added to that DB.
-- **S. aureus essentially absent** — 1 read across 104,918 (hac) and 104,980 (sup), 0 for fast. Not a meaningful clinical signal.
-- **E. faecium absent** — 0 reads in all three models.
-- **Major species counts are higher than standard_16gb** — P. aeruginosa 43,630 (PlusPF) vs 37,373 (standard_16gb), E. coli 21,609 vs 17,350, K. pneumoniae 9,677 vs 5,774. The extra reads come from the "long tail" pool, which shrank from ~37% to ~27%. PlusPF's different reference set shifts some LCA calls from genus/family-level ambiguous assignments to specific species — a reshuffling within classified reads, not just new classifications from unclassified.
+key findings:
+- **A. baumannii confirmed at 0.16-0.36%.** it was sitting in the standard DB long tail but never got tabulated (below the 1% threshold). Its presence here confirms a small but real A. baumannii component, invisible in sample_targeted because the NCBI genome was suppressed and couldn't be added to that DB.
+- **S. aureus essentially absent** - 1 read across 104,918 (hac) and 104,980 (sup), 0 for fast. Not a meaningful clinical signal.
+- **E. faecium absent** - 0 reads in all three models.
+- **Major species counts are higher than standard_16gb**: P. aeruginosa 43,630 (PlusPF) vs 37,373 (standard_16gb), E. coli 21,609 vs 17,350, K. pneumoniae 9,677 vs 5,774. The extra reads come from the "long tail" pool, which shrank from ~37% to ~27%. PlusPF's different reference set shifts some LCA calls from genus/family-level ambiguous assignments to specific species - a reshuffling within classified reads, not just new classifications from unclassified.
 
 ### Next Steps
 
@@ -103,19 +103,19 @@ Key findings:
 - [x] reads_fast × pluspf_103gb × 32T cold run (Luna)
 - [x] reads_hac × pluspf_103gb × 32T cold run (Luna)
 - [x] reads_sup × pluspf_103gb × 32T cold run (Luna)
-- [x] Fresh basecalling — all 16 FBE pod5 files, FAST model (2026-06-22)
-- [x] Fresh basecalling — all 16 FBE pod5 files, HAC model (2026-06-22)
-- [x] Fresh basecalling — all 16 FBE pod5 files, SUP model (2026-06-22)
-- [x] Per-pod5 Kraken2 runs — all 3 models × 16 files × 2 DBs (96 runs total, done 2026-06-22)
-- [x] Warm run for all three read models — done 2026-06-22 (1T: fast=100.4s, hac=96.9s, sup=95.0s; 32T: fast=57.7s, hac=56.8s, sup=56.4s)
-- [x] Thread scaling for pluspf_103gb: 1T–96T — all 3 models (done 2026-06-22), see ## pluspf_103gb Thread Scaling Summary below
+- [x] Fresh basecalling, all 16 FBE pod5 files, FAST model (2026-06-22)
+- [x] Fresh basecalling, all 16 FBE pod5 files, HAC model (2026-06-22)
+- [x] Fresh basecalling, all 16 FBE pod5 files, SUP model (2026-06-22)
+- [x] Per-pod5 Kraken2 runs, all 3 models × 16 files × 2 DBs (96 runs total, done 2026-06-22)
+- [x] Warm run for all three read models, done 2026-06-22 (1T: fast=100.4s, hac=96.9s, sup=95.0s; 32T: fast=57.7s, hac=56.8s, sup=56.4s)
+- [x] Thread scaling for pluspf_103gb: 1T–96T, all 3 models (done 2026-06-22), see ## pluspf_103gb Thread Scaling Summary below
 - [ ] Build optimised sample-specific ESKAPE database using pluspf per-pod5 output as ground truth
 
 ---
 
-## Fresh Basecalling — All 16 FBE Pod5 Files (2026-06-22)
+## Fresh Basecalling: All 16 FBE Pod5 Files (2026-06-22)
 
-Previous AccuracyDrift and AccuracyChase runs used reads basecalled from a single pod5 file (`FBE01990_24778b97_03e50f91_10.pod5`, ~104k reads). On 2026-06-22, fresh basecalling was run on all 16 pod5 files from the complete FBE dataset stored at `~/data/pod5/fbe/` on Luna.
+Previous AccuracyDrift and AccuracyChase runs used reads basecalled from a single pod5 file (`FBE01990_24778b97_03e50f91_10.pod5`, ~104k reads), so on 2026-06-22 we ran fresh basecalling on all 16 pod5 files from the complete FBE dataset stored at `~/data/pod5/fbe/` on Luna.
 
 **Model:** `dna_r10.4.1_e8.2_400bps_fast@v5.2.0`  
 **Hardware:** Luna dual L40S GPUs  
@@ -143,7 +143,7 @@ Previous AccuracyDrift and AccuracyChase runs used reads basecalled from a singl
 | FBE01990_24778b97_03e50f91_15.pod5 |  31,190 |
 | **Total** | **1,922,066** |
 
-Note: `_15.pod5` has significantly fewer reads (31,190 vs ~100–155k for others) — expected behaviour as the last chunk of a sequencing run when pore activity is trailing off.
+note: `_15.pod5` has significantly fewer reads (31,190 vs ~100-155k for others). We expect this - it's the last chunk of a sequencing run, when pore activity is trailing off.
 
 ### Per-file read counts (HAC model)
 
@@ -167,7 +167,7 @@ Note: `_15.pod5` has significantly fewer reads (31,190 vs ~100–155k for others
 | FBE01990_24778b97_03e50f91_15.pod5 |  30,854 |
 | **Total** | **1,906,966** |
 
-Note: HAC total (1,906,966) is slightly lower than FAST (1,922,066) — a ~0.8% difference due to model-specific quality filtering behaviour in v5.2.0, not a data issue. Individual file sizes are within 1% of FAST equivalents.
+note: HAC total (1,906,966) is slightly lower than FAST (1,922,066), a ~0.8% difference. That's model-specific quality filtering behaviour in v5.2.0, not a data issue - individual file sizes stay within 1% of the FAST equivalents.
 
 ### Per-file read counts (SUP model)
 
@@ -191,13 +191,13 @@ Note: HAC total (1,906,966) is slightly lower than FAST (1,922,066) — a ~0.8% 
 | FBE01990_24778b97_03e50f91_15.pod5 |  31,195 |
 | **Total** | **1,923,965** |
 
-### Cross-model summary (all 16 FBE pod5 files, 2026-06-22)
+### Cross-model summary (all 16 FBE pod5 files: 2026-06-22)
 
 | Model | Total reads | Notes |
 |-------|-------------|-------|
 | FAST  | 1,922,066   | Highest throughput model |
-| HAC   | 1,906,966   | ~15k fewer than FAST — model-specific quality filtering in v5.2.0 |
-| SUP   | 1,923,965   | Most reads — rescues borderline reads other models reject |
+| HAC   | 1,906,966   | ~15k fewer than FAST, model-specific quality filtering in v5.2.0 |
+| SUP   | 1,923,965   | Most reads, rescues borderline reads other models reject |
 
 All three models output to `~/data/basecalled/{fast,hac,sup}/` on Luna, one fastq per pod5 file.
 
@@ -205,7 +205,7 @@ All three models output to `~/data/basecalled/{fast,hac,sup}/` on Luna, one fast
 
 ## pluspf_103gb Thread Scaling Summary
 
-All three read models on Luna (Xeon Platinum 8468, 96c/192t, 210 MB LLC). Warm runs: 3-run average per thread count, numactl --cpunodebind=0 --membind=0, DB page-cached in 503 GB RAM. reads_fast values from `reads_fast_thread_scaling/pluspf_103gb_NT.txt`; reads_hac and reads_sup from `pluspf_thread_scaling/{hac,sup}_NT.txt`.
+All three read models on Luna (Xeon Platinum 8468, 96c/192t, 210 MB LLC). Warm runs: 3-run average per thread count, numactl --cpunodebind=0 --membind=0, DB page-cached in 503 GB RAM. reads_fast values come from `reads_fast_thread_scaling/pluspf_103gb_NT.txt`; reads_hac and reads_sup come from `pluspf_thread_scaling/{hac,sup}_NT.txt`.
 
 | Threads | fast time (s) | hac time (s) | sup time (s) | fast LLC Miss% | hac LLC Miss% | sup LLC Miss% |
 |---------|---------------|--------------|--------------|----------------|---------------|---------------|
@@ -218,8 +218,8 @@ All three read models on Luna (Xeon Platinum 8468, 96c/192t, 210 MB LLC). Warm r
 | 64      | 57.537        | 56.579       | 56.236       | 89.76          | 90.80         | 90.90         |
 | 96      | 57.508        | 56.417       | 56.337       | 89.56          | 90.68         | 90.79         |
 
-Key observations:
-- **DRAM wall dominates:** peak speedup is ~1.69–1.75x by 32T across all three models; no gain beyond. Every k-mer lookup misses LLC (89–92% miss rate throughout), so throughput is limited by DRAM bandwidth, not by core count.
-- **reads_hac/sup are ~5% faster than reads_fast** at every thread count despite processing slightly fewer reads. Longer reads in the hac/sup fastq files increase k-mer locality (consecutive k-mers from the same read reuse hash-table regions), slightly reducing effective DRAM pressure.
-- **LLC miss rate is uniform across models** at any given thread count — the bottleneck is the 103 GB DB size eclipsing the 210 MB LLC, not the read k-mer quality.
-- **Warm 32T = ~57s** (all models), compared to the cold-run ~57s seen initially — DB was effectively cached after the first cold extraction run. The apparent "no improvement" from cold to warm is because the OS had cached the 103 GB file during the cold run itself on this 503 GB RAM machine.
+key observations:
+- **DRAM wall dominates:** peak speedup is ~1.69-1.75x by 32T across all three models, with no gain beyond that. Every k-mer lookup misses LLC (89-92% miss rate throughout), so DRAM bandwidth limits throughput, not core count.
+- **reads_hac/sup run ~5% faster than reads_fast** at every thread count, despite processing slightly fewer reads. Longer reads in the hac/sup fastq files increase k-mer locality (consecutive k-mers from the same read reuse hash-table regions), which slightly reduces effective DRAM pressure.
+- **LLC miss rate stays uniform across models** at any given thread count. The 103 GB DB size eclipsing the 210 MB LLC is the bottleneck here, not read k-mer quality.
+- **Warm 32T comes out to ~57s** (all models), about the same as the cold-run ~57s we saw initially - the DB was effectively cached after the first cold extraction run. That apparent "no improvement" from cold to warm just reflects the OS having already cached the 103 GB file during the cold run, on this 503 GB RAM machine.

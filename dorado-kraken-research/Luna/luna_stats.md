@@ -1,4 +1,4 @@
-# Luna — Server Specifications & Diagnostics
+# Luna - Server Specifications & Diagnostics
 
 > Last updated: 2026-05-28 (tool audit 22:19 UTC)
 > Server name: luna (dell-R760) | hostname: `dell-R760`
@@ -33,7 +33,7 @@ Socket(s):            2
 | Max clock | 3.8 GHz (min 800 MHz) |
 | Architecture | x86_64 |
 | SIMD | AVX2, **AVX-512F/DQ/BW/VL/IFMA/VNNI/BF16/FP16** |
-| **Special** | **AMX** (amx_bf16, amx_tile, amx_int8) — hardware matrix multiply unit |
+| **Special** | **AMX** (amx_bf16, amx_tile, amx_int8) - hardware matrix multiply unit |
 
 **vs Minerva (Xeon Gold 6330):** 96 vs 56 physical cores, 3.8 vs 2.0 GHz base, AVX-512 + AMX vs AVX-512 only.
 
@@ -58,8 +58,8 @@ L3:     210 MiB (2 instances)
 |---|---|---|---|---|
 | L1d | 4.5 MiB | **48 KB** | 2.25 MiB | 96 instances |
 | L1i | 3 MiB | **32 KB** | 1.5 MiB | 96 instances |
-| L2 | **192 MiB** | **2 MB** | 96 MiB | 96 instances — 4× Minerva's L2 |
-| L3 | **210 MiB** | — | **105 MB/socket** | 2 instances — huge LLC |
+| L2 | **192 MiB** | **2 MB** | 96 MiB | 96 instances - 4× Minerva's L2 |
+| L3 | **210 MiB** | - | **105 MB/socket** | 2 instances - huge LLC |
 
 > **Impact on matrix multiply benchmarks:** N=1024 (24 MB) and N=2048 (96 MB) matrices both fit in L3 here (210 MB). On WSL2 (16 MB L3) both were memory-bound. Luna will show very different (lower) L3 miss rates for the same benchmarks.
 
@@ -75,15 +75,15 @@ numactl --hardware    # install: sudo apt install numactl
 **From lscpu:**
 ```
 NUMA node(s):   2
-NUMA node0:     0,2,4,6,...190   (even CPUs — socket 0)
-NUMA node1:     1,3,5,7,...191   (odd CPUs  — socket 1)
+NUMA node0:     0,2,4,6,...190   (even CPUs - socket 0)
+NUMA node1:     1,3,5,7,...191   (odd CPUs  - socket 1)
 ```
 
 | Property | Value |
 |---|---|
 | NUMA nodes | 2 |
 | CPUs per node | 96 logical (48 physical) |
-| Interleaved assignment | Yes — even=node0, odd=node1 |
+| Interleaved assignment | Yes - even=node0, odd=node1 |
 
 > numactl installed 2026-05-29. Run `numactl --hardware` to see memory bandwidth per node and NUMA-aware pinning options.
 
@@ -113,7 +113,7 @@ Swap:           59Gi   430Mi    59Gi
 | Swap total | 59 GB |
 | Swap used | 430 MB |
 
-> **vs Minerva:** 503 GB vs 251 GB — twice the RAM. Entire Kraken-2 standard DB (180 GB) fits in RAM with room to spare.
+> **vs Minerva:** 503 GB vs 251 GB, twice the RAM. The entire Kraken-2 standard DB (180 GB) fits in RAM with room to spare.
 
 ---
 
@@ -137,7 +137,7 @@ GPU  Name         VRAM Used/Total       GPU-Util  Temp   Power
 | Model | **NVIDIA L40S** | **NVIDIA L40S** |
 | Architecture | Ada Lovelace | Ada Lovelace |
 | VRAM | **46 GB GDDR6** | **46 GB GDDR6** |
-| Combined VRAM | **~92 GB** | — |
+| Combined VRAM | **~92 GB** | - |
 | Power cap | 350W | 350W |
 | Current power | 86W | 33W |
 | GPU util | 0% | 0% |
@@ -145,7 +145,7 @@ GPU  Name         VRAM Used/Total       GPU-Util  Temp   Power
 | CUDA Version | 12.9 | 12.9 |
 | Driver | 575.64.03 | 575.64.03 |
 
-> **vs Minerva (A40):** L40S is newer Ada Lovelace (vs Ampere A40). L40S has ~91.6 TFLOPS FP32 vs A40's ~37.4 TFLOPS — roughly 2.5× more compute per card. Both have 46 GB VRAM.
+> **vs Minerva (A40):** L40S is newer Ada Lovelace (vs Ampere A40). L40S has ~91.6 TFLOPS FP32 vs A40's ~37.4 TFLOPS, roughly 2.5x more compute per card. Both have 46 GB VRAM.
 
 ---
 
@@ -171,7 +171,7 @@ tmpfs           252G   108K  252G    ~0%  /dev/shm
 | /dev/sda1 | 4.7 GB | 6.1 MB | 4.7 GB | 1% | /boot/efi |
 | tmpfs (shm) | 252 GB | ~0 | 252 GB | ~0% | /dev/shm |
 
-> Root at 74% (238 GB free). Fine for now. /dev/shm is 252 GB — large in-memory scratch space.
+> Root at 74% (238 GB free). Fine for now. /dev/shm is 252 GB, a large in-memory scratch space.
 
 ---
 
@@ -192,20 +192,20 @@ Linux dell-R760 6.8.0-78-generic #78~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC x86_64 G
 
 ## perf Hardware Counter Status
 
-**Native Linux — no Hyper-V, full PMU access in hardware.**
-** perf_event_paranoid = 1 — hardware counters ENABLED for all users (verified 2026-05-28 22:19 UTC).**
+**Native Linux, no Hyper-V, full PMU access in hardware.**
+**perf_event_paranoid = 1, hardware counters ENABLED for all users (verified 2026-05-28 22:19 UTC).**
 
 ```
-perf_event_paranoid = 1   ← verified 2026-05-28 22:19 UTC
+perf_event_paranoid = 1   <- verified 2026-05-28 22:19 UTC
 ```
 
 | Value | Meaning |
 |---|---|
 | -1 | All events allowed for all users |
 | 0 | All hardware events allowed for all users |
-| **1** | **Hardware events allowed — recommended for profiling** |
+| **1** | **Hardware events allowed, recommended for profiling** |
 | 2 | Only software events for non-root |
-| **4** | **Current value — blocks ALL hardware events for non-root** |
+| **4** | **Current value, blocks ALL hardware events for non-root** |
 
 **Already applied (2026-05-28):** value confirmed at 1. No action needed.
 
@@ -216,7 +216,7 @@ perf_event_paranoid = 1   ← verified 2026-05-28 22:19 UTC
 | `cycles`, `instructions`, IPC |  Accurate | No virtualisation throttling |
 | `cache-misses`, `cache-references` |  Works | |
 | `LLC-load-misses`, `LLC-loads` |  **Works** | Was blocked on WSL2 |
-| `stalled-cycles-backend` |  **Works** | Memory stall % — key metric |
+| `stalled-cycles-backend` |  **Works** | Memory stall %, key metric |
 | `L1-dcache-load-misses` |  Works | |
 | `mem-loads`, `mem-stores` |  Works | DRAM traffic counts |
 | TMA metrics (`tma_*`) |  **Full TMA** | Sapphire Rapids native TMAM |
@@ -231,7 +231,7 @@ perf_event_paranoid = 1   ← verified 2026-05-28 22:19 UTC
 
 | Tool | Version / Path | Status | Notes |
 |---|---|---|---|
-| **perf** | `/usr/bin/perf` v6.8.12 | Installed | paranoid=1 — full hardware counters enabled |
+| **perf** | `/usr/bin/perf` v6.8.12 | Installed | paranoid=1 - full hardware counters enabled |
 | **gprof** | `/usr/bin/gprof` | Installed | part of binutils, use with -pg -g compile flags |
 | **gcc** | `/usr/bin/gcc` | Installed | |
 | **g++** | `/usr/bin/g++` | Installed | |
@@ -245,13 +245,13 @@ perf_event_paranoid = 1   ← verified 2026-05-28 22:19 UTC
 | **numactl** | `/usr/bin/numactl` | Installed | |
 | **valgrind** | `/usr/bin/valgrind` v3.18.1 | Installed | includes cachegrind |
 | **gperftools** | installed via apt | Installed | google-perftools + libgoogle-perftools-dev |
-| nvcc (CUDA compiler) | — | Not in PATH | Check: `find /usr /opt -name nvcc 2>/dev/null` |
-| nsys (Nsight Systems) | — | Not in PATH | Check: `find /usr /opt -name nsys 2>/dev/null` |
-| ncu (Nsight Compute) | — | Not in PATH | Check: `find /usr /opt -name ncu 2>/dev/null` |
-| likwid-perfctr | — | Not installed | See install_tools.md |
-| VTune | — | Unknown | Check: `find /opt /usr -name vtune 2>/dev/null` |
+| nvcc (CUDA compiler) | - | Not in PATH | Check: `find /usr /opt -name nvcc 2>/dev/null` |
+| nsys (Nsight Systems) | - | Not in PATH | Check: `find /usr /opt -name nsys 2>/dev/null` |
+| ncu (Nsight Compute) | - | Not in PATH | Check: `find /usr /opt -name ncu 2>/dev/null` |
+| likwid-perfctr | - | Not installed | See install_tools.md |
+| VTune | - | Unknown | Check: `find /opt /usr -name vtune 2>/dev/null` |
 
-> **nvcc/nsys/ncu missing from PATH** — likely installed but not on PATH. Check:
+> **nvcc/nsys/ncu missing from PATH** - likely installed but not on PATH. Check:
 > ```bash
 > find /usr /opt -name "nvcc" 2>/dev/null
 > find /usr /opt -name "nsys" 2>/dev/null

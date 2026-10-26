@@ -1,4 +1,4 @@
-# Luna — User Guide
+# Luna - User Guide
 
 > Server: dell-R760 | hostname: `dell-R760`
 > OS: Ubuntu 22.04 LTS | Kernel: 6.8.0-78-generic
@@ -56,7 +56,7 @@ df -h
 
 ## Running the Matrix Multiply Benchmarks on Luna
 
-The source files are in `All_Matrix_Mul_perf_stats/` on your local machine.
+The source files live in `All_Matrix_Mul_perf_stats/` on your local machine.
 Copy them to Luna:
 
 ```bash
@@ -76,7 +76,7 @@ make run_perf SIZE=2048 THREADS=8
 make run_perf SIZE=10000 THREADS=8
 ```
 
-> When rebuilt on Luna with `-march=native`, the compiler will auto-generate AVX-512 instructions instead of AVX2 — `auto_vec_O3` will be faster without any code changes.
+> When rebuilt on Luna with `-march=native`, the compiler auto-generates AVX-512 instructions instead of AVX2, so `auto_vec_O3` gets faster without any code changes.
 
 ---
 

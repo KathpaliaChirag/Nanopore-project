@@ -1,4 +1,4 @@
-# Luna vs Minerva vs Orion — Full Comparison
+# Luna vs Minerva vs Orion: full comparison
 
 > Luna: dell-R760 | Minerva: minerva | Orion: Jetson AGX Orin 64GB
 > Luna + Minerva: Ubuntu 22.04 LTS, CUDA 12.9, Driver 575.64.03
@@ -21,26 +21,26 @@
 | SIMD | AVX-512 | **AVX-512 + AMX** | Luna |
 | AMX (tile matrix multiply) | No | **Yes** | Luna only |
 | AVX-512 width | 512-bit | **512-bit** | Tie |
-| FP64 SIMD throughput | 4 doubles/instr | **8 doubles/instr (ZMM)** | Luna (same — both 512-bit) |
+| FP64 SIMD throughput | 4 doubles/instr | **8 doubles/instr (ZMM)** | Luna (same, both 512-bit) |
 
-> **AMX** (Advanced Matrix Extensions) on Luna's Sapphire Rapids is a hardware tile multiply unit — can multiply 16×64 × 64×16 BF16 matrices in a single instruction. Only available on Xeon Platinum 8468 and newer.
+> **AMX** (Advanced Matrix Extensions) on Luna's Sapphire Rapids is a hardware tile multiply unit: it can multiply 16x64 x 64x16 BF16 matrices in a single instruction. only available on Xeon Platinum 8468 and newer.
 
 ---
 
-## Cache Hierarchy
+## Cache hierarchy
 
 | Level | Minerva | Luna | Winner |
 |---|---|---|---|
 | L1d per core | 48 KB | 48 KB | Tie |
 | L1i per core | 32 KB | 32 KB | Tie |
-| L2 per core | **1 MB** | **2 MB** | Luna (2×) |
-| L3 total | ~66 MB (2 × ~33 MB) | **210 MB (2 × 105 MB)** | Luna (3.2×) |
+| L2 per core | **1 MB** | **2 MB** | Luna (2x) |
+| L3 total | ~66 MB (2 x ~33 MB) | **210 MB (2 x 105 MB)** | Luna (3.2x) |
 
-> **Impact on workloads:**
+> **impact on workloads:**
 > - N=1024 matmul (24 MB): fits in Luna's L3 (210 MB), overflows Minerva's L3 (66 MB)
 > - N=2048 matmul (96 MB): fits in Luna's L3, far exceeds Minerva's
-> - Kraken-2 8 GB DB: neither L3 holds it — both DRAM-bound, but Luna's 3.8 GHz helps
-> - Luna's larger L3 means IPC will be higher and stall-BE% will be lower for the same workloads
+> - Kraken-2 8 GB DB: neither L3 holds it, both are DRAM-bound, but Luna's 3.8 GHz clock helps
+> - Luna's larger L3 means higher IPC and lower stall-BE% for the same workloads
 
 ---
 
@@ -48,7 +48,7 @@
 
 | Property | Minerva | Luna | Winner |
 |---|---|---|---|
-| Total RAM | 251 GB | **503 GB** | Luna (2×) |
+| Total RAM | 251 GB | **503 GB** | Luna (2x) |
 | Available (idle) | ~219 GB | **~451 GB** | Luna |
 | Swap | 59 GB | 59 GB | Tie |
 | Kraken-2 standard DB (180 GB) | Fits with ~39 GB margin | **Fits with ~271 GB margin** | Luna |
@@ -60,18 +60,18 @@
 
 | Property | Minerva | Luna | Winner |
 |---|---|---|---|
-| Model | 2× NVIDIA A40 | **2× NVIDIA L40S** | Luna |
+| Model | 2x NVIDIA A40 | **2x NVIDIA L40S** | Luna |
 | Architecture | Ampere (2020) | **Ada Lovelace (2022)** | Luna |
 | VRAM per card | 46 GB GDDR6 | 46 GB GDDR6 | Tie |
 | Total VRAM | ~90 GB | **~92 GB** | Tie |
-| FP32 throughput per card | ~37.4 TFLOPS | **~91.6 TFLOPS** | Luna (**2.5×**) |
-| FP16 throughput per card | ~74.8 TFLOPS | **~183 TFLOPS** | Luna (2.5×) |
-| BF16 throughput per card | ~74.8 TFLOPS | **~183 TFLOPS** | Luna (2.5×) |
-| Power cap per card | 300W | 350W | — |
+| FP32 throughput per card | ~37.4 TFLOPS | **~91.6 TFLOPS** | Luna (**2.5x**) |
+| FP16 throughput per card | ~74.8 TFLOPS | **~183 TFLOPS** | Luna (2.5x) |
+| BF16 throughput per card | ~74.8 TFLOPS | **~183 TFLOPS** | Luna (2.5x) |
+| Power cap per card | 300W | 350W | - |
 | CUDA version | 12.9 | 12.9 | Tie |
 | Driver | 575.64.03 | 575.64.03 | Tie |
 
-> **For Dorado basecalling:** Dorado is dominated by GEMM (82%+ GPU time). L40S at ~2.5× more FP32 means Dorado fast/hac model should run ~2–2.5× faster on Luna per card.
+> **for Dorado basecalling:** Dorado is dominated by GEMM (matrix multiply, 82%+ of GPU time). the L40S's ~2.5x more FP32 throughput means the Dorado fast/hac model should run ~2-2.5x faster on Luna per card.
 
 ---
 
@@ -80,16 +80,16 @@
 | Property | Minerva | Luna | Winner |
 |---|---|---|---|
 | Root disk size | 3.4 TB | 938 GB | Minerva |
-| Root disk used | 3.2 TB | 655 GB | — |
-| Root disk free | **9.1 GB (CRITICAL — 100%)** | **236 GB (74%)** | Luna |
+| Root disk used | 3.2 TB | 655 GB | - |
+| Root disk free | **9.1 GB (CRITICAL, 100%)** | **236 GB (74%)** | Luna |
 | /dev/shm (tmpfs) | 126 GB | **252 GB** | Luna |
-| Risk level |  Full — jobs may fail |  Fine | Luna |
+| Risk level | Full, jobs may fail | Fine | Luna |
 
-> Minerva root disk is critically full (100%). Luna has 236 GB free — comfortable for benchmarks, datasets, and build artifacts.
+> Minerva's root disk is critically full (100%). Luna has 236 GB free, comfortable for benchmarks, datasets, and build artifacts.
 
 ---
 
-## OS and Kernel
+## OS and kernel
 
 | Property | Minerva | Luna |
 |---|---|---|
@@ -99,28 +99,28 @@
 
 ---
 
-## Profiling Readiness
+## Profiling readiness
 
 | Tool / Setting | Minerva | Luna |
 |---|---|---|
-| `perf` binary |  `/usr/bin/perf` |  `/usr/bin/perf` |
-| `perf_event_paranoid` |  1 (fixed) |  **1 (confirmed 2026-05-28)** |
-| Hardware counters (LLC, stall-BE, TMA) |  Works |  Works |
-| TMA (Top-down Analysis) |  Ice Lake TMAM |  **Sapphire Rapids TMAM** (newer, more metrics) |
-| `gcc` / `g++` |  11.4.0 |  11.4.0 |
-| `nsys` (Nsight Systems) |  PATH fixed → `/usr/lib/nsight-systems/bin/nsys` |  Not in PATH (may be installed — needs `find`) |
-| `ncu` (Nsight Compute) |  2021.3.1.0 |  Not in PATH |
-| `nvcc` (CUDA compiler) | Unknown |  Not in PATH |
-| `valgrind` | Available via conda |  Not installed |
-| `numactl` | Unknown |  Not installed |
-| `likwid` | Not installed |  Not installed |
-| `btop` | Not documented |  Installed |
+| `perf` binary | `/usr/bin/perf` | `/usr/bin/perf` |
+| `perf_event_paranoid` | 1 (fixed) | **1 (confirmed 2026-05-28)** |
+| Hardware counters (LLC, stall-BE, TMA) | Works | Works |
+| TMA (Top-down Analysis) | Ice Lake TMAM | **Sapphire Rapids TMAM** (newer, more metrics) |
+| `gcc` / `g++` | 11.4.0 | 11.4.0 |
+| `nsys` (Nsight Systems) | PATH fixed -> `/usr/lib/nsight-systems/bin/nsys` | Not in PATH (may be installed, needs `find`) |
+| `ncu` (Nsight Compute) | 2021.3.1.0 | Not in PATH |
+| `nvcc` (CUDA compiler) | Unknown | Not in PATH |
+| `valgrind` | Available via conda | Not installed |
+| `numactl` | Unknown | Not installed |
+| `likwid` | Not installed | Not installed |
+| `btop` | Not documented | Installed |
 
-> Luna hardware counters are ready. GPU profiling tools (nsys, ncu) still need PATH fix or install — same situation as Minerva before the nsys fix.
+> Luna's hardware counters are ready. GPU profiling tools (nsys, ncu) still need a PATH fix or install, the same situation Minerva was in before its nsys fix.
 
 ---
 
-## Users and Access
+## Users and access
 
 | Property | Minerva | Luna |
 |---|---|---|
@@ -131,22 +131,22 @@
 
 ---
 
-## Benchmark Results (Matmul, WSL2 → to be re-run on both)
+## Benchmark results (matmul, WSL2, to be re-run on both)
 
 | Metric | WSL2 | Expected on Minerva | Expected on Luna |
 |---|---|---|---|
-| IPC (naive_ijk) | 0.23† (wrong) | ~0.3–0.5 | ~0.3–0.5 |
-| IPC (tiled_avx2) | 3.04† (wrong) | ~3–5 | **~4–7** (higher clock + L3) |
-| LLC-load-misses | Not supported |  |  |
-| stalled-cycles-backend | Not supported |  |  |
+| IPC (naive_ijk) | 0.23† (wrong) | ~0.3-0.5 | ~0.3-0.5 |
+| IPC (tiled_avx2) | 3.04† (wrong) | ~3-5 | **~4-7** (higher clock + L3) |
+| LLC-load-misses | Not supported | | |
+| stalled-cycles-backend | Not supported | | |
 | N=1024 naive_ijk time | 9,961ms | ~6,000ms | **~2,000ms** (3.8 GHz + L3 fits) |
 | N=1024 tiled_avx2 time | 335ms | ~200ms | **~80ms** (higher clock + AVX-512 wider use) |
 
 ---
 
-## Orion — Jetson AGX Orin 64GB
+## Orion: Jetson AGX Orin 64GB
 
-Orion is a third experiment machine added to the project during AccuracyDrift (2026-05-30 onwards). It is campus-network-only and accessed via SSH.
+Orion is a third experiment machine, added to the project during AccuracyDrift (2026-05-30 onwards). it's campus-network-only, accessed via SSH.
 
 **Access:** `jetsonagx@10.154.233.173` (campus network required)
 
@@ -154,68 +154,68 @@ Orion is a third experiment machine added to the project during AccuracyDrift (2
 |---|---|
 | Platform | NVIDIA Jetson AGX Orin 64GB |
 | Architecture | ARM64 (aarch64) |
-| CPU | 12-core ARM Cortex-A78AE (3 clusters × 4 cores, no hyperthreading) |
+| CPU | 12-core ARM Cortex-A78AE (3 clusters x 4 cores, no hyperthreading) |
 | SLC (L3) | 4 MB System Level Cache (shared across all 12 cores) |
 | GPU | Ampere GPU, 2048 CUDA cores, integrated (unified memory) |
 | RAM | 64 GB LPDDR5 (unified CPU + GPU memory) |
 | OS | Ubuntu 20.04.6 LTS (JetPack R35.4.1) |
 | CUDA | Available (integrated) |
-| Campus network | Yes — not reachable from outside IIT Delhi network |
+| Campus network | Yes, not reachable from outside IIT Delhi network |
 
-**Key difference from Luna/Minerva:** Orion uses unified memory — the CPU and GPU share the same physical RAM pool. There is no discrete VRAM, and no PCIe transfer overhead for GPU workloads. This makes memory bandwidth characteristics fundamentally different from Luna and Minerva.
+**key difference from Luna/Minerva:** Orion uses unified memory: the CPU and GPU share the same physical RAM pool. there's no discrete VRAM and no PCIe transfer overhead for GPU workloads. this makes memory bandwidth characteristics fundamentally different from Luna and Minerva.
 
-**Role in experiments:** Orion was used for AccuracyDrift multi-DB accuracy runs (reads_sup × all 5 DBs × 4T through 12T thread counts). Results are in `AccuracyDrift/RESULTS.md`.
+**role in experiments:** Orion was used for AccuracyDrift multi-DB accuracy runs (reads_sup x all 5 DBs x 4T through 12T thread counts). results are in `AccuracyDrift/RESULTS.md`.
 
-**Profiling notes:** ARM64 `perf` counters differ from x86 PMU events. Thread-scaling results from Orion should not be directly compared with Luna without accounting for the architectural difference.
+**profiling notes:** ARM64 `perf` counters differ from x86 PMU events. thread-scaling results from Orion shouldn't be compared directly with Luna without accounting for the architectural difference.
 
 ---
 
 ## Verdict
 
-### Luna vs Minerva vs Orion — hardware dimension summary:
+### Luna vs Minerva vs Orion: hardware dimension summary
 
 | Dimension | Luna | Minerva | Orion |
 |---|---|---|---|
 | CPU compute (single-thread) | **3.8 GHz Xeon Platinum 8468** | 2.0 GHz Xeon Gold 6330 | ~1.7 GHz ARM Cortex-A78AE |
 | CPU compute (multi-thread) | **192 logical CPUs** | 112 logical CPUs | 12 cores (no HT) |
-| Cache (L2) | **2 MB per core** | 1 MB per core | — (ARM cluster cache) |
+| Cache (L2) | **2 MB per core** | 1 MB per core | - (ARM cluster cache) |
 | Cache (LLC/SLC) | **210 MB** | ~66 MB | 4 MB SLC |
 | RAM | **503 GB DDR5** | 251 GB DDR4 | 64 GB LPDDR5 (unified) |
-| GPU compute | **2× L40S (91.6 TFLOPS FP32 each)** | 2× A40 (37.4 TFLOPS FP32 each) | Ampere, 2048 CUDA cores (integrated) |
-| Disk health | **74% used, 236 GB free** | 100% full — blocked | 85% used, 8.5 GB free |
+| GPU compute | **2x L40S (91.6 TFLOPS FP32 each)** | 2x A40 (37.4 TFLOPS FP32 each) | Ampere, 2048 CUDA cores (integrated) |
+| Disk health | **74% used, 236 GB free** | 100% full, blocked | 85% used, 8.5 GB free |
 | AMX (tile matrix multiply) | **Yes (Sapphire Rapids)** | No | No (ARM architecture) |
 | SIMD | **AVX-512 + AMX** | AVX-512 | NEON (ARM) |
 | Memory architecture | Discrete DRAM | Discrete DRAM | **Unified (CPU+GPU share pool)** |
 
-### Luna wins on x86 dimensions:
+### Luna wins on x86 dimensions
 
 | Dimension | Winner | Margin |
 |---|---|---|
-| CPU compute (single-thread) | **Luna** | 3.8 vs 2.0 GHz = 1.9× clock |
-| CPU compute (multi-thread) | **Luna** | 192 vs 112 logical CPUs = 1.7× |
-| Cache (L2) | **Luna** | 2× per core |
-| Cache (L3) | **Luna** | 3.2× total |
-| RAM | **Luna** | 2× |
-| GPU compute | **Luna** | 2.5× FP32 per card |
+| CPU compute (single-thread) | **Luna** | 3.8 vs 2.0 GHz = 1.9x clock |
+| CPU compute (multi-thread) | **Luna** | 192 vs 112 logical CPUs = 1.7x |
+| Cache (L2) | **Luna** | 2x per core |
+| Cache (L3) | **Luna** | 3.2x total |
+| RAM | **Luna** | 2x |
+| GPU compute | **Luna** | 2.5x FP32 per card |
 | Disk health | **Luna** | 236 GB free vs 9 GB (critical) |
 | Matrix multiply (AMX) | **Luna only** | Hardware tile unit not on Minerva |
 
-### Minerva's only current advantages:
+### Minerva's only current advantages
 
 | Advantage | Notes |
 |---|---|
 | nsys / ncu in PATH | Already fixed on Minerva; Luna needs same fix |
-| More disk space (total) | 3.4 TB vs 938 GB — but Minerva is full, Luna has 236 GB free |
+| More disk space (total) | 3.4 TB vs 938 GB, but Minerva is full, Luna has 236 GB free |
 
-### Use each for:
+### Use each for
 
 | Task | Use | Why |
 |---|---|---|
-| Kraken-2 CPU profiling | **Luna** | 3.8 GHz + 210 MB L3 — accurate IPC, TMA metrics |
-| Dorado GPU basecalling | **Luna** | L40S 2.5× faster than A40 per card |
+| Kraken-2 CPU profiling | **Luna** | 3.8 GHz + 210 MB L3, accurate IPC, TMA metrics |
+| Dorado GPU basecalling | **Luna** | L40S 2.5x faster than A40 per card |
 | Matrix multiply benchmarks | **Luna** | AVX-512 + AMX + larger L3 changes the story |
 | NUMA experiments | **Luna** | 2-socket, 503 GB, numactl available after install |
-| Anything right now | **Luna** | Disk is healthy; Minerva is at 100% — risky |
-| AccuracyDrift / ARM64 cross-validation | **Orion** | ARM64 architecture, unified memory — different perf profile from x86 |
+| Anything right now | **Luna** | Disk is healthy; Minerva is at 100%, risky |
+| AccuracyDrift / ARM64 cross-validation | **Orion** | ARM64 architecture, unified memory, different perf profile from x86 |
 
-**Bottom line: Luna is the primary machine for all x86 benchmarks. Orion is used for ARM64 cross-validation and AccuracyDrift experiments. Minerva is on hold until disk is cleared.**
+**bottom line: Luna is the primary machine for all x86 benchmarks. Orion is used for ARM64 cross-validation and AccuracyDrift experiments. Minerva is on hold until its disk is cleared.**

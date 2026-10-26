@@ -1,4 +1,4 @@
-# Dorado GPU Profiling — Luna L40S
+# Dorado GPU Profiling: Luna L40S
 
 > Machine: Luna (dell-R760) | GPU: 2× NVIDIA L40S (46 GB each, Ada Lovelace) | CUDA 12.9
 > Dorado: ~/tools/dorado/bin/dorado v1.4.0+ba44a013
@@ -11,16 +11,16 @@
 
 | Item | Value |
 |---|---|
-| nsys | `/usr/lib/nsight-systems/bin/nsys` v2021.3.3.2 — **broken on L40S** (GLIBC_PRIVATE symbol error) |
-| nvprof | `/usr/bin/nvprof` v11.5 — **rejected at runtime** (compute capability ≥ 8.0 unsupported) |
-| ncu | `/usr/bin/ncu` v2021.3.1 — viable for per-kernel metrics |
+| nsys | `/usr/lib/nsight-systems/bin/nsys` v2021.3.3.2, **broken on L40S** (GLIBC_PRIVATE symbol error) |
+| nvprof | `/usr/bin/nvprof` v11.5, **rejected at runtime** (compute capability ≥ 8.0 unsupported) |
+| ncu | `/usr/bin/ncu` v2021.3.1, viable for per-kernel metrics |
 | dorado path | `~/tools/dorado/bin/dorado` v1.4.0+ba44a013 |
 | pod5 input | `~/data/pod5/fbe/FBE01990_24778b97_03e50f91_10.pod5` |
 | models | dna_r10.4.1_e8.2_400bps_{fast,hac,sup}@v5.2.0 |
 
 ---
 
-## Baseline Wall Times — GPU vs CPU
+## Baseline Wall Times: GPU vs CPU
 
 | Model | Luna L40S GPU | Luna CPU | Orion Ampere GPU | Luna GPU speedup vs CPU |
 |---|---|---|---|---|
@@ -30,13 +30,13 @@
 
 > Luna GPU: 2× L40S (cuda:0 + cuda:1), dorado v1.4.0. CPU: 650 threads, ~130 cores active, 96 GB RAM.
 > Orion GPU: 2048-core Ampere iGPU, 64 GB unified memory, dorado v0.5.3, batch size capped at 64.
-> SUP CPU: progress bar showed `9d:01h:14m:10s` remaining after 12 min elapsed — cancelled, estimate used.
-> Orion HAC: ~1 day ETA from progress bar at 0% before SSH disconnect — estimate only.
+> SUP CPU: progress bar showed `9d:01h:14m:10s` remaining after 12 min elapsed, cancelled, estimate used.
+> Orion HAC: ~1 day ETA from progress bar at 0% before SSH disconnect, estimate only.
 
 **Luna GPU batch sizes:** fast=320, hac=2,944, sup=96 (VRAM-limited)
 **Orion GPU batch sizes:** fast=64, hac=64 (unified memory constraint)
 
-> **Why SUP CPU is so slow:** The SUP model uses FP8 precision (`fp8_e4m3`) on GPU — a data type natively accelerated by Ada Lovelace tensor cores. No CPU architecture currently supports native FP8 arithmetic (Intel Xeon Platinum 8468 has AMX for BF16/INT8 but not FP8). On CPU, dorado falls back to FP32 for all FP8 ops, increasing both compute cost and memory bandwidth. The fused GPU kernels (e.g. `mm_swiglu<fp8>` = matmul + SwiGLU in one pass) also break into separate CPU ops, adding overhead. Result: the SUP GPU→CPU penalty is expected to be far worse than fast (28.6×) or hac (107×).
+> **Why SUP CPU is so slow:** The SUP model uses FP8 precision (`fp8_e4m3`) on GPU, a data type natively accelerated by Ada Lovelace tensor cores. No CPU architecture currently supports native FP8 arithmetic (Intel Xeon Platinum 8468 has AMX for BF16/INT8 but not FP8). On CPU, dorado falls back to FP32 for all FP8 ops, increasing both compute cost and memory bandwidth. The fused GPU kernels (e.g. `mm_swiglu<fp8>` = matmul + SwiGLU in one pass) also break into separate CPU ops, adding overhead. Result: the SUP GPU→CPU penalty is expected to be far worse than fast (28.6×) or hac (107×).
 
 ---
 
@@ -47,7 +47,7 @@
 
 ---
 
-### Fast Model — nsys Profile
+### Fast Model: nsys Profile
 
 **NVTX pipeline breakdown (% of total annotated time):**
 
@@ -67,7 +67,7 @@
 | cudaEventSynchronize | 33.4% | 640 |
 | cudaMalloc | 1.4% | 387 |
 | cudaLaunchKernel | 0.7% | 54,924 |
-| **Total blocking sync** | **96.5%** | — |
+| **Total blocking sync** | **96.5%** | - |
 
 **GPU kernel breakdown (% of total GPU time):**
 
@@ -96,7 +96,7 @@
 
 ---
 
-### HAC Model — nsys Profile
+### HAC Model: nsys Profile
 
 **CUDA API breakdown:**
 
@@ -104,7 +104,7 @@
 |---|---|---|
 | cudaStreamSynchronize | **51.2%** | 2,196 |
 | cudaEventSynchronize | 44.9% | 640 |
-| **Total blocking sync** | **96.1%** | — |
+| **Total blocking sync** | **96.1%** | - |
 
 **GPU kernel breakdown (% of total GPU time):**
 
@@ -125,9 +125,9 @@
 
 ---
 
-### SUP Model — nsys Profile
+### SUP Model: nsys Profile
 
-> SUP uses a **Transformer architecture** (not LSTM), with FP8 precision — fundamentally different from fast/hac.
+> SUP uses a **Transformer architecture** (not LSTM), with FP8 precision, fundamentally different from fast/hac.
 
 **CUDA API breakdown:**
 
@@ -135,13 +135,13 @@
 |---|---|---|
 | cudaStreamSynchronize | **97.3%** | 15,517 |
 | cudaEventSynchronize | 1.4% | 128 |
-| **Total blocking sync** | **~98.7%** | — |
+| **Total blocking sync** | **~98.7%** | - |
 
 **GPU kernel breakdown (% of total GPU time):**
 
 | Kernel | % GPU time | Notes |
 |---|---|---|
-| `tiled_residual_rmsnorm` | **17.1%** | Transformer RMSNorm — runs between every layer |
+| `tiled_residual_rmsnorm` | **17.1%** | Transformer RMSNorm, runs between every layer |
 | `mm_swiglu<fp8_e4m3>` | **15.1%** | FP8 FFN linear + SwiGLU fused |
 | `attention<256>` | **10.4%** | Self-attention |
 | `qkv_rotary<fp8_e4m3>` | **9.4%** | FP8 QKV projection + rotary embeddings |
@@ -160,7 +160,7 @@
 
 ---
 
-## Orion GPU Runs (Jetson AGX Orin, dorado v0.5.3)
+## Orion GPU Runs (Jetson AGX Orin: dorado v0.5.3)
 
 > Machine: Orion | GPU: 2048-core Ampere iGPU, 64 GB unified memory
 > dorado v0.5.3, model v4.3.0, batch size capped at 64 (OOM at default)
@@ -178,22 +178,22 @@
 
 | Metric | WSL2 GTX 1650 | Luna L40S fast | Luna L40S hac | Luna L40S sup |
 |---|---|---|---|---|
-| Wall time | — | 33.9s | 55.0s | 4m 26s |
-| Throughput (samples/s) | — | 2.35 × 10⁸ | 2.03 × 10⁸ | 1.98 × 10⁷ |
+| Wall time | - | 33.9s | 55.0s | 4m 26s |
+| Throughput (samples/s) | - | 2.35 × 10⁸ | 2.03 × 10⁸ | 1.98 × 10⁷ |
 | Model architecture | RNN (GRU) | LSTM | LSTM | **Transformer** |
 | Precision | FP16 | FP16 | FP16 | **FP8 + FP16** |
 | GEMM % of GPU time | 82% | **30.8%** | **~15.0%** | **~43.6%** |
-| LSTM % of GPU time | — | **27.5%** | **~68.0%** | **0%** |
-| Attention % | — | 0% | 0% | **10.4%** |
-| RMSNorm % | — | 0% | 0% | **17.1%** |
-| Beam search % | — | 14.8% | 2.1% | 8.5% |
+| LSTM % of GPU time | - | **27.5%** | **~68.0%** | **0%** |
+| Attention % | - | 0% | 0% | **10.4%** |
+| RMSNorm % | - | 0% | 0% | **17.1%** |
+| Beam search % | - | 14.8% | 2.1% | 8.5% |
 | cudaStreamSynchronize % | 98.9% | **63.1%** | **51.2%** | **97.3%** |
-| Total blocking sync % | — | **96.5%** | **96.1%** | **~98.7%** |
+| Total blocking sync % | - | **96.5%** | **96.1%** | **~98.7%** |
 | Architecture | Turing | Ada Lovelace | Ada Lovelace | Ada Lovelace |
 | FP32 TFLOPS | ~2.9 | ~91.6 | ~91.6 | ~91.6 |
 
 **Key insights:**
-- **fast (L40S):** GEMM drops from 82% (GTX 1650) to 30.8% — L40S finishes matrix ops 31× faster, exposing LSTM and beam search.
+- **fast (L40S):** GEMM drops from 82% (GTX 1650) to 30.8%, L40S finishes matrix ops 31× faster, exposing LSTM and beam search.
 - **hac (L40S):** Larger LSTM network (`vcs_lstm` custom kernels). LSTM explodes to 68%, GEMM halves to 15%. Almost entirely LSTM-bound.
-- **sup (L40S):** Completely different architecture — a **Transformer** with FP8 precision. No LSTM at all. RMSNorm (17.1%), FP8 GEMMs (43.6%), self-attention (10.4%). Batch size collapses to 96 due to model size. cudaStreamSynchronize returns to 97.3% — CPU is almost always blocked.
-- **Total blocking sync stays ~96-98%** across all models — the pipeline is always CPU-blocked on GPU regardless of model complexity.
+- **sup (L40S):** Completely different architecture, a **Transformer** with FP8 precision. No LSTM at all. RMSNorm (17.1%), FP8 GEMMs (43.6%), self-attention (10.4%). Batch size collapses to 96 due to model size. cudaStreamSynchronize returns to 97.3%, CPU is almost always blocked.
+- **Total blocking sync stays ~96-98%** across all models, the pipeline is always CPU-blocked on GPU regardless of model complexity.

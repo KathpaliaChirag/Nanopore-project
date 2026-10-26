@@ -2,8 +2,7 @@
 
 **Status as of 2026-06-26: M1, M2, M3, M4, M5, M7 are done - results in `Luna/profiling/pending/*.txt`, decisions in `AccuracyDrift/patches.md`. M6 was not run (low priority). The patch itself (`kraken2_opt_v1.patch`) has NOT yet been applied or benchmarked - `run_kraken2_opt_v1.sh` has never been executed. That run is the next step.**
 
-These five measurements answer questions that **decide which patches matter and which
-parameters to tune**. Run all five on Luna in the order shown. Results paste back to chat
+Run these before touching the patches, because they're what tell you which patches actually matter and which parameters to tune. Run all five on Luna in the order shown. Paste results back to chat
 or commit to `Luna/profiling/results_kraken2.md`. Each command also writes a `.txt`
 output file under `~/results/profiling/pending/` for later analysis.
 
@@ -20,8 +19,8 @@ IN=~/results/basecalling/reads_hac.fastq
 
 ## M1. Hash table header - cell type, capacity, load factor
 
-**Why:** decides prefetch stride (12 vs 16 cells), confirms 40-bit vs 32-bit cells.
-Load factor near 1.0 → long clusters → prefetch is high-value.
+This decides the prefetch stride (12 vs 16 cells) and confirms 40-bit vs 32-bit cells.
+A load factor near 1.0 means long clusters, which means prefetch is high-value.
 
 ```bash
 python3 - <<'PY' | tee m1_hash_header.txt
@@ -43,14 +42,14 @@ print(f"cells/cache_line   : {64/cell_b:.2f}")
 PY
 ```
 
-**Decision:** if load_factor > 0.95 → expect long probe chains → Patch 1 (prefetch) is
-high-leverage. If 40-bit cell → Patch 1's PF_STRIDE = 12.
+**Decision:** if load_factor > 0.95, expect long probe chains, which makes Patch 1 (prefetch)
+high-leverage. If it's a 40-bit cell, Patch 1's PF_STRIDE = 12.
 
 ---
 
 ## M2. DTLB pressure - does huge pages help?
 
-**Why:** decides whether Patch 2 (MADV_HUGEPAGE) is worthwhile.
+This decides whether Patch 2 (MADV_HUGEPAGE) is worth applying.
 
 ```bash
 numactl --cpunodebind=0 --membind=0 \
@@ -64,8 +63,8 @@ iTLB-load-misses \
 ```
 
 **Decision:**
-- `dTLB-load-misses / dTLB-loads > 0.005` (0.5 %) → Patch 2 is worth applying.
-- If already < 0.001 → THP is already active; Patch 2 is a no-op.
+- `dTLB-load-misses / dTLB-loads > 0.005` (0.5%) means Patch 2 is worth applying.
+- If it's already < 0.001, THP is already active and Patch 2 is a no-op.
 
 Cross-check whether THP is already in use on file-backed mmap:
 ```bash
@@ -78,9 +77,9 @@ cat /proc/$(pgrep classify | head -1)/smaps_rollup 2>/dev/null | grep -i huge
 
 ## M3. perf annotate - exact line in Get() causing the LL misses
 
-**Why:** confirms whether the probe-load (`table_[idx].value(...)`) is the dominant miss
-line, or whether `hashed_key()` and `value()` are reading the cell separately and we should
-combine.
+This confirms whether the probe-load (`table_[idx].value(...)`) is the dominant miss
+line, or whether `hashed_key()` and `value()` are reading the cell separately, in which case we should
+combine them.
 
 ```bash
 # Build with -g (Makefile already has -g) and ensure debug info present.
@@ -98,17 +97,17 @@ Note: if the symbol name differs (template mangling), try
 `--symbol-filter=CompactHashTable` or `perf report -i m3_perf.data --stdio | head`
 to find the exact mangled name first.
 
-**Decision:** the line accounting for > 80 % of LLC misses inside Get() should be the
+**Decision:** the line accounting for > 80% of LLC misses inside Get() should be the
 `table_[idx].value(value_bits_)` read. If it isn't, the inferred algorithm is still wrong
-somewhere - re-investigate.
+somewhere, so re-investigate.
 
 ---
 
 ## M4. DRAM bandwidth - latency-bound vs bandwidth-bound
 
-**Why:** if uncore IMC counters show DRAM well under saturation (≤ 50 % of peak), we are
-**latency-bound** → LRU + prefetch are the right fix. If close to peak → we are
-**bandwidth-bound** → compression / DB shrink is needed.
+This tells you which fix is worth pursuing. If uncore IMC counters show DRAM well under saturation (<= 50% of peak), you're
+**latency-bound**, so LRU + prefetch are the right fix. If it's close to peak, you're
+**bandwidth-bound**, and need compression / DB shrink instead.
 
 ```bash
 # Discover IMC PMU names (varies on Sapphire Rapids)
@@ -125,18 +124,18 @@ numactl --cpunodebind=0 --membind=0 \
 ```
 
 **Decision:**
-- Peak DDR5-4800 per channel = 38.4 GB/s; Sapphire Rapids has 8 channels per socket.
-  Single-socket peak ≈ 300 GB/s.
-- Compute observed BW: total cas_count × 64 B / wall_seconds.
-- Observed / peak < 0.5 → latency-bound (expected) → patches 1, 4 win.
-- Observed / peak > 0.7 → bandwidth-bound → defer LRU; investigate DB compression instead.
+- Peak DDR5-4800 per channel = 38.4 GB/s; Sapphire Rapids has 8 channels per socket,
+  so single-socket peak is about 300 GB/s.
+- Compute observed BW as: total cas_count x 64 B / wall_seconds.
+- Observed / peak < 0.5 means latency-bound (expected), and patches 1, 4 win.
+- Observed / peak > 0.7 means bandwidth-bound, so defer LRU and investigate DB compression instead.
 
 ---
 
 ## M5. K-mer reuse rate - validate LRU cache hit-rate before implementing
 
-**Why:** Patch 4 (thread-local LRU) only pays if reuse rate is > 20 %. Measuring it
-beforehand prevents wasted patching.
+Patch 4 (thread-local LRU) only pays off if the reuse rate is > 20%. Measuring it
+beforehand keeps you from patching for nothing.
 
 There are two ways:
 
@@ -178,15 +177,15 @@ perf stat -e \
 ```
 
 **Decision:**
-- `reuse_rate > 0.30` → Patch 4 likely lands −20 %+
-- `0.10 < reuse_rate < 0.30` → marginal; halve `LRU_BITS` to 13 (8 K entries)
-- `reuse_rate < 0.10` → skip Patch 4, focus on Patches 1, 2, 3, 6, 8
+- `reuse_rate > 0.30` means Patch 4 likely lands -20%+
+- `0.10 < reuse_rate < 0.30` is marginal; halve `LRU_BITS` to 13 (8K entries)
+- `reuse_rate < 0.10` means skip Patch 4, focus on Patches 1, 2, 3, 6, 8
 
 ---
 
 ## M6. perf c2c - false sharing (only matters if scaling beyond 32T)
 
-**Why:** thread sweet spot is 32T; not strictly needed yet. Run if we want to revisit
+The thread sweet spot is 32T, so this isn't strictly needed yet. Run it if we want to revisit
 NUMA Patch 5.
 
 ```bash
@@ -197,14 +196,14 @@ numactl --cpunodebind=0 --membind=0 \
 perf c2c report -i m6_c2c.data --stdio | head -150 | tee m6_c2c.txt
 ```
 
-**Decision:** "HITM" events > 5 % of cache traffic → cross-thread sharing on the hash
-table is a real issue. With a read-only mmap table, HITM should be ~0 - confirms.
+**Decision:** "HITM" events > 5% of cache traffic means cross-thread sharing on the hash
+table is a real issue. With a read-only mmap table, HITM should be ~0, which would confirm that.
 
 ---
 
 ## M7. MinimizerScanner vectorisation status (do we have AVX-512?)
 
-**Why:** confirms whether compiler is auto-vectorising and decides whether SIMD work on
+This confirms whether the compiler is auto-vectorising, and decides whether SIMD work on
 MinimizerScanner is needed.
 
 ```bash
@@ -215,9 +214,9 @@ objdump -d $KK | grep -cE '\b[a-z]+.*%zmm' | tee -a m7_simd_count.txt
 ```
 
 **Decision:**
-- zmm count > 0 → AVX-512 in use already.
-- Only ymm → AVX2 only; rebuild with `-march=sapphirerapids` (Patch 3).
-- xmm only → no vectorisation; biggest gap is the MinimizerScanner sliding minimum.
+- zmm count > 0 means AVX-512 is already in use.
+- Only ymm means AVX2 only; rebuild with `-march=sapphirerapids` (Patch 3).
+- xmm only means no vectorisation; the biggest gap is the MinimizerScanner sliding minimum.
 
 ---
 

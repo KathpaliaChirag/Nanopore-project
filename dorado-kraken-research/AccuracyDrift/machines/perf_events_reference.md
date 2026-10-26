@@ -1,6 +1,6 @@
-# perf Event Reference — Cross-Machine Comparison
+# perf Event Reference: Cross-Machine Comparison
 
-## Luna (x86-64, Sapphire Rapids, kernel 5.15.x)
+## Luna (x86-64: Sapphire Rapids, kernel 5.15.x)
 
 ```bash
 perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instructions,cycles \
@@ -27,7 +27,7 @@ Derived metrics:
 
 ---
 
-## Orion (ARM64, Cortex-A78AE, kernel 5.10.120-tegra)
+## Orion (ARM64: Cortex-A78AE, kernel 5.10.120-tegra)
 
 perf binary: `/usr/lib/linux-tools-5.4.0-26/perf` (5.4 binary works on 5.10 kernel)
 Must run with sudo. Alias set in ~/.bashrc: `alias perf='sudo /usr/lib/linux-tools-5.4.0-26/perf'`
@@ -40,7 +40,7 @@ perf stat -e cache-misses,cache-references,LLC-loads,LLC-load-misses,instruction
   ~/reads/reads_hac.fastq
 ```
 
-Note: `numactl` omitted — Orion has unified memory (single NUMA node, no binding needed).
+Note: `numactl` omitted, Orion has unified memory (single NUMA node, no binding needed).
 Thread counts to test: 1, 2, 4, 6, 8, 10, 12 (12-core CPU, no hyperthreading).
 
 | Event | Maps to on ARM Cortex-A78 |
@@ -57,7 +57,7 @@ Derived metrics: same formulas as Luna.
 **Important:** On ARM, `cache-misses/cache-references` reflects L1D behavior, not L3.
 On x86 (Luna), it reflects the overall cache hierarchy. Both are valid for
 cross-machine comparison but measure slightly different levels. LLC-load-misses
-is the directly comparable metric — it measures DRAM pressure on both machines.
+is the directly comparable metric, it measures DRAM pressure on both machines.
 
 **Confirmed working** (tested 2026-06-12): all 6 events return real hardware values with sudo.
 
@@ -83,5 +83,5 @@ is the directly comparable metric — it measures DRAM pressure on both machines
 numactl --hardware
 ```
 
-Orion has unified LPDDR5 memory — likely single NUMA node. The `--cpunodebind=0 --membind=0`
+Orion has unified LPDDR5 memory, likely single NUMA node. The `--cpunodebind=0 --membind=0`
 flags from Luna's command are unnecessary but harmless if present.
