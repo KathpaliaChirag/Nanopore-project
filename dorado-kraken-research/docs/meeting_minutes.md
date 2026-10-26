@@ -535,3 +535,44 @@ Kicked off a 4-agent parallel research pass same day to start answering item 2â€
 
 ### Next meeting
 Not confirmed. The next standing Wednesday slot is 2026-09-09, per the cadence set at Meeting 9.
+
+---
+
+## Meeting 13 - 2026-10-21 (Wednesday)
+
+**Attendees:** Kolin sir, Chirag K
+**Format:** Weekly check-in. No entry exists for any slot between Meeting 12 (2026-09-04) and this one. Flagging the gap instead of skipping past it, same as Meetings 11 and 12.
+
+> Written 2026-10-26 from CK's recollection of what sir asked. Only the database-structure discussion is recorded. See the MISSING note under Topics.
+
+### Topics covered
+
+1. **Sir asked whether the database structure itself can change, an algorithm change instead of tuning the flat table.**
+   - His example: a trie (a tree that looks a key up one piece at a time) instead of the flat hash table, to keep searching easy and make it faster.
+   - A dictionary approach (a map that stores the whole key, so it is exact) came up as the second option. CK's note: the current table is already a kind of dictionary, except it stores only a fingerprint of each key.
+   - He asked for an estimate: how much algorithm change is needed, how much code change, how much time.
+
+2. **Sir wanted to see whether the lookup is a function or inline** (a real call, or compiled into its caller).
+   - [UNCLEAR: this is CK's wording of sir's remark. The brief answers two readings: (a) is the lookup a real function call, (b) is the table behind an interface we can swap.]
+
+3. [MISSING: whatever else was discussed on 2026-10-21. `plan_paper/talk_track_sir_2026-10-21.md` was prepared for this meeting, so CK to add: whether the five experiments in its section 7 (E1 to E5) got an ok, whether orin access was arranged, and sir's answers to the four asks in its section 8.]
+
+### Same-week follow-up (CK with Claude, 2026-10-26)
+
+Research pass and written plan: `plan_paper/research_brief_db_structure_trie_dictionary_2026-10-21.md`. Headline findings, all predictions except where marked measured:
+- **Function or inline:** a real function. `GetAt` and `PrefetchIndex` are virtual functions of `KeyValueStore`, called from another source file, and show as separate symbols in the S19 perf profile (measured). The table already sits behind an interface, so a new structure is a new subclass plus a builder, not a rewrite of the classify loop. Choose it at compile time, or LTO loses the chance to inline the call.
+- **Trie:** predicted slower, not faster. A flat table needs about 1 memory read per lookup (1.07 to 1.32 cache lines at load 0.70). A trie over a random 48-bit key needs 3 to 24 dependent reads, and a general radix tree costs up to 52 bytes per key against 4 now. The only trie-like shape that works is "direct index on the top bits plus a short sorted bucket", which is Kraken 1's design, the one Kraken 2 replaced.
+- **Dictionary:** an exact map with 8-byte slots is 2x the memory (222 GB for the 103GB db, 100 MB for the 50MB db) at the same number of reads. Structures that shrink the table (mphf + fingerprint, sorted keys in Elias-Fano) save 23% to 31% but need 2 to 3 reads per lookup. Their real payoff is space and, for the exact ones, zero false positives, which is the far end of the thesis 2 cell-width curve. It is not a speed win.
+- **Ceiling:** on the 50MB db the lookup is 19.5% of cpu time (measured), so even a free lookup gives at most 1.24x.
+- **Blocker:** no new structure can be built from `hash.k2d`, because each cell keeps only a fingerprint of the key. It needs a rebuild from the library genomes. The 103GB db cannot be rebuilt on Luna (35 GB free disk).
+- **Output check changes:** an exact structure removes false positives, so output stops being byte-identical to stock. Validation becomes count the differing lines and score them, the same check double hashing needs.
+- **Estimate:** 200 to 600 new lines per structure plus 250 to 550 lines of shared glue (build_db tap, loaders, harness). 3 to 6 working days to a first result on the 50MB db, 3 to 4 weeks to a defensible 16-cell result. A measured go/no-go takes about 2 days (stage 0 below).
+
+### Action items
+- Stage 0, about 2 days, before any structure is built: (a) grep which source files touch the table, (b) `nm` / `objdump` on the S19 binary to prove function vs inline, (c) `perf` S19 on the 8GB db for the lookup share, (d) one-file benchmark of the current table against an exact dictionary, a prefix-directory bucket and a 3-level radix tree on random 48-bit keys. Go/no-go gate is written in the brief, section 7, before the numbers exist.
+- Confirm with sir at the next meeting what "inline" meant, and show him the stage 0 table.
+- Check that the 8GB and 16GB library genomes are still on Luna. A rebuild for any new structure depends on it.
+- Carried over: E1 to E5 from `plan_paper/next_steps_plan_2026-10-21.md`. [MISSING: status, check `plan_paper/command_log.md`.]
+
+### Next meeting
+2026-10-28, 4-5 pm (standing Wednesday slot), unconfirmed.
