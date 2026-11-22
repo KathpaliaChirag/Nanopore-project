@@ -1,0 +1,11 @@
+--- /home/student/chirag_K/tools/kraken2-src-s19/src/classify.cc	2026-09-24 23:15:28.527197591 +0530
++++ /home/student/e1/src_hll/src/classify.cc	2026-11-23 05:45:26.119962330 +0530
+@@ -862,7 +862,7 @@
+               last_minimizer = pf[i].min;
+               if (taxon) {
+                 minimizer_hit_groups++;
+-                if (!opts.report_filename.empty()) {
++                if (!opts.report_filename.empty() && opts.report_kmer_data) {  // E5: HLL only needed for --report-minimizer-data
+                   curr_taxon_counts[taxon].add_kmer(pf[i].min);
+                 }
+               }

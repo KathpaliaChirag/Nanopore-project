@@ -1,0 +1,9 @@
+1872777 sequences (6036.15 Mbp) processed in 10.699s (10502.7 Kseq/m, 33851.19 Mbp/m). stock rep1 wall=20.33 user=334.16 sys=104.38 
+1872777 sequences (6036.15 Mbp) processed in 8.797s (12773.8 Kseq/m, 41171.25 Mbp/m). hll rep1 wall=12.48 user=268.38 sys=106.06 
+1872777 sequences (6036.15 Mbp) processed in 10.593s (10607.3 Kseq/m, 34188.53 Mbp/m). stock rep2 wall=20.36 user=332.59 sys=106.05 
+1872777 sequences (6036.15 Mbp) processed in 8.772s (12809.2 Kseq/m, 41285.44 Mbp/m). hll rep2 wall=12.36 user=268.74 sys=102.89 
+1872777 sequences (6036.15 Mbp) processed in 10.820s (10384.7 Kseq/m, 33470.83 Mbp/m). stock rep3 wall=20.45 user=335.50 sys=109.18 
+1872777 sequences (6036.15 Mbp) processed in 8.780s (12797.9 Kseq/m, 41248.89 Mbp/m). hll rep3 wall=12.42 user=268.08 sys=103.35 
+1872777 sequences (6036.15 Mbp) processed in 10.641s (10560.2 Kseq/m, 34036.68 Mbp/m). stock rep4 wall=19.96 user=333.24 sys=106.21 
+1872777 sequences (6036.15 Mbp) processed in 8.749s (12843.9 Kseq/m, 41397.37 Mbp/m). hll rep4 wall=12.24 user=267.99 sys=101.00 
+ABDONE

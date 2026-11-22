@@ -1,0 +1,21 @@
+== correctness 103GB full reads (output to /dev/shm)
+  1850859 sequences classified (98.83%)
+  1850859 sequences classified (98.83%)
+awk: 1: unexpected character '\'
+FULL_OUTPUT_BYTE_IDENTICAL
+FULL_REPORT_SORTED_IDENTICAL
+/dev/shm/f_stock.rep /dev/shm/f_hll.rep differ: byte 5395, line 76
+(report line order differs among tied siblings, as expected)
+standard_8gb stock rep1 wall=8.58 user=232.65
+standard_8gb hll rep1 wall=7.62 user=215.57
+standard_8gb stock rep2 wall=8.56 user=232.12
+standard_8gb hll rep2 wall=7.56 user=214.92
+standard_16gb stock rep1 wall=10.26 user=264.94
+standard_16gb hll rep1 wall=8.51 user=239.21
+standard_16gb stock rep2 wall=10.09 user=264.88
+standard_16gb hll rep2 wall=8.57 user=240.70
+sample_targeted stock rep1 wall=8.38 user=249.63
+sample_targeted hll rep1 wall=7.90 user=233.85
+sample_targeted stock rep2 wall=8.44 user=250.77
+sample_targeted hll rep2 wall=7.94 user=234.71
+FULLDONE
