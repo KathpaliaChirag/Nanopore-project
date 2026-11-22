@@ -11,7 +11,7 @@ method: copied the S19 tree to ~/e1, added a tracer at the GetAt call site (e1/t
 | lookups that hit a stored k-mer | 86.75% |
 | global repeat rate (lookup slot seen before) | 81.4% |
 | top 16K / 64K / 262K / 1M slots cover | 12.5% / 24.2% / 55.8% / 90.0% of lookups |
-| repeats at reuse distance 2^17 to 2^21 | about 78% |
+| repeats at reuse distance 2^17 to 2^21 | about 77% |
 | lines (64 B) per lookup if all distinct | 0.184 |
 
 hit rate of a cache of N entries on this trace (fully associative unless noted):

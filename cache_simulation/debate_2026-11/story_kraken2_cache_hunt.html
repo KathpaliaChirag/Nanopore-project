@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Kraken2 Cache Hunt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* palette: cool paper + ink, teal for "good/sequential", orange for "the thing to watch", violet for the agents.
+   layout idea: one long scroll, ten chapters, every chapter opens with a picture and ends with a plain-words takeaway. */
+:root{
+  --bg:#f2f5f8; --card:#ffffff; --ink:#13202c; --muted:#56687a; --line:#d5dee7;
+  --a:#0a7a74; --b:#d4540b; --c:#5846d0; --good:#1c8a4a; --bad:#c23a2b; --soft:#e7eef4;
+  --display:'Bricolage Grotesque',system-ui,sans-serif; --body:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d141b; --card:#15202b; --ink:#e5edf4; --muted:#92a4b5; --line:#263544;
+    --a:#3ccbc1; --b:#ff8f50; --c:#a99dff; --good:#52cf84; --bad:#ff7d6d; --soft:#1b2a37; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d141b; --card:#15202b; --ink:#e5edf4; --muted:#92a4b5; --line:#263544;
+  --a:#3ccbc1; --b:#ff8f50; --c:#a99dff; --good:#52cf84; --bad:#ff7d6d; --soft:#1b2a37; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 var(--body)}
+.wrap{max-width:860px;margin:0 auto;padding:0 18px}
+h1,h2,h3{font-family:var(--display);line-height:1.15;text-wrap:balance;margin:0}
+h1{font-size:clamp(2.1rem,6vw,3.4rem);letter-spacing:-.02em}
+h2{font-size:clamp(1.55rem,4vw,2.1rem);letter-spacing:-.01em}
+h3{font-size:1.15rem}
+p{margin:.8em 0;max-width:68ch}
+code,.mono{font-family:var(--mono);font-size:.9em}
+code{background:var(--soft);padding:1px 6px;border-radius:5px}
+b,strong{font-weight:600}
+a{color:var(--a)}
+
+/* progress bar + chapter nav */
+#prog{position:fixed;left:0;top:0;height:4px;background:var(--b);width:0;z-index:50}
+nav{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;gap:6px;overflow-x:auto;padding:8px 18px;scrollbar-width:none}
+nav a{flex:none;text-decoration:none;font:500 13px var(--mono);color:var(--muted);padding:4px 10px;border-radius:99px;border:1px solid transparent}
+nav a:hover,nav a.on{color:var(--ink);border-color:var(--line);background:var(--card)}
+
+header.hero{padding:44px 0 20px}
+.eyebrow{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{font-size:1.15rem;color:var(--muted);max-width:60ch}
+.short{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:22px 0 6px}
+.short div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.short .big{font:700 1.8rem var(--display);display:block;line-height:1.1}
+.short small{color:var(--muted);display:block;margin-top:4px;line-height:1.4}
+.pos{color:var(--good)} .neg{color:var(--bad)} .warn{color:var(--b)}
+
+section.chap{padding:46px 0 12px;border-top:1px solid var(--line);margin-top:26px}
+.chap .tag{display:inline-block;margin-bottom:10px}
+figure{margin:22px 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 14px 10px}
+figure svg{display:block;width:100%;height:auto}
+figcaption{font-size:.9rem;color:var(--muted);margin-top:8px;line-height:1.5}
+.take{background:var(--soft);border-left:4px solid var(--a);padding:12px 16px;border-radius:0 10px 10px 0;margin:22px 0}
+.take b:first-child{color:var(--a)}
+.take.warnbox{border-color:var(--b)} .take.warnbox b:first-child{color:var(--b)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums}
+th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{font:500 12px var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+tr.hl td{background:color-mix(in srgb,var(--b) 14%,transparent)}
+td.g{color:var(--good);font-weight:600} td.r{color:var(--bad);font-weight:600}
+
+/* bars */
+.bars{display:grid;gap:8px}
+.brow{display:grid;grid-template-columns:130px 1fr 74px;gap:10px;align-items:center;font-size:.9rem}
+.brow .lab{color:var(--muted)} .brow .val{font:500 .85rem var(--mono);text-align:right}
+.track{background:var(--soft);border-radius:6px;height:22px;position:relative;overflow:hidden}
+.fill{height:100%;border-radius:6px;transform-origin:left;background:var(--a)}
+.in .fill{animation:grow 1.1s cubic-bezier(.2,.8,.2,1) both}
+@keyframes grow{from{transform:scaleX(0)}}
+.mark{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);opacity:.55}
+@media (max-width:520px){.brow{grid-template-columns:92px 1fr 62px;font-size:.8rem}}
+
+/* chat bubbles for the agents */
+.debate{display:grid;gap:14px;margin:18px 0}
+.agent{display:grid;grid-template-columns:64px 1fr;gap:12px;align-items:start}
+.agent svg{width:64px;height:64px}
+.bubble{background:var(--card);border:1px solid var(--line);border-radius:4px 14px 14px 14px;padding:10px 14px;font-size:.95rem;position:relative}
+.bubble b{display:block;font:500 12px var(--mono);text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.in .agent{animation:pop .6s both} .in .agent:nth-child(2){animation-delay:.25s} .in .agent:nth-child(3){animation-delay:.5s}
+@keyframes pop{from{opacity:.001;transform:translateY(14px)}}
+
+/* svg shared */
+.sv-t{fill:currentColor;font:12px var(--mono)} .sv-ts{fill:var(--muted);font:11px var(--mono)} .sv-tb{fill:currentColor;font:600 13px var(--body)}
+.pulse{animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+@keyframes flashcell{0%,100%{fill:var(--soft)}50%{fill:var(--b)}}
+details{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin:10px 0}
+summary{cursor:pointer;font-weight:600}
+.ctrl{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:10px 0}
+.ctrl label{font:500 13px var(--mono);color:var(--muted);display:block}
+.ctrl input{width:100%}
+.res{font:700 2.4rem var(--display)}
+button.go{font:600 14px var(--body);background:var(--ink);color:var(--bg);border:0;border-radius:99px;padding:8px 18px;cursor:pointer}
+button.go:focus-visible,nav a:focus-visible,summary:focus-visible{outline:3px solid var(--b);outline-offset:2px}
+footer{padding:40px 0 70px;color:var(--muted);font-size:.9rem;border-top:1px solid var(--line);margin-top:40px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="prog"></div>
+<nav aria-label="chapters"><div class="wrap" id="nav"></div></nav>
+
+<div class="wrap">
+<header class="hero">
+  <div class="eyebrow">nanopore project / kraken2 / november 2026</div>
+  <h1>The Kraken2 Cache Hunt</h1>
+  <p class="lede">we set out to show that a 4-way set-associative hardware cache makes kraken2 faster. three agents argued about it, a simulator and a real server tested it, and the best result came from a place nobody was looking. this page tells the story in ten chapters. every picture moves, and every number comes from a file in the repo.</p>
+
+  <div class="short" id="short">
+    <div><span class="big neg">no</span><small>hardware cache associativity: flat within 1% at every size we tested</small></div>
+    <div><span class="big warn">3 to 5%</span><small>the most any software cache or eviction policy can give after the S19 speedups, on the 8 GB database</small></div>
+    <div><span class="big neg">1.8 to 2.5x</span><small>how much slower double hashing makes lookups (a result for thesis 2, not a speedup)</small></div>
+    <div><span class="big pos">1.64x</span><small>the surprise: one line that skips unused bookkeeping, 20.3 s down to 12.4 s on the 103 GB database</small></div>
+  </div>
+</header>
+
+<!-- ===================== CH 1 ===================== -->
+<section class="chap reveal" id="c1">
+  <div class="eyebrow tag">chapter 1 of 10</div>
+  <h2>What kraken2 does all day</h2>
+  <p>a nanopore sequencer gives you reads, long strings of the letters A, C, G and T. kraken2 answers one question about each read: which organism did this come from? it slides a small window along the read, keeps a short fingerprint called a <b>minimizer</b> from every window, and looks each fingerprint up in a giant table that says which organisms contain it.</p>
+  <p>that table is between 8 GB and 104 GB. every lookup jumps to a random place in it, so the computer has to fetch a fresh chunk of memory from DRAM, the slow main memory. millions of random jumps per run is where the time could be hiding, so that is where we started.</p>
+
+  <figure>
+    <svg viewBox="0 0 900 270" role="img" aria-label="a read is scanned by a window, each window gives a fingerprint, the fingerprint jumps to a random cell of a big table, and the cell holds the organism">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+      <text class="sv-tb" x="20" y="24">1. a read (letters)</text>
+      <g id="strip"></g>
+      <rect class="pulse" id="win" x="20" y="38" width="110" height="34" rx="6" fill="none" stroke="var(--b)" stroke-width="3"><animate attributeName="x" values="20;300;20" dur="7s" repeatCount="indefinite"/></rect>
+      <text class="sv-ts" x="20" y="96">the window slides one letter at a time</text>
+      <path d="M180 76 C 180 130, 300 120, 330 150" fill="none" stroke="currentColor" stroke-width="2" marker-end="url(#ar)"/>
+      <text class="sv-tb" x="250" y="132">2. fingerprint</text>
+      <rect x="300" y="150" width="120" height="40" rx="8" fill="var(--soft)" stroke="var(--line)"/>
+      <text class="sv-t" x="360" y="175" text-anchor="middle">minimizer</text>
+      <path d="M420 170 L 520 170" stroke="currentColor" stroke-width="2" marker-end="url(#ar)"/>
+      <text class="sv-ts" x="424" y="160">hash</text>
+      <text class="sv-tb" x="560" y="24">3. the table (8 to 104 GB)</text>
+      <g id="grid"></g>
+      <circle r="7" fill="var(--b)"><animateMotion dur="3.5s" repeatCount="indefinite" path="M360 170 L 520 170 L 660 120 L 360 170"/></circle>
+      <text class="sv-ts" x="560" y="232">each lookup lands in a different random cell,</text>
+      <text class="sv-ts" x="560" y="248">so memory must fetch a new line from DRAM</text>
+      <path d="M840 120 L 880 120 L 880 230 L 600 258" fill="none" stroke="none"/>
+      <rect x="720" y="196" width="150" height="34" rx="17" fill="var(--a)" opacity=".9"/>
+      <text x="795" y="218" text-anchor="middle" fill="#fff" font-family="var(--mono)" font-size="12">organism = E. coli</text>
+      <path d="M 700 150 L 760 196" stroke="currentColor" stroke-width="2" marker-end="url(#ar)" />
+    </svg>
+    <figcaption>the pipeline in one picture. the orange dot is one lookup: fingerprint, hash, random jump into the table, answer back.</figcaption>
+  </figure>
+  <div class="take"><b>so what</b> kraken2 is mostly a machine for making random memory trips. anything that makes those trips cheaper, or avoids them, makes it faster. that is the whole reason a cache was worth trying.</div>
+</section>
+
+<!-- ===================== CH 2 ===================== -->
+<section class="chap reveal" id="c2">
+  <div class="eyebrow tag">chapter 2 of 10</div>
+  <h2>The idea: a cache that remembers answers</h2>
+  <p>a cache is a small, fast memory that keeps recent answers close to the processor. if the answer you need is in the cache, that is a <b>hit</b> and it is quick. if not, that is a <b>miss</b> and you pay the full trip to DRAM. a modern chip stacks three caches, each bigger and slower than the last.</p>
+  <figure>
+    <svg viewBox="0 0 900 250" role="img" aria-label="a request travels from the cpu through L1, L2, L3 caches to DRAM; the earlier it finds its answer the shorter the trip">
+      <g font-family="var(--mono)" font-size="12">
+        <rect x="20" y="90" width="90" height="70" rx="10" fill="var(--soft)" stroke="var(--line)"/><text x="65" y="130" text-anchor="middle" fill="currentColor">cpu core</text>
+        <rect x="190" y="80" width="110" height="90" rx="10" fill="color-mix(in srgb,var(--a) 22%,var(--card))" stroke="var(--a)"/><text x="245" y="120" text-anchor="middle" fill="currentColor">L1</text><text x="245" y="138" text-anchor="middle" class="sv-ts">32 KB, ~1 ns</text>
+        <rect x="380" y="70" width="120" height="110" rx="10" fill="color-mix(in srgb,var(--a) 14%,var(--card))" stroke="var(--a)"/><text x="440" y="120" text-anchor="middle" fill="currentColor">L2</text><text x="440" y="138" text-anchor="middle" class="sv-ts">0.5 to 2 MB, ~4 ns</text>
+        <rect x="580" y="60" width="130" height="130" rx="10" fill="color-mix(in srgb,var(--a) 8%,var(--card))" stroke="var(--a)"/><text x="645" y="120" text-anchor="middle" fill="currentColor">L3 (LLC)</text><text x="645" y="138" text-anchor="middle" class="sv-ts">16 to 105 MB, ~20 ns</text>
+        <rect x="770" y="40" width="110" height="170" rx="10" fill="color-mix(in srgb,var(--b) 18%,var(--card))" stroke="var(--b)"/><text x="825" y="120" text-anchor="middle" fill="currentColor">DRAM</text><text x="825" y="138" text-anchor="middle" class="sv-ts">GBs, ~100 ns</text>
+      </g>
+      <g stroke="currentColor" stroke-width="2" opacity=".55"><path d="M110 125 H190"/><path d="M300 125 H380"/><path d="M500 125 H580"/><path d="M710 125 H770"/></g>
+      <circle r="6" fill="var(--good)"><animateMotion dur="2.4s" repeatCount="indefinite" path="M110 110 H245 H110"/></circle>
+      <circle r="6" fill="var(--c)"><animateMotion dur="4s" repeatCount="indefinite" path="M110 125 H440 H110"/></circle>
+      <circle r="6" fill="var(--b)"><animateMotion dur="6s" repeatCount="indefinite" path="M110 140 H825 H110"/></circle>
+      <text class="sv-ts" x="190" y="215">green: L1 hit, fast</text><text class="sv-ts" x="390" y="215">violet: L2 hit</text><text class="sv-ts" x="590" y="228">orange: missed everywhere, full trip to DRAM</text>
+    </svg>
+    <figcaption>three requests, three outcomes. the sizes and times are typical orders of magnitude. our real server, Luna, has a 105 MB L3 per socket.</figcaption>
+  </figure>
+
+  <h3>what "4-way set-associative" means</h3>
+  <p>a cache cannot let any answer sit anywhere, because searching everything would be slow. so each address is assigned to one <b>set</b>, and a set has a few slots called <b>ways</b>. in a 4-way cache a set has 4 slots. when a fifth address arrives for the same set, one resident has to leave. the rule for who leaves is the <b>eviction policy</b>; LRU means "evict the one used longest ago". watch it work:</p>
+  <figure>
+    <div id="assoc"></div>
+    <figcaption>one set of a 4-way LRU cache. addresses A to F arrive in a fixed order. green means hit, orange means miss, and the slot that gets replaced is the oldest one.</figcaption>
+  </figure>
+  <div class="take"><b>the hypothesis</b> a 4-way hardware cache, or a 4-way software cache kraken2 builds for itself, might hold the right recent answers and save trips to DRAM. that is what we tried to prove.</div>
+</section>
+
+<!-- ===================== CH 3 ===================== -->
+<section class="chap reveal" id="c3">
+  <div class="eyebrow tag">chapter 3 of 10</div>
+  <h2>Testing without owning the hardware: Sniper</h2>
+  <p>you cannot resize the cache on a real chip. <b>Sniper</b> is a simulator: it runs the real kraken2 program instruction by instruction on a pretend processor whose caches we can set to any size and associativity, then reports cycles, hit rates and instructions. we built it on Luna in September and fixed several bugs to make it load our configs.</p>
+  <figure>
+    <svg viewBox="0 0 900 210" role="img" aria-label="real kraken2 binary feeds a simulated processor configured by a config file, and the simulator outputs cycles and hit rates">
+      <g font-family="var(--mono)" font-size="12" fill="currentColor">
+        <rect x="20" y="70" width="150" height="70" rx="10" fill="var(--soft)" stroke="var(--line)"/><text x="95" y="102" text-anchor="middle">real kraken2</text><text x="95" y="120" text-anchor="middle" class="sv-ts">+ a few reads</text>
+        <rect x="260" y="40" width="250" height="130" rx="12" fill="color-mix(in srgb,var(--c) 14%,var(--card))" stroke="var(--c)"/><text x="385" y="68" text-anchor="middle">Sniper (pretend cpu)</text>
+        <rect x="285" y="84" width="60" height="26" rx="5" fill="var(--card)" stroke="var(--a)"/><text x="315" y="102" text-anchor="middle">L1</text>
+        <rect x="355" y="84" width="60" height="26" rx="5" fill="var(--card)" stroke="var(--a)"/><text x="385" y="102" text-anchor="middle">L2</text>
+        <rect x="425" y="84" width="60" height="26" rx="5" fill="var(--card)" stroke="var(--a)"/><text x="455" y="102" text-anchor="middle">L3</text>
+        <rect x="285" y="124" width="200" height="26" rx="5" fill="var(--card)" stroke="var(--b)"/><text x="385" y="142" text-anchor="middle">DRAM 45 ns</text>
+        <rect x="600" y="70" width="170" height="70" rx="10" fill="var(--soft)" stroke="var(--line)"/><text x="685" y="98" text-anchor="middle">cycles, IPC,</text><text x="685" y="116" text-anchor="middle">hit rates</text>
+        <path d="M170 105 H260" stroke="currentColor" stroke-width="2" marker-end="url(#ar)"/><path d="M510 105 H600" stroke="currentColor" stroke-width="2" marker-end="url(#ar)"/>
+        <rect x="285" y="176" width="200" height="22" rx="5" fill="none" stroke="var(--muted)" stroke-dasharray="4 3"/><text x="385" y="191" text-anchor="middle" class="sv-ts">config file: sizes, ways</text>
+      </g>
+      <circle r="5" fill="var(--b)"><animateMotion dur="3s" repeatCount="indefinite" path="M95 105 H385 H685"/></circle>
+    </svg>
+    <figcaption>the speed limit: 10 reads took 12 to 15 minutes to simulate and 100 reads took 2 to 3 hours. so every Sniper run used only 10 to 500 reads, a sliver of the 1.87 million reads in a real run.</figcaption>
+  </figure>
+</section>
+
+<!-- ===================== CH 4 ===================== -->
+<section class="chap reveal" id="c4">
+  <div class="eyebrow tag">chapter 4 of 10</div>
+  <h2>What the simulator seemed to say</h2>
+  <p>the first results looked great. at 50 reads, a software 4-way cache cut simulated cycles by about half on the big databases. the table shows speedup over S0, the version with no software cache (cycles of S0 divided by cycles of the variant; above 1.00 is faster).</p>
+  <figure>
+    <div class="scroll"><table>
+      <tr><th>database</th><th>1-way</th><th>4-way</th><th>8-way</th><th>16-way</th></tr>
+      <tr><td>50 MB</td><td class="r">0.90x</td><td class="r">0.91x</td><td class="r">0.88x</td><td class="r">0.85x</td></tr>
+      <tr><td>8 GB</td><td class="g">1.81x</td><td class="g">1.83x</td><td class="g">1.81x</td><td class="g">1.79x</td></tr>
+      <tr><td>16 GB</td><td class="g">2.02x</td><td class="g">2.05x</td><td class="g">2.02x</td><td class="g">2.00x</td></tr>
+      <tr><td>103 GB</td><td class="g">1.93x</td><td class="g">1.97x</td><td class="g">1.92x</td><td class="g">1.89x</td></tr>
+    </table></div>
+    <figcaption>the full grid, 50 reads. 4-way wins or ties in every row, which is where "4-way is best" came from.</figcaption>
+  </figure>
+  <p>then we made the workload bigger, and the win disappeared. the chart below is 4-way divided by S0 on the 8 GB database as the amount of DNA grows. below the line at 1.00 the cache helps; above it the cache hurts.</p>
+  <figure>
+    <div id="flip"></div>
+    <figcaption>read length held at about 35 to 50 kbp. the cache advantage falls from 30% faster to 9% slower as total bases grow. read length was not the cause, total amount of DNA was.</figcaption>
+  </figure>
+  <p>at 2000 reads on the 50 MB database every software cache was slower than none:</p>
+  <figure><div class="bars" id="r2000"></div><figcaption>cycles compared with no cache (S0 = 1.00). all four are slower, and 4-way is the least bad.</figcaption></figure>
+
+  <h3>and the hardware side?</h3>
+  <p>the question was really about hardware associativity, so we also changed only the real LLC's associativity (1, 4, 8, 15 which is Luna's real value, 16 and 30 ways) and ran the plain kraken2 with no software cache. the full grid of cycles in millions:</p>
+  <figure>
+    <div class="scroll"><table>
+      <tr><th>reads</th><th>1-way</th><th>4-way</th><th>8-way</th><th>15 (real)</th><th>16-way</th><th>30-way</th><th>spread</th></tr>
+      <tr><td>10</td><td>13.6</td><td>13.7</td><td>13.6</td><td>13.7</td><td>13.7</td><td>13.7</td><td>0.7%</td></tr>
+      <tr><td>50</td><td>24.4</td><td>24.4</td><td>24.4</td><td>24.4</td><td>24.4</td><td>24.4</td><td>0.0%</td></tr>
+      <tr><td>100</td><td>870.0</td><td>877.2</td><td>869.9</td><td>870.4</td><td>869.8</td><td>877.3</td><td>0.9%</td></tr>
+      <tr><td>500</td><td>4528.2</td><td>4524.0</td><td>4537.9</td><td>4534.5</td><td>4526.4</td><td>4523.2</td><td>0.3%</td></tr>
+    </table></div>
+    <figcaption>flat. no row trends with associativity, and the same null held on the 8 GB and 16 GB databases. on the 50 MB database under 1 to 2% of loads even reach the LLC, so it has almost nothing to organise.</figcaption>
+  </figure>
+  <p>we also modelled a desktop-sized and an Orion-sized cache (cache sizes only, on the same x86 core model). speedup of 4-way at 50 MB and 8 GB:</p>
+  <figure><div class="scroll"><table>
+    <tr><th>hardware model</th><th>50 MB</th><th>8 GB</th></tr>
+    <tr><td>Luna (real server caches)</td><td class="r">0.910x</td><td class="g">1.830x</td></tr>
+    <tr><td>desktop-sized (Ryzen 5 5600X)</td><td class="r">0.919x</td><td class="g">1.936x</td></tr>
+    <tr><td>Orion-sized (Jetson AGX Orin)</td><td class="r">0.902x</td><td class="g">1.649x</td></tr>
+  </table></div><figcaption>no clean "smaller cache needs more help" story. we avoided that tempting claim.</figcaption></figure>
+
+  <h3>the from-scratch redo: cleanstart</h3>
+  <p>in a second pass we rebuilt the hardware experiment by hand: plain kraken2, a laptop-like cache, 1, 4 and 8 cores. the 1-core baseline finished (9 of 9 runs). at 4 cores the speedup depends on how many reads there are, because kraken2 hands reads to threads in batches:</p>
+  <figure><div class="bars" id="cores"></div><figcaption>4-core speedup over 1 core (cycles). 10 reads fit in one batch so only one thread works. two runs also deadlocked at startup, so we added a hang watchdog. the 8-core group is unfinished.</figcaption></figure>
+  <div class="take warnbox"><b>watch out</b> at this point the story is "4-way cache wins on big databases at small workloads, loses at larger ones, and hardware associativity does nothing". before believing any of it we audited the data.</div>
+</section>
+
+<!-- ===================== CH 5 ===================== -->
+<section class="chap reveal" id="c5">
+  <div class="eyebrow tag">chapter 5 of 10</div>
+  <h2>Why nothing held up</h2>
+  <p>an auditor agent recomputed every row of every results file. the arithmetic was clean (189 of 190 rows matched, the one flag was rounding). the problem was what the simulator was measuring, not the sums. four suspects:</p>
+
+  <h3>suspect 1: the "no cache" binary was a different program</h3>
+  <p>S0 and the cache builds were compiled from different source snapshots. S0 executes many more instructions, and the gap grows with database size, while the cache builds sit near 52 M. cycles were nearly identical (within about 2%) for 1 to 16 ways and for cache sizes from 128 KB to 64 MB, so the cache was not the cause of the "2x".</p>
+  <figure><div class="bars" id="instr"></div><figcaption>instructions (millions) at 50 reads. S0 vs the 4-way build. on 8 GB and 16 GB S0 runs 16 M and 26 M more instructions than a build that is supposedly the same plus a cache.</figcaption></figure>
+
+  <h3>suspect 2: the simulated LLC was tiny</h3>
+  <p>with one simulated core (<code>-n 1</code>) Sniper builds a single slice of the last-level cache, about 1.1 MB, not Luna's real 105 MB.</p>
+  <figure>
+    <svg viewBox="0 0 900 250" role="img" aria-label="a large square for the real 105 megabyte LLC and a tiny square for the simulated 1.1 megabyte slice, about one percent of the area">
+      <rect x="40" y="20" width="210" height="210" rx="6" fill="color-mix(in srgb,var(--a) 16%,var(--card))" stroke="var(--a)" stroke-width="2"/>
+      <text class="sv-tb" x="145" y="115" text-anchor="middle">real LLC</text><text class="sv-t" x="145" y="135" text-anchor="middle">105 MB</text>
+      <rect class="pulse" x="330" y="209" width="21" height="21" fill="var(--b)"/>
+      <text class="sv-tb" x="365" y="218">what -n 1 simulated</text><text class="sv-t" x="365" y="236">1.1 MB, about 1% of the real one</text>
+      <path d="M255 200 C 290 200, 300 215, 326 218" stroke="currentColor" fill="none" marker-end="url(#ar)" stroke-width="1.5"/>
+    </svg>
+    <figcaption>every "hardware LLC" null was about a cache one hundredth the size of the real thing. the result says little about Luna.</figcaption>
+  </figure>
+
+  <h3>suspect 3: the windows were tiny and cold</h3>
+  <p>10 to 500 reads touch each part of the table about once. there was never time for repeated lookups to build up, so steady-state reuse was never measured. a real run has 1.87 million reads.</p>
+  <h3>suspect 4: the pretend machine is too cheap</h3>
+  <figure><div class="bars" id="cheap"></div><figcaption>simulated against measured numbers for a same-class Sapphire Rapids chip (outside measurements, not from Luna). the simulator treats memory as 2 to 3 times cheaper than it is, and latency does not grow with cache size.</figcaption></figure>
+  <p>there was also no prefetching, no hugepage or TLB model, no thread contention, and no calibration against the real <code>perf</code> counters.</p>
+  <div class="take"><b>verdict</b> both the "wins" and the "nulls" from Sniper are weak evidence about Luna. the one thing the real machine had already shown independently was that the software cache is worth nothing in production (the S6 ablation: 11.06 s with it, 11.10 s without).</div>
+</section>
+
+<!-- ===================== CH 6 ===================== -->
+<section class="chap reveal" id="c6">
+  <div class="eyebrow tag">chapter 6 of 10</div>
+  <h2>Three agents argue it out</h2>
+  <p>you asked for three agents that argue and reach a conclusion. we ran five rounds. round 1 read the history, round 2 argued why nothing was positive, round 3 researched papers and ideas, round 4 voted, round 5 ran experiments on Luna. here is round 2:</p>
+  <div class="debate">
+    <div class="agent"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="var(--c)"/><circle cx="23" cy="27" r="4" fill="#fff"/><circle cx="41" cy="27" r="4" fill="#fff"/><path d="M20 42 Q32 50 44 42" stroke="#fff" stroke-width="3" fill="none"/></svg>
+      <div class="bubble"><b style="color:var(--c)">agent A: "the null is real"</b>reuse exists but is too far apart for any affordable cache. my first claim of "near-zero reuse" was wrong: 90.7% of lookups repeat. but 81% of the repeats are 10 thousand to a million lookups apart.</div></div>
+    <div class="agent"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="var(--a)"/><rect x="17" y="23" width="12" height="9" rx="2" fill="#fff"/><rect x="35" y="23" width="12" height="9" rx="2" fill="#fff"/><path d="M22 44 H42" stroke="#fff" stroke-width="3"/></svg>
+      <div class="bubble"><b style="color:var(--a)">agent B: "the simulator is broken"</b>one 1.1 MB slice, uncalibrated memory, cold windows. the setup could not have shown a win even if one exists. calibrate against perf first.</div></div>
+    <div class="agent"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="var(--b)"/><circle cx="23" cy="27" r="4" fill="#fff"/><circle cx="41" cy="27" r="4" fill="#fff"/><circle cx="32" cy="44" r="5" fill="#fff"/></svg>
+      <div class="bubble"><b style="color:var(--b)">agent C: "wrong layer"</b>every cache change was null on Luna. every access-pattern or page-size change was a real win (S14 hugepages 35 s to 13-20 s, S16 prefetch -10%). stop caching, start hiding latency.</div></div>
+  </div>
+  <p>round 3 searched for real papers (RRIP, SHiP, Hawkeye, TinyLFU, group prefetching, AMAC, PTHash and more; the reports mark which citations were opened and which are unverified). round 4 was the cross-examination. they attacked each other's arithmetic, retracted weak ideas, and voted:</p>
+  <figure><div class="scroll"><table>
+    <tr><th>experiment</th><th>A</th><th>B</th><th>C</th><th>outcome</th></tr>
+    <tr><td>E1 trace the real lookups, compute the best possible cache</td><td>1st</td><td>1st</td><td>1st</td><td class="g">run first</td></tr>
+    <tr><td>E2 AMAC: deeper latency hiding beyond S16</td><td>2nd</td><td>3rd</td><td>2nd</td><td>only if lookups are big</td></tr>
+    <tr><td>E3 structbench: linear vs double hashing vs aligned</td><td>4th</td><td>2nd</td><td>3rd</td><td class="g">run</td></tr>
+    <tr><td>E4 batched dedup / partition</td><td>3rd, if</td><td>4th, if</td><td>4th, if</td><td>only if E1 shows dedup</td></tr>
+  </table></div><figcaption>unanimous on E1. they dropped the Sniper prefetch gate, the fitted model, the 16-way SIMD cache and the static hot set (kept as a free table from E1).</figcaption></figure>
+  <div class="take"><b>what the debate fixed</b> double hashing was predicted to touch 60% more cache lines, break-even must use measured memory time not a guessed 90 ns, and the old "one cache line per set" SIMD idea needed two lines because entries are 24 bytes.</div>
+</section>
+
+<!-- ===================== CH 7 ===================== -->
+<section class="chap reveal" id="c7">
+  <div class="eyebrow tag">chapter 7 of 10</div>
+  <h2>On Luna: is there reuse after all?</h2>
+  <p>experiment E1. we copied the S19 source (the fastest version so far), added a few lines that write the table slot of every lookup to a file in RAM, and ran 104,980 reads on the 8 GB database, one thread. output stayed identical (101,922 reads classified, 97.09%) and the logging cost only about 3%. that gave a trace of <b>12,237,762 lookups</b> with only <b>2,270,742 distinct slots</b>.</p>
+  <figure>
+    <svg viewBox="0 0 900 200" role="img" aria-label="a stream of lookups where most repeat an earlier slot">
+      <g id="stream"></g>
+      <text class="sv-ts" x="20" y="190">each square is a lookup; a dot means the same table slot was seen before. 81% of all lookups carry a dot.</text>
+    </svg>
+    <figcaption>reuse is real. earlier we told ourselves "no reuse". the trace says that story was wrong.</figcaption>
+  </figure>
+  <h3>a few hot slots carry most lookups</h3>
+  <figure><div id="cover"></div><figcaption>share of all lookups covered by the N most-used slots. 262,144 slots (a few MB) cover 56% of everything. log scale on the horizontal axis.</figcaption></figure>
+  <h3>but the repeats are far apart</h3>
+  <figure><div id="rd"></div><figcaption>how many different slots were touched between two uses of the same slot, as a share of all repeats. the peak is between 260 thousand and a million distinct slots. a small cache has already forgotten the slot by then.</figcaption></figure>
+  <h3>what a cache would actually catch</h3>
+  <figure>
+    <div class="scroll"><table>
+      <tr><th>entries</th><th>LRU (any slot)</th><th>4-way LRU</th><th>Belady (perfect)</th></tr>
+      <tr><td>4,096</td><td>8.2%</td><td>8.2%</td><td>17.9%</td></tr>
+      <tr><td>16,384</td><td>10.4%</td><td>10.4%</td><td>28.0%</td></tr>
+      <tr><td>65,536</td><td>18.9%</td><td>18.5%</td><td>44.1%</td></tr>
+      <tr class="hl"><td>262,144</td><td>40.1%</td><td>38.9%</td><td>66.6%</td></tr>
+      <tr><td>1,048,576</td><td>76.5%</td><td>71.0%</td><td>81.4%</td></tr>
+      <tr><td>4,194,304</td><td>81.4%</td><td>81.1%</td><td>81.4%</td></tr>
+    </table></div>
+    <figcaption>hit rate at each cache size. Belady is the best any policy could do (it knows the future), so it is an upper bound. the 4-way LRU stays within 0 to 6 points of fully flexible LRU (the gap only opens at 1M entries), which is a small plus for the original 4-way idea.</figcaption>
+  </figure>
+</section>
+
+<!-- ===================== CH 8 ===================== -->
+<section class="chap reveal" id="c8">
+  <div class="eyebrow tag">chapter 8 of 10</div>
+  <h2>The ceiling, and double hashing</h2>
+  <p>a hit rate is only half the story. a cache can save at most the time spent on lookups. we profiled stock S19 with <code>perf</code> on three databases. the lookup functions (<code>PrefetchIndex</code> and <code>GetAt</code>) were only 7.7% of CPU samples on 8 GB and 6.9% on 16 GB. <code>GetAt</code>, where the memory wait would show, was under 1%, because S19's prefetching already hides most DRAM latency.</p>
+  <p>try the calculator. the best possible speedup is 1 divided by (1 minus lookup share times hit rate):</p>
+  <figure>
+    <div class="ctrl">
+      <div><label for="sh">lookup share of cpu time: <span id="shv">7.7</span>%</label><input id="sh" type="range" min="1" max="40" step="0.1" value="7.7"></div>
+      <div><label for="hr">cache hit rate: <span id="hrv">39</span>%</label><input id="hr" type="range" min="1" max="100" step="1" value="39"></div>
+    </div>
+    <div class="res" id="ceil">1.03x</div>
+    <div id="ceilbar" class="bars" style="margin-top:8px"></div>
+    <figcaption>defaults are the measured 8 GB share (7.7%) and the 4-way LRU hit rate at 262K entries (39%). the best case with a perfect policy, 67%, gives about 1.05x. that is before the cache pays for its own probes.</figcaption>
+  </figure>
+  <div class="take warnbox"><b>conclusion for eviction policy</b> on the 8 GB and 16 GB databases no policy can give more than about 3 to 5%. a new eviction policy is not where a noticeable speedup lives, once S19's prefetching is in.</div>
+
+  <h3>structbench: why double hashing loses</h3>
+  <p>thesis 2 wanted to switch from linear probing to double hashing, because double hashing needs fewer probes when the table is full. we built a stand-alone benchmark with the real kraken2 rule (<code>step = (hash &gt;&gt; 8) | 1</code>), 4-byte cells, load 0.70 and S16-style prefetch. a cache line holds 16 cells. linear probing walks along cells that share a line. double hashing hops to a new line every probe:</p>
+  <figure>
+    <svg viewBox="0 0 900 282" role="img" aria-label="linear probing touches one or two cache lines while double hashing hops to a new line at every probe">
+      <text class="sv-tb" x="10" y="18">linear probing: 1.07 lines per hit, 1.32 per miss</text>
+      <g id="lin"></g>
+      <text class="sv-tb" x="10" y="158">double hashing: 1.72 lines per hit, 3.33 per miss</text>
+      <g id="dbl"></g>
+    </svg>
+    <figcaption>each row is one 64-byte cache line (16 cells). dots show the order cells are probed. fewer probes with double hashing does not help when each probe is a new trip to memory.</figcaption>
+  </figure>
+  <p>nanoseconds per lookup per thread, 13% of lookups absent (like the real trace), best of 3, full grid:</p>
+  <figure><div class="scroll"><table>
+    <tr><th>table</th><th>threads</th><th>linear</th><th>aligned</th><th>double</th><th>double + prefetch both</th></tr>
+    <tr><td>8 GB</td><td>1</td><td>28.5</td><td>36.1</td><td class="r">65.5</td><td>56.4</td></tr>
+    <tr><td>8 GB</td><td>32</td><td>82.5</td><td>72.4</td><td class="r">151.0</td><td>130.6</td></tr>
+    <tr><td>32 GB</td><td>1</td><td>35.1</td><td>38.1</td><td class="r">79.1</td><td>66.0</td></tr>
+    <tr><td>32 GB</td><td>32</td><td>49.2</td><td>63.6</td><td class="r">125.0</td><td>112.1</td></tr>
+  </table></div><figcaption>double hashing is about 1.8 to 2.5x slower at 32 threads. line-aligned buckets cut lines touched by 5% (hit) and 12% (miss) but the timing is within noise. on a shared machine, treat single-thread gaps under 15% as noise.</figcaption></figure>
+  <p>two honest side notes. first, the first version of this benchmark had a bug (the fingerprint and the start slot used the same hash bits, so 43% of absent keys falsely matched); we caught it from the hit counts and fixed it before reporting anything. second, with double hashing one insert failed at two table sizes. capacities of the form 2^k minus 1 divide by 3, so a step that is a multiple of 3 visits only a third of the table. real kraken2 capacities are arbitrary, so that silent-failure risk needs checking before anyone ships double hashing.</p>
+  <div class="take"><b>for thesis 2</b> keep linear probing for speed. double hashing is a space and false-positive trade, and it costs 1.8 to 2.5x on lookup time.</div>
+</section>
+
+<!-- ===================== CH 9 ===================== -->
+<section class="chap reveal" id="c9">
+  <div class="eyebrow tag">chapter 9 of 10</div>
+  <h2>The surprise nobody was looking for</h2>
+  <p>the lookup layer was capped, so we measured the part nobody had been optimising: a profile at production scale. S19, the 103 GB database, 32 threads, all 1,872,777 reads. here is where the time goes:</p>
+  <figure>
+    <div id="stack"></div>
+    <figcaption>share of perf samples. the orange sliver, <code>HyperLogLogPlusMinus</code> insert and merge, is bookkeeping for counting distinct minimizers. it has nothing to do with classifying reads.</figcaption>
+  </figure>
+  <p>why is it running? in <code>classify.cc</code> line 866, kraken2 calls <code>add_kmer</code> whenever a report file is requested. but the distinct-minimizer numbers are only printed with <code>--report-minimizer-data</code>. a plain <code>--report</code> pays for numbers it never prints.</p>
+  <figure>
+    <div class="scroll"><pre style="margin:0;font:13px/1.6 var(--mono)"><span style="color:var(--bad)">- if (!opts.report_filename.empty()) {</span>
+<span style="color:var(--good)">+ if (!opts.report_filename.empty() &amp;&amp; opts.report_kmer_data) {</span>
+      curr_taxon_counts[taxon].add_kmer(pf[i].min);
+  }</pre></div>
+    <figcaption>the whole patch. one condition.</figcaption>
+  </figure>
+  <h3>does it work? race them</h3>
+  <figure>
+    <button class="go" id="race">race them again</button>
+    <div class="bars" id="racebars" style="margin-top:12px">
+      <div class="brow"><span class="lab">stock S19</span><div class="track"><div class="fill" id="r1" style="background:var(--b);width:100%"></div></div><span class="val">20.3 s</span></div>
+      <div class="brow"><span class="lab">with the guard</span><div class="track"><div class="fill" id="r2" style="background:var(--a);width:61%"></div></div><span class="val">12.4 s</span></div>
+    </div>
+    <figcaption>103 GB database, 32 threads, 1.87M reads, plain <code>--report</code>. four interleaved repetitions gave 20.33, 20.36, 20.45, 19.96 s for stock and 12.48, 12.36, 12.42, 12.24 s patched. the bars race at about 3.3 times real speed.</figcaption>
+  </figure>
+  <p>the full set of databases (T=32, all reads, plain <code>--report</code>, wall time):</p>
+  <figure><div class="scroll"><table>
+    <tr><th>database</th><th>stock S19</th><th>with guard</th><th>speedup</th><th>user cpu</th></tr>
+    <tr><td>50 MB</td><td>8.41 s</td><td>7.92 s</td><td class="g">1.06x</td><td>250 to 234 s</td></tr>
+    <tr><td>8 GB</td><td>8.57 s</td><td>7.59 s</td><td class="g">1.13x</td><td>233 to 215 s</td></tr>
+    <tr><td>16 GB</td><td>10.18 s</td><td>8.54 s</td><td class="g">1.19x</td><td>265 to 240 s</td></tr>
+    <tr class="hl"><td>103 GB</td><td>20.3 s</td><td>12.4 s</td><td class="g">1.64x</td><td>334 to 268 s</td></tr>
+  </table></div><figcaption>means of the repetitions (103 GB has four, the rest two). the gap on 103 GB is bigger than the classification phase alone (10.7 s to 8.8 s), so freeing the HyperLogLog structures at exit also cost seconds. that matches the old "exit tax" note.</figcaption></figure>
+  <h3>the control that proves the cause</h3>
+  <figure><div class="bars" id="control"></div><figcaption>stock without a report already runs at 12.3 s, the same as the patched build with one. so the whole gap is the HyperLogLog path that <code>--report</code> switches on. a user who never asks for a report gains nothing.</figcaption></figure>
+  <h3>is the answer still right?</h3>
+  <figure>
+    <ul style="list-style:none;margin:0;padding:0;display:grid;gap:8px" id="checks"></ul>
+    <figcaption>the per-read output file was compared with <code>cmp</code> over all 1,872,777 reads. reports were compared sorted.</figcaption>
+  </figure>
+  <h3>the one thing that changes</h3>
+  <p>the report lists sibling taxa sorted by read count, and when read counts tie it breaks the tie with the distinct-minimizer count. without that count the tied siblings can swap places. the content is identical, only the order moves:</p>
+  <figure>
+    <svg viewBox="0 0 900 130" role="img" aria-label="two report lines with equal read counts swap places when the hyperloglog tie-break is removed">
+      <g font-family="var(--mono)" font-size="13" fill="currentColor">
+        <text x="20" y="20" class="sv-ts">stock S19</text><text x="470" y="20" class="sv-ts">with the guard</text>
+        <rect x="20" y="30" width="400" height="30" rx="6" fill="var(--soft)"/><text x="30" y="50">  0.00   5   5   S  2816906   Pseudomonas sp. BYT-1</text>
+        <rect x="20" y="70" width="400" height="30" rx="6" fill="var(--soft)"/><text x="30" y="90">  0.00   5   5   S  1294143   Pseudomonas sp. ATCC 13867</text>
+        <g><rect x="470" y="30" width="400" height="30" rx="6" fill="color-mix(in srgb,var(--b) 25%,var(--card))"><animate attributeName="y" values="30;70;30" dur="4s" repeatCount="indefinite"/></rect><text x="480" y="50">  0.00   5   5   S  1294143   Pseudomonas sp. ATCC 13867<animate attributeName="y" values="50;90;50" dur="4s" repeatCount="indefinite"/></text></g>
+        <g><rect x="470" y="70" width="400" height="30" rx="6" fill="color-mix(in srgb,var(--b) 25%,var(--card))"><animate attributeName="y" values="70;30;70" dur="4s" repeatCount="indefinite"/></rect><text x="480" y="90">  0.00   5   5   S  2816906   Pseudomonas sp. BYT-1<animate attributeName="y" values="90;50;90" dur="4s" repeatCount="indefinite"/></text></g>
+      </g>
+    </svg>
+    <figcaption>illustrative: same two lines, swapped order. anything that reads the report by hierarchy and taxid is unaffected. anything that diffs report text byte for byte against stock will see reordered ties. with <code>--report-minimizer-data</code> the output is byte-identical.</figcaption>
+  </figure>
+  <div class="take warnbox"><b>caveats, plainly</b> one machine (Luna), warm page cache, and the diff is against the S19 working tree which has uncommitted changes. we did not check whether upstream kraken2 has the same unconditional call. the order change should go to sir before this becomes "S22".</div>
+</section>
+
+<!-- ===================== CH 10 ===================== -->
+<section class="chap reveal" id="c10">
+  <div class="eyebrow tag">chapter 10 of 10</div>
+  <h2>Scoreboard and what to ask next</h2>
+  <figure><div class="scroll"><table>
+    <tr><th>idea</th><th>result</th><th>how sure</th></tr>
+    <tr><td>hardware LLC associativity</td><td class="r">no effect (under 1% spread)</td><td>simulator, 1.1 MB slice, so weak</td></tr>
+    <tr><td>software 4-way cache</td><td class="r">wins at tiny workloads, loses at large, real null on Luna</td><td>real hardware, solid</td></tr>
+    <tr><td>smarter eviction policy</td><td class="r">capped near 3 to 5% on 8 GB</td><td>real trace + real profile, solid</td></tr>
+    <tr><td>hot-slot reuse exists</td><td class="g">yes: 81% repeats, top 262K slots = 56%</td><td>real trace, one 105k-read sample</td></tr>
+    <tr><td>double hashing</td><td class="r">1.8 to 2.5x slower lookups</td><td>stand-alone benchmark, solid</td></tr>
+    <tr><td>line-aligned buckets</td><td>5 to 12% fewer lines, no timing win</td><td>within noise</td></tr>
+    <tr><td>skip unused HyperLogLog</td><td class="g">1.06x to 1.64x with --report</td><td>real, controlled, output identical</td></tr>
+  </table></div><figcaption>every row traces to a committed file in <code>cache_simulation/debate_2026-11/</code>.</figcaption></figure>
+
+  <h3>open threads</h3>
+  <ul>
+    <li>the 103 GB profile at one thread was dominated by database loading, so the 28%-of-user-time lookup share there is rough. AMAC (deeper latency hiding) is still unmeasured. at production scale <code>GetAt</code> is 6.7% and <code>PrefetchIndex</code> 9.7%, so it could still matter on the biggest database.</li>
+    <li>the scanner (<code>NextMinimizer</code> 19% and <code>ClassifySequence</code> 17%) is now the largest cost. S21 compile-flag variants exist on Luna but were not part of this work.</li>
+    <li>the Sniper side still needs calibration against <code>perf</code>, a full-size LLC, and honest-scale windows before it can support any claim.</li>
+  </ul>
+
+  <details><summary>glossary: every term, from zero</summary>
+    <p><b>read</b>: one DNA fragment from the sequencer, thousands of letters long. <b>minimizer</b>: a short fingerprint picked from each window of a read. <b>hash table</b>: a big array where a fingerprint's hash picks the cell to check. <b>cache</b>: small fast memory holding recent answers. <b>hit / miss</b>: found in cache / not found. <b>associativity (N-way)</b>: how many slots one address may use inside a cache. <b>eviction policy</b>: the rule for which resident leaves, for example LRU (least recently used). <b>Belady</b>: the perfect policy that knows the future, used as an upper bound. <b>LLC</b>: last-level cache, the biggest cache (L3). <b>DRAM</b>: main memory. <b>prefetch</b>: asking memory for data before it is needed, so waiting overlaps. <b>cycles / IPC</b>: processor clock ticks / instructions per tick. <b>linear probing</b>: on a collision, try the next cell. <b>double hashing</b>: on a collision, jump by a hash-dependent step. <b>perf</b>: the Linux profiler that samples where a program spends time. <b>HyperLogLog</b>: a compact counter that estimates how many distinct items were seen. <b>S0, S19</b>: our names for stock kraken2 and the version with all our speedups.</p>
+  </details>
+  <p>when something here is unclear, ask about the chapter number and we will go slower there.</p>
+</section>
+
+<footer>made from the files in <code>cache_simulation/debate_2026-11/</code> (rounds 1 to 6, plus e1/ and e5/ data). simulator numbers are from Sniper on Luna, September 2026. Luna numbers are from November 23, 2026.</footer>
+</div>
+
+<script>
+(function(){
+  /* ---------- helpers ---------- */
+  var $=function(s,r){return (r||document).querySelector(s)};
+  function bars(id,rows,o){
+    o=o||{}; var el=$(id); if(!el) return; var max=o.max||Math.max.apply(null,rows.map(function(r){return r.v}));
+    el.className='bars'; el.innerHTML=rows.map(function(r){
+      var w=Math.max(1.5,r.v/max*100);
+      var mk=o.mark?'<div class="mark" style="left:'+(o.mark/max*100)+'%"></div>':'';
+      return '<div class="brow"><span class="lab">'+r.l+'</span><div class="track"><div class="fill" style="width:'+w+'%;background:'+(r.c||'var(--a)')+'"></div>'+mk+'</div><span class="val">'+(r.t||r.v)+'</span></div>';
+    }).join('');
+  }
+  var svgNS='http://www.w3.org/2000/svg';
+  function mk(tag,attrs,parent){var e=document.createElementNS(svgNS,tag);for(var k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e}
+
+  /* ---------- nav + progress + reveal ---------- */
+  var titles=['pipeline','cache idea','simulator','results','audit','debate','reuse','ceiling','surprise','score'];
+  $('#nav').innerHTML=titles.map(function(t,i){return '<a href="#c'+(i+1)+'" data-i="c'+(i+1)+'">'+(i+1)+' '+t+'</a>'}).join('');
+  var navLinks=[].slice.call(document.querySelectorAll('#nav a'));
+  function onScroll(){
+    var h=document.documentElement; $('#prog').style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+  }
+  window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){e.target.classList.add('in'); navLinks.forEach(function(a){a.classList.toggle('on',a.dataset.i===e.target.id)})}
+    })},{threshold:.12});
+    [].forEach.call(document.querySelectorAll('.reveal'),function(s){io.observe(s)});
+  } else { [].forEach.call(document.querySelectorAll('.reveal'),function(s){s.classList.add('in')}); }
+
+  /* ---------- ch1: read strip + table grid ---------- */
+  var cols=['var(--a)','var(--b)','var(--c)','var(--good)'], letters='ACGT';
+  var strip=$('#strip'); for(var i=0;i<34;i++){var x=20+i*20;var r=(i*7+3)%4;
+    mk('rect',{x:x,y:42,width:18,height:26,rx:3,fill:cols[r],opacity:.85},strip);
+    var t=mk('text',{x:x+9,y:60,'text-anchor':'middle',fill:'#fff','font-family':'var(--mono)','font-size':11},strip);t.textContent=letters[r];}
+  var grid=$('#grid'); for(var gy=0;gy<7;gy++)for(var gx=0;gx<14;gx++){
+    var c=mk('rect',{x:560+gx*20,y:36+gy*20,width:17,height:17,rx:3,fill:'var(--soft)',stroke:'var(--line)'},grid);
+    if((gx*5+gy*3)%11===0){c.setAttribute('style','animation:flashcell '+(2+((gx+gy)%4))+'s '+((gx*gy)%5*.4)+'s infinite');} }
+
+  /* ---------- ch2: set-associative animation ---------- */
+  (function(){
+    var seq=['A','B','C','D','A','E','B','A','F','C','A','D'];
+    var cols2={A:'var(--a)',B:'var(--c)',C:'var(--b)',D:'var(--good)',E:'#c7498b',F:'#7a8b2a'};
+    var host=$('#assoc'); if(!host) return;
+    var svg=mk('svg',{viewBox:'0 0 900 200',role:'img','aria-label':'one set of a four way LRU cache processing a sequence of addresses'},host);
+    var slots=[],order=[]; var boxes=[],labs=[];
+    for(var i=0;i<4;i++){boxes.push(mk('rect',{x:40+i*120,y:60,width:100,height:60,rx:10,fill:'var(--soft)',stroke:'var(--line)','stroke-width':2},svg));
+      labs.push(mk('text',{x:90+i*120,y:98,'text-anchor':'middle','font-family':'var(--mono)','font-size':22,fill:'var(--ink)'},svg));
+      var tt=mk('text',{x:90+i*120,y:140,'text-anchor':'middle',class:'sv-ts'},svg);tt.textContent='way '+(i+1);}
+    var nextT=mk('text',{x:560,y:76,class:'sv-tb'},svg), resT=mk('text',{x:560,y:104,'font-family':'var(--mono)','font-size':16,fill:'var(--ink)'},svg), exT=mk('text',{x:560,y:130,class:'sv-ts'},svg);
+    var hist=mk('text',{x:40,y:185,class:'sv-ts'},svg); var n=0,done=[];
+    function step(){
+      var k=seq[n%seq.length]; if(n%seq.length===0){slots=[];order=[];done=[]}
+      var idx=slots.indexOf(k),res,ex='';
+      if(idx>=0){res='hit';order.splice(order.indexOf(k),1);order.push(k)}
+      else{res='miss'; if(slots.length<4){slots.push(k);}
+        else{var victim=order.shift();var vi=slots.indexOf(victim);slots[vi]=k;ex='evicts '+victim+' (least recently used)'}
+        order.push(k)}
+      for(var i=0;i<4;i++){var s=slots[i];labs[i].textContent=s||'';boxes[i].setAttribute('fill',s?cols2[s]:'var(--soft)');boxes[i].setAttribute('fill-opacity',s?.28:1);boxes[i].setAttribute('stroke',s?cols2[s]:'var(--line)');labs[i].setAttribute('fill',s?cols2[s]:'var(--ink)')}
+      nextT.textContent='address '+k+' arrives'; resT.textContent=res.toUpperCase(); resT.setAttribute('fill',res==='hit'?'var(--good)':'var(--b)'); exT.textContent=ex;
+      done.push(k+(res==='hit'?'+':'-')); hist.textContent='history ( + hit, - miss ): '+done.join('  ');
+      n++;
+    }
+    step(); setInterval(step,1400);
+  })();
+
+  /* ---------- ch4 charts ---------- */
+  (function(){
+    var host=$('#flip'); if(!host) return;
+    var pts=[[0.35,.704],[0.90,.831],[1.87,.957],[4.7,1.031],[25.4,1.092]];
+    var W=860,H=260,L=56,R=20,T=18,B=48;
+    var svg=mk('svg',{viewBox:'0 0 '+W+' '+H,role:'img','aria-label':'ratio of 4-way to no cache cycles rising from 0.70 to 1.09 as total bases grow'},host);
+    function X(v){return L+(Math.log10(v)-Math.log10(.3))/(Math.log10(30)-Math.log10(.3))*(W-L-R)}
+    function Y(v){return T+(1.15-v)/(1.15-.65)*(H-T-B)}
+    mk('rect',{x:L,y:Y(1),width:W-L-R,height:Y(.65)-Y(1),fill:'var(--good)',opacity:.1},svg);
+    mk('rect',{x:L,y:Y(1.15),width:W-L-R,height:Y(1)-Y(1.15),fill:'var(--bad)',opacity:.1},svg);
+    [.7,.8,.9,1.0,1.1].forEach(function(v){mk('line',{x1:L,x2:W-R,y1:Y(v),y2:Y(v),stroke:'var(--line)'},svg);var t=mk('text',{x:L-8,y:Y(v)+4,'text-anchor':'end',class:'sv-ts'},svg);t.textContent=v.toFixed(1)});
+    mk('line',{x1:L,x2:W-R,y1:Y(1),y2:Y(1),stroke:'var(--ink)','stroke-width':2,'stroke-dasharray':'5 4'},svg);
+    var t1=mk('text',{x:L+8,y:Y(1)+16,class:'sv-ts'},svg);t1.textContent='cache faster than no cache';
+    var t2=mk('text',{x:L+8,y:Y(1)-8,class:'sv-ts'},svg);t2.textContent='cache slower';
+    var d=pts.map(function(p,i){return (i?'L':'M')+X(p[0])+','+Y(p[1])}).join(' ');
+    var path=mk('path',{d:d,fill:'none',stroke:'var(--b)','stroke-width':3,pathLength:1,'stroke-dasharray':1,class:'draw'},svg);
+    pts.forEach(function(p){mk('circle',{cx:X(p[0]),cy:Y(p[1]),r:5,fill:'var(--b)'},svg);var t=mk('text',{x:X(p[0]),y:Y(p[1])-11,'text-anchor':'middle',class:'sv-t'},svg);t.textContent=p[1].toFixed(3)});
+    [.35,.9,1.87,4.7,25.4].forEach(function(v){var t=mk('text',{x:X(v),y:H-22,'text-anchor':'middle',class:'sv-ts'},svg);t.textContent=v+'M'});
+    var ax=mk('text',{x:W/2,y:H-4,'text-anchor':'middle',class:'sv-ts'},svg);ax.textContent='total bases in the workload (log scale)';
+    var st=document.createElement('style');st.textContent='.in .draw{animation:dr 2s ease both}@keyframes dr{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}.draw{stroke-dashoffset:0}';document.head.appendChild(st);
+  })();
+  bars('#r2000',[{l:'no cache (S0)',v:1,t:'1.000x',c:'var(--muted)'},{l:'4-way',v:1.284,t:'1.284x',c:'var(--bad)'},{l:'1-way',v:1.312,t:'1.312x',c:'var(--bad)'},{l:'8-way',v:1.339,t:'1.339x',c:'var(--bad)'},{l:'16-way',v:1.386,t:'1.386x',c:'var(--bad)'}],{max:1.45,mark:1});
+  bars('#cores',[{l:'10 reads, 50 MB',v:.96,t:'0.96x',c:'var(--muted)'},{l:'50 reads, 50 MB',v:1.28,t:'1.28x'},{l:'50 reads, 8 GB',v:1.18,t:'1.18x'},{l:'100 reads, 50 MB',v:2.26,t:'2.26x'},{l:'100 reads, 8 GB',v:1.89,t:'1.89x'}],{max:2.4,mark:1});
+
+  /* ---------- ch5 ---------- */
+  bars('#instr',[{l:'8 GB: S0',v:68.1,t:'68.1 M',c:'var(--b)'},{l:'8 GB: 4-way',v:51.9,t:'51.9 M'},{l:'16 GB: S0',v:77.3,t:'77.3 M',c:'var(--b)'},{l:'16 GB: 4-way',v:51.9,t:'51.9 M'},{l:'103 GB: S0',v:102.9,t:'102.9 M',c:'var(--b)'},{l:'103 GB: 4-way',v:70.3,t:'70.3 M'}],{max:110});
+  bars('#cheap',[{l:'DRAM sim',v:45,t:'45 ns',c:'var(--c)'},{l:'DRAM measured',v:107,t:'~107 ns',c:'var(--b)'},{l:'L3 sim',v:35,t:'35 cyc',c:'var(--c)'},{l:'L3 measured',v:105,t:'88-125 cyc',c:'var(--b)'}],{max:120});
+
+  /* ---------- ch7 ---------- */
+  (function(){
+    var s=$('#stream'); if(!s) return; var seen={};
+    for(var i=0;i<140;i++){var col=i%35,row=Math.floor(i/35);var key=(i*37+11)%60; var rep=seen[key]; seen[key]=1;
+      var x=20+col*25,y=18+row*40;
+      mk('rect',{x:x,y:y,width:20,height:20,rx:4,fill:rep?'var(--a)':'var(--soft)',stroke:rep?'var(--a)':'var(--line)',opacity:rep?.75:1},s);
+      if(rep) mk('circle',{cx:x+10,cy:y+10,r:3,fill:'#fff'},s);}
+  })();
+  (function(){
+    var host=$('#cover'); if(!host) return;
+    var pts=[[1024,7.63],[16384,12.53],[65536,24.17],[262144,55.83],[1048576,90.01]];
+    var W=860,H=250,L=56,R=24,T=14,B=44; var svg=mk('svg',{viewBox:'0 0 '+W+' '+H,role:'img','aria-label':'coverage of lookups by the top N slots rising from 7.6 percent to 90 percent'},host);
+    function X(v){return L+(Math.log10(v)-Math.log10(500))/(Math.log10(2e6)-Math.log10(500))*(W-L-R)} function Y(v){return T+(100-v)/100*(H-T-B)}
+    [0,25,50,75,100].forEach(function(v){mk('line',{x1:L,x2:W-R,y1:Y(v),y2:Y(v),stroke:'var(--line)'},svg);var t=mk('text',{x:L-8,y:Y(v)+4,'text-anchor':'end',class:'sv-ts'},svg);t.textContent=v+'%'});
+    var d=pts.map(function(p,i){return (i?'L':'M')+X(p[0])+','+Y(p[1])}).join(' ');
+    mk('path',{d:d+' L'+X(1048576)+','+Y(0)+' L'+X(1024)+','+Y(0)+'z',fill:'var(--a)',opacity:.12},svg);
+    mk('path',{d:d,fill:'none',stroke:'var(--a)','stroke-width':3,pathLength:1,'stroke-dasharray':1,class:'draw'},svg);
+    pts.forEach(function(p){mk('circle',{cx:X(p[0]),cy:Y(p[1]),r:5,fill:'var(--a)'},svg);var t=mk('text',{x:X(p[0]),y:Y(p[1])-11,'text-anchor':'middle',class:'sv-t'},svg);t.textContent=p[1].toFixed(1)+'%';
+      var l=mk('text',{x:X(p[0]),y:H-22,'text-anchor':'middle',class:'sv-ts'},svg);l.textContent=(p[0]>=1e6?'1M':p[0]>=1000?Math.round(p[0]/1024)+'K':p[0])});
+    var ax=mk('text',{x:W/2,y:H-4,'text-anchor':'middle',class:'sv-ts'},svg);ax.textContent='number of most-used slots kept (log scale)';
+  })();
+  (function(){
+    var host=$('#rd'); if(!host) return;
+    var v=[.0016,.0481,.0151,.0079,.0024,.0017,.0019,.0025,.0034,.0034,.0038,.0037,.0051,.0091,.0179,.0365,.0684,.1046,.1554,.2302,.2161,.0611,.0002];
+    var W=860,H=230,L=46,R=14,T=12,B=44; var svg=mk('svg',{viewBox:'0 0 '+W+' '+H,role:'img','aria-label':'histogram of reuse distances peaking near two to the nineteen'},host);
+    var bw=(W-L-R)/v.length; var mx=.25;
+    [0,.1,.2].forEach(function(g){mk('line',{x1:L,x2:W-R,y1:T+(1-g/mx)*(H-T-B),y2:T+(1-g/mx)*(H-T-B),stroke:'var(--line)'},svg);var t=mk('text',{x:L-6,y:T+(1-g/mx)*(H-T-B)+4,'text-anchor':'end',class:'sv-ts'},svg);t.textContent=Math.round(g*100)+'%'});
+    v.forEach(function(x,i){var h=x/mx*(H-T-B);var big=i>=17&&i<=21;
+      var r=mk('rect',{x:L+i*bw+2,y:T+(H-T-B)-h,width:bw-4,height:h,rx:2,fill:big?'var(--b)':'var(--c)',opacity:big?.9:.6},svg);
+      if(i%2===0){var t=mk('text',{x:L+i*bw+bw/2,y:H-24,'text-anchor':'middle',class:'sv-ts'},svg);t.textContent=i<10?'2^'+i:'2^'+i}});
+    var ax=mk('text',{x:W/2,y:H-4,'text-anchor':'middle',class:'sv-ts'},svg);ax.textContent='distinct slots between two uses of the same slot (2^n, orange = 2^17 to 2^21, 77% of repeats)';
+  })();
+
+  /* ---------- ch8: calculator ---------- */
+  function calc(){
+    var s=parseFloat($('#sh').value)/100,h=parseFloat($('#hr').value)/100; var g=1/(1-s*h);
+    $('#shv').textContent=(s*100).toFixed(1); $('#hrv').textContent=Math.round(h*100); $('#ceil').textContent=g.toFixed(2)+'x';
+    bars('#ceilbar',[{l:'best possible',v:(g-1)*100,t:'+'+((g-1)*100).toFixed(1)+'%',c:'var(--b)'}],{max:40}); $('#ceilbar').classList.remove('in');
+  }
+  $('#sh').addEventListener('input',calc); $('#hr').addEventListener('input',calc); calc();
+
+  /* cache-line diagrams */
+  function lines(host,hops,color){
+    var rows=4;
+    for(var r=0;r<rows;r++){
+      mk('text',{x:10,y:44+r*24,class:'sv-ts'},host).textContent='line '+(r+1);
+      for(var c=0;c<16;c++) mk('rect',{x:70+c*34,y:30+r*24,width:30,height:18,rx:3,fill:'var(--soft)',stroke:'var(--line)'},host);
+    }
+    hops.forEach(function(h,i){
+      var cx=70+h[1]*34+15,cy=39+h[0]*24;
+      var g=mk('g',{},host);
+      var dot=mk('circle',{cx:cx,cy:cy,r:8,fill:color,opacity:0},g);
+      mk('animate',{attributeName:'opacity',values:'0;1;1;0',keyTimes:'0;.1;.9;1',dur:'6s',begin:(i*0.8)+'s',repeatCount:'indefinite'},dot);
+      var t=mk('text',{x:cx,y:cy+4,'text-anchor':'middle','font-size':10,fill:'#fff','font-family':'var(--mono)',opacity:0},g);t.textContent=i+1;
+      mk('animate',{attributeName:'opacity',values:'0;1;1;0',keyTimes:'0;.1;.9;1',dur:'6s',begin:(i*0.8)+'s',repeatCount:'indefinite'},t);
+    });
+  }
+  lines($('#lin'),[[0,5],[0,6],[0,7]],'var(--a)');
+  var dg=$('#dbl'); dg.setAttribute('transform','translate(0,140)');
+  lines(dg,[[0,5],[2,12],[3,3],[1,10]],'var(--b)');
+
+  /* ---------- ch9 ---------- */
+  (function(){
+    var host=$('#stack'); if(!host) return;
+    var seg=[['scanner NextMinimizer',18.98,'var(--c)'],['ClassifySequence',17.01,'var(--a)'],['kernel (loading, faults)',20.96,'var(--muted)'],['table lookup (prefetch + GetAt)',16.31,'#3b82c4'],['HyperLogLog',4.5,'var(--b)'],['everything else',22.24,'var(--line)']];
+    var html='<div style="display:flex;height:54px;border-radius:10px;overflow:hidden;border:1px solid var(--line)">'+seg.map(function(s,i){return '<div class="seg'+(i===4?' pulse':'')+'" style="width:'+s[1]+'%;background:'+s[2]+'" title="'+s[0]+' '+s[1]+'%"></div>'}).join('')+'</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:6px 14px;margin-top:12px;font-size:.88rem">'+seg.map(function(s){return '<div style="display:flex;gap:8px;align-items:center"><span style="width:12px;height:12px;border-radius:3px;background:'+s[2]+';flex:none"></span><span>'+s[0]+' <b class="mono">'+s[1]+'%</b></span></div>'}).join('')+'</div>';
+    host.innerHTML=html;
+  })();
+  function race(){
+    var a=$('#r1'),b=$('#r2'); [a,b].forEach(function(e){e.style.animation='none';void e.offsetWidth});
+    a.style.animation='grow 6.1s linear both'; b.style.animation='grow 3.7s linear both';
+  }
+  $('#race').addEventListener('click',race);
+  bars('#control',[{l:'stock, no report',v:12.35,t:'12.3 s',c:'var(--muted)'},{l:'guard, no report',v:12.27,t:'12.3 s',c:'var(--muted)'},{l:'guard, with report',v:12.4,t:'12.4 s',c:'var(--a)'},{l:'stock, with report',v:19.86,t:'19.9 s',c:'var(--b)'}],{max:21});
+  $('#checks').innerHTML=[
+    ['per-read output, 1,872,777 reads on 103 GB','byte-identical to stock (cmp)',1],
+    ['classified reads','1,850,859 (98.83%) in both builds',1],
+    ['sorted plain report','identical to stock',1],
+    ['--report-minimizer-data report','byte-identical to stock',1],
+    ['plain report line order','tied siblings can swap places',0]
+  ].map(function(c){return '<li style="display:flex;gap:10px;align-items:center;background:var(--soft);border-radius:10px;padding:8px 12px"><svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="10" fill="'+(c[2]?'var(--good)':'var(--b)')+'"/>'+(c[2]?'<path d="M6 11.5l3.2 3L16 8" stroke="#fff" stroke-width="2.4" fill="none"/>':'<path d="M11 5v7M11 15.5v1" stroke="#fff" stroke-width="2.4"/>')+'</svg><span><b>'+c[0]+'</b>: '+c[1]+'</span></li>'}).join('');
+})();
+</script>
+</body>
+</html>
