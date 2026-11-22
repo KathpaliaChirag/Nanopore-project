@@ -1,0 +1,61 @@
+== hll standard_8gb
+    38.64%  [.] kraken2::MinimizerScanner::NextMinimizer()                                                    
+    21.56%  [.] ClassifySequence(kraken2::Sequence&, kraken2::Sequence&, std::__cxx11::basic_ostringstream<cha
+    11.79%  [.] kraken2::CompactHashTable::PrefetchIndex(unsigned long) const                                 
+     2.39%  [k] 0xffffffffb3247ff8                                                                            
+     1.53%  [.] kraken2::CompactHashTable::GetAt(unsigned long, unsigned long, unsigned long) const           
+     1.17%  [k] 0xffffffffb3ba2be7                                                                            
+     0.36%  [k] 0xffffffffb2dbea4f                                                                            
+     0.09%  [k] 0xffffffffb3c1c4ce                                                                            
+     0.08%  [k] 0xffffffffb3e0128c                                                                            
+== hll standard_16gb
+    33.94%  [.] kraken2::MinimizerScanner::NextMinimizer()                                                    
+    19.87%  [.] ClassifySequence(kraken2::Sequence&, kraken2::Sequence&, std::__cxx11::basic_ostringstream<cha
+    11.12%  [.] kraken2::CompactHashTable::PrefetchIndex(unsigned long) const                                 
+     2.85%  [k] 0xffffffffb3247ff8                                                                            
+     2.56%  [.] kraken2::CompactHashTable::GetAt(unsigned long, unsigned long, unsigned long) const           
+     2.27%  [k] 0xffffffffb3ba2be7                                                                            
+     0.23%  [k] 0xffffffffb2dbea4f                                                                            
+     0.10%  [k] 0xffffffffb3ba3137                                                                            
+     0.09%  [k] 0xffffffffb3c1c4ce                                                                            
+== hll pluspf_103gb
+    22.85%  [.] kraken2::MinimizerScanner::NextMinimizer()                                                    
+    14.16%  [k] 0xffffffffb3247ff8                                                                            
+    13.96%  [.] ClassifySequence(kraken2::Sequence&, kraken2::Sequence&, std::__cxx11::basic_ostringstream<cha
+    10.63%  [.] kraken2::CompactHashTable::PrefetchIndex(unsigned long) const                                 
+    10.60%  [k] 0xffffffffb3ba2be7                                                                            
+     8.04%  [.] kraken2::CompactHashTable::GetAt(unsigned long, unsigned long, unsigned long) const           
+     0.84%  [k] 0xffffffffb2dbea4f                                                                            
+     0.18%  [k] 0xffffffffb2dbf2f0                                                                            
+     0.15%  [k] 0xffffffffb2e51e60                                                                            
+== stock standard_8gb
+    35.90%  [.] kraken2::MinimizerScanner::NextMinimizer()                                                    
+    21.60%  [.] ClassifySequence(kraken2::Sequence&, kraken2::Sequence&, std::__cxx11::basic_ostringstream<cha
+    10.95%  [.] kraken2::CompactHashTable::PrefetchIndex(unsigned long) const                                 
+     2.38%  [.] HyperLogLogPlusMinus<unsigned long>::insert(unsigned long)                                    
+     2.04%  [k] 0xffffffffb3247ff8                                                                            
+     1.43%  [.] kraken2::CompactHashTable::GetAt(unsigned long, unsigned long, unsigned long) const           
+     1.16%  [k] 0xffffffffb3ba2be7                                                                            
+     0.61%  [.] HyperLogLogPlusMinus<unsigned long>::merge(HyperLogLogPlusMinus<unsigned long>&&)             
+     0.34%  [k] 0xffffffffb2dbea4f                                                                            
+== stock standard_16gb
+    30.85%  [.] kraken2::MinimizerScanner::NextMinimizer()                                                    
+    20.47%  [.] ClassifySequence(kraken2::Sequence&, kraken2::Sequence&, std::__cxx11::basic_ostringstream<cha
+    10.27%  [.] kraken2::CompactHashTable::PrefetchIndex(unsigned long) const                                 
+     2.75%  [k] 0xffffffffb3247ff8                                                                            
+     2.41%  [.] kraken2::CompactHashTable::GetAt(unsigned long, unsigned long, unsigned long) const           
+     2.34%  [.] HyperLogLogPlusMinus<unsigned long>::insert(unsigned long)                                    
+     2.23%  [k] 0xffffffffb3ba2be7                                                                            
+     0.52%  [.] HyperLogLogPlusMinus<unsigned long>::merge(HyperLogLogPlusMinus<unsigned long>&&)             
+     0.23%  [k] 0xffffffffb2dbea4f                                                                            
+== stock pluspf_103gb
+    19.09%  [.] kraken2::MinimizerScanner::NextMinimizer()                                                    
+    16.89%  [.] ClassifySequence(kraken2::Sequence&, kraken2::Sequence&, std::__cxx11::basic_ostringstream<cha
+    11.42%  [k] 0xffffffffb3247ff8                                                                            
+     9.69%  [k] 0xffffffffb3ba2be7                                                                            
+     9.51%  [.] kraken2::CompactHashTable::PrefetchIndex(unsigned long) const                                 
+     6.60%  [.] kraken2::CompactHashTable::GetAt(unsigned long, unsigned long, unsigned long) const           
+     3.26%  [.] HyperLogLogPlusMinus<unsigned long>::insert(unsigned long)                                    
+     1.21%  [.] HyperLogLogPlusMinus<unsigned long>::merge(HyperLogLogPlusMinus<unsigned long>&&)             
+     0.69%  [k] 0xffffffffb2dbea4f                                                                            
+P32DONE
