@@ -1,0 +1,391 @@
+--- src_best/src/classify.cc	2026-11-23 10:19:21.313982716 +0530
++++ impl_pread/src/classify.cc	2026-11-23 10:24:43.946963486 +0530
+@@ -491,6 +491,27 @@
+   omp_lock_t output_lock;
+   omp_init_lock(&output_lock);
+   k2_skip_qual() = (opts.minimum_quality_score == 0 && opts.classified_output_filename.empty() && opts.unclassified_output_filename.empty() && ! getenv("K2_KEEPQ")) ? 1 : 0;
++  // K2_PREAD: lock-free offset-partitioned reading for plain regular fastq files (default on, K2_PREAD=0 forces the kseq path)
++  k2pread::Plan pread_plan;
++  bool use_pread = false;
++  {
++    const char *e = getenv("K2_PREAD");
++    bool want = (e == nullptr || strcmp(e, "0") != 0);
++    if (want && filename1 != nullptr && ! opts.paired_end_processing) {
++      std::vector<std::string> files;
++      files.push_back(filename1);
++      if (g_extra_files != nullptr)
++        for (const std::string &f : *g_extra_files) files.push_back(f);
++      uint64_t chunk = 4ull << 20;
++      const char *ce = getenv("K2_PREAD_CHUNK");
++      if (ce != nullptr && atoll(ce) > 0) chunk = (uint64_t) atoll(ce);
++      std::string why;
++      use_pread = pread_plan.Init(files, chunk, why);
++      if (getenv("K2_PREAD_VERBOSE"))
++        fprintf(stderr, "K2_PREAD: %s (%s), %llu chunks of %llu bytes\n", use_pread ? "on" : "off, using kseq path",
++                use_pread ? "ok" : why.c_str(), (unsigned long long) pread_plan.total, (unsigned long long) chunk);
++    }
++  }
+   BatchSequenceReader r1(filename1);
+   if (filename1 != nullptr && g_extra_files != nullptr)
+     for (const std::string &f : *g_extra_files)
+@@ -521,6 +542,16 @@
+ 
+       auto ok_read = false;
+ 
++      if (use_pread) {
++        // no lock: an atomic ticket is the block id, the chunk is read and parsed by this thread alone.
++        // an empty chunk still yields an (empty) output block so next_output_block_id never stalls.
++        uint64_t t = __atomic_fetch_add(&pread_plan.next, (uint64_t) 1, __ATOMIC_RELAXED);
++        block_id = t;
++        ok_read = t < pread_plan.total;
++        if (ok_read)
++          reader1.LoadPread(pread_plan, t);
++      }
++      else
+       #pragma omp critical(seqread)
+       {  // Input processing block
+         if (! opts.paired_end_processing) {
+@@ -622,7 +653,7 @@
+                << " sequences (" << stats.total_bases << " bp) ...";
+       }
+ 
+-      if (!outputs.initialized) {
++      if (!outputs.initialized && reader1.loaded() > 0) {
+         InitializeOutputs(opts, outputs, reader1.file_format());
+       }
+ 
+--- src_best/src/seqreader.h	2026-11-23 10:19:21.301982717 +0530
++++ impl_pread/src/seqreader.h	2026-11-23 10:25:50.876959497 +0530
+@@ -10,6 +10,7 @@
+ #include "kraken2_headers.h"
+ #include "kseq.h"
+ #include <fcntl.h>
++#include "preadfq.h"
+ 
+ KSEQ_INIT(int, read)
+ 
+@@ -126,6 +127,48 @@
+     return size_ > 0;
+   }
+ 
++
++  // K2_PREAD: lock-free chunk load. ticket t of the plan is parsed by this thread alone (no lock held).
++  // on any parse problem the process exits with an error (never silently differs from the kseq path).
++  size_t loaded() const { return size_; }
++  bool LoadPreadTry(k2pread::Plan &plan, uint64_t t, std::string &err) {
++    struct PSink {
++      std::vector<Sequence> &v; size_t n; bool skipq; SequenceFormat fmt;
++      void begin() { n = 0; }
++      void add(const k2pread::Rec &r) {
++        if (n == v.size()) v.resize(n + 1);
++        Sequence &s = v[n++];
++        s.header.assign(r.name, r.nl);
++        s.comment.assign(r.com, r.cl);
++        s.seq.assign(r.seq, r.sl);
++        if (r.ql > 0) {
++          fmt = s.format = SequenceFormat::FORMAT_FASTQ;
++          if (skipq) s.quals.clear(); else s.quals.assign(r.qual, r.ql);
++        } else {
++          fmt = s.format = SequenceFormat::FORMAT_FASTA;
++        }
++      }
++    };
++    size_t f; uint64_t k;
++    plan.Locate(t, f, k);
++    PSink sink = { seqs_, 0, k2_skip_qual() != 0, file_format_ };
++    int rc = k2pread::read_chunk(plan.fds[f], plan.sizes[f], k, plan.B, rbuf_, sink, &err);
++    if (rc != k2pread::PR_OK) { size_ = 0; curr_ = 0; return false; }
++    size_ = sink.n;
++    curr_ = 0;
++    if (size_ > 0) file_format_ = sink.fmt;
++    return true;
++  }
++  void LoadPread(k2pread::Plan &plan, uint64_t t) {
++    std::string err;
++    if (! LoadPreadTry(plan, t, err)) {
++      fprintf(stderr, "classify: K2_PREAD failed on ticket %llu: %s. rerun with K2_PREAD=0\n",
++              (unsigned long long)t, err.c_str());
++      fflush(stderr);
++      ::_exit(3);
++    }
++  }
++
+   bool NextSequence(Sequence& seq)
+   {
+     bool seq_read = false;
+@@ -217,6 +260,7 @@
+ 
+   kseq_t* kseq_;
+   std::vector<Sequence> seqs_;
++  std::vector<char> rbuf_;
+   SequenceFormat file_format_;
+   int fd_;
+   size_t curr_;
+--- /dev/null	2025-12-10 20:14:18.683999869 +0530
++++ impl_pread/src/preadfq.h	2026-11-23 10:26:51.164955903 +0530
+@@ -0,0 +1,265 @@
++// preadfq.h: lock-free chunked FASTQ reader (offset partition, pread, strict 4-line parser).
++// self-contained (no kraken headers) so the unit test can include it directly.
++// semantics copied from kseq.h (kseq_read with the 4 line FASTQ shape); anything else is BAD.
++#ifndef K2_PREADFQ_H_
++#define K2_PREADFQ_H_
++
++#include <stdint.h>
++#include <string.h>
++#include <stdio.h>
++#include <errno.h>
++#include <unistd.h>
++#include <fcntl.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <vector>
++#include <string>
++#include <algorithm>
++
++namespace k2pread {
++
++enum { PR_OK = 0, PR_MORE = 1, PR_BAD = 2, PR_NO = 3 };
++
++struct Buf { const char *p; size_t len; bool eof; };
++
++static inline bool is_sp(unsigned char c) { return c == ' ' || (c >= 9 && c <= 13); }
++// kseq rule: a trailing '\r' is dropped only when the line (field) is longer than 1 byte
++static inline size_t effl(const char *p, size_t raw) { return (raw > 1 && p[raw - 1] == '\r') ? raw - 1 : raw; }
++
++// end of the line that starts at pos (pos < len required by caller). le = index of '\n', or len for an unterminated last line at eof.
++static inline int line_end(const Buf &b, size_t pos, size_t &le) {
++  const void *m = memchr(b.p + pos, '\n', b.len - pos);
++  if (m) { le = (const char *)m - b.p; return PR_OK; }
++  if (b.eof) { le = b.len; return PR_OK; }
++  return PR_MORE;
++}
++
++struct Rec {
++  const char *name; size_t nl;
++  const char *com; size_t cl;
++  const char *seq; size_t sl;
++  const char *qual; size_t ql;   // qual points at the quality line (ql = its effective length)
++};
++
++// parse one strict record starting at pos. on PR_OK sets rec and next (start of the following record, or len).
++static inline int parse_record(const Buf &b, size_t pos, Rec &r, size_t &next) {
++  const char *p = b.p;
++  if (pos >= b.len) return b.eof ? PR_BAD : PR_MORE;
++  if (p[pos] != '@') return PR_BAD;
++  size_t l1, l2, l3, l4;
++  int rc = line_end(b, pos, l1); if (rc != PR_OK) return rc;
++  if (l1 >= b.len) return PR_BAD;              // header at eof with nothing after it
++  // header: name up to first isspace byte, comment = rest of the line after that one byte
++  size_t i = pos + 1;
++  while (i < l1 && !is_sp((unsigned char)p[i])) i++;
++  r.name = p + pos + 1; r.nl = i - (pos + 1);
++  if (i >= l1) { r.com = p + l1; r.cl = 0; }
++  else { r.com = p + i + 1; r.cl = effl(p + i + 1, l1 - (i + 1)); }
++  size_t s1 = l1 + 1;
++  if (s1 >= b.len) return b.eof ? PR_BAD : PR_MORE;
++  rc = line_end(b, s1, l2); if (rc != PR_OK) return rc;
++  if (l2 > s1 && (p[s1] == '@' || p[s1] == '+' || p[s1] == '>')) return PR_BAD;
++  r.seq = p + s1; r.sl = effl(p + s1, l2 - s1);
++  if (l2 >= b.len) return PR_BAD;
++  size_t s2 = l2 + 1;
++  if (s2 >= b.len) return b.eof ? PR_BAD : PR_MORE;
++  if (p[s2] != '+') return PR_BAD;
++  rc = line_end(b, s2, l3); if (rc != PR_OK) return rc;
++  if (l3 >= b.len) return PR_BAD;
++  size_t s3 = l3 + 1;
++  if (s3 >= b.len) {
++    if (!b.eof) return PR_MORE;
++    // kseq accepts an empty read whose (empty) quality line is simply missing at eof
++    if (r.sl == 0) { r.qual = p + b.len; r.ql = 0; next = b.len; return PR_OK; }
++    return PR_BAD;
++  }
++  rc = line_end(b, s3, l4); if (rc != PR_OK) return rc;
++  r.qual = p + s3; r.ql = effl(p + s3, l4 - s3);
++  if (r.ql != r.sl) return PR_BAD;
++  next = (l4 < b.len) ? l4 + 1 : b.len;
++  return PR_OK;
++}
++
++// candidate test used by find_start: header line at pos, line+2 starts with '+', len(line+1) == len(line+3)
++static inline int cand(const Buf &b, size_t pos, size_t &l1_out) {
++  const char *p = b.p;
++  size_t l1, l2, l3, l4;
++  int rc = line_end(b, pos, l1); if (rc != PR_OK) return rc;
++  l1_out = l1;
++  if (l1 >= b.len) return PR_NO;
++  size_t s1 = l1 + 1;
++  rc = line_end(b, s1, l2); if (rc != PR_OK) return rc;
++  if (l2 >= b.len) return PR_NO;
++  size_t s2 = l2 + 1;
++  if (s2 >= b.len) return b.eof ? PR_NO : PR_MORE;
++  if (p[s2] != '+') return PR_NO;
++  rc = line_end(b, s2, l3); if (rc != PR_OK) return rc;
++  if (l3 >= b.len) return PR_NO;
++  size_t s3 = l3 + 1;
++  if (s3 >= b.len) {
++    if (!b.eof) return PR_MORE;
++    return effl(p + s1, l2 - s1) == 0 ? PR_OK : PR_NO;
++  }
++  rc = line_end(b, s3, l4); if (rc != PR_OK) return rc;
++  if (effl(p + s1, l2 - s1) != effl(p + s3, l4 - s3)) return PR_NO;
++  return PR_OK;
++}
++
++// first record start (absolute offset) at or after off. returns fsize when there is none.
++// buffer holds file bytes [base, base+len); base <= off-1 when off > 0.
++static inline int find_start(const Buf &b, uint64_t base, uint64_t off, uint64_t fsize, uint64_t &out) {
++  size_t pos;
++  if (off == 0) pos = 0;
++  else {
++    size_t rel = (size_t)(off - base);
++    if (b.p[rel - 1] == '\n') pos = rel;
++    else {
++      if (rel >= b.len) { if (b.eof) { out = fsize; return PR_OK; } return PR_MORE; }
++      const void *m = memchr(b.p + rel, '\n', b.len - rel);
++      if (!m) { if (b.eof) { out = fsize; return PR_OK; } return PR_MORE; }
++      pos = (const char *)m - b.p + 1;
++    }
++  }
++  for (;;) {
++    if (pos >= b.len) { if (b.eof) { out = fsize; return PR_OK; } return PR_MORE; }
++    size_t l1;
++    if (b.p[pos] == '@') {
++      int rc = cand(b, pos, l1);
++      if (rc == PR_OK) { out = base + pos; return PR_OK; }
++      if (rc == PR_MORE) return PR_MORE;
++    } else {
++      int rc = line_end(b, pos, l1); if (rc != PR_OK) return rc;
++    }
++    pos = l1 + 1;
++  }
++}
++
++static inline bool tail_has_header_char(const Buf &b, size_t pos) {
++  for (size_t i = pos; i < b.len; i++) if (b.p[i] == '@' || b.p[i] == '>') return true;
++  return false;
++}
++
++// parse all records that start inside [off_s, off_e). sink gets add(...) calls in file order.
++// guard: the end of the last record must equal find_start(off_e) (what the next chunk will use as its start).
++template <class Sink>
++static int process_chunk(const Buf &b, uint64_t base, uint64_t off_s, uint64_t off_e, uint64_t fsize,
++                         Sink &sink, std::string *err) {
++  uint64_t F, S;
++  if (off_e >= fsize) F = fsize;
++  else { int rc = find_start(b, base, off_e, fsize, F); if (rc != PR_OK) return rc; }
++  if (off_s == 0) S = 0;
++  else { int rc = find_start(b, base, off_s, fsize, S); if (rc != PR_OK) return rc; }
++  size_t pos = (size_t)(S - base);
++  if (S >= fsize) pos = b.len;
++  sink.begin();
++  while (base + pos < off_e) {
++    if (pos >= b.len) { if (err) *err = "chunk ran past eof"; return PR_BAD; }
++    if (b.p[pos] != '@') {
++      // only acceptable as trailing junk with no '@' or '>' in it (kseq would skip it)
++      if (F == fsize && b.eof && !tail_has_header_char(b, pos)) { pos = b.len; break; }
++      if (err) *err = "byte at record start is not '@'";
++      return PR_BAD;
++    }
++    Rec r; size_t next;
++    int rc = parse_record(b, pos, r, next);
++    if (rc == PR_MORE) return PR_MORE;
++    if (rc != PR_OK) { if (err) *err = "record is not strict 4-line fastq"; return PR_BAD; }
++    sink.add(r);
++    pos = next;
++  }
++  uint64_t q = base + pos;
++  if (q != F) {
++    if (F == fsize && b.eof && q < fsize && !tail_has_header_char(b, pos)) return PR_OK;
++    if (err) *err = "end of chunk parse does not match next chunk start";
++    return PR_BAD;
++  }
++  return PR_OK;
++}
++
++static inline bool pread_full(int fd, char *dst, size_t n, uint64_t off) {
++  size_t got = 0;
++  while (got < n) {
++    ssize_t r = pread(fd, dst + got, n - got, (off_t)(off + got));
++    if (r < 0) { if (errno == EINTR) continue; return false; }
++    if (r == 0) return false;
++    got += (size_t)r;
++  }
++  return true;
++}
++
++// read chunk k of a file of fsize bytes with nominal chunk size B, retrying with a longer tail when needed.
++template <class Sink>
++static int read_chunk(int fd, uint64_t fsize, uint64_t k, uint64_t B, std::vector<char> &buf,
++                      Sink &sink, std::string *err, uint64_t init_tail = 64 * 1024) {
++  uint64_t off_s = k * B, off_e = std::min(off_s + B, fsize);
++  uint64_t base = off_s ? off_s - 1 : 0;
++  uint64_t tail = init_tail;
++  for (;;) {
++    uint64_t want = (off_e - base) + tail;
++    if (base + want > fsize) want = fsize - base;
++    if (buf.size() < want) buf.resize((size_t)want);
++    if (!pread_full(fd, buf.data(), (size_t)want, base)) { if (err) *err = std::string("pread failed: ") + strerror(errno); return PR_BAD; }
++    Buf b = { buf.data(), (size_t)want, base + want == fsize };
++    int rc = process_chunk(b, base, off_s, off_e, fsize, sink, err);
++    if (rc != PR_MORE) return rc;
++    tail *= 4;
++  }
++}
++
++struct NullSink { void begin() {} void add(const Rec &) {} };
++
++struct Plan {
++  std::vector<int> fds;
++  std::vector<uint64_t> sizes, cum;   // cum[f] = chunks before file f; cum.back() = total
++  uint64_t B;
++  uint64_t total;
++  uint64_t next;                      // atomic ticket counter (use __atomic_fetch_add)
++
++  Plan() : B(4u << 20), total(0), next(0) {}
++  ~Plan() { for (size_t i = 0; i < fds.size(); i++) if (fds[i] >= 0) close(fds[i]); }
++
++  // decide up front: every file must be a regular file and its first MiB must be strict fastq starting at byte 0
++  bool Init(const std::vector<std::string> &files, uint64_t chunk, std::string &why) {
++    B = chunk;
++    cum.assign(1, 0);
++    for (size_t i = 0; i < files.size(); i++) {
++      int fd = open(files[i].c_str(), O_RDONLY);
++      if (fd < 0) { why = "cannot open " + files[i]; return false; }
++      fds.push_back(fd);
++      struct stat st;
++      if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) { why = "not a regular file: " + files[i]; return false; }
++      uint64_t sz = (uint64_t)st.st_size;
++      sizes.push_back(sz);
++      if (sz > 0) {
++        size_t n = (size_t)std::min<uint64_t>(sz, 1u << 20);
++        std::vector<char> pb(n);
++        if (!pread_full(fd, pb.data(), n, 0)) { why = "pre-scan read failed: " + files[i]; return false; }
++        Buf b = { pb.data(), n, n == sz };
++        if (pb[0] != '@') { why = "first byte is not '@': " + files[i]; return false; }
++        size_t pos = 0; int nrec = 0;
++        for (;;) {
++          if (pos >= b.len) break;
++          if (b.p[pos] != '@' && b.eof && !tail_has_header_char(b, pos)) break;   // trailing blank lines, kseq skips them
++          Rec r; size_t nx;
++          int rc = parse_record(b, pos, r, nx);
++          if (rc == PR_MORE) break;
++          if (rc != PR_OK) { why = "pre-scan: not strict 4-line fastq: " + files[i]; return false; }
++          nrec++; pos = nx;
++        }
++        if (nrec == 0 && n == sz) { why = "pre-scan: no record: " + files[i]; return false; }
++      }
++      cum.push_back(cum.back() + (sz + B - 1) / B);
++    }
++    total = cum.back();
++    return true;
++  }
++
++  void Locate(uint64_t t, size_t &f, uint64_t &k) const {
++    f = (size_t)(std::upper_bound(cum.begin(), cum.end(), t) - cum.begin()) - 1;
++    k = t - cum[f];
++  }
++};
++
++}  // namespace k2pread
++
++#endif

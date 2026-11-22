@@ -1,0 +1,4 @@
+50MB best+bulk vs stock: OUT_OK REP_BYTE_IDENTICAL
+8GB best+bulk vs stock: OUT_OK REP_BYTE_IDENTICAL
+16GB best+bulk vs stock: OUT_OK REP_BYTE_IDENTICAL
+103GB best+bulk vs stock: OUT_OK REP_BYTE_IDENTICAL

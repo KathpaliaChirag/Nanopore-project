@@ -1,0 +1,18 @@
+[1] synthetic edge files
+    after [1]: pass=7432 fail=0
+[2] multi-file concatenation
+    after [2]: pass=7457 fail=0
+[3] up-front rejection
+    after [3]: pass=7466 fail=0
+[4] late damage after a clean first MiB (guard test)
+    after [4]: pass=7496 fail=0 (guard fired or plan rejected: 30, identical-by-luck counted as pass)
+[5] fuzz
+    after [5]: pass=8096 fail=0 (rejected/guarded among damaged cases: 485)
+[6] real data (first 3 files of per_pod5_fastq)
+    after [6]: pass=8101 fail=0
+TOTAL cases passed=8101 failed=0  (damaged-input cases that were rejected up front=455, caught by the runtime guard=30)
+PASS
+
+real	0m18.074s
+user	0m16.589s
+sys	0m6.069s
