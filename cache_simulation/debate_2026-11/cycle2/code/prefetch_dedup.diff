@@ -1,0 +1,24 @@
+--- /home/student/e1/src_hll/src/classify.cc	2026-11-23 05:45:26.119962330 +0530
++++ /home/student/e1/src_dedup/src/classify.cc	2026-11-23 07:13:46.508646402 +0530
+@@ -814,6 +814,7 @@
+         scanner.LoadSequence(mate_num == 0 ? dna.seq : dna2.seq);
+       }
+       uint64_t last_minimizer = UINT64_MAX;
++      uint64_t fill_last = UINT64_MAX;  // E6: mirror of last_minimizer on the fill side
+       taxid_t last_taxon = TAXID_MAX;
+       PfSlot pfA[PF_MAX], pfB[PF_MAX];
+       PfSlot *cur = pfA, *nxt = pfB;
+@@ -825,9 +826,11 @@
+           if (minimizer_ptr == nullptr) break;
+           pf[n].min = *minimizer_ptr;
+           pf[n].amb = scanner.is_ambiguous();
+-          if (! pf[n].amb) {
++          if (! pf[n].amb && pf[n].min != fill_last) {   // E6: a repeat of the previous minimizer never reads hc or idx in the resolve loop
++            fill_last = pf[n].min;
+             pf[n].hc = MurmurHash3(pf[n].min);
+-            pf[n].idx = hash->PrefetchIndex(pf[n].hc);
++            if (idx_opts.minimum_acceptable_hash_value && pf[n].hc < idx_opts.minimum_acceptable_hash_value) pf[n].idx = 0;  // resolve loop skips this lookup
++            else pf[n].idx = hash->PrefetchIndex(pf[n].hc);
+           }
+           n++;
+         }
