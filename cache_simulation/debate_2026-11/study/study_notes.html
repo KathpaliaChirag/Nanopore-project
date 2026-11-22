@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cache Simulation Study Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#fbfaf7; --fg:#1c1c1a; --muted:#66655f; --rule:#dcdad2; --soft:#f1efe8;
+  --accent:#1f4e8c; --sim:#9a5b00; --real:#1d6b3a; --unv:#a02a2a;
+  --c1:#1f4e8c; --c2:#c26a00; --c3:#2a8a52; --c4:#7a7a72;
+  --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --sans:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+:root[data-theme="dark"]{
+  --bg:#16171a; --fg:#e6e4dc; --muted:#a09e94; --rule:#33343a; --soft:#1e2024;
+  --accent:#7fb0ee; --sim:#e0a24a; --real:#6cc48a; --unv:#ee8a8a;
+  --c1:#7fb0ee; --c2:#e8963a; --c3:#6cc48a; --c4:#9a9a92;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#16171a; --fg:#e6e4dc; --muted:#a09e94; --rule:#33343a; --soft:#1e2024;
+    --accent:#7fb0ee; --sim:#e0a24a; --real:#6cc48a; --unv:#ee8a8a;
+    --c1:#7fb0ee; --c2:#e8963a; --c3:#6cc48a; --c4:#9a9a92;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:16px}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.62 var(--serif);-webkit-text-size-adjust:100%}
+.layout{display:block;max-width:1180px;margin:0 auto;padding:0 20px}
+nav.toc{display:none}
+main{min-width:0;max-width:760px;padding:28px 0 80px}
+@media (min-width:1020px){
+  .layout{display:grid;grid-template-columns:250px 1fr;gap:56px}
+  nav.toc{display:block;position:sticky;top:0;align-self:start;max-height:100vh;overflow:auto;padding:28px 0;font:14px/1.45 var(--sans)}
+  details.mtoc{display:none}
+}
+nav.toc .ttl{font:600 12px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+nav.toc a{display:block;padding:4px 0 4px 10px;color:var(--muted);text-decoration:none;border-left:2px solid var(--rule)}
+nav.toc a:hover,nav.toc a.on{color:var(--fg);border-left-color:var(--accent)}
+details.mtoc{margin:16px 0;font:14px var(--sans);border:1px solid var(--rule);padding:8px 12px}
+details.mtoc a{display:block;padding:3px 0;color:var(--accent);text-decoration:none}
+h1{font:600 30px/1.2 var(--sans);letter-spacing:-.01em;margin:0 0 10px}
+h2{font:600 23px/1.25 var(--sans);letter-spacing:-.005em;margin:0 0 14px;padding-top:6px}
+h3{font:600 17px/1.3 var(--sans);margin:26px 0 8px}
+section{padding:44px 0 8px;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0;padding-top:8px}
+p{margin:0 0 14px}
+a{color:var(--accent)}
+.sub{color:var(--muted);font:15px/1.5 var(--sans);margin:0 0 18px}
+.topbar{display:flex;justify-content:space-between;align-items:center;font:13px var(--sans);color:var(--muted);margin-bottom:22px}
+button.th{font:13px var(--sans);background:transparent;color:var(--fg);border:1px solid var(--rule);padding:4px 10px;border-radius:4px;cursor:pointer}
+button.th:hover{border-color:var(--accent)}
+.tag{display:inline-block;font:600 10.5px/1 var(--sans);letter-spacing:.05em;padding:3px 5px 2px;border:1px solid currentColor;border-radius:3px;vertical-align:1px;white-space:nowrap}
+.tag.sim{color:var(--sim)} .tag.real{color:var(--real)} .tag.unv{color:var(--unv)}
+.taught{border-left:3px solid var(--accent);padding:2px 0 2px 14px;margin:18px 0}
+.taught b{font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.note{background:var(--soft);padding:10px 14px;font:14.5px/1.5 var(--sans);margin:16px 0;border-radius:3px}
+table{border-collapse:collapse;width:100%;margin:14px 0 18px;font:14px/1.4 var(--sans);font-variant-numeric:tabular-nums}
+.tw{overflow-x:auto;margin:14px 0 18px}
+.tw table{margin:0;min-width:420px}
+th,td{padding:6px 10px;border-bottom:1px solid var(--rule);text-align:right;vertical-align:top}
+th:first-child,td:first-child{text-align:left}
+td.l,th.l{text-align:left}
+th{font-weight:600;color:var(--muted);border-bottom:1.5px solid var(--fg);font-size:12.5px}
+tr.hl td{background:var(--soft)}
+td.b{font-weight:600}
+caption{caption-side:bottom;text-align:left;color:var(--muted);font-size:13px;padding-top:6px}
+code{font:13.5px var(--mono);background:var(--soft);padding:1px 4px;border-radius:3px}
+figure{margin:20px 0}
+figure svg{width:100%;height:auto;display:block;font-family:var(--sans)}
+figcaption{font:13.5px/1.45 var(--sans);color:var(--muted);margin-top:6px}
+svg .ax{stroke:var(--muted);stroke-width:1}
+svg .gr{stroke:var(--rule);stroke-width:1}
+svg .ref{stroke:var(--unv);stroke-width:1;stroke-dasharray:4 3}
+svg text{fill:var(--muted);font-size:11px}
+svg text.v{fill:var(--fg)}
+svg .l1{stroke:var(--c1);fill:none;stroke-width:2} svg .m1{fill:var(--c1)}
+svg .l2{stroke:var(--c2);fill:none;stroke-width:2;stroke-dasharray:6 3} svg .m2{fill:var(--c2)}
+svg .l3{stroke:var(--c3);fill:none;stroke-width:2;stroke-dasharray:2 3} svg .m3{fill:var(--c3)}
+svg .l4{stroke:var(--c4);fill:none;stroke-width:2} svg .m4{fill:var(--c4)}
+svg .bar{fill:var(--c1)} svg .bar.lo{fill:var(--c2)}
+svg circle:hover{r:5}
+details.qa{border-top:1px solid var(--rule);padding:0}
+details.qa:last-of-type{border-bottom:1px solid var(--rule)}
+details.qa summary{cursor:pointer;list-style:none;padding:12px 0 12px 34px;position:relative;font:500 16px/1.4 var(--sans)}
+details.qa summary::-webkit-details-marker{display:none}
+details.qa summary::before{content:counter(q);counter-increment:q;position:absolute;left:0;top:12px;font:600 13px var(--sans);color:var(--muted)}
+details.qa[open] summary{color:var(--accent)}
+.qalist{counter-reset:q}
+.ans{padding:0 0 10px 34px}
+.ans p{margin:0 0 10px}
+.trap{font:14.5px/1.5 var(--sans);color:var(--muted)}
+.trap b{color:var(--unv);font-weight:600}
+.slide{border:1px solid var(--rule);padding:12px 16px;margin:14px 0;border-radius:3px}
+.slide h3{margin:0 0 6px}
+.slide p{margin:0 0 6px;font:15px/1.5 var(--sans)}
+.slide .k{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.upd{border-top:1px solid var(--rule);padding:6px 0 4px}
+.upd h3{margin:12px 0 6px}
+ul,ol{padding-left:22px;margin:0 0 14px}
+li{margin:0 0 5px}
+.cheat table{font-size:13.5px}
+@media (max-width:560px){body{font-size:16px}h1{font-size:25px}}
+@media print{nav.toc,.topbar button{display:none}.layout{display:block}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" id="toc"><div class="ttl">Contents</div></nav>
+<main>
+<div class="topbar"><span>Cache simulation (Sniper) on kraken2 / study notes</span><button class="th" id="themebtn" type="button">Theme</button></div>
+<h1>Cache simulation study notes</h1>
+<p class="sub">Last updated 2026-11-23. Scope: only the hardware-cache simulation work (Sniper) on kraken2, the audit that followed, and the real-machine measurements that answered the same question afterwards. Built from <code>cache_simulation/command_log.md</code>, <code>measurements/*.csv</code>, <code>configs/</code>, <code>cleanstart/</code> and <code>debate_2026-11/</code>. Every number was re-checked against the raw CSV or the named report.</p>
+<details class="mtoc"><summary>Contents</summary><div id="mtoc"></div></details>
+
+<section id="guide" data-toc="How to read this page">
+<h2>How to read this page</h2>
+<p>Every number carries a label. <span class="tag sim">SIM</span> means simulated cycles from Sniper (never wall-clock seconds of the simulator). <span class="tag real">REAL</span> means measured on the real Luna machine (2 x Xeon Platinum 8468, shared). <span class="tag unv">UNVERIFIED</span> means I could not confirm it from the repo or it is quoted from a report without re-checking the source.</p>
+<p>The one-paragraph version. Sniper first showed a 2x win for a 4-way software k-mer cache on big databases, which then reversed as the workload grew, and hardware cache knobs on their own did nothing. An audit showed the simulator setup could not have answered the question: the 2x was a binary-lineage artifact, and the simulated last-level cache was about 1% of the real one. Real traces on Luna then gave the actual answer: kraken2 does reuse k-mers (81% repeats), but any cache or eviction policy can gain at most about 3% to 5% after the lookup loop is tuned, and a hot-set front cache gains about 0% at 103 GB and loses at 8 GB.</p>
+<!-- CHAPTER-APPEND-NOTE: new chapters go at CHAPTER-APPEND-HERE below, after chapter 9. The table of contents is built from the data-toc attribute, so no TOC edit is needed. -->
+</section>
+
+<section id="ch1" data-toc="1. Question and hypothesis">
+<h2>1. The question and the hypothesis</h2>
+<p><b>Wrong intuition first.</b> "A cache obviously helps a hash-table workload, so add one and measure." That skips two problems. A software cache costs its own lookup on every query, and the hardware already has three cache levels in front of the table. Whether more cache, different associativity or a different policy helps depends on the access stream, not on the idea.</p>
+<p><b>Hypothesis.</b> A per-thread 4-way set-associative software k-mer cache in front of kraken2's big hash table (the supervisor's design) reduces table probes, and hardware cache knobs (associativity, size, topology) interact with it. The thesis question was "smaller database, smarter cache": which cache organisation is best for kraken2.</p>
+<p><b>Why a simulator.</b> You cannot change the associativity, slice size or replacement policy of the silicon in Luna. A simulator lets you change one knob per run and read hit rates at every level. The cost is that the answer is only as good as the model.</p>
+<h3>The real machine being modelled <span class="tag real">REAL</span></h3>
+<p>Read from <code>/sys/devices/system/cpu/cpu0/cache/index*/</code> on Luna, not from a spec sheet (command log step 11).</p>
+<div class="tw"><table>
+<tr><th>Level</th><th>Size</th><th>Ways</th><th>Sets</th><th>Line</th></tr>
+<tr><td>L1d</td><td>48 KB</td><td>12</td><td>64</td><td>64 B</td></tr>
+<tr><td>L1i</td><td>32 KB</td><td>8</td><td>64</td><td>64 B</td></tr>
+<tr><td>L2 (private)</td><td>2048 KB</td><td>16</td><td>2048</td><td>64 B</td></tr>
+<tr><td>L3 / LLC (shared per socket)</td><td>107520 KB (105 MB)</td><td>15</td><td>114688</td><td>64 B</td></tr>
+</table></div>
+<div class="taught"><b>What it taught</b><br>Define the instrument before the experiment. Everything later depends on how faithfully this table was carried into the simulator, and Chapter 7 shows it was carried in badly in two places.</div>
+</section>
+
+<section id="ch2" data-toc="2. Building Sniper on Luna">
+<h2>2. Building Sniper on Luna</h2>
+<p><b>What we did.</b> Cloned Sniper master (commit <code>56505e4</code>, 2026-05-23, no release tags exist), installed missing packages, built clean, ran <code>/bin/true</code> in fast-forward and detailed mode. The detailed smoke test gave a believable IPC and a clean memory-model self-check (74 VA-to-PA mappings, 0 violations). Fast-forward IPC (166684) is meaningless, it skips the timing model.</p>
+<h3>The config pipeline</h3>
+<p><code>luna.cfg</code> is an overlay loaded after <code>address_translation_schemes/baseline</code> with two separate <code>-c</code> flags (baseline first). It overrides the cache sizes with the sysfs table above, the clock with 2.1 GHz (the 8468 base clock from Intel's spec, looked up, not measured), and the LLC with a NUCA model: 96 slices of 1125 KB, 15-way. Everything else is inherited: the core model is Sniper's <code>meteor_lake_pcore</code> interval core (no Sapphire Rapids core model ships), DRAM is <code>ddr4_2400</code>, NUCA latencies are placeholders.</p>
+<p>The slice size is an approximation twice over. 107520 KB / 96 = 1120 KB, but Sniper aborts unless size = sets x ways x 64 B exactly, and 1120 KB at 15-way needs 1194.67 sets. It was rounded to 1125 KB (1200 sets), a 0.45% error on top of the even-split assumption.</p>
+<h3>Bugs hit, in order</h3>
+<div class="tw"><table>
+<tr><th class="l">Bug</th><th class="l">Symptom</th><th class="l">Cause and fix</th></tr>
+<tr><td class="l">Wrong <code>-c</code> syntax</td><td class="l">Identical to default output, no error</td><td class="l">A comma in a <code>-c</code> value routes to the heterogeneous per-core config path. Separate <code>-c</code> flags chain correctly, in order. In the wrong order baseline's core file silently clobbered the cache overrides (L1-I stayed 16-way).</td></tr>
+<tr><td class="l">NUCA size validation</td><td class="l">SIGABRT, "size != sets x associativity x block"</td><td class="l">1120 KB is not divisible at 15-way. Rounded to 1125 KB.</td></tr>
+<tr><td class="l">SIGSEGV in <code>CacheSet::find</code></td><td class="l">Crash during a real run</td><td class="l">The inherited <code>xor_mod</code> set hash only stays in range when the set count is a power of two. 1200 sets is not. Fix: <code>address_hash = mod</code> for the NUCA section only.</td></tr>
+<tr><td class="l">Perl wrapper</td><td class="l">Sniper reported ~0.2M instructions, no output files</td><td class="l"><code>kraken2</code> is a Perl script. Sniper traces compiled x86 only. Trace the real <code>classify</code> binary instead (flags recovered with strace).</td></tr>
+</table></div>
+<p>After the fixes the first real run completed: 25.1M instructions, about 14.3M cycles, IPC 1.76, output identical to the native run (7 of 10 reads classified). <span class="tag sim">SIM</span></p>
+<div class="taught"><b>What it taught, and what it implies for trust</b><br>Three of the four bugs were silent or half-silent: a wrong flag produced a plausible run on default settings. So the config you think you ran is not necessarily the config that ran. Later the same class of bug struck again (cleanstart found <code>-n N</code> alone leaves <code>total_cores = 1</code>, and that instruction-cache modeling was off in every old run). The defence is to read the effective <code>sim.cfg</code> of every run, and Chapter 7 shows that was not done early enough.</div>
+<div class="note"><span class="tag unv">UNVERIFIED</span> The 96 in "96 slices" is the logical CPUs per socket from lscpu. If the 8468 has 48 physical cores per socket (my understanding, not checked on Luna), a per-core split would be about 2.2 MB, double the 1125 KB used. This does not change the -n 1 conclusion in Chapter 7, but it should be checked with <code>lscpu</code>.</div>
+</section>
+
+<section id="ch3" data-toc="3. Associativity sweep, first positive result">
+<h2>3. The associativity sweep and the first positive result</h2>
+<h3>Step 1: width sweep, 10 reads, 50 MB database <span class="tag sim">SIM</span></h3>
+<p>Software cache width 4, 8, 16, 32, 64 ways. Cycles rose monotonically: 14.3, 14.4, 14.7, 15.1, 15.9 M. 64-way versus 4-way: +13.5% instructions, 4.3x unique cache lines, +11.2% cycles. IPC stayed flat (1.76 to 1.80), so the cost shows up as more instructions, not more stalls per instruction. This was read as allocation and comparison overhead, consistent with an earlier real-hardware sweep.</p>
+<p><b>Correction found next.</b> The row called "baseline" was not a no-cache reference. It was an S2 build with the cache compiled in (<code>s2_cache</code> symbol present). The true no-cache binary (S0) is a separate source checkout, <code>kraken2-src-baseline</code>, with zero cache symbols.</p>
+<h3>Step 2: the fair batch, 4 databases x 5 variants, 50 reads <span class="tag sim">SIM</span></h3>
+<p>Same workload, same <code>luna.cfg</code>, run strictly one after another so contention could not distort anything. Cycles in millions (source: <code>final_fair_batch_2026-09-09_5variant_all_db.csv</code>):</p>
+<div class="tw"><table>
+<tr><th>DB</th><th>S0</th><th>1-way</th><th>4-way</th><th>8-way</th><th>16-way</th></tr>
+<tr><td>50 MB</td><td>24.4</td><td>27.0</td><td>26.8</td><td>27.8</td><td>28.7</td></tr>
+<tr><td>7.5 GB</td><td>51.8</td><td>28.6</td><td>28.3</td><td>28.7</td><td>28.9</td></tr>
+<tr><td>15 GB</td><td>60.7</td><td>30.1</td><td>29.6</td><td>30.1</td><td>30.4</td></tr>
+<tr><td>103 GB</td><td>94.3</td><td>48.8</td><td>47.8</td><td>49.1</td><td>50.0</td></tr>
+</table></div>
+<p>Cycle-derived speedup, S0 cycles divided by variant cycles (re-derived from the CSV):</p>
+<div class="tw"><table>
+<tr><th>DB</th><th>1-way</th><th>4-way</th><th>8-way</th><th>16-way</th></tr>
+<tr><td>50 MB</td><td>0.904</td><td class="b">0.910</td><td>0.878</td><td>0.850</td></tr>
+<tr><td>7.5 GB</td><td>1.811</td><td class="b">1.830</td><td>1.805</td><td>1.792</td></tr>
+<tr><td>15 GB</td><td>2.017</td><td class="b">2.051</td><td>2.017</td><td>1.997</td></tr>
+<tr><td>103 GB</td><td>1.932</td><td class="b">1.973</td><td>1.920</td><td>1.886</td></tr>
+</table></div>
+<figure><svg id="c1" viewBox="0 0 560 250" role="img" aria-label="4-way speedup over S0 by database size"></svg>
+<figcaption>Fig 1. 4-way speedup over S0 in simulated cycles, 50 reads. Below the dashed line the cache loses. This was the headline result at the time. Chapter 7 shows it is confounded by binary lineage.</figcaption></figure>
+<p>Classification output was byte-identical across variants (diff of S0 against 16-way at 103 GB was empty), so the cache is a pure lookup optimisation here. 4-way won or tied at every size, but its margin over 1-way is only 0.7% to 2.1% from single runs.</p>
+<h3>Two corrections that shaped everything after</h3>
+<p><b>Wall-clock is the wrong metric.</b> The <code>wallclock_s</code> column is how long Sniper took to compute the simulation, which tracks instruction count. On it, 1-way "won" (103 GB: 346 s versus 360 s for 4-way), contradicting cycles. Worse, the same job ran 1.8x faster per simulated Mcycle in a later batch (about 14 versus about 8 s per Mcycle), because of host and page-cache state. Cycles divided by the 2.1 GHz clock is the quantity a real chip would experience, and it never showed the drift. Older log sentences quoting "2.05x faster" in seconds are simulator speed and must not be cited.</p>
+<p><b>Mislabelled baseline.</b> Above. Anything computed against the S2 "baseline" row was relative to a cache build, not to no cache.</p>
+<div class="taught"><b>What it taught</b><br>A positive result that arrives early deserves the most suspicion. 4-way was best on cycles everywhere, by small margins, and the effect grew with database size. Chapter 7 shows why that pattern was misleading.</div>
+</section>
+
+<section id="ch4" data-toc="4. Scaling the workload">
+<h2>4. Scaling the workload: the sign flips</h2>
+<h3>2000 reads on the 50 MB database <span class="tag sim">SIM</span></h3>
+<p>Every cache variant is slower than no cache. Ratios are variant cycles over S0 cycles (6354.0 M), 35.1M bases, 12 to 15 hours of simulator time per variant:</p>
+<div class="tw"><table>
+<tr><th>Variant</th><th>Cycles (M)</th><th>vs S0</th><th>Unique lines</th><th>IPC</th></tr>
+<tr><td>S0</td><td>6354.0</td><td>1.000</td><td>1,615,102</td><td>1.58</td></tr>
+<tr><td>1-way</td><td>8336.3</td><td>1.312</td><td>2,272,676</td><td>1.36</td></tr>
+<tr class="hl"><td>4-way</td><td>8159.1</td><td>1.284</td><td>2,281,890</td><td>1.45</td></tr>
+<tr><td>8-way</td><td>8508.1</td><td>1.339</td><td>2,294,178</td><td>1.46</td></tr>
+<tr><td>16-way</td><td>8805.9</td><td>1.386</td><td>2,313,682</td><td>1.51</td></tr>
+</table></div>
+<p>The software cache adds about 41% unique cache lines (the cache array itself is data the hardware must hold) and lowers L1d hit rate from 99.04% to 98.49% (4-way). The 1-way cost was read as conflict misses and the 8/16-way cost as sequential comparison overhead. That split is the log's reading, supported by hit rates rising with width while cycles worsen, but no run isolated it.</p>
+<p><b>A wrong reconciliation, retracted.</b> The first write-up said the earlier 2x win was a small-workload artifact of 10 to 50 reads. That was wrong: this run used the same 50 MB database, where the cache had already lost at 50 reads. The 2x lived on the 8 GB and larger databases, which the 2000-read run never touched.</p>
+<h3>Laptop sweep: read count x database <span class="tag sim">SIM</span></h3>
+<p>Ryzen 7 5800H config, ratio of cycles to the same row's S0 (below 1 means the cache is faster):</p>
+<div class="tw"><table>
+<tr><th>Reads</th><th>DB</th><th>1-way</th><th>4-way</th><th>8-way</th></tr>
+<tr><td>10</td><td>8 GB</td><td>0.279</td><td>0.279</td><td>0.290</td></tr>
+<tr><td>10</td><td>16 GB</td><td>0.299</td><td>0.299</td><td>0.308</td></tr>
+<tr><td>50</td><td>8 GB</td><td>0.523</td><td>0.516</td><td>0.526</td></tr>
+<tr><td>50</td><td>16 GB</td><td>0.464</td><td>0.456</td><td>0.466</td></tr>
+<tr><td>100</td><td>8 GB</td><td>1.056</td><td>1.031</td><td>1.056</td></tr>
+<tr><td>100</td><td>16 GB</td><td>0.943</td><td>0.923</td><td>0.946</td></tr>
+<tr><td>500</td><td>8 GB</td><td>1.119</td><td>1.092</td><td>1.119</td></tr>
+<tr><td>500</td><td>16 GB</td><td>1.044</td><td>1.022</td><td>1.050</td></tr>
+</table></div>
+<p>The advantage shrinks with workload size and flips: 8 GB by 100 reads, 16 GB by 500. <b>The confound.</b> The 10 and 50 read files are short reads (about 0.8 and 1.8 kbp, 8K and 91K total bases). The 100 and 500 read files are cut from a long-read file (about 47 to 51 kbp, 4.7M and 25.4M bases). Between 50 and 100 reads, read length rose about 26x and total bases about 52x, exactly where 8 GB flips. This sweep cannot separate read count, read length and total bases.</p>
+<h3>Long-read scaling: the controlled follow-up <span class="tag sim">SIM</span></h3>
+<p>Nested prefixes of one long-read file (10, 25, 50 reads at 34.6 to 37.4 kbp average), 8 GB database, laptop config, joined with the 100 and 500 read rows from the same source file.</p>
+<div class="tw"><table>
+<tr><th>Long reads</th><th>Total bases</th><th>S0 cycles (M)</th><th>4-way cycles (M)</th><th>4-way / S0</th><th>S0 instr (M)</th><th>4-way instr (M)</th></tr>
+<tr><td>10</td><td>0.35M</td><td>94.1</td><td>66.2</td><td>0.704</td><td>128.3</td><td>113.9</td></tr>
+<tr><td>25</td><td>0.90M</td><td>200.5</td><td>166.6</td><td>0.831</td><td>302.8</td><td>288.6</td></tr>
+<tr><td>50</td><td>1.87M</td><td>346.8</td><td>331.9</td><td>0.957</td><td>567.6</td><td>581.8</td></tr>
+<tr><td>100</td><td>4.7M</td><td>813.6</td><td>839.1</td><td>1.031</td><td>1392.2</td><td>1453.0</td></tr>
+<tr><td>500</td><td>25.4M</td><td>3946.5</td><td>4310.7</td><td>1.092</td><td>7043.1</td><td>7531.1</td></tr>
+</table></div>
+<figure><svg id="c2" viewBox="0 0 560 250" role="img" aria-label="4-way over S0 cycles versus total bases"></svg>
+<figcaption>Fig 2. 4-way / S0 simulated cycles against total bases (log axis), long reads, 8 GB. The crossover sits between 1.87M and 4.7M bases.</figcaption></figure>
+<p>With read length held near 35 to 51 kbp, the 4-way advantage falls from 30% to 17% to 4% and flips to a loss. Read length alone is not the driver: 10 long reads at 35 kbp still win by 30%. Total bases is the best explanation. Caveats: read length still drifts from 34.6 to 50.8 kbp along the curve, and S0 and 4-way are different source lineages. The instruction columns show the lineage problem directly: the cache build executes fewer instructions than S0 at 10 and 25 reads and more at 50 and above, and a pure add-on lookup cache cannot remove instructions.</p>
+<div class="taught"><b>What it taught</b><br>The win does not survive scale. Two things change with size: the fixed difference between the binaries gets amortised, and the cache's own cost per lookup (about +7% instructions at 500 reads) accumulates. Neither is a hardware effect, which Chapter 7 confirms.</div>
+</section>
+
+<section id="ch5" data-toc="5. Hardware knobs on their own">
+<h2>5. Hardware knobs on their own</h2>
+<h3>5a. LLC associativity sweep <span class="tag sim">SIM</span></h3>
+<p>The mirror image of the software sweeps: software cache fixed at none (S0), only the simulated LLC associativity varied (1, 4, 8, 15 real, 16, 30), slice size held at 1125 KB. Cycles in millions, 50 MB database:</p>
+<div class="tw"><table>
+<tr><th>Reads</th><th>Lowest</th><th>Highest</th><th>Spread</th></tr>
+<tr><td>10</td><td>13.6</td><td>13.7</td><td>0.7%</td></tr>
+<tr><td>50</td><td>24.4</td><td>24.4</td><td>0.0%</td></tr>
+<tr><td>100</td><td>869.8</td><td>877.3</td><td>0.9%</td></tr>
+<tr><td>500</td><td>4523.2</td><td>4537.9</td><td>0.3%</td></tr>
+</table></div>
+<p>Big databases (50 reads): 8 GB flat at 51.7 to 51.8 M, 16 GB flat at 60.7 M across all six associativities. No monotonic trend, unique cache lines identical to within 1. Why: 99.1% to 99.4% of loads hit L1d, and under 0.5% reach the LLC (1-core cleanstart baseline: L2 hit 0.08% to 0.22%, L3 hit 0.38% to 0.49%). A level that serves 3 loads in 1000 cannot matter however it is organised. The slice is also 1125 / 107520 = 1.05% of the real LLC.</p>
+<p>A caution raised in the iteration debate: a hardware-associativity null does not decide the software cache. The hardware LLC is consulted by address after an L1 miss, the software cache intercepts by minimizer identity before the table is touched.</p>
+<h3>5b. Flat L3 versus NUCA <span class="tag sim">SIM</span></h3>
+<div class="tw"><table>
+<tr><th>DB</th><th>NUCA cycles (M)</th><th>Flat 107 MB cycles (M)</th><th>Flat slower by</th><th>Instructions (M), both</th></tr>
+<tr><td>50 MB</td><td>24.4</td><td>31.9</td><td>30.7%</td><td>35.8</td></tr>
+<tr><td>8 GB</td><td>51.8</td><td>60.4</td><td>16.6%</td><td>68.1</td></tr>
+</table></div>
+<p>The flat bank is the only run at the real LLC capacity, and it is slower with identical instructions and almost no hits (L3 hit 0.02% and 0.11%, from the later audit). The config gives a 107 MB bank the same 15 + 20 cycle latency placeholder as a 1.1 MB slice, so the difference is model structure and set-count behaviour, not caching. (The CSV's <code>l3_hit_pct</code> is 0 for the NUCA rows because of a parser bug. Cycles and instructions are unaffected.)</p>
+<h3>5c. Hardware size configs <span class="tag sim">SIM</span></h3>
+<p>S0 cycles over 4-way cycles, 50 reads, same x86 binaries and the same Meteor Lake core model, only cache sizes changed:</p>
+<div class="tw"><table>
+<tr><th>Config</th><th>Cache sizes used</th><th>50 MB</th><th>8 GB</th></tr>
+<tr><td>Luna</td><td>L2 2 MB, slice 1125 KB</td><td>0.910</td><td>1.830</td></tr>
+<tr><td>Desktop (Ryzen 5 5600X sizes)</td><td>L2 512 KB, L3 32 MB / 6 cores</td><td>0.919</td><td>1.936</td></tr>
+<tr><td>Orion (Jetson AGX Orin sizes)</td><td>L1 64 KB, L2 256 KB, SLC 4 MB / 12 cores</td><td>0.902</td><td>1.649</td></tr>
+</table></div>
+<p>Not monotonic in cache size. These are cache-size edits under an x86 core model, not those chips. Orion's associativities are placeholders (the "8-way L2" claim was retracted). The explanation offered at the time, that Orion's larger L1 absorbs what the cache would catch, is unverified.</p>
+<h3>5d. Size ladder and hypotheses H1 to H4 <span class="tag sim">SIM</span></h3>
+<p>Six builds of the current cache design with the set count pinned (2048 to 1,048,576 sets, 4-way, 128 KB to 64 MB). Cycles in millions:</p>
+<div class="tw"><table>
+<tr><th>Workload</th><th>2048</th><th>4096</th><th>16384</th><th>65536</th><th>262144</th><th>1048576</th><th>Spike vs 16384</th></tr>
+<tr><td>50 MB, 10 reads (S0 = 14.1)</td><td>14.2</td><td>14.2</td><td>14.2</td><td class="b">15.1</td><td>14.2</td><td>14.3</td><td>+6.3%</td></tr>
+<tr><td>8 GB, 50 reads</td><td>27.9</td><td>27.9</td><td>27.9</td><td class="b">28.6</td><td>27.9</td><td>27.9</td><td>+2.5%</td></tr>
+<tr><td>16 GB, 50 reads</td><td>29.2</td><td>29.3</td><td>29.3</td><td class="b">29.6</td><td>29.3</td><td>29.3</td><td>+1.0%</td></tr>
+<tr><td>103 GB, 10 reads</td><td>15.1</td><td>15.1</td><td>15.1</td><td class="b">16.0</td><td>15.1</td><td>15.1</td><td>+6.0%</td></tr>
+</table></div>
+<figure><svg id="c3" viewBox="0 0 560 250" role="img" aria-label="Size ladder cycles normalised to the 16384 point"></svg>
+<figcaption>Fig 3. Cycles normalised to each database's 16384-set value. Flat everywhere except one isolated point at 65536 sets.</figcaption></figure>
+<div class="tw"><table>
+<tr><th class="l">Hypothesis</th><th class="l">Verdict</th><th class="l">Key number</th></tr>
+<tr><td class="l">H1: small-DB loss is structural</td><td class="l">Confirmed</td><td class="l">True S0 14.1 M cycles is at or below all six sizes on 50 MB (14.2 to 15.1)</td></tr>
+<tr><td class="l">H2: large-DB win grows with capacity</td><td class="l">Refuted</td><td class="l">Cycles identical at 5 of 6 sizes on 8 GB and 103 GB; capacity buys nothing</td></tr>
+<tr><td class="l">H3: optimum is a fraction of DB size</td><td class="l">Refuted on location</td><td class="l">Anomaly at the same absolute 65536 sets across a 2000x DB range; magnitude +1.0% to +6.3%</td></tr>
+<tr><td class="l">H4: default sizing formula near optimal</td><td class="l">Trivially true at T=1, cannot speak for T&gt;1</td><td class="l">Formula gives 262144 sets at T=1, indistinguishable from every other size</td></tr>
+</table></div>
+<p><b>The 65536 anomaly and its corrected magnitude.</b> It first appeared as +4.4% (8 GB) and +10.2% (103 GB). Those were instruction deltas written up as cycle deltas. The correct cycle figures are +2.5% and +6.0%. The mechanism is unresolved: a linear initialisation-cost theory was proposed and then overturned when cycles reverted at 262144 and above. A hash-distribution artifact at that mask width is the leading guess, untested, and a build-quirk check of the 65536 binary was never done. <span class="tag unv">UNVERIFIED</span></p>
+<p><b>Caveats on this ladder.</b> The panels mix workloads (10 reads for 50 MB and 103 GB, 50 reads for 8 GB and 16 GB). The 16 GB ladder never entered the H1 to H4 verdict. The 8 GB "peer" CSV is a byte-identical copy of the 8 GB rows, so there was no independent confirmation. And these pinned builds are a different cache design from the width sweeps (heap-allocated, 16-byte entries, round-robin eviction, murmur set index), so size and width are not one experiment.</p>
+<div class="taught"><b>What it taught</b><br>A flat plane with one narrow hole is not a hill to climb. Sizing the software cache is not a productive search. Cycles identical to three digits across a 512x size range also says the cache is not hitting meaningfully at this window, which Chapter 7 explains.</div>
+</section>
+
+<section id="ch6" data-toc="6. Cleanstart baseline">
+<h2>6. Cleanstart: the from-scratch baseline</h2>
+<p><b>Why restart.</b> After the corrections above, nothing in the old folder was trusted. <code>cleanstart/</code> (from 2026-09-19) redoes the hardware question by hand: S0 only, one hardware knob per run, one fixed reads file (first 10, 50, 100 reads of a 104,980-read sup basecall), three databases (50 MB, 8 GB, 16 GB), detailed mode. Baseline: Ryzen 7 5800H config, L1d 32 KB 8-way, L2 512 KB 8-way, L3 16 MB 16-way NUCA, LRU, no prefetchers, DRAM 45 ns (Sniper default, not measured), instruction-cache modeling now on, TLBs set to Zen 3 values. Reads: 372,413 / 2,209,336 / 5,262,723 bases, so 100 reads is 14.1x the work of 10, not 10x.</p>
+<h3>1 core, 9 of 9 done <span class="tag sim">SIM</span></h3>
+<div class="tw"><table>
+<tr><th>Reads</th><th>DB</th><th>Instr (M)</th><th>Cycles (M)</th><th>IPC</th><th>L1d hit %</th><th>L3 hit %</th></tr>
+<tr><td>10</td><td>50 MB</td><td>124.9</td><td>86.0</td><td>1.45</td><td>99.09</td><td>0.49</td></tr>
+<tr><td>10</td><td>8 GB</td><td>132.6</td><td>80.3</td><td>1.65</td><td>99.21</td><td>0.42</td></tr>
+<tr><td>10</td><td>16 GB</td><td>154.1</td><td>99.4</td><td>1.55</td><td>99.23</td><td>0.42</td></tr>
+<tr><td>50</td><td>50 MB</td><td>677.5</td><td>446.1</td><td>1.52</td><td>99.15</td><td>0.45</td></tr>
+<tr><td>50</td><td>8 GB</td><td>685.0</td><td>373.3</td><td>1.84</td><td>99.31</td><td>0.43</td></tr>
+<tr><td>50</td><td>16 GB</td><td>783.1</td><td>470.8</td><td>1.66</td><td>99.31</td><td>0.42</td></tr>
+<tr><td>100</td><td>50 MB</td><td>1583.6</td><td>1017.1</td><td>1.56</td><td>99.19</td><td>0.43</td></tr>
+<tr><td>100</td><td>8 GB</td><td>1640.7</td><td>880.9</td><td>1.86</td><td>99.37</td><td>0.40</td></tr>
+<tr><td>100</td><td>16 GB</td><td>1858.1</td><td>1096.0</td><td>1.70</td><td>99.35</td><td>0.38</td></tr>
+</table></div>
+<p>Every cell: 99.1% to 99.4% L1d hit, L2 hit 0.08% to 0.22%, so under 1% of loads leave L1. Unexplained and repeated: the 8 GB database is faster than the 50 MB one at every read count (373 versus 446 M cycles at 50 reads). The untested guess is that the 50 MB table is nearly full, so absent k-mers probe long chains. The early explanation that 10-read runs are "dominated by startup" does not hold: the marginal cost is (1583.6 - 677.5) / (5.263M - 2.209M bases), about 297 instructions per base, so 0.37M bases accounts for about 110M of the 125M instructions.</p>
+<h3>4 cores, 8 of 9 done <span class="tag sim">SIM</span></h3>
+<p>Cycles are the slowest core. Speedup is 1-core cycles over 4-core cycles:</p>
+<div class="tw"><table>
+<tr><th>Reads</th><th>50 MB</th><th>8 GB</th><th>16 GB</th></tr>
+<tr><td>10</td><td>0.963</td><td>0.956</td><td>0.946</td></tr>
+<tr><td>50</td><td>1.279</td><td>1.177</td><td>hung, no row</td></tr>
+<tr><td>100</td><td>2.259</td><td>1.892</td><td>1.909</td></tr>
+</table></div>
+<p>These measure how many threads got work, not core scaling. kraken2 hands reads to threads in batches: at 10 reads one thread does the work and three spin, at 50 reads two do (about 73/27), at 100 reads three do. Total instructions rise 3% to 19% with four cores from spinning.</p>
+<h3>Deadlocks and the watchdog</h3>
+<p>Two of 14 four-core launches deadlocked at startup (<code>4c_r10_50mb</code> sat 9 hours at 0% CPU, <code>4c_r50_16gb</code> 72 minutes at 20 CPU-seconds), none of the 9 one-core runs. A 2-read smoke test with the same setup ran fine, so the cause is unknown (a startup race is suspected). The first watchdog rule (no CPU change for 900 s) never fired because the Python wrapper keeps accruing a few CPU-seconds. The second rule compares session CPU against the value 900 s earlier and kills if growth is under 60 CPU-seconds (a healthy run adds about 850).</p>
+<p><b>Status.</b> 17 of 27 planned rows. No 8-core rows. Whether the 8-core queue finished on Luna is unknown from the repo. Zero hardware-knob comparisons were produced, only a baseline. <span class="tag unv">UNVERIFIED</span> The audit also notes that the 1-core runs may have received a 2 MB slice despite the "L3-16MB" name (an earlier pre-redefinition run showed a 2048 KB slice), so check the effective <code>sim.cfg</code> before citing those rows as 16 MB.</p>
+<div class="taught"><b>What it taught</b><br>Cleanstart is the right method (one binary, one knob, effective config read back) but it yielded a baseline, not an answer, and its own baseline fills the hierarchy only to L1: the experiment as designed would have measured the cache levels that serve under 1% of loads.</div>
+</section>
+
+<section id="ch7" data-toc="7. The audit">
+<h2>7. The audit: why the simulator results cannot be trusted for Luna</h2>
+<p>A read-only audit (debate round 1, agent C) recomputed every CSV row. The arithmetic is clean: 189 of 190 rows agree with their IPC column within 0.015 (the one flag is rounding), and cleanstart cycles match simulated time within 0.1%. The numbers are correctly computed. The question is what they measure. Ranked by how much each hides:</p>
+<ol>
+<li><b>The LLC under test was about 1% of the real one.</b> With <code>-n 1</code> Sniper instantiates one NUCA slice: 1125 KB for "Luna", 2048 KB for the laptop config (confirmed in the effective <code>sim.cfg</code>), against 105 MB real. Only the flat-L3 run saw real capacity, and it was slower (5b). A size or topology idea cannot look positive in a cache that is 1% of the target.</li>
+<li><b>The workload shows almost no reuse inside the window.</b> At 10 to 500 reads, unique cache lines is about the lookup count and LLC hit is 0.2% to 0.5% of loads. This is partly a real property and partly a cold-window artifact (see Chapter 8, where a full trace shows reuse that is long-distance).</li>
+<li><b>DRAM and latency are unvalidated.</b> DRAM is 45 ns, a DDR4 default. Measured Sapphire Rapids DRAM is about 107 ns and L3 about 33 ns (Chips and Cheese, a same-class chip, not Luna <span class="tag unv">UNVERIFIED</span>), so DRAM is about 2.4x too cheap and the 35-cycle NUCA hit about 3x too cheap. The flat-versus-NUCA gap (17% to 31%) is larger than any effect being hunted.</li>
+<li><b>The positive headline was a binary-lineage artifact.</b> S0 and the cache variants are different source snapshots, not one tree with a switch. Evidence below.</li>
+<li><b>The software cache pollutes the hardware cache it was meant to help.</b> At 2000 reads, IPC fell 1.58 to 1.45 and unique lines rose 41%.</li>
+<li><b>Two different cache designs were mixed</b> (original: fixed 4096 sets, static thread-local array, 24 B entries, LRU, raw low-bit set index; current: heap array, 16 B entries, round-robin, murmur index, sizing formula). The weak original index was later shown to give an 8.9x hit-rate change when fixed.</li>
+<li><b>Model artifacts exceed the signal.</b> Instruction-cache modeling was off in every old run (it halves a smoke-test IPC from 0.87 to 0.42), the core is a Meteor Lake model, TLB and prefetch behaviour were never validated.</li>
+<li><b>Instrument limits.</b> Single run per cell, no replicates, uneven read axes, 2 multicore deadlocks, 17 of 27 cleanstart rows.</li>
+</ol>
+<h3>The lineage evidence <span class="tag sim">SIM</span></h3>
+<p>If the cache caused the 2x, a lookup add-on could not remove instructions, and size and width would matter. They do not behave that way:</p>
+<div class="tw"><table>
+<tr><th>DB</th><th>S0 instr (M)</th><th>4-way instr (M)</th><th>S0 minus 4-way</th><th>1-way instr (M)</th><th>S0 minus 1-way</th></tr>
+<tr><td>50 MB</td><td>35.8</td><td>39.7</td><td>-3.9</td><td>38.2</td><td>-2.4</td></tr>
+<tr><td>8 GB</td><td>68.1</td><td>51.9</td><td>+16.2</td><td>51.7</td><td>+16.4</td></tr>
+<tr><td>16 GB</td><td>77.3</td><td>51.9</td><td>+25.4</td><td>51.6</td><td>+25.7</td></tr>
+<tr><td>103 GB</td><td>102.9</td><td>70.3</td><td>+32.6</td><td>68.8</td><td>+34.1</td></tr>
+</table></div>
+<ul>
+<li>The instruction gap grows with database size, so it is something in the load path, not the lookup path.</li>
+<li>On 8 GB, 1-way (96 KB per thread), 4-way (384 KB) and 16-way (1.5 MB) give 28.6, 28.3 and 28.9 M cycles. The size ladder from 128 KB to 64 MB gives 27.9 M at every point except 65536.</li>
+<li><span class="tag real">REAL</span> An ablation on Luna (stock build plus multi-file streaming, no cache) ran 11.06 s and 14.48 s against 11.10 s and 14.55 s with the 4-way cache, perf samples 174K versus 175K. The cache contributed nothing there either. (Quoted from the S6 report, one run per cell, not re-opened.)</li>
+</ul>
+<p>S0 is <code>kraken2-src-baseline</code>, a different snapshot whose line-wrapping broke the patch scripts, so the 1-way build was made from a pristine parent commit of the first cache commit and the other widths from a tree with the cache history already committed.</p>
+<div class="note">What survives: the CSV arithmetic, the flat-versus-NUCA gap as a warning about model sensitivity, size-sweep invariance as evidence the cache is not hitting, the cleanstart S0 baseline once its LLC size is restated. What to drop from any talk or paper: the 2x speedup, the "50 reads artifact" reconciliation, any wall-clock speedup sentence, Orion numbers as edge-device evidence, the "startup dominates 10 reads" claim, and the nearly-full-table explanation until measured.</div>
+<h3>What Sniper's own accuracy would allow <span class="tag unv">UNVERIFIED</span></h3>
+<p>Sniper is an interval simulator (Carlson, Heirman, Eeckhout, SC 2011). The debate saw slides reporting about 25% average error against a 16-core Xeon X7460 on parallel applications, so error bars of that order are normal even for a validated setup. Here the effects being hunted are 1% to 5%, and nothing was validated at all. Whether this build executes software prefetch instructions is unknown (the trace format has no prefetch record).</p>
+<div class="taught"><b>What it taught</b><br>"No positive result" was mostly a statement about the instrument. The honest framing is: the simulation answered neither yes nor no for Luna, and the setup needs calibration before any simulated cache claim is made.</div>
+</section>
+
+<section id="ch8" data-toc="8. What the real machine said">
+<h2>8. What the real machine said afterwards</h2>
+<p><b>Wrong intuition, named.</b> The audit's working story was "kraken2 has no reuse, so no cache can help." The real trace falsifies the first half. The reuse is large and skewed, it is just far away. The second half still holds for a different reason.</p>
+<h3>The trace <span class="tag real">REAL</span></h3>
+<p>A tracer at the table-lookup call site of the tuned build logged the slot index and hit bit of every lookup. 8 GB database, 104,980 reads, one thread. Classification unchanged (101,922 of 104,980 classified, 97.09%, same as stock). Tracer overhead about 3% (15.4 s versus 14.9 s). 12,237,762 lookups touched 2,270,742 unique slots. Code and raw output are in <code>debate_2026-11/e1/</code>.</p>
+<div class="tw"><table>
+<tr><th class="l">Fact</th><th>Value</th></tr>
+<tr><td class="l">Lookups that hit a stored k-mer</td><td>86.75%</td></tr>
+<tr><td class="l">Global repeat rate (slot seen before)</td><td>81.4%</td></tr>
+<tr><td class="l">Top 16K / 64K / 262K / 1M slots cover</td><td>12.5% / 24.2% / 55.8% / 90.0% of lookups</td></tr>
+<tr><td class="l">Repeats at reuse distance 2^17 to 2^21</td><td>about 77%</td></tr>
+<tr><td class="l">Windowed dedup at 10K / 100K / 1M / 10M lookups</td><td>8.2% / 15.4% / 43.7% / 75.8%</td></tr>
+</table></div>
+<p>Hit rate of a cache of N entries replaying this trace:</p>
+<div class="tw"><table>
+<tr><th>N entries</th><th>LRU (fully assoc.)</th><th>4-way LRU</th><th>Belady (optimal)</th></tr>
+<tr><td>16K</td><td>10.4%</td><td>10.4%</td><td>28.0%</td></tr>
+<tr><td>64K</td><td>18.9%</td><td>18.5%</td><td>44.1%</td></tr>
+<tr><td>262K</td><td>40.1%</td><td>38.9%</td><td>66.6%</td></tr>
+<tr><td>1M</td><td>76.5%</td><td>71.0%</td><td>81.4%</td></tr>
+</table></div>
+<figure><svg id="c4" viewBox="0 0 560 250" role="img" aria-label="Cache hit rate versus entries for LRU, 4-way and Belady"></svg>
+<figcaption>Fig 4. Hit rate on the real 8 GB trace. 4-way LRU stays within 0 to 6 points of fully associative LRU. Belady at 1M entries equals the 81.4% repeat rate: it catches every repeat.</figcaption></figure>
+<p>Reading it as conflict, capacity and compulsory misses: compulsory misses are the first touches, 1 - 0.814 = 18.6% of lookups, a hard ceiling of 81.4% hits. Conflict misses are the gap between LRU and 4-way, at most 1.2 points up to 262K entries and 5.5 points at 1M. Capacity and policy are the large gap, LRU 40.1% versus Belady 66.6% at 262K. Associativity is not the lever.</p>
+<h3>The bound <span class="tag real">REAL</span></h3>
+<p>The tuned production build already batches and prefetches its table probes, so lookups are a small share of CPU. From perf record, one thread, 105k reads:</p>
+<div class="tw"><table>
+<tr><th>DB</th><th>Prefetch</th><th>GetAt</th><th>Lookup total</th><th>Note</th></tr>
+<tr><td>8 GB</td><td>7.08%</td><td>0.66%</td><td>7.7% (about 15% of user time)</td><td>kernel DB load about 20%</td></tr>
+<tr><td>16 GB</td><td>5.98%</td><td>0.94%</td><td>6.9%</td><td>kernel load about 45%</td></tr>
+<tr><td>103 GB</td><td>1.13%</td><td>0.58%</td><td>1.7% (about 28% of user time)</td><td>about 450 user samples, rough</td></tr>
+</table></div>
+<p>Gain from any cache or policy is at most hit rate x lookup share, before paying the cache's own probe cost. At 8 GB, 262K entries: 4-way LRU 0.39 x 0.077 = about 3%, Belady 0.67 x 0.077 = about 5%. No eviction policy can give a noteworthy speedup on 8 GB or 16 GB.</p>
+<h3>The oracle ceiling <span class="tag real">REAL</span></h3>
+<p>A hot-set front table was falsified before it was built. In a copy of the tuned build, for a fixed fraction of keys (chosen by hash bits, so repeats get the same decision, like a hot set) skip both the prefetch and the lookup and reuse the previous taxon. Output is wrong by design, this is a time-only upper bound: a real front table cannot be cheaper because its probe costs time and a hit still needs the value. 32 threads, all 1,872,777 reads, 3 interleaved repetitions. Median wall seconds (raw: <code>cycle2/data/ceil.csv</code>):</p>
+<div class="tw"><table>
+<tr><th>Variant</th><th>103 GB</th><th>vs skip 0</th><th>8 GB</th><th>vs skip 0</th></tr>
+<tr><td>Skip 0% (hook control)</td><td>12.35</td><td>-</td><td>7.57</td><td>-</td></tr>
+<tr><td>Skip 25%</td><td>12.46</td><td>+0.9%</td><td>7.91</td><td>+4.5%</td></tr>
+<tr><td>Skip 45%</td><td>12.19</td><td>-1.3%</td><td>8.11</td><td>+7.1%</td></tr>
+<tr><td>Skip 60%</td><td>11.69</td><td>-5.3%</td><td>7.96</td><td>+5.1%</td></tr>
+<tr><td>Skip 80%</td><td>10.80</td><td>-12.5%</td><td>7.58</td><td>+0.1%</td></tr>
+</table><caption>The report quotes +0.3% for 8 GB skip 80; recomputing the medians from the CSV gives +0.1%. Either way it is break-even.</caption></div>
+<p>A front table small enough to stay in L2 (262K entries, a few MB) covers 45% to 56% of lookups. At that coverage the oracle gains about 0% at 103 GB and loses about 7% at 8 GB. The loss is most likely branch misprediction plus holes in the 16-lookup batches, because the skip decision is data-dependent and near 50/50 (a hypothesis, not measured). A real front probe has the same branch and holes plus its own latency. Only at 80% coverage does 103 GB gain 12%, which needs about 0.6M to 1M entries, too big to stay in L2 and with probe cost not in the bound. The hook alone costs about 1.6% at 103 GB and 1% at 8 GB.</p>
+<div class="taught"><b>What it taught</b><br>Any idea that changes which lookups reach memory must first pass an oracle ceiling, because the tuned build already overlaps most miss latency and a data-dependent branch in the batch loop is itself costly. Caveats: the trace is 105k reads of one file, so repeat rates are lower bounds for a 1.87M-read run, a per-thread cache at T=32 sees 1/32 of the trace, and the 103 GB profile has few samples.</div>
+</section>
+
+<section id="ch9" data-toc="9. Claims, limits, next steps">
+<h2>9. What we can claim, what we cannot, and what to do next</h2>
+<h3>Can claim</h3>
+<ul>
+<li>The method works end to end: Sniper builds on Luna, runs the compiled <code>classify</code> with correct output, and the config pipeline from sysfs is documented bug by bug.</li>
+<li>Within Sniper with this setup, hardware LLC associativity has no measurable effect (0% to 0.9% spread, 50 MB, 8 GB, 16 GB). <span class="tag sim">SIM</span> Treat this as "this setup cannot see it", not "hardware associativity is irrelevant".</li>
+<li>Software cache capacity is flat across a 512x range apart from one isolated point at 65536 sets, magnitude +1.0% to +6.3%, cause unknown. <span class="tag sim">SIM</span></li>
+<li>On real Luna: 81.4% of lookups repeat, 262K hot slots cover 55.8%, reuse is mostly at distance 2^17 to 2^21, 4-way LRU is within 0 to 6 points of fully associative LRU, and any cache or eviction policy gains at most about 3% to 5% at 8 GB after the lookup loop is tuned. <span class="tag real">REAL</span></li>
+<li>A static hot-set front table is falsified at table sizes that fit in cache: about 0% at 103 GB, a loss at 8 GB. <span class="tag real">REAL</span></li>
+</ul>
+<h3>Cannot claim</h3>
+<ul>
+<li>That a 4-way (or any) software cache is 2x faster on large databases. Lineage artifact.</li>
+<li>Any simulated speedup in seconds, or any Orion or desktop result as evidence about those chips.</li>
+<li>That the cache sizing formula is right or wrong for real multi-threaded runs (the sweeps are T=1).</li>
+<li>That no cache idea could ever help. The bound is for lookups after the loop is tuned, on 8 GB and 16 GB, with a sample of one file. 103 GB lookup share is rough.</li>
+</ul>
+<h3>Threats to validity</h3>
+<p>LLC about 1% of real (-n 1 slice). DRAM 45 ns and NUCA latency are placeholders. Core model is Meteor Lake, not Sapphire Rapids. No prefetch or TLB validation. Different binary lineages. Two cache designs mixed. Single runs, no replicates. Tiny cold windows (10 to 500 reads against 1.87M real). No sim-versus-perf calibration anywhere.</p>
+<h3>What to do next (ranked)</h3>
+<ol>
+<li><b>Calibrate Sniper against perf.</b> Round 3 proposed a 4 GB random-probe microbenchmark: dependent chain versus independent probes versus batched prefetch, native under <code>perf stat</code> against Sniper with a flat 105 MB L3 and measured DRAM and L3 latency. Proposed acceptance: instructions within 2%, cycles within 15%, LLC misses within 20%, dTLB misses within 25%. Kill rule: if Sniper cannot reproduce known real orderings, demote it to trace generation. 1 to 2 days. Not yet run.</li>
+<li><b>Full-size LLC and measured latency.</b> One bank or all slices reachable, latency as a function of size from a pointer-chase, icache and TLB modeling on in every run.</li>
+<li><b>Honest-scale windows.</b> Sampled simulation (SMARTS-style windows with functional warming, 10 to 20 windows of 20 to 50M instructions), reporting a confidence interval. Kill rule: if warmed windows disagree by more than 10% in cycles, the workload is not stationary at this scale.</li>
+<li><b>Replicates</b> (3 per cell) or a documented determinism check, so a 0.3% to 0.9% spread can be called noise or effect.</li>
+<li><b>One source lineage.</b> S0, a cache-off variant of the same tree via a constant switch, and cache variants from one git commit, reporting only within-tree differences.</li>
+<li>Finish multicore (fix the startup deadlock, run 4 and 8 cores) if a shared-LLC claim is wanted.</li>
+</ol>
+<h3>Unverified items, collected</h3>
+<ul>
+<li>Sniper about 25% validation error (seen in slides, not full text); TACO 2014 author list; Chips and Cheese latencies (same-class chip).</li>
+<li>96 slices versus 48 physical cores per socket on the 8468.</li>
+<li>Whether cleanstart 1-core runs got 16 MB or 2 MB of L3; whether the 8-core queue finished; status of the hung 4c_r50_16gb retry.</li>
+<li>Causes of: the 65536 spike; 8 GB faster than 50 MB at 1 core; the Orion-versus-desktop ordering; the 8 GB loss under the oracle (branch and batch-hole hypothesis).</li>
+<li>Real-Luna S6 ablation numbers and the 80% to 84% LLC miss rate are quoted from reports, not re-opened.</li>
+<li>Whether Sniper executes software prefetch.</li>
+</ul>
+<!-- CHAPTER-APPEND-HERE: add new <section id="chN" data-toc="N. Title"> blocks above this comment. -->
+</section>
+
+<section id="qa" data-toc="Questions a professor might ask">
+<h2>Questions a professor might ask</h2>
+<p class="sub">Each answer uses the numbers above. "Trap" is the follow-up that catches people out. Click a question to open it.</p>
+<div class="qalist">
+
+<details class="qa"><summary>Why Sniper and not gem5, ZSim or ChampSim?</summary><div class="ans">
+<p>The repo records no head-to-head comparison, so the honest answer is practical. Sniper runs real compiled x86 binaries through an Intel SDE trace frontend, exposes every cache level, replacement policy, NUCA topology and DRAM parameter as config keys, and runs at about 200 to 230 KIPS in detailed mode, fast enough for 50 to 100 read windows. We could trace the actual <code>classify</code> binary without writing a model of kraken2.</p>
+<p>Claims about gem5 being slower, ChampSim being trace-only for a single core, and ZSim's accuracy are general knowledge, not checked in this repo. <span class="tag unv">UNVERIFIED</span></p>
+<p class="trap"><b>Trap:</b> "Did you try another simulator to cross-check?" No. A second simulator would have exposed the DRAM and latency placeholders, so it is a fair criticism.</p></div></details>
+
+<details class="qa"><summary>What does Sniper's interval model do, and how accurate is it?</summary><div class="ans">
+<p>It does not simulate every pipeline stage. It advances the core in intervals between miss events (cache misses, branch mispredicts) and models overlap of independent misses, memory-level parallelism, as a second-order effect. Newer versions add a ROB-centric core model. The original paper (Carlson, Heirman, Eeckhout, SC 2011) reports about 25% average error against a 16-core Xeon X7460, a figure the debate saw in slides rather than the full text.</p>
+<p>Our effects are 1% to 5%, well inside that error band, and our setup was not validated at all.</p>
+<p class="trap"><b>Trap:</b> "Which core model did you use?" The inherited Meteor Lake P-core interval model with the clock changed to 2.1 GHz. Which variant (interval or ROB) the config selects was never checked. <span class="tag unv">UNVERIFIED</span></p></div></details>
+
+<details class="qa"><summary>Why cycles and not wall-clock time?</summary><div class="ans">
+<p><code>wallclock_s</code> is how long Sniper took, which tracks instruction count and host state. On it, 1-way beat 4-way at 103 GB (346 s versus 360 s) while 4-way was ahead on cycles (47.8 M versus 48.8 M). The same job ran at about 14 s per Mcycle in one batch and about 8 s per Mcycle in a later one, a 1.8x drift from page-cache warmth.</p>
+<p>Simulated cycles divided by the clock is the time a real core would take, and every cycle-versus-IPC check held (189 of 190 rows within 0.015). Several older log sentences quote seconds and are now banned.</p>
+<p class="trap"><b>Trap:</b> "So you never measured real seconds?" Not in Sniper. Real seconds exist only from Luna runs, which are the REAL-labelled numbers.</p></div></details>
+
+<details class="qa"><summary>Why 4-way associativity?</summary><div class="ans">
+<p>It was the supervisor's baseline design, and the simulated sweeps supported it by a thin margin: best or tied on cycles at all four database sizes (speedup 0.910, 1.830, 2.051, 1.973), 0.7% to 2.1% ahead of 1-way, and 2% to 5% ahead of 16-way on the large databases. On the real trace, 4-way LRU sits within 0 to 6 points of fully associative LRU (38.9% versus 40.1% at 262K).</p>
+<p>The simple reasoning: 1-way suffers conflicts, wide ways pay a longer comparison scan, 4-way sits between. The data fit it but do not isolate it.</p>
+<p class="trap"><b>Trap:</b> "Is 4-way better or just least bad?" Given single runs and a 1% to 2% margin, least bad. And all of it sits on top of a lineage confound.</p></div></details>
+
+<details class="qa"><summary>Which misses dominate here: conflict, capacity or compulsory?</summary><div class="ans">
+<p>On the real 8 GB trace, compulsory misses (first touches) are 18.6% of lookups, so the hit rate cannot exceed 81.4%. Conflict misses are small: 4-way LRU trails fully associative LRU by 0 points at 16K entries, 1.2 at 262K and 5.5 at 1M. Capacity and policy dominate: at 262K entries LRU gets 40.1% while Belady gets 66.6%.</p>
+<p>Because reuse distances are mostly 2^17 to 2^21 slots, a cache needs hundreds of thousands of entries before capacity stops binding.</p>
+<p class="trap"><b>Trap:</b> "Then why not raise associativity?" It would not help: associativity attacks the smallest of the three gaps.</p></div></details>
+
+<details class="qa"><summary>Why does the cache win vanish as the workload grows?</summary><div class="ans">
+<p>In the long-read series (same source file, 8 GB) the 4-way / S0 ratio goes 0.704, 0.831, 0.957, 1.031, 1.092 as total bases go 0.35M to 25.4M. Read length is not the driver (10 long reads still win by 30%). The instruction columns show two effects: the two binaries differ by a fixed-size lineage gap that is large relative to small runs, and the cache build executes about 7% more instructions than S0 at 500 reads, the cost of its own lookup code.</p>
+<p>So the early "win" is mostly the binary difference being amortised, and the late "loss" is the cache's own overhead. Neither is a hardware-cache effect.</p>
+<p class="trap"><b>Trap:</b> "So the cache hurts in production?" Not shown. It is neutral on real hardware (S6 ablation, 11.06/14.48 s without versus 11.10/14.55 s with).</p></div></details>
+
+<details class="qa"><summary>Why is hardware LLC associativity flat in the simulation?</summary><div class="ans">
+<p>Three reasons, all in the data. 99.1% to 99.4% of loads hit L1d and under 0.5% reach the LLC, so the level under test serves about 3 loads per 1000. The simulated slice is 1125 KB, 1.05% of the real 105 MB. And the windows are cold: unique lines is about the lookup count.</p>
+<p>The spread is 0.0% to 0.9% with no monotonic trend (500 reads: 4523.2 to 4537.9 M cycles across ways 1 to 30), and with single runs that cannot be classed as noise or effect.</p>
+<p class="trap"><b>Trap:</b> "Does that prove hardware associativity does not matter on Luna?" No. It proves this setup cannot see it. A real associativity effect on Luna is untested.</p></div></details>
+
+<details class="qa"><summary>What do NUCA and slice sizing mean for <code>-n 1</code>?</summary><div class="ans">
+<p>The Meteor Lake chain models the LLC as distributed per-core slices on a mesh, not one bank. With <code>-n 1</code> only one slice is instantiated, so "Luna" had a 1125 KB LLC, the laptop config 2048 KB, the desktop config about 5.3 MB, the Orion config 342 KB. Real Luna has 105 MB.</p>
+<p>Only the flat-L3 run (one 107 MB bank) used real capacity, and it came out 17% to 31% slower with identical instructions, because latency does not scale with size in the config and set-count behaviour differs. Multicore runs add one slice per core, which cleanstart fixes by holding total L3 constant.</p>
+<p class="trap"><b>Trap:</b> "How do you know it was one slice?" The effective <code>sim.cfg</code> in the cleanstart run showed a single 2048 KB NUCA entry with <code>-n 1</code>.</p></div></details>
+
+<details class="qa"><summary>How was the config derived, and how was it validated?</summary><div class="ans">
+<p>Derived: L1d, L1i, L2 and LLC geometry read from sysfs on Luna, clock from Intel's published base frequency (2.1 GHz), LLC split into per-core slices (1125 KB, 15-way, address hash switched to <code>mod</code> to avoid a crash). Everything else (core model, DRAM, latencies, replacement) is inherited from Sniper defaults.</p>
+<p>Validated: only that the caches instantiate with the intended sets and ways, that the run completes, and that classification output matches the native run. There is no timing validation.</p>
+<p class="trap"><b>Trap:</b> "Is LRU the real LLC policy?" Unknown. It is a placeholder, and real Intel LLC policy is not publicly documented for this generation.</p></div></details>
+
+<details class="qa"><summary>What validation against perf exists?</summary><div class="ans">
+<p>None. No run was ever compared to <code>perf stat</code> on the same input: not IPC, not LLC misses, not DRAM reads. This is the single largest gap, and the first item in the next-steps list.</p>
+<p>The proposed recipe is a random-probe microbenchmark run natively and in Sniper, accepting instructions within 2%, cycles within 15%, LLC misses within 20% and dTLB misses within 25%. That recipe is a proposal from the debate and has not been executed.</p>
+<p class="trap"><b>Trap:</b> "So the simulated cycle counts mean what?" A consistent ordering within one setup, not a prediction of Luna's time.</p></div></details>
+
+<details class="qa"><summary>What are the main threats to validity?</summary><div class="ans">
+<p>Ordered by impact: the LLC under test is 1% of real (1125 KB of 105 MB); the headline win is a binary-lineage artifact (instruction gap grows to +32.6 M at 103 GB); DRAM is 45 ns against about 107 ns measured on the same class of chip; NUCA latency is about 3x too cheap; two cache designs are mixed; instruction-cache modeling was off; no calibration; single runs; windows of 10 to 500 reads against 1.87M real.</p>
+<p>The CSV arithmetic itself is clean, so the numbers are right and the question they answer is the wrong one.</p>
+<p class="trap"><b>Trap:</b> "Which one alone would overturn the result?" The lineage confound, since it removes the only positive result.</p></div></details>
+
+<details class="qa"><summary>How did you control for confounds?</summary><div class="ans">
+<p>What was controlled: wall-clock contamination (switched to cycles, ran the fair batch strictly sequentially), the mislabelled baseline (found the true S0), the IPC consistency of every row, classification output identity (diff against S0 empty), and read length versus total bases (long-read series).</p>
+<p>What was not: binary lineage, cache design mixing, LLC size, latency, replicates. The audit found those after the headline had been reported.</p>
+<p class="trap"><b>Trap:</b> "Why did it take an audit to find the lineage problem?" Because every individual check passed: the arithmetic was right. The confound was visible only by comparing instruction counts across binaries and noticing the gap grows with database size.</p></div></details>
+
+<details class="qa"><summary>Why LRU?</summary><div class="ans">
+<p>It is Sniper's default and the standard baseline. The real LLC policy on this Xeon is an undocumented adaptive scheme, so LRU is a stated placeholder. For the software cache, the real trace shows policy is not the bottleneck either way: even optimal Belady yields at most about 5% at 8 GB after the loop is tuned.</p>
+<p>Hardware replacement policies (SRRIP, SHiP, Hawkeye) were dropped by consensus because they act on levels that see 0.2% to 0.5% of loads.</p>
+<p class="trap"><b>Trap:</b> "LRU versus Belady is 40% versus 67% at 262K. Isn't that a big gap?" Yes in hit rate, no in time: hit rate x lookup share (7.7%) is 3% versus 5%.</p></div></details>
+
+<details class="qa"><summary>What does the Belady bound mean?</summary><div class="ans">
+<p>Belady's algorithm evicts the entry whose next use is furthest in the future. It needs the future, so it is offline, and no real policy can beat its hit rate at that capacity. On the real trace it gives 28.0%, 44.1%, 66.6%, 81.4% at 16K, 64K, 262K, 1M entries.</p>
+<p>Multiplying by the lookup share of CPU turns it into a time bound: 0.667 x 0.077 = about 5% at 8 GB. It ignores the cost of probing the cache itself, so the real ceiling is lower.</p>
+<p class="trap"><b>Trap:</b> "Belady at 1M equals 81.4%, why that number?" It equals the repeat rate: with enough capacity and perfect foresight every repeat hits, and only first touches (18.6%) miss.</p></div></details>
+
+<details class="qa"><summary>Why was a hot-set front cache ruled out?</summary><div class="ans">
+<p>An oracle experiment gave an upper bound before anything was built. Skipping the lookup for a hash-chosen fraction of keys, with wrong output by design, at 45% coverage (about what 262K entries cover) changes 103 GB by -1.3% and 8 GB by +7.1% (slower). Even 60% coverage gives only -5.3% at 103 GB and +5.1% at 8 GB. Only 80% coverage gains 12.5% at 103 GB, and that needs 0.6M to 1M entries.</p>
+<p>A real table can only be slower than the oracle, so the idea is falsified at cache-resident sizes. The two-to-four days of building it were saved.</p>
+<p class="trap"><b>Trap:</b> "The 1M-entry table is untested." Correct, and the oracle says at most about 10% at 103 GB if its probe were free and 0% at 8 GB, so it was not worth building.</p></div></details>
+
+<details class="qa"><summary>What is the contribution or novelty, honestly?</summary><div class="ans">
+<p>Not a new cache design that wins. The defensible contributions are a measured reuse profile of kraken2 lookups (81.4% repeats, 55.8% covered by 262K slots, reuse mostly at distance 2^17 to 2^21), an optimal-policy bound (3% to 5% at 8 GB after tuning), a priced oracle-ceiling method that kills an idea in a day, and a documented list of Sniper pitfalls for this kind of workload.</p>
+<p>Novelty against the literature is not established. The debate reports opened abstracts of TinyLFU, RRIP, ARC, MICA, MemC3, SHARDS and SMARTS (abstract level only, full texts not read). The project notes list kache-hash, MegIS, MetaCache-GPU and GPMeta as must-cite genomics prior art, which I did not open. <span class="tag unv">UNVERIFIED</span></p>
+<p class="trap"><b>Trap:</b> "Is there prior art on caching k-mer lookups?" Do not claim there is none. Say a targeted search was not completed.</p></div></details>
+
+<details class="qa"><summary>What would you do with six more months?</summary><div class="ans">
+<p>First calibrate: a microbenchmark under perf stat and under Sniper with measured DRAM and LLC latency, and a go or no-go on whether Sniper can reproduce real orderings at all. Then single-lineage binaries, full-capacity LLC, sampled windows with confidence intervals and three replicates. Then a Cache Allocation Technology sweep on real Luna (needs root and resctrl, availability unknown) as ground truth for LLC size effects, since the real machine can vary LLC ways and the simulator cannot be trusted to.</p>
+<p>Only after that would a new cache or policy idea be worth simulating.</p>
+<p class="trap"><b>Trap:</b> "Why not just run more reads now?" Detailed mode is about 1 hour per 50 reads and 12 to 15 hours per 2000-read run. Scale needs sampling, not patience.</p></div></details>
+
+<details class="qa"><summary>Why simulate only 10 to 500 reads?</summary><div class="ans">
+<p>Speed. Detailed Sniper runs at about 200 to 230 KIPS: about 1 hour for 50 reads, 12 to 15 hours per variant for 2000 reads (35.1M bases). Production is 1.87M reads. So every window is a cold start: unique cache lines about equals lookups, and almost nothing is touched twice, which hides exactly the long-distance reuse the real trace later found.</p>
+<p>The repair is sampled simulation with functional warming, not longer runs.</p>
+<p class="trap"><b>Trap:</b> "Does a tiny window bias toward or against caches?" Both ways: no reuse hurts a cache, but a cold fixed startup cost flatters whichever binary has less of it.</p></div></details>
+
+<details class="qa"><summary>Why single runs and no replicates?</summary><div class="ans">
+<p>Cost and an unexamined assumption that Sniper is deterministic. It is not fully so (the trace reader runs on its own thread), so noise is unbounded. The 0.3% to 0.9% hardware-associativity spreads cannot be classed as noise or effect, and the 1% to 2% margin of 4-way over 1-way is within what an unmeasured noise floor could produce.</p>
+<p>The large effects (2x, 30%, a 28% loss at 2000 reads) are far outside any plausible noise. The small ones (width ordering, 65536 spike at +1.0% on 16 GB) are not.</p>
+<p class="trap"><b>Trap:</b> "Then which conclusions survive?" The ones that rest on large effects or on real-hardware traces.</p></div></details>
+
+<details class="qa"><summary>What are the Orion and desktop configs really?</summary><div class="ans">
+<p>Cache-size edits on the same Meteor Lake x86 core model, running the same x86 binaries. <code>desktop.cfg</code> uses Ryzen 5 5600X published sizes (L2 512 KB, 32 MB L3 over 6 cores). <code>orion_sizes.cfg</code> uses Jetson AGX Orin sizes (L1 64 KB, L2 256 KB, 4 MB SLC over 12 cores) with unverified associativities.</p>
+<p>They test sensitivity of the x86 model to size, not Orion's Cortex-A78AE behaviour. Sniper's x86 frontend cannot trace ARM binaries, so a real Orion run would need DynamoRIO traces recorded on the board.</p>
+<p class="trap"><b>Trap:</b> "Why is Orion's 8 GB speedup lower?" Unknown. The larger-L1 explanation is untested.</p></div></details>
+
+<details class="qa"><summary>What would falsify your conclusions?</summary><div class="ans">
+<p>For the real-trace bound: a full-scale run (1.87M reads, T=32) where a per-thread cache's hit rate times lookup share exceeds 5%, or a 103 GB profile with a much larger lookup share than the rough 1.7% of CPU seen. For the oracle: a front table of 600K to 1M entries that stays cache-resident and beats the break-even.</p>
+<p>For the simulator audit: a calibration run in which Sniper, after DRAM and LLC fixes, reproduces known real orderings. That would rehabilitate the simulator for new ideas.</p>
+<p class="trap"><b>Trap:</b> "Is anything you said unfalsifiable?" The causes of the 65536 spike and of 8 GB being faster than 50 MB are untested guesses, labelled as such.</p></div></details>
+
+<details class="qa"><summary>Why did the simulator say 8 GB is faster than 50 MB when real Luna disagrees?</summary><div class="ans">
+<p>In cleanstart, 1 core, S0: 8 GB takes 373.3 M cycles versus 446.1 M for 50 MB at 50 reads, and 880.9 versus 1017.1 at 100. Real Luna at 1.87M reads is monotonic in database size (50 MB 16.71 s, 8 GB 21.17 s, 16 GB 25.81 s, 103 GB 95.62 s, stock build).</p>
+<p>The real runs include database load and 32 threads, the simulation is one core and a short window. The 50 MB database also classifies fewer reads (84% versus 98%) and has more DRAM reads (1.11M versus 0.81M). The untested guess is a nearly full table with long probe chains for absent k-mers. <span class="tag unv">UNVERIFIED</span></p>
+<p class="trap"><b>Trap:</b> "Is the simulator wrong then?" It is not comparable: different scale, thread count and what is included.</p></div></details>
+
+<details class="qa"><summary>Why was the first "2x" result an artifact?</summary><div class="ans">
+<p>S0 is a different source snapshot from the cache builds. On 8 GB, S0 executes 68.1 M instructions against 51.9 M for 4-way, and the gap grows with database size (+16.2, +25.4, +32.6 M at 8, 16, 103 GB) while it is negative on 50 MB. A lookup cache cannot delete instructions that scale with database size, so the difference is elsewhere in the code path.</p>
+<p>Corroboration: cycles are identical across 1-way to 16-way and across 128 KB to 64 MB, and on real Luna removing the cache changes nothing (11.06 s versus 11.10 s).</p>
+<p class="trap"><b>Trap:</b> "How do you know it is not a real cache win?" If it were, width and size would matter. They do not.</p></div></details>
+
+<details class="qa"><summary>Why model Sapphire Rapids with a Meteor Lake core?</summary><div class="ans">
+<p>Sniper ships no Sapphire Rapids (Golden Cove) core model. The <code>baseline</code> address-translation scheme pulls in a Meteor Lake P-core (Redwood Cove) config. Both are wide Intel big-core designs, and L1d and L2 geometry happened to match Luna exactly, so only L1i, the LLC and the clock were overridden.</p>
+<p>The ROB size, branch predictor, issue width and latencies are Meteor Lake values. Whether that biases memory-level parallelism, the thing a cache study depends on, was never tested.</p>
+<p class="trap"><b>Trap:</b> "Is 2.1 GHz right?" It is the documented base clock, not measured, and real runs sit between 0.8 and 3.8 GHz depending on turbo.</p></div></details>
+
+<details class="qa"><summary>How wrong is the DRAM and NUCA latency model?</summary><div class="ans">
+<p>DRAM in the config is 45 ns, 57.6 GB/s (a DDR4-2400 default). Measured Sapphire Rapids is about 107 ns for DRAM and about 33 ns (125 cycles at 3 GHz) for L3, from a third-party measurement on the same class of chip, not Luna. So DRAM is about 2.4x too cheap and the 35-cycle NUCA hit about 3x too cheap. <span class="tag unv">UNVERIFIED</span></p>
+<p>In the cleanstart runs about 0.8M to 1.1M DRAM reads occur per 50 reads in 373M to 446M cycles, so DRAM is a minority of cycles and an error of that size moves the totals by tens of percent, enough to swamp 1% to 5% effects.</p>
+<p class="trap"><b>Trap:</b> "Which direction does the error bias?" Depends on the experiment: size sweeps get biased toward bigger, cache-avoids-LLC-trip tests toward worse. The sign cannot be trusted.</p></div></details>
+
+<details class="qa"><summary>What is the 65536 anomaly and how big is it really?</summary><div class="ans">
+<p>Across the six-size ladder, cycles are flat except at exactly 65536 sets: +6.3% (50 MB), +2.5% (8 GB), +1.0% (16 GB), +6.0% (103 GB). The first write-up cited +4.4% and +10.2% for 8 GB and 103 GB, but those were instruction deltas, an error caught by cross-checking the CSV.</p>
+<p>A linear initialisation-cost theory was overturned when cycles reverted at 262144 and above. The leading guess, a hash-distribution artifact at that mask width, is untested, as is a build-quirk check of that one binary.</p>
+<p class="trap"><b>Trap:</b> "Is it a real effect or noise?" It recurs at the same set count on four databases, so not random noise. But the workloads differ by panel (10 versus 50 reads) and the cause is unknown.</p></div></details>
+
+<details class="qa"><summary>Why was flat L3 slower than NUCA?</summary><div class="ans">
+<p>Instructions are identical (35.8 M and 68.1 M) and L3 hit is 0.02% and 0.11%, so caching behaviour did not cause the +30.7% (50 MB) and +16.6% (8 GB) cycle difference. The same 15 + 20 cycle latency placeholder was used for a 107 MB bank as for a 1.1 MB slice, and the set counts differ (114,688 versus 1,200), which changes mapping and queuing behaviour in the model.</p>
+<p>The point for the talk: the topology assumption moved cycles by 17% to 31%, far more than any associativity knob (under 1%), so the model's structure outweighs the signal.</p>
+<p class="trap"><b>Trap:</b> "Which one is right?" Neither is validated. NUCA is the architecturally realistic one.</p></div></details>
+
+<details class="qa"><summary>What did cleanstart actually establish?</summary><div class="ans">
+<p>A trustworthy-in-method 1-core baseline (9 of 9 cells, S0, laptop config with instruction-cache modeling and Zen 3 TLBs on) and a 4-core set with 8 of 9 cells, and an infrastructure with a hang watchdog and one-knob-per-run naming. 1-core cycles range from 80.3 M to 1096.0 M, L1d hit 99.1% to 99.4%.</p>
+<p>It established no hardware-knob effect, since none of the L3, L2, L1 or associativity sweeps was run. The 8-core group has no rows, and the 1-core L3 size needs re-checking in the effective config.</p>
+<p class="trap"><b>Trap:</b> "What is the one-line result?" A baseline showing the hierarchy beyond L1 serves under 1% of loads.</p></div></details>
+
+<details class="qa"><summary>What were the multicore deadlocks and how were they handled?</summary><div class="ans">
+<p>Two of 14 four-core launches froze at startup: all four processes sleeping at 0% CPU, log ending at "Thread N started", no <code>sim.stats</code>. One ran 9 hours before being noticed. Zero of 9 single-core runs hung, and a 2-read 4-core smoke test passed, so a startup race is suspected but not shown.</p>
+<p>A watchdog now kills a run whose session CPU grows less than 60 CPU-seconds in 900 s and writes a HUNG row so the queue continues. The first rule (CPU time unchanged) never fired, because the Python wrapper keeps accruing a little CPU.</p>
+<p class="trap"><b>Trap:</b> "Could hangs bias the results?" The hung cells are missing, not wrong, but missing cells can still bias a sweep.</p></div></details>
+
+<details class="qa"><summary>"No reuse" was the old story. What changed?</summary><div class="ans">
+<p>The 10 to 500 read windows showed unique lines about equal to lookups and LLC hits under 0.5%, so "no reuse" was inferred. The real trace of 12.2M lookups shows 81.4% repeats and 90% of lookups covered by 1M slots. Reuse exists but at distance 2^17 to 2^21 slots (about 77% of repeats), far beyond L1 or L2 and beyond the cold window.</p>
+<p>It also matches an earlier real reuse-distance histogram in the project (54% repeats at T=1 on 3.0M lookups, quoted from the round 2 report, not re-opened), so the correction is not a one-off. <span class="tag unv">UNVERIFIED</span></p>
+<p class="trap"><b>Trap:</b> "So a big cache does help?" Hit rate yes (76.5% at 1M entries), time no: lookups are about 7.7% of CPU, so the cap is single digits.</p></div></details>
+
+<details class="qa"><summary>Why does a front cache lose at 8 GB in the oracle?</summary><div class="ans">
+<p>The oracle's skip decision is data-dependent and near 50/50 at 45% coverage, so the branch mispredicts often, and skipped keys leave holes in the 16-lookup prefetch batches. At 8 GB the table is partly cache-resident and prefetch already hides most latency, so there is little time to save and the branch cost dominates: +7.1% at 45%.</p>
+<p>That is the most likely explanation, not a measured one. At 103 GB, where lookups are more latency-bound, the same skip gives -1.3% at 45% and -12.5% at 80%.</p>
+<p class="trap"><b>Trap:</b> "A real front cache has no mispredict if branchless." Possible, but a real probe also has its own latency, and the oracle charges none.</p></div></details>
+
+<details class="qa"><summary>How were the 4-way LRU and Belady hit rates computed?</summary><div class="ans">
+<p>Offline, by replaying the traced slot-index sequence (12,237,762 lookups) through each policy: fully associative LRU, 4-way set-associative LRU, and Belady's optimal. Code is <code>debate_2026-11/e1/analyze.cpp</code>, raw output <code>analysis_8gb_T1.txt</code>. The trace is the table-slot sequence, so a hit means "this slot was looked up recently enough to be in an N-entry structure".</p>
+<p>Caveats: one thread (a T=32 per-thread cache sees about 1/32 of the stream), 105k reads of one file (repeat rates are lower bounds for 1.87M reads), and the cache's own probe cost is excluded.</p>
+<p class="trap"><b>Trap:</b> "Is this the same as measuring a cache in the program?" No, it is a bound on hits, not time.</p></div></details>
+
+<details class="qa"><summary>Is the lookup share (7.7%) reliable?</summary><div class="ans">
+<p>For 8 GB and 16 GB, reasonably (perf record on 105k reads, one thread, 7.7% and 6.9% of CPU, about 15% of user-space time). For 103 GB it is rough: 1.7% of CPU, about 28% of user time, with only about 450 user samples because the run is dominated by database load at one thread. Kernel database-load time is 20% to 65% of samples depending on database.</p>
+<p>Because the 3% to 5% bound uses 8 GB, 103 GB may allow more. That is why the next honest step is a 32-thread, 1.87M-read profile on 103 GB.</p>
+<p class="trap"><b>Trap:</b> "Why does the oracle show 12.5% at 103 GB then?" At 80% skip it removes work that is a larger fraction there. It does not contradict the bound, which was for 8 GB.</p></div></details>
+
+<details class="qa"><summary>What exactly do you claim for the thesis?</summary><div class="ans">
+<p>A negative-result thesis with positive method: kraken2 lookups have heavy, long-distance reuse; hit-rate-optimal caching and eviction cannot give more than about 3% to 5% at 8 GB after the lookup loop is tuned; a static hot-set front cache is ruled out by an oracle ceiling; and the earlier simulated 2x was an artifact of binary lineage and a 1% LLC. The simulator itself needs calibration before it is used for new designs.</p>
+<p>I would not claim a new cache that speeds up kraken2.</p>
+<p class="trap"><b>Trap:</b> "Isn't a negative result unpublishable?" A priced upper bound with a reproducible oracle method is publishable as characterisation, if the claims stay within the bound.</p></div></details>
+
+<details class="qa"><summary>Is the 105 MB LLC and the 96 slices consistent?</summary><div class="ans">
+<p>The sysfs LLC is 107520 KB shared per socket. The config divides it by 96, treated as cores per socket. But 96 is the logical CPU count per socket (192 threads on 2 sockets). If the 8468 has 48 physical cores per socket (my understanding, not verified on Luna), the per-core slice would be about 2.2 MB, double the 1125 KB used.</p>
+<p>It does not rescue the setup: 2.2 MB is still about 2% of the real LLC. It should still be fixed and checked with <code>lscpu</code>. <span class="tag unv">UNVERIFIED</span></p>
+<p class="trap"><b>Trap:</b> "Was it caught?" No audit flagged it, it came from reading the numbers side by side.</p></div></details>
+
+<details class="qa"><summary>Which numbers from the old log must never be cited?</summary><div class="ans">
+<p>The 2x (2.05x) speedup in seconds, and the speedup in any wall-clock column; the "50 reads is a small-workload artifact" reconciliation; +4.4% and +10.2% for the 65536 spike (use +2.5% and +6.0%); the Orion "8-way L2"; and "startup dominates 10-read runs".</p>
+<p>Also the older real-hardware "22x slowdown cliff" is superseded: it was mostly a thread-local-storage bug, not the sizing formula.</p>
+<p class="trap"><b>Trap:</b> "Why list wrong numbers?" Because they are in the log and in earlier decks, and a professor may have seen them.</p></div></details>
+
+<!-- QA-APPEND-HERE: add new <details class="qa"> blocks above this comment, same markup. Numbering is automatic. -->
+</div>
+</section>
+
+<section id="cheat" data-toc="Numbers to memorise" class="cheat">
+<h2>Numbers to memorise</h2>
+<p class="sub">One page. S = simulated (Sniper cycles), R = real Luna, U = unverified.</p>
+<div class="tw"><table>
+<tr><th class="l">Number</th><th class="l">What</th><th>Src</th></tr>
+<tr><td class="l">L1d 48K 12w / L2 2 MB 16w / LLC 105 MB 15w</td><td class="l">Real Luna cache geometry (sysfs)</td><td>R</td></tr>
+<tr><td class="l">1125 KB, 15-way, 1200 sets</td><td class="l">Simulated NUCA slice (1.05% of real LLC)</td><td>S</td></tr>
+<tr><td class="l">45 ns vs about 107 ns</td><td class="l">Simulated DRAM vs measured on a same-class chip</td><td>U</td></tr>
+<tr><td class="l">about 25%</td><td class="l">Sniper's reported validation error</td><td>U</td></tr>
+<tr><td class="l">0.910 / 1.830 / 2.051 / 1.973</td><td class="l">4-way speedup over S0, 50 MB / 8 GB / 16 GB / 103 GB (artifact)</td><td>S</td></tr>
+<tr><td class="l">+16.2 / +25.4 / +32.6 M</td><td class="l">S0 minus 4-way instructions at 8 / 16 / 103 GB (lineage gap)</td><td>S</td></tr>
+<tr><td class="l">1.284x, 1.386x</td><td class="l">2000 reads, 50 MB: 4-way and 16-way cycles vs S0</td><td>S</td></tr>
+<tr><td class="l">0.704 to 1.092</td><td class="l">4-way / S0 over 0.35M to 25.4M bases; crossover at 1.87M to 4.7M</td><td>S</td></tr>
+<tr><td class="l">0.0% to 0.9%</td><td class="l">Cycle spread across LLC associativity 1 to 30</td><td>S</td></tr>
+<tr><td class="l">+30.7% / +16.6%</td><td class="l">Flat L3 vs NUCA, 50 MB / 8 GB</td><td>S</td></tr>
+<tr><td class="l">+6.3 / +2.5 / +1.0 / +6.0%</td><td class="l">65536-set spike, 50 MB / 8 / 16 / 103 GB (not +4.4, +10.2)</td><td>S</td></tr>
+<tr><td class="l">99.1% to 99.4%; under 0.5%</td><td class="l">L1d hit rate; share of loads reaching the LLC</td><td>S</td></tr>
+<tr><td class="l">297 instr/base</td><td class="l">Marginal cost per base in cleanstart</td><td>S</td></tr>
+<tr><td class="l">17 of 27; 2 of 14</td><td class="l">Cleanstart rows done; four-core runs deadlocked</td><td>S</td></tr>
+<tr><td class="l">12,237,762 / 2,270,742</td><td class="l">Traced lookups / unique slots, 8 GB</td><td>R</td></tr>
+<tr><td class="l">81.4%; 86.75%</td><td class="l">Repeat rate; lookups hitting a stored k-mer</td><td>R</td></tr>
+<tr><td class="l">12.5 / 24.2 / 55.8 / 90.0%</td><td class="l">Coverage by top 16K / 64K / 262K / 1M slots</td><td>R</td></tr>
+<tr><td class="l">about 77%</td><td class="l">Repeats at reuse distance 2^17 to 2^21</td><td>R</td></tr>
+<tr><td class="l">40.1 / 38.9 / 66.6%</td><td class="l">262K entries: LRU / 4-way LRU / Belady</td><td>R</td></tr>
+<tr><td class="l">76.5 / 71.0 / 81.4%</td><td class="l">1M entries: LRU / 4-way LRU / Belady</td><td>R</td></tr>
+<tr><td class="l">7.7% / 6.9% / 1.7%</td><td class="l">Lookup share of CPU, 8 / 16 / 103 GB</td><td>R</td></tr>
+<tr><td class="l">3% and 5%</td><td class="l">Bound at 8 GB: 4-way LRU and Belady, 262K entries</td><td>R</td></tr>
+<tr><td class="l">+0.9 / -1.3 / -5.3 / -12.5%</td><td class="l">Oracle at 103 GB, skip 25 / 45 / 60 / 80%</td><td>R</td></tr>
+<tr><td class="l">+4.5 / +7.1 / +5.1 / +0.1%</td><td class="l">Oracle at 8 GB, skip 25 / 45 / 60 / 80%</td><td>R</td></tr>
+<tr><td class="l">11.06 / 14.48 s vs 11.10 / 14.55 s</td><td class="l">Real ablation, no cache vs 4-way cache</td><td>R</td></tr>
+</table></div>
+</section>
+
+<section id="outline" data-toc="Presentation outline">
+<h2>Proposed presentation outline (14 slides)</h2>
+<p class="sub">Each slide: one claim, the evidence, and a two-line speaker note.</p>
+
+<div class="slide"><h3>1. The question</h3><p><span class="k">Claim</span> Which cache organisation is best for kraken2 is not answerable on real silicon alone.</p><p><span class="k">Evidence</span> Luna's cache geometry (L1d 48K 12w, L2 2 MB 16w, LLC 105 MB 15w) cannot be changed.</p><p><span class="k">Note</span> State the hypothesis: a 4-way software k-mer cache plus hardware knobs. Say once that the story ends in a negative result and a method.</p></div>
+<div class="slide"><h3>2. Why simulate, and how</h3><p><span class="k">Claim</span> Sniper lets us change one knob per run on the real compiled binary.</p><p><span class="k">Evidence</span> Interval core model, SDE trace of <code>classify</code>, about 200 KIPS, cycles as the metric.</p><p><span class="k">Note</span> Mention reported error of about 25% for validated Sniper. Set the expectation that 1% to 5% effects are below that.</p></div>
+<div class="slide"><h3>3. Building the instrument</h3><p><span class="k">Claim</span> The config is derived from sysfs but half-inherited.</p><p><span class="k">Evidence</span> luna.cfg: NUCA 1125 KB 15-way, 2.1 GHz, inherited Meteor Lake core, DDR4 45 ns.</p><p><span class="k">Note</span> Be explicit about what is real and what is placeholder. This slide pre-empts the validation question.</p></div>
+<div class="slide"><h3>4. Bugs and what they imply for trust</h3><p><span class="k">Claim</span> Silent config failures mean you must read back the effective config.</p><p><span class="k">Evidence</span> -c comma trap, 1120 to 1125 KB rounding, xor_mod SIGSEGV, Perl wrapper, later -n N ignored.</p><p><span class="k">Note</span> One sentence per bug. The lesson is verification, not embarrassment.</p></div>
+<div class="slide"><h3>5. The first positive result</h3><p><span class="k">Claim</span> In the fair batch, 4-way looked 1.83x to 2.05x faster on 8 GB and larger.</p><p><span class="k">Evidence</span> Cycle table, 4 databases x 5 variants; 50 MB at 0.91x. Fig 1.</p><p><span class="k">Note</span> Present it as it was believed. Do not oversell, the next slides take it apart.</p></div>
+<div class="slide"><h3>6. Two early corrections</h3><p><span class="k">Claim</span> Wall-clock and the first baseline were both wrong.</p><p><span class="k">Evidence</span> wallclock_s is simulator time (1-way "won" 346 vs 360 s); 14 vs 8 s per Mcycle drift; baseline had the cache compiled in.</p><p><span class="k">Note</span> Cycles are the metric from here on. This shows the habit of checking.</p></div>
+<div class="slide"><h3>7. Scaling the workload flips the sign</h3><p><span class="k">Claim</span> The cache advantage shrinks with total bases and reverses.</p><p><span class="k">Evidence</span> 2000 reads: all variants 1.28x to 1.39x slower. Long-read series 0.704 to 1.092. Fig 2.</p><p><span class="k">Note</span> Name the confound: read count, length and bases were tangled until the long-read follow-up.</p></div>
+<div class="slide"><h3>8. Hardware knobs alone are null</h3><p><span class="k">Claim</span> Simulated LLC associativity does not move cycles.</p><p><span class="k">Evidence</span> 0.0% to 0.9% spread on 50 MB, flat on 8 and 16 GB. Flat L3 vs NUCA differs 17% to 31%.</p><p><span class="k">Note</span> Under 0.5% of loads reach the LLC. The model structure moved cycles more than the knob under study.</p></div>
+<div class="slide"><h3>9. The size ladder and the 65536 spike</h3><p><span class="k">Claim</span> Cache size is a flat plane with one unexplained hole.</p><p><span class="k">Evidence</span> 2048 to 1,048,576 sets flat; +6.3 / +2.5 / +1.0 / +6.0% at 65536. H1 to H4 table. Fig 3.</p><p><span class="k">Note</span> Mention the corrected magnitudes and the instruction-versus-cycle mix-up. Say the cause is unknown.</p></div>
+<div class="slide"><h3>10. Cleanstart</h3><p><span class="k">Claim</span> The from-scratch baseline is sound in method and incomplete.</p><p><span class="k">Evidence</span> 1-core 9 of 9, 4-core 8 of 9, two deadlocks, watchdog, no 8-core rows, L1d hit 99.1% to 99.4%.</p><p><span class="k">Note</span> It produced a baseline, not a comparison. Keep this slide short.</p></div>
+<div class="slide"><h3>11. The audit</h3><p><span class="k">Claim</span> The simulator results cannot be trusted for Luna.</p><p><span class="k">Evidence</span> LLC 1.05% of real; instruction gap +32.6 M at 103 GB; DRAM 45 vs about 107 ns; no perf calibration.</p><p><span class="k">Note</span> The arithmetic was clean, the question was wrong. Show the lineage table.</p></div>
+<div class="slide"><h3>12. The real trace</h3><p><span class="k">Claim</span> kraken2 does reuse k-mers, but at long distance.</p><p><span class="k">Evidence</span> 12.2M lookups, 81.4% repeats, 262K slots cover 55.8%, reuse at 2^17 to 2^21. Fig 4 hit rates.</p><p><span class="k">Note</span> This reverses the "no reuse" story. 4-way LRU is within 0 to 6 points of fully associative LRU.</p></div>
+<div class="slide"><h3>13. Bounds and the oracle ceiling</h3><p><span class="k">Claim</span> No cache or policy can gain more than about 3% to 5% at 8 GB, and a hot-set front table is falsified.</p><p><span class="k">Evidence</span> Hit rate x 7.7% lookup share; oracle: 0% at 103 GB, +7% slower at 8 GB for 45% coverage.</p><p><span class="k">Note</span> The oracle killed an idea before building it. The method is the contribution.</p></div>
+<div class="slide"><h3>14. Claims, limits, next</h3><p><span class="k">Claim</span> A priced negative result and a recalibration plan.</p><p><span class="k">Evidence</span> Can-claim and cannot-claim lists; next: perf calibration, full-size LLC, sampled windows, replicates, one lineage.</p><p><span class="k">Note</span> Close on what would falsify us. Admit novelty against prior art is not yet established.</p></div>
+</section>
+
+<section id="updates" data-toc="Updates">
+<h2>Updates</h2>
+<p class="sub">Dated entries, newest last. Add each new result as one entry, then fold anything that changes a chapter into the chapter text.</p>
+<div id="updlist">
+<article class="upd"><h3>2026-11-23: Real trace of 12.2M lookups and the bound</h3>
+<p>On Luna, an 8 GB database, 104,980 reads, one thread: 12,237,762 lookups, 2,270,742 unique slots, 81.4% repeats, 86.75% hit a stored k-mer. Top 262K slots cover 55.8%, top 1M cover 90.0%, about 77% of repeats sit at distance 2^17 to 2^21. Hit rate at 262K entries: LRU 40.1%, 4-way LRU 38.9%, Belady 66.6%; at 1M: 76.5%, 71.0%, 81.4%. Lookup share of CPU 7.7% (8 GB), 6.9% (16 GB), 1.7% (103 GB, rough). Bound: 0.39 x 0.077 = about 3% (4-way LRU) and 0.67 x 0.077 = about 5% (Belady) at 8 GB. This replaces the "no reuse" framing. <span class="tag real">REAL</span> See Chapter 8. Source: <code>debate_2026-11/round5_RESULTS.md</code>.</p></article>
+<article class="upd"><h3>2026-11-23: Oracle ceiling kills the static hot-set front table</h3>
+<p>Time-only oracle on 32 threads, 1,872,777 reads, 3 interleaved reps. Skipping 45% of lookups (the coverage a cache-resident table can reach) changes 103 GB by -1.3% and 8 GB by +7.1% (slower). 60%: -5.3% and +5.1%. 80%: -12.5% and +0.1%. The hook itself costs about 1.6% (103 GB) and 1% (8 GB). The idea is falsified at cache-resident sizes before building; only a 0.6M to 1M entry table remains untested and is judged not worth building. <span class="tag real">REAL</span> See Chapter 8. Source: <code>debate_2026-11/cycle2/round2_RESULT_oracle_ceiling.md</code>, <code>cycle2/data/ceil.csv</code>.</p></article>
+<!-- UPDATES-APPEND-HERE: add new <article class="upd"> blocks above this comment, newest last. -->
+</div>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+  // theme
+  var root=document.documentElement, btn=document.getElementById('themebtn');
+  try{var t=localStorage.getItem('csn-theme'); if(t) root.setAttribute('data-theme',t);}catch(e){}
+  btn.addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    if(!cur) cur=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
+    var nx=cur==='dark'?'light':'dark'; root.setAttribute('data-theme',nx);
+    try{localStorage.setItem('csn-theme',nx);}catch(e){}
+    drawAll();
+  });
+
+  // table of contents from data-toc
+  var secs=document.querySelectorAll('main section[data-toc]');
+  var toc=document.getElementById('toc'), mt=document.getElementById('mtoc');
+  secs.forEach(function(s){
+    var a=document.createElement('a'); a.href='#'+s.id; a.textContent=s.getAttribute('data-toc'); toc.appendChild(a);
+    var b=a.cloneNode(true); mt.appendChild(b);
+  });
+  if('IntersectionObserver' in window){
+    var links=toc.querySelectorAll('a');
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(l){l.classList.toggle('on',l.getAttribute('href')==='#'+e.target.id);}); } });
+    },{rootMargin:'-10% 0px -80% 0px'});
+    secs.forEach(function(s){io.observe(s);});
+  }
+
+  // charts
+  var NS='http://www.w3.org/2000/svg';
+  function el(n,a,txt){var e=document.createElementNS(NS,n); for(var k in a) e.setAttribute(k,a[k]); if(txt!==undefined) e.textContent=txt; return e;}
+  function frame(svg,W,H){while(svg.firstChild) svg.removeChild(svg.firstChild);}
+  var M={l:52,r:18,t:22,b:46}, W=560, H=250;
+  function sx(v,a,b){return M.l+(v-a)*(W-M.l-M.r)/(b-a);}
+  function sy(v,a,b){return H-M.b-(v-a)*(H-M.t-M.b)/(b-a);}
+  function yaxis(svg,y0,y1,step,fmt){
+    for(var v=y0; v<=y1+1e-9; v+=step){
+      var y=sy(v,y0,y1);
+      svg.appendChild(el('line',{x1:M.l,x2:W-M.r,y1:y,y2:y,'class':'gr'}));
+      svg.appendChild(el('text',{x:M.l-6,y:y+4,'text-anchor':'end'},fmt?fmt(v):v.toFixed(2)));
+    }
+    svg.appendChild(el('line',{x1:M.l,x2:M.l,y1:M.t,y2:H-M.b,'class':'ax'}));
+    svg.appendChild(el('line',{x1:M.l,x2:W-M.r,y1:H-M.b,y2:H-M.b,'class':'ax'}));
+  }
+  function ref(svg,v,y0,y1,label){
+    var y=sy(v,y0,y1);
+    svg.appendChild(el('line',{x1:M.l,x2:W-M.r,y1:y,y2:y,'class':'ref'}));
+    if(label) svg.appendChild(el('text',{x:W-M.r-2,y:y-4,'text-anchor':'end'},label));
+  }
+  function bars(id,o){
+    var svg=document.getElementById(id); if(!svg) return; frame(svg);
+    yaxis(svg,o.y0,o.y1,o.step,o.fmt);
+    var n=o.labels.length, bw=(W-M.l-M.r)/n;
+    o.vals.forEach(function(v,i){
+      var x=M.l+i*bw+bw*0.22, w=bw*0.56, y=sy(v,o.y0,o.y1), y0=sy(o.y0,o.y0,o.y1);
+      var r=el('rect',{x:x,y:y,width:w,height:y0-y,'class':'bar'+(v<o.ref?' lo':'')});
+      r.appendChild(el('title',{},o.labels[i]+': '+v.toFixed(3)));
+      svg.appendChild(r);
+      svg.appendChild(el('text',{x:x+w/2,y:y-5,'text-anchor':'middle','class':'v'},v.toFixed(3)));
+      svg.appendChild(el('text',{x:x+w/2,y:H-M.b+16,'text-anchor':'middle'},o.labels[i]));
+    });
+    ref(svg,o.ref,o.y0,o.y1,'1.0 = no gain');
+    svg.appendChild(el('text',{x:M.l+(W-M.l-M.r)/2,y:H-6,'text-anchor':'middle'},o.xt));
+  }
+  function lines(id,o){
+    var svg=document.getElementById(id); if(!svg) return; frame(svg);
+    yaxis(svg,o.y0,o.y1,o.step,o.fmt);
+    var xs=o.xs, a=Math.min.apply(null,xs), b=Math.max.apply(null,xs), pad=(b-a)*0.04; a-=pad; b+=pad;
+    xs.forEach(function(x,i){
+      svg.appendChild(el('text',{x:sx(x,a,b),y:H-M.b+16,'text-anchor':'middle'},o.xl[i]));
+    });
+    if(o.ref!==undefined) ref(svg,o.ref,o.y0,o.y1,o.reflabel);
+    o.series.forEach(function(s,k){
+      var c=s.c, pts=s.v.map(function(v,i){return sx(xs[i],a,b)+','+sy(v,o.y0,o.y1);}).join(' ');
+      svg.appendChild(el('polyline',{points:pts,'class':'l'+c}));
+      s.v.forEach(function(v,i){
+        var ci=el('circle',{cx:sx(xs[i],a,b),cy:sy(v,o.y0,o.y1),r:3.5,'class':'m'+c});
+        ci.appendChild(el('title',{},s.n+' @ '+o.xl[i]+': '+(o.tfmt?o.tfmt(v):v)));
+        svg.appendChild(ci);
+      });
+      // legend
+      var lx=M.l+8+k*(o.lw||110), ly=M.t+6;
+      svg.appendChild(el('line',{x1:lx,x2:lx+18,y1:ly,y2:ly,'class':'l'+c}));
+      svg.appendChild(el('text',{x:lx+23,y:ly+4},s.n));
+    });
+    svg.appendChild(el('text',{x:M.l+(W-M.l-M.r)/2,y:H-6,'text-anchor':'middle'},o.xt));
+  }
+
+  // data (all from the CSVs / reports cited in the chapters)
+  var fair={ // S0 cycles, 4way cycles (final_fair_batch csv)
+    labels:['50 MB','7.5 GB','15 GB','103 GB'], s0:[24.4,51.8,60.7,94.3], w4:[26.8,28.3,29.6,47.8]};
+  var longr={ // total bases, S0 and 4way cycles (longread csvs + laptop_sweep 100/500)
+    bases:[346387,900057,1868769,4.7e6,25.4e6], s0:[94.1,200.5,346.8,813.6,3946.5], w4:[66.2,166.6,331.9,839.1,4310.7]};
+  var ladder={ // cycles at 2048,4096,16384,65536,262144,1048576 (size sweep csvs); normalised to 16384
+    '50 MB':[14.2,14.2,14.2,15.1,14.2,14.3],
+    '8 GB':[27.9,27.9,27.9,28.6,27.9,27.9],
+    '16 GB':[29.2,29.3,29.3,29.6,29.3,29.3],
+    '103 GB':[15.1,15.1,15.1,16.0,15.1,15.1]};
+  var hit={n:['16K','64K','262K','1M'], lru:[10.4,18.9,40.1,76.5], w4:[10.4,18.5,38.9,71.0], bel:[28.0,44.1,66.6,81.4]};
+
+  function drawAll(){
+    bars('c1',{labels:fair.labels,vals:fair.s0.map(function(v,i){return v/fair.w4[i];}),ref:1,y0:0,y1:2.4,step:0.4,xt:'Database (50 reads, simulated cycles, S0 / 4-way)'});
+    lines('c2',{xs:longr.bases.map(function(b){return Math.log10(b);}),xl:['0.35M','0.90M','1.87M','4.7M','25.4M'],
+      series:[{n:'4-way / S0 cycles',c:1,v:longr.w4.map(function(v,i){return v/longr.s0[i];})}],
+      y0:0.6,y1:1.2,step:0.1,ref:1,reflabel:'1.0 = equal',xt:'Total bases (log axis)',lw:150,tfmt:function(v){return v.toFixed(3);}});
+    var names=Object.keys(ladder), idx=2;
+    lines('c3',{xs:[0,1,2,3,4,5],xl:['2048','4096','16384','65536','262144','1048576'],
+      series:names.map(function(n,i){return {n:n,c:i+1,v:ladder[n].map(function(v){return v/ladder[n][idx];})};}),
+      y0:0.98,y1:1.08,step:0.02,ref:1,xt:'Pinned cache sets (cycles / cycles at 16384)',lw:90,tfmt:function(v){return v.toFixed(3);}});
+    lines('c4',{xs:[0,1,2,3],xl:hit.n,
+      series:[{n:'LRU',c:1,v:hit.lru},{n:'4-way LRU',c:2,v:hit.w4},{n:'Belady',c:3,v:hit.bel}],
+      y0:0,y1:100,step:20,fmt:function(v){return v+'%';},xt:'Cache entries (real 8 GB trace)',lw:110,tfmt:function(v){return v+'%';}});
+  }
+  drawAll();
+})();
+</script>
+</body>
+</html>
