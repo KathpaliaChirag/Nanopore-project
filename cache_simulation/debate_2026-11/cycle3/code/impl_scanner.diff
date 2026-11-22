@@ -1,0 +1,191 @@
+--- src_final/src/classify.cc	2026-11-23 09:54:21.418072117 +0530
++++ impl_scanner/src/classify.cc	2026-11-23 09:57:11.606061973 +0530
+@@ -12,6 +12,7 @@
+ #include "taxonomy.h"
+ #include "seqreader.h"
+ #include "mmscanner.h"
++#include "mmbulk.h"
+ #include "compact_hash.h"
+ #include "kraken2_data.h"
+ #include "aa_translate.h"
+@@ -808,7 +809,23 @@
+     }
+     // index of frame is 0 - 5 w/ tx search (or 0 if no tx search)
+     for (int frame_idx = 0; frame_idx < frame_ct; frame_idx++) {
+-      if (opts.use_translated_search) {
++      // K2_BULK: scalar bulk scanner (exact fallback to NextMinimizer otherwise)
++      static const bool bulk_env = (getenv("K2_BULK") != nullptr && atoi(getenv("K2_BULK")) == 1);
++      const bool use_bulk = bulk_env && ! opts.use_translated_search &&
++          BulkSupported(idx_opts.dna_db, idx_opts.revcom_version, (int64_t) idx_opts.k, (int64_t) idx_opts.l);
++      const size_t BULK_CHUNK = 4096;
++      static thread_local std::vector<uint64_t> bulk_mins;
++      static thread_local std::vector<uint8_t> bulk_amb;
++      BulkState bst; BulkParams bpar;
++      const std::string *bseq = nullptr;
++      size_t bcur = 0, bhave = 0; bool bdone = false;
++      if (use_bulk) {
++        if (bulk_mins.empty()) { bulk_mins.resize(BULK_CHUNK); bulk_amb.resize(BULK_CHUNK); }
++        BulkInitParams(bpar, (int64_t) idx_opts.k, (int64_t) idx_opts.l, idx_opts.spaced_seed_mask, idx_opts.toggle_mask);
++        bst.init();
++        bseq = (mate_num == 0 ? &dna.seq : &dna2.seq);
++      }
++      else if (opts.use_translated_search) {
+         scanner.LoadSequence(tx_frames[frame_idx]);
+       }
+       else {
+@@ -823,10 +840,23 @@
+       auto fill = [&](PfSlot *pf) -> int {
+         int n = 0;
+         while (n < la_batch) {
+-          minimizer_ptr = scanner.NextMinimizer();
+-          if (minimizer_ptr == nullptr) break;
+-          pf[n].min = *minimizer_ptr;
+-          pf[n].amb = scanner.is_ambiguous();
++          if (use_bulk) {
++            if (bcur == bhave) {
++              if (bdone) break;
++              bhave = ScanBulk(bst, bpar, bseq->data(), bseq->size(), bulk_mins.data(), bulk_amb.data(), BULK_CHUNK);
++              bcur = 0;
++              if (bhave == 0) { bdone = true; break; }
++            }
++            pf[n].min = bulk_mins[bcur];
++            pf[n].amb = bulk_amb[bcur] != 0;
++            bcur++;
++          }
++          else {
++            minimizer_ptr = scanner.NextMinimizer();
++            if (minimizer_ptr == nullptr) break;
++            pf[n].min = *minimizer_ptr;
++            pf[n].amb = scanner.is_ambiguous();
++          }
+           if (! pf[n].amb && pf[n].min != fill_last) {   // E6: a repeat of the previous minimizer never reads hc or idx in the resolve loop
+             fill_last = pf[n].min;
+             pf[n].hc = MurmurHash3(pf[n].min);
+--- src_final/src/Makefile	2026-11-23 09:54:21.404072118 +0530
++++ impl_scanner/src/Makefile	2026-11-23 09:57:11.617061972 +0530
+@@ -27,7 +27,7 @@
+ aa_translate.o: aa_translate.cc aa_translate.h
+ utilities.o: utilities.cc utilities.h
+ 
+-classify.o: classify.cc kraken2_data.h kv_store.h taxonomy.h seqreader.h mmscanner.h compact_hash.h aa_translate.h reports.h utilities.h readcounts.h
++classify.o: classify.cc mmbulk.h kraken2_data.h kv_store.h taxonomy.h seqreader.h mmscanner.h compact_hash.h aa_translate.h reports.h utilities.h readcounts.h
+ dump_table.o: dump_table.cc compact_hash.h taxonomy.h mmscanner.h kraken2_data.h reports.h
+ estimate_capacity.o: estimate_capacity.cc kv_store.h mmscanner.h seqreader.h utilities.h
+ build_db.o: build_db.cc taxonomy.h mmscanner.h seqreader.h compact_hash.h kv_store.h kraken2_data.h utilities.h
+--- /dev/null	2025-12-10 20:14:18.683999869 +0530
++++ impl_scanner/src/mmbulk.h	2026-11-23 09:57:11.247061994 +0530
+@@ -0,0 +1,114 @@
++// mmbulk.h: scalar bulk minimizer scanner, bit-identical (value, ambiguous) stream
++// to MinimizerScanner for dna, revcom_version != 0, k - l == 4 (5-slot window).
++#ifndef KRAKEN2_MMBULK_H_
++#define KRAKEN2_MMBULK_H_
++
++#include <cstdint>
++#include <cstddef>
++
++namespace kraken2 {
++
++struct BulkParams {
++  int64_t k, l;
++  uint64_t LM, SM, TG;   // l-mer mask, spaced seed (or ~0), toggle & LM
++  unsigned SH;           // 2*(l-1)
++};
++
++struct BulkState {
++  uint64_t lm, rc, run;
++  uint64_t c1, c2, c3, c4;   // ce_{t-1} .. ce_{t-4}
++  uint64_t p1, p2;           // pair mins p_{t-1}, p_{t-2}
++  uint64_t stale;
++  size_t i;                  // next char index
++  void init() {
++    lm = rc = run = 0;
++    c1 = c2 = c3 = c4 = p1 = p2 = ~0ull;
++    stale = ~0ull;
++    i = 0;
++  }
++};
++
++// true when the bulk path reproduces the old scanner exactly
++inline bool BulkSupported(bool dna, int revcom_version, int64_t k, int64_t l) {
++  return dna && revcom_version != 0 && k > l && (k - l) == 4 && l >= 2 && l <= 31;
++}
++
++inline void BulkInitParams(BulkParams &P, int64_t k, int64_t l,
++                           uint64_t spaced_seed_mask, uint64_t toggle_mask) {
++  P.k = k; P.l = l;
++  P.LM = (1ull << (2 * l)) - 1;
++  P.TG = toggle_mask & P.LM;
++  P.SM = spaced_seed_mask ? spaced_seed_mask : ~0ull;
++  P.SH = (unsigned) (2 * (l - 1));
++}
++
++struct BulkTable {
++  uint8_t t[256];
++  BulkTable() {
++    for (int i = 0; i < 256; i++) t[i] = 0xFF;
++    t[(int) 'A'] = t[(int) 'a'] = 0;
++    t[(int) 'C'] = t[(int) 'c'] = 1;
++    t[(int) 'G'] = t[(int) 'g'] = 2;
++    t[(int) 'T'] = t[(int) 't'] = 3;
++  }
++};
++inline const uint8_t *BulkTab() { static const BulkTable bt; return bt.t; }
++
++#define K2_BULK_MIN(a, b) ((a) < (b) ? (a) : (b))
++
++// Scan from st.i, writing up to max_items items (one per char from index k-1).
++// Returns items written; 0 means the sequence is finished.
++inline __attribute__((noinline))
++size_t ScanBulk(BulkState &st, const BulkParams &P, const char *s, size_t n,
++                uint64_t *mins, uint8_t *amb, size_t max_items) {
++  const uint8_t *tab = BulkTab();
++  const uint64_t LM = P.LM, SM = P.SM, TG = P.TG;
++  const unsigned SH = P.SH;
++  const uint64_t l = (uint64_t) P.l, km1 = (uint64_t) (P.k - 1);
++  uint64_t lm = st.lm, rc = st.rc, run = st.run;
++  uint64_t c1 = st.c1, c2 = st.c2, c3 = st.c3, c4 = st.c4, p1 = st.p1, p2 = st.p2;
++  uint64_t stale = st.stale;
++  size_t i = st.i, o = 0;
++
++#define K2_BULK_STEP                                                         \
++    const uint64_t code = tab[(uint8_t) s[i]];                               \
++    const uint64_t keep = (code <= 3) ? ~0ull : 0ull;                        \
++    const uint64_t cc = code & 3;                                            \
++    lm = (((lm << 2) | cc) & LM) & keep;                                     \
++    rc = ((rc >> 2) | ((3 - cc) << SH)) & keep;                              \
++    const uint64_t rn = run + 1;                                             \
++    run = keep & (rn < 64 ? rn : 64);                                        \
++    const uint64_t cand = ((lm < rc ? lm : rc) & SM) ^ TG;                   \
++    const bool valid = run >= l;                                             \
++    const uint64_t ce = valid ? cand : ~0ull;                                \
++    const uint64_t a1 = K2_BULK_MIN(ce, c1);                                 \
++    const uint64_t m = K2_BULK_MIN(K2_BULK_MIN(a1, p2), c4);                 \
++    c4 = c3; c3 = c2; c2 = c1; c1 = ce; p2 = p1; p1 = a1;
++
++  size_t warm_end = n < km1 ? n : (size_t) km1;
++  for (; i < warm_end; ++i) {
++    K2_BULK_STEP
++    (void) m;
++  }
++  size_t lim = i;
++  if (i < n) {
++    size_t rem = n - i;
++    lim = i + (rem < max_items ? rem : max_items);
++  }
++  for (; i < lim; ++i) {
++    K2_BULK_STEP
++    const uint64_t val = valid ? (m ^ TG) : stale;
++    stale = val;
++    mins[o] = val;
++    amb[o] = (uint8_t) (run < km1);
++    o++;
++  }
++#undef K2_BULK_STEP
++  st.lm = lm; st.rc = rc; st.run = run;
++  st.c1 = c1; st.c2 = c2; st.c3 = c3; st.c4 = c4; st.p1 = p1; st.p2 = p2;
++  st.stale = stale; st.i = i;
++  return o;
++}
++
++}  // namespace kraken2
++#endif

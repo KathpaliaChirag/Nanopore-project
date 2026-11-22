@@ -1,0 +1,195 @@
+--- src_final/src/kseq.h	2026-11-23 09:56:57.692062802 +0530
++++ impl_reader/src/kseq.h	2026-11-23 09:57:01.449062578 +0530
+@@ -47,7 +47,7 @@
+ #define __KS_TYPE(type_t)						\
+ 	typedef struct __kstream_t {				\
+ 		unsigned char *buf;						\
+-		int begin, end, is_eof;					\
++		int begin, end, is_eof; size_t cap;					\
+ 		type_t f;								\
+ 	} kstream_t;
+ 
+@@ -59,7 +59,7 @@
+ 	{																\
+ 		kstream_t *ks = (kstream_t*)calloc(1, sizeof(kstream_t));	\
+ 		ks->f = f;													\
+-		ks->buf = (unsigned char*)malloc(__bufsize);				\
++		ks->buf = (unsigned char*)malloc(__bufsize); ks->cap = __bufsize;				\
+ 		return ks;													\
+ 	}																\
+ 	static inline void ks_destroy(kstream_t *ks)					\
+--- src_final/src/seqreader.h	2026-11-23 09:56:57.689062803 +0530
++++ impl_reader/src/seqreader.h	2026-11-23 10:04:55.723034310 +0530
+@@ -12,6 +12,9 @@
+ #include <fcntl.h>
+ 
+ KSEQ_INIT(int, read)
++#ifdef K2_FAST_STATS
++static long g_fast_hit = 0, g_fast_miss = 0;
++#endif
+ 
+ namespace kraken2 {
+ 
+@@ -71,6 +74,7 @@
+     // max_size_ = 0;
+     file_format_ = SequenceFormat::FORMAT_AUTO_DETECT;
+     primary_ = true;
++    init_fast();
+   }
+ 
+   ~BatchSequenceReader() {
+@@ -102,12 +106,31 @@
+     // max_size_ = rhs.max_size_;
+     // seqs_ = rhs.seqs_;
+     primary_ = false;
++    fast_ = rhs.fast_;
++    fastbuf_ = rhs.fastbuf_;
+   }
+ 
+   bool LoadBlock(size_t block_size) {
+     size_t total = 0;
+     size_ = 0;
+     while (total < block_size) {
++      if (fast_) {
++        if (size_ == seqs_.size()) {
++          seqs_.resize(seqs_.size() + 1);
++        }
++        size_t slen = 0;
++        if (FastRecord(seqs_[size_], slen)) {
++#ifdef K2_FAST_STATS
++          ++g_fast_hit;
++#endif
++          total += slen;
++          size_++;
++          continue;
++        }
++      }
++#ifdef K2_FAST_STATS
++      if (fast_) ++g_fast_miss;
++#endif
+       if (kseq_read(kseq_) >= 0) {
+         if (size_ == seqs_.size()) {
+           seqs_.resize(seqs_.size() + 1);
+@@ -198,6 +221,122 @@
+   }
+ 
+   Multi *multi_;
++
++  // Option 4 fast path: parse one strict 4-line FASTQ record straight out of
++  // kseq's stream buffer into the Sequence strings (one copy instead of two).
++  // Returns false, without consuming anything, whenever the record is not
++  // strictly 4 lines or is not fully buffered even after refilling; the caller
++  // then runs the real kseq_read + copy_from_kseq on the untouched stream.
++  // Rules mirror kseq_read exactly (see round2_A_reader_design.md section 5).
++  bool FastRecord(Sequence& seq, size_t& slen)
++  {
++    if (kseq_->last_char != 0) return false;
++    kstream_t* ks = kseq_->f;
++    for (;;) {
++      int st = 1;  // 0 ok, 1 incomplete, 2 not strict
++      if (ks->begin < ks->end) {
++        const unsigned char* b = ks->buf;
++        const unsigned char* p = b + ks->begin;
++        const unsigned char* e = b + ks->end;
++        if (*p != '@') return false;
++        st = 1;
++        const unsigned char* n1 = (const unsigned char*)memchr(p, '\n', e - p);
++        if (n1) {
++          const unsigned char* q = p + 1;
++          while (q < n1 && !isspace(*q)) ++q;
++          const unsigned char* cs = (q < n1) ? q + 1 : n1;
++          const unsigned char* ce = n1;
++          if (ce - cs > 1 && ce[-1] == '\r') --ce;
++          const unsigned char* s = n1 + 1;
++          if (s < e) {
++            unsigned char ch = *s;
++            if (ch == '\n' || ch == '>' || ch == '+' || ch == '@') {
++              st = 2;
++            } else {
++              const unsigned char* n2 = (const unsigned char*)memchr(s, '\n', e - s);
++              if (n2) {
++                const unsigned char* se = n2;
++                if (se - s > 1 && se[-1] == '\r') --se;
++                const unsigned char* t = n2 + 1;
++                if (t < e) {
++                  if (*t != '+') {
++                    st = 2;
++                  } else {
++                    const unsigned char* n3 = (const unsigned char*)memchr(t, '\n', e - t);
++                    const unsigned char* u = n3 ? n3 + 1 : e;
++                    if (n3 && u < e) {
++                      const unsigned char* n4 = (const unsigned char*)memchr(u, '\n', e - u);
++                      if (n4) {
++                        const unsigned char* qe = n4;
++                        if (qe - u > 1 && qe[-1] == '\r') --qe;
++                        if ((size_t)(qe - u) != (size_t)(se - s)) {
++                          st = 2;
++                        } else {
++                          seq.header.assign((const char*)p + 1, q - (p + 1));
++                          seq.comment.assign((const char*)cs, ce > cs ? ce - cs : 0);
++                          seq.seq.assign((const char*)s, se - s);
++                          if (kseq_->skip_qual) seq.quals.clear();
++                          else seq.quals.assign((const char*)u, qe - u);
++                          // slen > 0 here (empty seq lines were rejected above)
++                          seq.format = SequenceFormat::FORMAT_FASTQ;
++                          file_format_ = SequenceFormat::FORMAT_FASTQ;
++                          slen = (size_t)(se - s);
++                          ks->begin = (int)(n4 + 1 - b);
++                          return true;
++                        }
++                      }
++                    }
++                  }
++                }
++              }
++            }
++          }
++        }
++      }
++      if (st == 2) return false;
++      if (!FastFill(ks)) return false;
++    }
++  }
++
++  // Compact the unread bytes to the buffer start and read more (growing the
++  // buffer when the partial record fills it). Same state transitions as
++  // kseq's own refill: is_eof is set when read() returns 0.
++  bool FastFill(kstream_t* ks)
++  {
++    if (ks->is_eof) return false;
++    size_t rem = (size_t)(ks->end - ks->begin);
++    if (ks->begin > 0 && rem > 0) memmove(ks->buf, ks->buf + ks->begin, rem);
++    ks->begin = 0;
++    ks->end = (int)rem;
++    size_t want = ks->cap;
++    if (want < fastbuf_) want = fastbuf_;
++    while (want - rem < want / 4) want *= 2;
++    if (want > ((size_t)1 << 30)) return false;
++    if (want != ks->cap) {
++      unsigned char* nb = (unsigned char*)realloc(ks->buf, want);
++      if (!nb) return false;
++      ks->buf = nb;
++      ks->cap = want;
++    }
++    ssize_t n = read(ks->f, ks->buf + rem, ks->cap - rem);
++    if (n < 0) return false;
++    if (n == 0) { ks->is_eof = 1; return false; }
++    ks->end = (int)(rem + (size_t)n);
++    return true;
++  }
++
++  void init_fast()
++  {
++    const char* v = getenv("K2_FASTREAD");
++    fast_ = !(v && v[0] == '0');
++    fastbuf_ = 65536;
++    const char* w = getenv("K2_FASTBUF");
++    if (w && atol(w) > 0) fastbuf_ = (size_t)atol(w);
++  }
++
++  bool fast_ = false;
++  size_t fastbuf_ = 65536;
++
+   void copy_from_kseq(Sequence& seq)
+   {
+     seq.header.assign(kseq_->name.s, kseq_->name.l);
