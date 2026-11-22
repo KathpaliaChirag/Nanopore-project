@@ -1,0 +1,68 @@
+== 8GB full
+# started on Mon Nov 23 08:00:03 2026
+
+
+ Performance counter stats for '/home/student/e1/bin_dedup/kraken2 --db /home/student/chirag_K/AccuracyDrift/databases/standard_8gb --threads 48 --output /dev/null --report /home/student/e1/e.rep /home/student/chirag_K/results/per_pod5_fastq/pod5_0.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_10.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_11.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_12.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_13.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_14.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_15.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_1.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_2.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_3.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_4.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_5.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_6.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_7.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_8.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_9.fastq':
+
+ 6,99,32,92,07,810      cycles                                                                
+16,14,72,14,07,073      instructions                     #    2.31  insn per cycle            
+ 2,83,11,48,47,003      branches                                                              
+    7,87,47,99,508      branch-misses                    #    2.78% of all branches           
+
+       6.993636375 seconds time elapsed
+
+     214.766002000 seconds user
+      13.292928000 seconds sys
+
+
+== 8GB r10
+# started on Mon Nov 23 08:00:10 2026
+
+
+ Performance counter stats for '/home/student/e1/bin_dedup/kraken2 --db /home/student/chirag_K/AccuracyDrift/databases/standard_8gb --threads 48 --output /dev/null --report /home/student/e1/e.rep /home/student/chirag_K/results/readcount_bench/reads_10.fastq':
+
+   21,22,12,54,271      cycles                                                                
+    1,62,10,16,524      instructions                     #    0.08  insn per cycle            
+      34,14,82,837      branches                                                              
+         13,61,302      branch-misses                    #    0.40% of all branches           
+
+       0.275500559 seconds time elapsed
+
+       0.650031000 seconds user
+       6.322305000 seconds sys
+
+
+== 103GB full
+# started on Mon Nov 23 08:00:10 2026
+
+
+ Performance counter stats for '/home/student/e1/bin_dedup/kraken2 --db /home/student/chirag_K/AccuracyDrift/databases/pluspf_103gb --threads 48 --output /dev/null --report /home/student/e1/e.rep /home/student/chirag_K/results/per_pod5_fastq/pod5_0.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_10.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_11.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_12.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_13.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_14.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_15.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_1.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_2.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_3.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_4.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_5.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_6.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_7.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_8.fastq /home/student/chirag_K/results/per_pod5_fastq/pod5_9.fastq':
+
+11,73,47,39,41,606      cycles                                                                
+18,70,25,08,57,367      instructions                     #    1.59  insn per cycle            
+ 3,36,26,87,97,390      branches                                                              
+    8,78,96,41,162      branch-misses                    #    2.61% of all branches           
+
+      10.844806922 seconds time elapsed
+
+     271.719243000 seconds user
+     108.895555000 seconds sys
+
+
+== 103GB r10
+# started on Mon Nov 23 08:00:21 2026
+
+
+ Performance counter stats for '/home/student/e1/bin_dedup/kraken2 --db /home/student/chirag_K/AccuracyDrift/databases/pluspf_103gb --threads 48 --output /dev/null --report /home/student/e1/e.rep /home/student/chirag_K/results/readcount_bench/reads_10.fastq':
+
+ 3,05,47,49,60,683      cycles                                                                
+   20,29,96,60,698      instructions                     #    0.07  insn per cycle            
+    3,97,74,34,553      branches                                                              
+         52,37,559      branch-misses                    #    0.13% of all branches           
+
+       3.582353603 seconds time elapsed
+
+       0.849960000 seconds user
+      98.059487000 seconds sys
+
+
