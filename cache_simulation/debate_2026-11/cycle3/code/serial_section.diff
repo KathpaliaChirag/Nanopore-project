@@ -1,0 +1,105 @@
+--- src_dedup/src/kseq.h	2026-11-23 07:13:46.503646403 +0530
++++ src_serial/src/kseq.h	2026-11-23 09:39:41.568124560 +0530
+@@ -27,6 +27,9 @@
+ 
+ #ifndef AC_KSEQ_H
+ #define AC_KSEQ_H
++#ifdef __cplusplus
++inline int& k2_skip_qual() { static int v = 0; return v; }
++#endif
+ 
+ #include <ctype.h>
+ #include <string.h>
+@@ -142,7 +145,31 @@
+ 		return str->l;													\
+ 	} \
+ 	static inline int ks_getuntil(kstream_t *ks, int delimiter, kstring_t *str, int *dret) \
+-	{ return ks_getuntil2(ks, delimiter, str, dret, 0); }
++	{ return ks_getuntil2(ks, delimiter, str, dret, 0); } \
++	static int ks_skipline(kstream_t *ks, size_t *tot) \
++	{ \
++		int gotany = 0; unsigned char lastc = 0; \
++		for (;;) { \
++			int i; \
++			if (ks->begin >= ks->end) { \
++				if (!ks->is_eof) { \
++					ks->begin = 0; \
++					ks->end = __read(ks->f, ks->buf, __bufsize); \
++					if (ks->end == 0) { ks->is_eof = 1; break; } \
++				} else break; \
++			} \
++			{ unsigned char *mp_ = (unsigned char*)memchr(ks->buf + ks->begin, 10, (size_t)(ks->end - ks->begin)); \
++			  i = mp_ ? (int)(mp_ - ks->buf) : ks->end; } \
++			gotany = 1; \
++			if (i > ks->begin) lastc = ks->buf[i-1]; \
++			*tot += (size_t)(i - ks->begin); \
++			ks->begin = i + 1; \
++			if (i < ks->end) break; \
++		} \
++		if (!gotany && ks_eof(ks)) return -1; \
++		if (*tot > 1 && lastc == 13) --*tot; \
++		return (int)*tot; \
++	}
+ 
+ #define KSTREAM_INIT(type_t, __read, __bufsize) \
+ 	__KS_TYPE(type_t)							\
+@@ -156,6 +183,7 @@
+ 	SCOPE kseq_t *kseq_init(type_t fd)									\
+ 	{																	\
+ 		kseq_t *s = (kseq_t*)calloc(1, sizeof(kseq_t));					\
++		s->skip_qual = k2_skip_qual();						\
+ 		s->f = ks_init(fd);												\
+ 		return s;														\
+ 	}																	\
+@@ -182,7 +210,7 @@
+ 			if (c == -1) return -1; /* end of file */ \
+ 			seq->last_char = c; \
+ 		} /* else: the first header char has been read in the previous call */ \
+-		seq->comment.l = seq->seq.l = seq->qual.l = 0; /* reset all members */ \
++		seq->comment.l = seq->seq.l = seq->qual.l = 0; seq->qual_len = 0; /* reset all members */ \
+ 		if (ks_getuntil(ks, 0, &seq->name, &c) < 0) return -1; /* normal exit: EOF */ \
+ 		if (c != '\n') ks_getuntil(ks, KS_SEP_LINE, &seq->comment, 0); /* read FASTA/Q comment */ \
+ 		if (seq->seq.s == 0) { /* we can do this in the loop below, but that is slower */ \
+@@ -208,6 +236,7 @@
+ 		} \
+ 		while ((c = ks_getc(ks)) != -1 && c != '\n'); /* skip the rest of '+' line */ \
+ 		if (c == -1) return -2; /* error: no quality string */ \
++		if (seq->skip_qual) { size_t ql_ = 0; while (ks_skipline(ks, &ql_) >= 0 && ql_ < seq->seq.l); seq->last_char = 0; seq->qual.l = 0; seq->qual_len = ql_; if (seq->seq.l != ql_) return -2; return seq->seq.l; } \
+ 		while (ks_getuntil2(ks, KS_SEP_LINE, &seq->qual, 0, 1) >= 0 && seq->qual.l < seq->seq.l); \
+ 		seq->last_char = 0;	/* we have not come to the next header line */ \
+ 		if (seq->seq.l != seq->qual.l) return -2; /* error: qual string is of a different length */ \
+@@ -217,6 +246,7 @@
+ #define __KSEQ_TYPE(type_t)						\
+ 	typedef struct {							\
+ 		kstring_t name, comment, seq, qual;		\
++		int skip_qual; size_t qual_len;			\
+ 		int last_char;							\
+ 		kstream_t *f;							\
+ 	} kseq_t;
+--- src_dedup/src/seqreader.h	2026-11-23 07:13:46.500646403 +0530
++++ src_serial/src/seqreader.h	2026-11-23 09:39:41.568124560 +0530
+@@ -203,12 +203,11 @@
+     seq.header.assign(kseq_->name.s, kseq_->name.l);
+     seq.comment.assign(kseq_->comment.s, kseq_->comment.l);
+     seq.seq.assign(kseq_->seq.s, kseq_->seq.l);
+-    seq.seq.shrink_to_fit();
+ 
+-    if (kseq_->qual.l > 0) {
++    if (kseq_->qual.l > 0 || kseq_->qual_len > 0) {
+       file_format_ = SequenceFormat::FORMAT_FASTQ;
+       seq.format = SequenceFormat::FORMAT_FASTQ;
+-      seq.quals.assign(kseq_->qual.s, kseq_->qual.l);
++      if (kseq_->qual.l > 0) seq.quals.assign(kseq_->qual.s, kseq_->qual.l); else seq.quals.clear();
+     } else {
+       file_format_ = SequenceFormat::FORMAT_FASTA;
+       seq.format = SequenceFormat::FORMAT_FASTA;
+--- src_dedup/src/classify.cc	2026-11-23 07:13:46.508646402 +0530
++++ src_serial/src/classify.cc	2026-11-23 09:39:41.568124560 +0530
+@@ -489,6 +489,7 @@
+   uint64_t next_output_block_id = 0;
+   omp_lock_t output_lock;
+   omp_init_lock(&output_lock);
++  k2_skip_qual() = (opts.minimum_quality_score == 0 && opts.classified_output_filename.empty() && opts.unclassified_output_filename.empty() && ! getenv("K2_KEEPQ")) ? 1 : 0;
+   BatchSequenceReader r1(filename1);
+   if (filename1 != nullptr && g_extra_files != nullptr)
+     for (const std::string &f : *g_extra_files)
