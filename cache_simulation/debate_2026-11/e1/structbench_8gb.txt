@@ -1,0 +1,28 @@
+CAP=2147483647 gcd(CAP,3)=1 M=1503238552
+BUILD cap=2^31 scheme=linear build_s=5.5 failed_inserts=0 (0.0000% of keys) lines_hit=1.073 lines_miss=1.316
+RESULT cap=2^31 T=1 miss=0.00 scheme=linear ns_per_lookup_per_thread=37.3 agg_Mlookups_s=26.8 found_frac=1.000 (best of 3)
+RESULT cap=2^31 T=1 miss=0.13 scheme=linear ns_per_lookup_per_thread=28.5 agg_Mlookups_s=35.1 found_frac=0.870 (best of 3)
+RESULT cap=2^31 T=1 miss=1.00 scheme=linear ns_per_lookup_per_thread=52.6 agg_Mlookups_s=19.0 found_frac=0.000 (best of 3)
+RESULT cap=2^31 T=32 miss=0.00 scheme=linear ns_per_lookup_per_thread=73.8 agg_Mlookups_s=433.7 found_frac=1.000 (best of 3)
+RESULT cap=2^31 T=32 miss=0.13 scheme=linear ns_per_lookup_per_thread=82.5 agg_Mlookups_s=387.9 found_frac=0.870 (best of 3)
+RESULT cap=2^31 T=32 miss=1.00 scheme=linear ns_per_lookup_per_thread=135.6 agg_Mlookups_s=236.0 found_frac=0.000 (best of 3)
+BUILD cap=2^31 scheme=double build_s=8.5 failed_inserts=1 (0.0000% of keys) lines_hit=1.718 lines_miss=3.333
+RESULT cap=2^31 T=1 miss=0.00 scheme=double ns_per_lookup_per_thread=53.1 agg_Mlookups_s=18.8 found_frac=1.000 (best of 3)
+RESULT cap=2^31 T=1 miss=0.00 scheme=double+pf2 ns_per_lookup_per_thread=49.3 agg_Mlookups_s=20.3 found_frac=1.000 (best of 3)
+RESULT cap=2^31 T=1 miss=0.13 scheme=double ns_per_lookup_per_thread=65.5 agg_Mlookups_s=15.3 found_frac=0.870 (best of 3)
+RESULT cap=2^31 T=1 miss=0.13 scheme=double+pf2 ns_per_lookup_per_thread=56.4 agg_Mlookups_s=17.7 found_frac=0.870 (best of 3)
+RESULT cap=2^31 T=1 miss=1.00 scheme=double ns_per_lookup_per_thread=111.3 agg_Mlookups_s=9.0 found_frac=0.000 (best of 3)
+RESULT cap=2^31 T=1 miss=1.00 scheme=double+pf2 ns_per_lookup_per_thread=96.4 agg_Mlookups_s=10.4 found_frac=0.000 (best of 3)
+RESULT cap=2^31 T=32 miss=0.00 scheme=double ns_per_lookup_per_thread=124.7 agg_Mlookups_s=256.6 found_frac=1.000 (best of 3)
+RESULT cap=2^31 T=32 miss=0.00 scheme=double+pf2 ns_per_lookup_per_thread=120.7 agg_Mlookups_s=265.1 found_frac=1.000 (best of 3)
+RESULT cap=2^31 T=32 miss=0.13 scheme=double ns_per_lookup_per_thread=151.0 agg_Mlookups_s=211.9 found_frac=0.870 (best of 3)
+RESULT cap=2^31 T=32 miss=0.13 scheme=double+pf2 ns_per_lookup_per_thread=130.6 agg_Mlookups_s=245.0 found_frac=0.870 (best of 3)
+RESULT cap=2^31 T=32 miss=1.00 scheme=double ns_per_lookup_per_thread=243.7 agg_Mlookups_s=131.3 found_frac=0.000 (best of 3)
+RESULT cap=2^31 T=32 miss=1.00 scheme=double+pf2 ns_per_lookup_per_thread=203.1 agg_Mlookups_s=157.5 found_frac=0.000 (best of 3)
+BUILD cap=2^31 scheme=aligned build_s=11.6 failed_inserts=0 (0.0000% of keys) lines_hit=1.016 lines_miss=1.154
+RESULT cap=2^31 T=1 miss=0.00 scheme=aligned ns_per_lookup_per_thread=33.8 agg_Mlookups_s=29.6 found_frac=1.000 (best of 3)
+RESULT cap=2^31 T=1 miss=0.13 scheme=aligned ns_per_lookup_per_thread=36.1 agg_Mlookups_s=27.7 found_frac=0.870 (best of 3)
+RESULT cap=2^31 T=1 miss=1.00 scheme=aligned ns_per_lookup_per_thread=51.5 agg_Mlookups_s=19.4 found_frac=0.000 (best of 3)
+RESULT cap=2^31 T=32 miss=0.00 scheme=aligned ns_per_lookup_per_thread=70.9 agg_Mlookups_s=451.2 found_frac=1.000 (best of 3)
+RESULT cap=2^31 T=32 miss=0.13 scheme=aligned ns_per_lookup_per_thread=72.4 agg_Mlookups_s=441.7 found_frac=0.870 (best of 3)
+RESULT cap=2^31 T=32 miss=1.00 scheme=aligned ns_per_lookup_per_thread=98.8 agg_Mlookups_s=324.1 found_frac=0.000 (best of 3)

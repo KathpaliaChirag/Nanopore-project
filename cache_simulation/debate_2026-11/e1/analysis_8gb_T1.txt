@@ -1,0 +1,59 @@
+lookups 12237762  hit_share 0.8675
+unique slots 2270742 (0.1856 of lookups)  unique 64B lines 2251471 (0.1840)
+global repeat rate 0.8144
+top-1024 slots cover 0.0763 of lookups
+top-16384 slots cover 0.1253 of lookups
+top-65536 slots cover 0.2417 of lookups
+top-262144 slots cover 0.5583 of lookups
+top-1048576 slots cover 0.9001 of lookups
+cold(first-touch) 2270742
+reuse-distance histogram (distinct slots between reuses), bucket 2^b:
+  <2^0  :     15738  (0.0016 of repeats, cum 0.0016)
+  <2^1  :    479013  (0.0481 of repeats, cum 0.0496)
+  <2^2  :    150577  (0.0151 of repeats, cum 0.0647)
+  <2^3  :     79122  (0.0079 of repeats, cum 0.0727)
+  <2^4  :     23498  (0.0024 of repeats, cum 0.0750)
+  <2^5  :     17053  (0.0017 of repeats, cum 0.0768)
+  <2^6  :     19131  (0.0019 of repeats, cum 0.0787)
+  <2^7  :     25105  (0.0025 of repeats, cum 0.0812)
+  <2^8  :     33663  (0.0034 of repeats, cum 0.0846)
+  <2^9  :     33731  (0.0034 of repeats, cum 0.0880)
+  <2^10 :     37390  (0.0038 of repeats, cum 0.0917)
+  <2^11 :     37203  (0.0037 of repeats, cum 0.0954)
+  <2^12 :     50975  (0.0051 of repeats, cum 0.1006)
+  <2^13 :     90550  (0.0091 of repeats, cum 0.1096)
+  <2^14 :    178816  (0.0179 of repeats, cum 0.1276)
+  <2^15 :    364255  (0.0365 of repeats, cum 0.1641)
+  <2^16 :    681504  (0.0684 of repeats, cum 0.2325)
+  <2^17 :   1042111  (0.1046 of repeats, cum 0.3371)
+  <2^18 :   1548798  (0.1554 of repeats, cum 0.4924)
+  <2^19 :   2294597  (0.2302 of repeats, cum 0.7227)
+  <2^20 :   2153764  (0.2161 of repeats, cum 0.9388)
+  <2^21 :    608674  (0.0611 of repeats, cum 0.9998)
+  <2^22 :      1752  (0.0002 of repeats, cum 1.0000)
+LRU fully-assoc hit rate (stack distance<N):
+  N=4096     0.0819
+  N=16384    0.1039
+  N=65536    0.1894
+  N=262144   0.4011
+  N=1048576  0.7646
+  N=4194304  0.8144
+windowed dedup (lookups removable inside non-overlapping windows):
+  W=10000     0.0822
+  W=100000    0.1543
+  W=1000000   0.4373
+  W=10000000  0.7580
+Belady (OPT) fully-assoc hit rate:
+  N=4096     0.1792
+  N=16384    0.2801
+  N=65536    0.4406
+  N=262144   0.6660
+  N=1048576  0.8144
+  N=4194304  0.8144
+4-way set-assoc LRU hit rate (murmur-mixed set index):
+  N=4096     0.0817
+  N=16384    0.1039
+  N=65536    0.1849
+  N=262144   0.3894
+  N=1048576  0.7104
+  N=4194304  0.8110

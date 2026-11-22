@@ -1,0 +1,11 @@
+782a783,790
+> #include <unistd.h>
+> #include <sys/syscall.h>
+> #include <cstdio>
+> static const bool e1_on = getenv("K2_TRACE") != nullptr;
+> struct E1Tr { FILE *f=nullptr; uint64_t buf[1<<16]; size_t n=0;
+>   void add(uint64_t v){ if(!f){ char p[128]; snprintf(p,sizeof p,"%s_%ld.bin",getenv("K2_TRACE"),(long)syscall(SYS_gettid)); f=fopen(p,"wb"); } buf[n++]=v; if(n==(1<<16)){ fwrite(buf,8,n,f); n=0; } }
+>   ~E1Tr(){ if(f){ fwrite(buf,8,n,f); fclose(f);} } };
+> static thread_local E1Tr e1_tr;
+859a868
+>                 if (e1_on) e1_tr.add((uint64_t)pf[i].idx | ((uint64_t)(taxon!=0) << 63));
