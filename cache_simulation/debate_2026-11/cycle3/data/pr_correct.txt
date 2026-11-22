@@ -1,0 +1,10 @@
+8GB tiny10 OUT_OK REP_BYTE_IDENTICAL | K2_PREAD: on (ok), 1 chunks of 4194304 bytes
+8GB reads1000 OUT_OK REP_BYTE_IDENTICAL | K2_PREAD: on (ok), 14 chunks of 4194304 bytes
+8GB tiny10_chunk64k OUT_OK REP_BYTE_IDENTICAL | K2_PREAD: on (ok), 14 chunks of 65536 bytes
+8GB reads1000_chunk4k OUT_OK REP_BYTE_IDENTICAL | K2_PREAD: on (ok), 14184 chunks of 4096 bytes
+50MB full_chunk64k OUT_OK REP_BYTE_IDENTICAL | K2_PREAD: on (ok), 191409 chunks of 65536 bytes
+50MB full_chunk1M OUT_OK REP_BYTE_IDENTICAL | K2_PREAD: on (ok), 11968 chunks of 1048576 bytes
+50MB full_default OUT_OK REP_BYTE_IDENTICAL | K2_PREAD: on (ok), 2998 chunks of 4194304 bytes
+8GB full_default OUT_OK REP_BYTE_IDENTICAL | K2_PREAD: on (ok), 2998 chunks of 4194304 bytes
+16GB full_default OUT_OK REP_BYTE_IDENTICAL | K2_PREAD: on (ok), 2998 chunks of 4194304 bytes
+103GB full_default OUT_OK REP_BYTE_IDENTICAL | K2_PREAD: on (ok), 2998 chunks of 4194304 bytes
