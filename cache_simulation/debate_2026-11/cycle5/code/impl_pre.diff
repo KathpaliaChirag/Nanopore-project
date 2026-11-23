@@ -1,0 +1,305 @@
+--- impl_all/src/preadfq.h	2026-11-23 14:50:27.805013158 +0530
++++ impl_pre/src/preadfq.h	2026-11-23 16:25:26.852673468 +0530
+@@ -12,6 +12,9 @@
+ #include <fcntl.h>
+ #include <sys/stat.h>
+ #include <sys/types.h>
++#include <sys/mman.h>
++#include <type_traits>
++#include <thread>
+ #include <vector>
+ #include <string>
+ #include <algorithm>
+@@ -42,6 +45,9 @@
+ };
+ 
+ // parse one strict record starting at pos. on PR_OK sets rec and next (start of the following record, or len).
++// CHECK=true (used only with NullSink, which ignores rec): skip the name/comment split, which cannot change the outcome
++// (it never returns PR_BAD/PR_MORE); every accept/reject/more decision is identical to CHECK=false.
++template <bool CHECK = false>
+ static inline int parse_record(const Buf &b, size_t pos, Rec &r, size_t &next) {
+   const char *p = b.p;
+   if (pos >= b.len) return b.eof ? PR_BAD : PR_MORE;
+@@ -49,17 +55,20 @@
+   size_t l1, l2, l3, l4;
+   int rc = line_end(b, pos, l1); if (rc != PR_OK) return rc;
+   if (l1 >= b.len) return PR_BAD;              // header at eof with nothing after it
+-  // header: name up to first isspace byte, comment = rest of the line after that one byte
+-  size_t i = pos + 1;
+-  while (i < l1 && !is_sp((unsigned char)p[i])) i++;
+-  r.name = p + pos + 1; r.nl = i - (pos + 1);
+-  if (i >= l1) { r.com = p + l1; r.cl = 0; }
+-  else { r.com = p + i + 1; r.cl = effl(p + i + 1, l1 - (i + 1)); }
++  if (!CHECK) {
++    // header: name up to first isspace byte, comment = rest of the line after that one byte
++    size_t i = pos + 1;
++    while (i < l1 && !is_sp((unsigned char)p[i])) i++;
++    r.name = p + pos + 1; r.nl = i - (pos + 1);
++    if (i >= l1) { r.com = p + l1; r.cl = 0; }
++    else { r.com = p + i + 1; r.cl = effl(p + i + 1, l1 - (i + 1)); }
++  }
+   size_t s1 = l1 + 1;
+   if (s1 >= b.len) return b.eof ? PR_BAD : PR_MORE;
+   rc = line_end(b, s1, l2); if (rc != PR_OK) return rc;
+   if (l2 > s1 && (p[s1] == '@' || p[s1] == '+' || p[s1] == '>')) return PR_BAD;
+-  r.seq = p + s1; r.sl = effl(p + s1, l2 - s1);
++  r.sl = effl(p + s1, l2 - s1);
++  if (!CHECK) r.seq = p + s1;
+   if (l2 >= b.len) return PR_BAD;
+   size_t s2 = l2 + 1;
+   if (s2 >= b.len) return b.eof ? PR_BAD : PR_MORE;
+@@ -74,7 +83,8 @@
+     return PR_BAD;
+   }
+   rc = line_end(b, s3, l4); if (rc != PR_OK) return rc;
+-  r.qual = p + s3; r.ql = effl(p + s3, l4 - s3);
++  r.ql = effl(p + s3, l4 - s3);
++  if (!CHECK) r.qual = p + s3;
+   if (r.ql != r.sl) return PR_BAD;
+   next = (l4 < b.len) ? l4 + 1 : b.len;
+   return PR_OK;
+@@ -139,6 +149,8 @@
+   return false;
+ }
+ 
++struct NullSink;
++
+ // parse all records that start inside [off_s, off_e). sink gets add(...) calls in file order.
+ // guard: the end of the last record must equal find_start(off_e) (what the next chunk will use as its start).
+ template <class Sink>
+@@ -167,7 +179,7 @@
+       return PR_BAD;
+     }
+     Rec r; size_t next;
+-    int rc = parse_record(b, pos, r, next);
++    int rc = parse_record<std::is_same<Sink, NullSink>::value>(b, pos, r, next);
+     if (rc == PR_MORE) return PR_MORE;
+     if (rc != PR_OK) {
+       if (can_tail) { sink.tail(b.p + pos, b.len - pos); return PR_OK; }
+@@ -217,6 +229,32 @@
+   }
+ }
+ 
++// same as read_chunk but the chunk bytes are read through a private read-only mmap of the file (no copy into a buffer).
++// the Buf handed to process_chunk covers exactly the same byte range as read_chunk's buffer (same base, same want, same eof flag),
++// so every decision is identical. falls back to read_chunk (pread) for this chunk when mmap fails.
++template <class Sink>
++static int read_chunk_mm(int fd, uint64_t fsize, uint64_t k, uint64_t B, std::vector<char> &buf,
++                         Sink &sink, std::string *err, bool populate, uint64_t init_tail = 64 * 1024) {
++  static const uint64_t PG = 4096;   // alignment for the mapping offset; 4096 divides every page size we run on
++  uint64_t off_s = k * B, off_e = std::min(off_s + B, fsize);
++  uint64_t base = off_s ? off_s - 1 : 0;
++  uint64_t tail = init_tail;
++  for (;;) {
++    uint64_t want = (off_e - base) + tail;
++    if (base + want > fsize) want = fsize - base;
++    uint64_t amap = base & ~(PG - 1);
++    size_t mlen = (size_t)(want + (base - amap));
++    void *m = mmap(nullptr, mlen, PROT_READ, MAP_PRIVATE | (populate ? MAP_POPULATE : 0), fd, (off_t)amap);
++    if (m == MAP_FAILED) return read_chunk(fd, fsize, k, B, buf, sink, err, init_tail);
++    madvise(m, mlen, MADV_SEQUENTIAL);
++    Buf b = { (const char *)m + (base - amap), (size_t)want, base + want == fsize };
++    int rc = process_chunk(b, base, off_s, off_e, fsize, sink, err);
++    munmap(m, mlen);
++    if (rc != PR_MORE) return rc;
++    tail *= 4;
++  }
++}
++
+ struct NullSink { void begin() {} void add(const Rec &) {} void tail(const char *, size_t) {} };
+ // (classify.cc runs read_chunk with a NullSink over every chunk before any output exists: tail damage is accepted, any other BAD
+ // makes the whole run use the stock kseq path)
+@@ -279,6 +317,27 @@
+   }
+ };
+ 
++// pre-pass worker: takes chunk tickets from *ticket until none are left (or damage was found) and runs the NullSink parse on each.
++// mm: read through mmap (else pread). *bad is set to 1 when any chunk is not PR_OK (non-tail damage). used by both the
++// OpenMP inline pre-pass and the overlapped std::thread pool, so both make the same decision.
++static inline void prescan_worker(const Plan &plan, uint64_t *ticket, int *bad, bool mm, bool populate, bool verbose) {
++  std::vector<char> pbuf;
++  NullSink ns;
++  for (;;) {
++    uint64_t pt = __atomic_fetch_add(ticket, (uint64_t) 1, __ATOMIC_RELAXED);
++    if (pt >= plan.total) break;
++    if (__atomic_load_n(bad, __ATOMIC_RELAXED)) continue;   // drain remaining tickets quickly
++    size_t pf; uint64_t pk; std::string perr;
++    plan.Locate(pt, pf, pk);
++    int rc = mm ? read_chunk_mm(plan.fds[pf], plan.sizes[pf], pk, plan.B, pbuf, ns, &perr, populate)
++                : read_chunk(plan.fds[pf], plan.sizes[pf], pk, plan.B, pbuf, ns, &perr);
++    if (rc != PR_OK) {
++      __atomic_store_n(bad, 1, __ATOMIC_RELAXED);
++      if (verbose) fprintf(stderr, "K2_PREAD: prescan found damage in chunk %lld: %s\n", (long long) pt, perr.c_str());
++    }
++  }
++}
++
+ }  // namespace k2pread
+ 
+ #endif
+--- impl_all/src/classify.cc	2026-11-23 14:50:27.811013157 +0530
++++ impl_pre/src/classify.cc	2026-11-23 16:25:27.242673445 +0530
+@@ -6,6 +6,9 @@
+ 
+ #include <sys/wait.h>
+ #include <sys/types.h>
++#include <functional>
++#include <memory>
++#include <thread>
+ 
+ #include "kraken2_headers.h"
+ #include "kv_store.h"
+@@ -120,6 +123,56 @@
+ // S8: extra input files to stream after the first (unpaired mode only).
+ static const std::vector<std::string> *g_extra_files = nullptr;
+ 
++// I6: pre-pass overlapped with the database load. the pre-pass only needs the input file list, known right after option parsing,
++// so main() starts it before load_index() and ProcessFiles() joins it. same decision as the inline pre-pass (same worker code).
++// K2_PRESCAN_OVERLAP=0 disables the overlap (pre-pass then runs inline in ProcessFiles as before), K2_PRESCAN_THREADS (default 16)
++// bounds the pool so the load is not starved, K2_PRESCAN_MMAP=0 reads through pread instead of mmap, K2_PRESCAN_POPULATE=0
++// drops MAP_POPULATE.
++static bool env_on(const char *name, bool def) {
++  const char *e = getenv(name);
++  if (e == nullptr) return def;
++  return strcmp(e, "0") != 0;
++}
++
++struct PrescanJob {
++  std::vector<std::string> files;
++  uint64_t chunk;
++  k2pread::Plan plan;
++  bool init_ok;
++  std::string why;
++  int bad;
++  uint64_t ticket;
++  std::thread launcher;
++  PrescanJob() : chunk(0), init_ok(false), bad(0), ticket(0) {}
++};
++static PrescanJob *g_prescan = nullptr;
++
++static void PrescanLauncher(PrescanJob *j, int nthreads, bool mm, bool pop, bool verbose) {
++  j->init_ok = j->plan.Init(j->files, j->chunk, j->why);
++  if (!j->init_ok) return;
++  std::vector<std::thread> ws;
++  for (int i = 1; i < nthreads; i++)
++    ws.emplace_back(k2pread::prescan_worker, std::cref(j->plan), &j->ticket, &j->bad, mm, pop, verbose);
++  k2pread::prescan_worker(j->plan, &j->ticket, &j->bad, mm, pop, verbose);
++  for (size_t i = 0; i < ws.size(); i++) ws[i].join();
++}
++
++static void StartPrescanOverlap(const Options &opts) {
++  if (!env_on("K2_PRESCAN_OVERLAP", true) || !env_on("K2_PREAD_PRESCAN", true) || !env_on("K2_PREAD", true)) return;
++  if (opts.report_kmer_data || opts.paired_end_processing || opts.filenames.empty()) return;
++  PrescanJob *j = new PrescanJob();
++  for (size_t i = 0; i < opts.filenames.size(); i++) j->files.push_back(opts.filenames[i]);
++  j->chunk = 4ull << 20;
++  const char *ce = getenv("K2_PREAD_CHUNK");
++  if (ce != nullptr && atoll(ce) > 0) j->chunk = (uint64_t) atoll(ce);
++  int n = 16;
++  const char *te = getenv("K2_PRESCAN_THREADS");
++  if (te != nullptr && atoi(te) > 0) n = std::min(atoi(te), 512);
++  g_prescan = j;
++  j->launcher = std::thread(PrescanLauncher, j, n, env_on("K2_PRESCAN_MMAP", true), env_on("K2_PRESCAN_POPULATE", true),
++                            getenv("K2_PREAD_VERBOSE") != nullptr);
++}
++
+ void ProcessFiles(const char *filename1, const char *filename2,
+     KeyValueStore *hash, Taxonomy &tax,
+     IndexOptions &idx_opts, Options &opts, ClassificationStats &stats,
+@@ -435,6 +488,7 @@
+   if (opts.daemon_mode) {
+     ClassifyDaemon(opts);
+   } else {
++    StartPrescanOverlap(opts);
+     auto index_data = load_index(opts);
+     classify(opts, index_data);
+     delete std::get<2>(index_data);
+@@ -494,8 +548,16 @@
+   omp_init_lock(&output_lock);
+   k2_skip_qual() = (opts.minimum_quality_score == 0 && opts.classified_output_filename.empty() && opts.unclassified_output_filename.empty() && ! getenv("K2_KEEPQ")) ? 1 : 0;
+   // K2_PREAD: lock-free offset-partitioned reading for plain regular fastq files (default on, K2_PREAD=0 forces the kseq path)
+-  k2pread::Plan pread_plan;
++  k2pread::Plan local_plan;
++  k2pread::Plan *pplan = &local_plan;
++  std::unique_ptr<PrescanJob> owned_job;
+   bool use_pread = false;
++  // I6: always collect the overlapped pre-pass thread first (a no-op when none was started), even if this run ends up not using it
++  if (g_prescan != nullptr) {
++    owned_job.reset(g_prescan);
++    g_prescan = nullptr;
++    if (owned_job->launcher.joinable()) owned_job->launcher.join();
++  }
+   {
+     const char *e = getenv("K2_PREAD");
+     // --report-minimizer-data: the distinct-minimizer columns depend on stock block boundaries (3 M bases per block), which a lock-free reader cannot reproduce, so use the kseq path there
+@@ -509,33 +571,33 @@
+       const char *ce = getenv("K2_PREAD_CHUNK");
+       if (ce != nullptr && atoll(ce) > 0) chunk = (uint64_t) atoll(ce);
+       std::string why;
+-      use_pread = pread_plan.Init(files, chunk, why);
+-      // pre-pass over every chunk, before any output file exists: damage anywhere except a file tail (handled exactly by the kseq
+-      // replay in LoadPreadTry) makes the whole run use the stock kseq path, so malformed input behaves exactly like stock.
+-      // K2_PREAD_PRESCAN=0 skips this (damage found later then aborts with exit 3, as before).
+-      const char *pe = getenv("K2_PREAD_PRESCAN");
+-      if (use_pread && (pe == nullptr || strcmp(pe, "0") != 0)) {
+-        int prescan_bad = 0;
+-        #pragma omp parallel
+-        {
+-          std::vector<char> pbuf;
+-          k2pread::NullSink null_sink;
+-          #pragma omp for schedule(dynamic, 1)
+-          for (int64_t pt = 0; pt < (int64_t) pread_plan.total; pt++) {
+-            if (__atomic_load_n(&prescan_bad, __ATOMIC_RELAXED)) continue;
+-            size_t pf; uint64_t pk; std::string perr;
+-            pread_plan.Locate((uint64_t) pt, pf, pk);
+-            if (k2pread::read_chunk(pread_plan.fds[pf], pread_plan.sizes[pf], pk, pread_plan.B, pbuf, null_sink, &perr) != k2pread::PR_OK) {
+-              __atomic_store_n(&prescan_bad, 1, __ATOMIC_RELAXED);
+-              if (getenv("K2_PREAD_VERBOSE")) fprintf(stderr, "K2_PREAD: prescan found damage in chunk %lld: %s\n", (long long) pt, perr.c_str());
+-            }
++      if (owned_job && owned_job->files == files && owned_job->chunk == chunk) {
++        // the pre-pass already ran during the database load (same Plan::Init, same worker): take its plan and verdict
++        pplan = &owned_job->plan;
++        use_pread = owned_job->init_ok;
++        why = owned_job->why;
++        if (use_pread && owned_job->bad) { use_pread = false; why = "prescan found damage"; }
++      } else {
++        use_pread = pplan->Init(files, chunk, why);
++        // pre-pass over every chunk, before any output file exists: damage anywhere except a file tail (handled exactly by the kseq
++        // replay in LoadPreadTry) makes the whole run use the stock kseq path, so malformed input behaves exactly like stock.
++        // K2_PREAD_PRESCAN=0 skips this (damage found later then aborts with exit 3, as before).
++        if (use_pread && env_on("K2_PREAD_PRESCAN", true)) {
++          uint64_t ticket = 0;
++          int prescan_bad = 0;
++          const bool mm = env_on("K2_PRESCAN_MMAP", true), pop = env_on("K2_PRESCAN_POPULATE", true);
++          const bool verb = getenv("K2_PREAD_VERBOSE") != nullptr;
++          k2pread::Plan &pl = *pplan;
++          #pragma omp parallel
++          {
++            k2pread::prescan_worker(pl, &ticket, &prescan_bad, mm, pop, verb);
+           }
++          if (prescan_bad) { use_pread = false; why = "prescan found damage"; }
+         }
+-        if (prescan_bad) { use_pread = false; why = "prescan found damage"; }
+       }
+       if (getenv("K2_PREAD_VERBOSE"))
+         fprintf(stderr, "K2_PREAD: %s (%s), %llu chunks of %llu bytes\n", use_pread ? "on" : "off, using kseq path",
+-                use_pread ? "ok" : why.c_str(), (unsigned long long) pread_plan.total, (unsigned long long) chunk);
++                use_pread ? "ok" : why.c_str(), (unsigned long long) pplan->total, (unsigned long long) chunk);
+     }
+   }
+   BatchSequenceReader r1(filename1);
+@@ -577,11 +639,11 @@
+       if (use_pread) {
+         // no lock: an atomic ticket is the block id, the chunk is read and parsed by this thread alone.
+         // an empty chunk still yields an (empty) output block so next_output_block_id never stalls.
+-        uint64_t t = __atomic_fetch_add(&pread_plan.next, (uint64_t) 1, __ATOMIC_RELAXED);
++        uint64_t t = __atomic_fetch_add(&pplan->next, (uint64_t) 1, __ATOMIC_RELAXED);
+         block_id = t;
+-        ok_read = t < pread_plan.total;
++        ok_read = t < pplan->total;
+         if (ok_read)
+-          reader1.LoadPread(pread_plan, t);
++          reader1.LoadPread(*pplan, t);
+       }
+       else
+       #pragma omp critical(seqread)

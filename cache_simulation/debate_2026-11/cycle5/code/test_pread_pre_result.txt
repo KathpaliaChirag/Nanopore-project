@@ -1,0 +1,21 @@
+[1] synthetic edge files
+    after [1]: pass=7432 fail=0
+[2] multi-file concatenation
+    after [2]: pass=7457 fail=0
+[3] up-front rejection
+    after [3]: pass=7467 fail=0
+[4] late damage after a clean first MiB (guard test)
+    after [4]: pass=7497 fail=0 (guard fired or plan rejected: 0, identical-by-luck counted as pass)
+[5] fuzz
+    after [5]: pass=8097 fail=0 (rejected/guarded among damaged cases: 124)
+[7] truncation and malformed input
+    after 7a (big sweep): pass=22353 fail=0 fallbacks=0
+    after 7a (small sweep): pass=32433 fail=0
+    after 7b (multi-file): pass=33881 fail=0
+    after 7c/7d (mid-file damage): pass=35209 fail=0
+    [7] total: runs accepted by the pre-pass and identical on damaged input=26136, pre-pass fallbacks=976
+[6] real data (first 3 files of per_pod5_fastq)
+    after [6]: pass=35214 fail=0
+TOTAL cases passed=35214 failed=0  (damaged-input cases that were rejected up front=124, caught by the runtime guard=0, pre-pass fallbacks=1148)
+prescan variant comparisons (pread/CHECK vs full parse vs mmap vs mmap-no-populate, plus worker verdicts): 46067058
+PASS
