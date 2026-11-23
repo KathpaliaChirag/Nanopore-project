@@ -15,3 +15,12 @@ the parallel reader failures:
 
 - safe to ship by the matrix: HLL guard with lazy keys, prefetch dedup, quality skip, bulk scanner (K2_BULK).
 - the parallel reader needs run 3 (bin_pread2, running) to confirm group 1 is gone, and a decision on group 2 (abort vs tolerate).
+
+## result of run 3 (bin_pread2 = parallel reader gated off for --report-minimizer-data, K2_BULK=1): 148 PASS, 18 FAIL, 0 WARN (data/validate_matrix3.log, gate: code/pread_gate_minimizer_data.diff)
+
+- the report-minimizer-data failures are gone (a11_quick_hg_K and f02_K_z on 8 GB and 16 GB now pass).
+- the 18 remaining failures are ONLY the malformed or truncated input cases: c_eof_after_seq, c_eof_after_plus, c_eof_after_plus2, c_eof_mid_qual, c_long, c_short. stock tolerates these (it silently stops reading at the first malformed record and exits 0); the parallel reader aborts with an error that names K2_PREAD=0.
+
+so: every valid-input case in the matrix is byte-identical to stock S19 with the whole stack on. the only known behaviour difference is the loud abort on malformed FASTQ.
+
+open decisions (not made here): (1) keep the abort (a damaged file is rejected loudly instead of silently truncated), or (2) make a truncated FINAL record of the LAST file behave like stock (drop it, exit 0), which is the realistic case (an interrupted basecaller). mid-file malformed records cannot be matched cheaply: stock stops reading there, and the parallel reader's other threads would already have classified later chunks, so the stats and report would include reads stock never saw.

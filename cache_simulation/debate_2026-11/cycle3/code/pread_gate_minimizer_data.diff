@@ -1,0 +1,12 @@
+--- impl_pread/src/classify.cc	2026-11-23 10:27:50.586952361 +0530
++++ impl_pread2/src/classify.cc	2026-11-23 12:19:50.810551805 +0530
+@@ -496,7 +496,8 @@
+   bool use_pread = false;
+   {
+     const char *e = getenv("K2_PREAD");
+-    bool want = (e == nullptr || strcmp(e, "0") != 0);
++    // --report-minimizer-data: the distinct-minimizer columns depend on stock block boundaries (3 M bases per block), which a lock-free reader cannot reproduce, so use the kseq path there
++    bool want = (e == nullptr || strcmp(e, "0") != 0) && ! opts.report_kmer_data;
+     if (want && filename1 != nullptr && ! opts.paired_end_processing) {
+       std::vector<std::string> files;
+       files.push_back(filename1);

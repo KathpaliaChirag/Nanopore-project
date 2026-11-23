@@ -1,0 +1,178 @@
+=== A. plain options on real reads (patches 1,2 mostly)
+PASS a01_default [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a02_names [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a03_z [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a04_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a05_K_z [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a06_mpa [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a07_mpa_z [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a08_conf [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a09_hitgroups [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a10_quick [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a11_quick_hg_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a12_mmap [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a13_names_conf_z [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a14_tiny20_z [sample_targeted] pread2: IDENTICAL lines=20 rc=0
+PASS a15_tiny5_z [sample_targeted] pread2: IDENTICAL lines=5 rc=0
+PASS a16_tiny20 [sample_targeted] pread2: IDENTICAL lines=20 rc=0
+PASS a17_T1 [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a18_T48 [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS a19_special [sample_targeted] pread2: IDENTICAL lines=160 rc=0
+PASS a20_special_q [sample_targeted] pread2: IDENTICAL lines=160 rc=0
+PASS a21_special_K [sample_targeted] pread2: IDENTICAL lines=160 rc=0
+=== B. quality handling (patch 3): the skip is on only when no -Q, -C, -U
+PASS b01_Q10 [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS b02_Q10_fasta [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS b03_C [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS b04_U [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS b05_CU [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS b06_CU_fasta [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS b07_CU_crlf [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS b08_Q10_atq [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS b09_CU_empty [sample_targeted] pread2: IDENTICAL lines=1023 rc=0
+=== C. input syntax (patch 3 reader)
+PASS c_fa_ml [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_fa_ml_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_fa_1l [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_fa_1l_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_fa_ml_crlf [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_fa_ml_crlf_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_fa_ml_nonl [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_fa_ml_nonl_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_crlf [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_crlf_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_nonl [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_nonl_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_crlf_nonl [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_crlf_nonl_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_crlf_nonl2 [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_crlf_nonl2_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_empty [sample_targeted] pread2: IDENTICAL lines=1023 rc=0
+PASS c_empty_K [sample_targeted] pread2: IDENTICAL lines=1023 rc=0
+PASS c_atq [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_atq_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_atq_all [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_atq_all_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_plq [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_plq_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_gtq [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_gtq_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_wrapfq [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_wrapfq_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_wrapfq_crlf [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_wrapfq_crlf_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_plusname [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_plusname_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_blank [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_blank_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_blank2 [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_blank2_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+FAIL c_short [sample_targeted] pread2: file set differs: [o.out o.rep rc stderr stdout ] vs [rc stderr stdout ]
+FAIL c_short [sample_targeted] pread2: rc differs
+FAIL c_short [sample_targeted] pread2: stderr differs
+PASS c_short_K [sample_targeted] pread2: IDENTICAL lines=999 rc=0
+FAIL c_long [sample_targeted] pread2: file set differs: [o.out o.rep rc stderr stdout ] vs [rc stderr stdout ]
+FAIL c_long [sample_targeted] pread2: rc differs
+FAIL c_long [sample_targeted] pread2: stderr differs
+PASS c_long_K [sample_targeted] pread2: IDENTICAL lines=999 rc=0
+PASS c_crcr [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_crcr_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_tabs [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_tabs_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_sweep [sample_targeted] pread2: IDENTICAL lines=600 rc=0
+PASS c_sweep_K [sample_targeted] pread2: IDENTICAL lines=600 rc=0
+PASS c_big [sample_targeted] pread2: IDENTICAL lines=202 rc=0
+PASS c_big_K [sample_targeted] pread2: IDENTICAL lines=202 rc=0
+PASS c_mixed [sample_targeted] pread2: IDENTICAL lines=400 rc=0
+PASS c_mixed_K [sample_targeted] pread2: IDENTICAL lines=400 rc=0
+FAIL c_eof_mid_qual [sample_targeted] pread2: file set differs: [o.out o.rep rc stderr stdout ] vs [rc stderr stdout ]
+FAIL c_eof_mid_qual [sample_targeted] pread2: rc differs
+FAIL c_eof_mid_qual [sample_targeted] pread2: stderr differs
+PASS c_eof_mid_qual_K [sample_targeted] pread2: IDENTICAL lines=999 rc=0
+FAIL c_eof_after_plus [sample_targeted] pread2: file set differs: [o.out o.rep rc stderr stdout ] vs [rc stderr stdout ]
+FAIL c_eof_after_plus [sample_targeted] pread2: rc differs
+FAIL c_eof_after_plus [sample_targeted] pread2: stderr differs
+PASS c_eof_after_plus_K [sample_targeted] pread2: IDENTICAL lines=999 rc=0
+FAIL c_eof_after_plus2 [sample_targeted] pread2: file set differs: [o.out o.rep rc stderr stdout ] vs [rc stderr stdout ]
+FAIL c_eof_after_plus2 [sample_targeted] pread2: rc differs
+FAIL c_eof_after_plus2 [sample_targeted] pread2: stderr differs
+PASS c_eof_after_plus2_K [sample_targeted] pread2: IDENTICAL lines=999 rc=0
+FAIL c_eof_after_seq [sample_targeted] pread2: file set differs: [o.out o.rep rc stderr stdout ] vs [rc stderr stdout ]
+FAIL c_eof_after_seq [sample_targeted] pread2: rc differs
+FAIL c_eof_after_seq [sample_targeted] pread2: stderr differs
+PASS c_eof_after_seq_K [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS c_bnd_end_0_0 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_0_-1 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_0_1 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_0_-2 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_0_2 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_0_-3 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_0_3 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_1_0 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_1_-1 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_1_1 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_1_-2 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_1_2 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_1_-3 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_end_1_3 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_0_0 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_0_-1 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_0_1 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_0_-2 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_0_2 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_0_-3 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_0_3 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_1_0 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_1_-1 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_1_1 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_1_-2 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_1_2 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_1_-3 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+PASS c_bnd_start_1_3 [sample_targeted] pread2: IDENTICAL lines=21 rc=0
+=== D. paired, interleaved, multi-file, compressed, stdin
+PASS d01_paired [sample_targeted] pread2: IDENTICAL lines=500 rc=0
+PASS d02_paired_CU [sample_targeted] pread2: IDENTICAL lines=500 rc=0
+PASS d03_paired_Q [sample_targeted] pread2: IDENTICAL lines=500 rc=0
+PASS d04_paired_crlf [sample_targeted] pread2: IDENTICAL lines=500 rc=0
+PASS d05_paired_short [sample_targeted] pread2: IDENTICAL lines=400 rc=0
+PASS d06_paired_K_z [sample_targeted] pread2: IDENTICAL lines=500 rc=0
+PASS d07_inter [sample_targeted] pread2: IDENTICAL lines=0 rc=0
+PASS d08_inter_odd [sample_targeted] pread2: IDENTICAL lines=0 rc=0
+PASS d09_inter_CU [sample_targeted] pread2: IDENTICAL lines=0 rc=0
+PASS d10_inter_Q [sample_targeted] pread2: IDENTICAL lines=0 rc=0
+PASS d11_multi [sample_targeted] pread2: IDENTICAL lines=800 rc=0
+PASS d12_multi_CU [sample_targeted] pread2: IDENTICAL lines=800 rc=0
+PASS d13_gz [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS d14_gz_crlf [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS d15_bz2 [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS d16_gz_paired [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS d17_stdin [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS d18_stdin_crlf [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS d19_chunk37 [sample_targeted] pread2: IDENTICAL lines=100 rc=0
+PASS d20_chunk1_crlf [sample_targeted] pread2: IDENTICAL lines=100 rc=0
+PASS d21_chunk7_wrap [sample_targeted] pread2: IDENTICAL lines=1000 rc=0
+PASS d22_chunk3_empty [sample_targeted] pread2: IDENTICAL lines=1023 rc=0
+=== E. translated search (needs PROT_DB, a protein database)
+SKIP translated search: set PROT_DB=/path/to/protein_db
+=== F. capped / large dbs, short core subset (dedup min-hash skip path, 3 builds x db)
+PASS f01_default [standard_8gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f02_K_z [standard_8gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f03_CU [standard_8gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f04_quick [standard_8gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f05_special [standard_8gb] pread2: IDENTICAL lines=160 rc=0
+PASS f06_paired [standard_8gb] pread2: IDENTICAL lines=500 rc=0
+PASS f07_mmap [standard_8gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f08_T48 [standard_8gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f01_default [standard_16gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f02_K_z [standard_16gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f03_CU [standard_16gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f04_quick [standard_16gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f05_special [standard_16gb] pread2: IDENTICAL lines=160 rc=0
+PASS f06_paired [standard_16gb] pread2: IDENTICAL lines=500 rc=0
+PASS f07_mmap [standard_16gb] pread2: IDENTICAL lines=1000 rc=0
+PASS f08_T48 [standard_16gb] pread2: IDENTICAL lines=1000 rc=0
+=== G. k-mer cap check: print minimum_acceptable_hash_value of each db (read-only; opts.k2d is 40+ bytes)
+/home/student/chirag_K/AccuracyDrift/databases/sample_targeted:  35 31  4611686018212639539 16392584516609989165  130068420637441 0  1 130064494624768 
+/home/student/chirag_K/AccuracyDrift/databases/standard_8gb:  35 31  4611686018212639539 16392584516609989165  140456894497793 16532781218598344704  1 140454020513792 
+/home/student/chirag_K/AccuracyDrift/databases/standard_16gb:  35 31  4611686018212639539 16392584516609989165  1 14618818363487137792  1 140677358813184 
+=== SUMMARY pass=148 warn=0 fail=6 (expected: every line IDENTICAL; WARN only on report line order)
