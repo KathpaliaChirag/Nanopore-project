@@ -46,3 +46,25 @@ bin_hint (compact_hash.cc PrefetchIndex with a runtime-selectable locality hint,
 | 8 GB | 1.70 1.64 1.65 1.64 1.65 | 1.66 1.65 1.64 1.66 1.66 | 1.67 1.67 1.65 1.64 1.66 | 1.66 1.67 1.67 1.67 1.67 |
 
 medians: 103 GB 6.51 / 6.66 / 6.67 / 6.53; 16 GB 2.09 / 2.12 / 2.14 / 2.09; 8 GB 1.65 / 1.66 / 1.66 / 1.67. all within noise (about 2%), no hint beats the default. the lookup stall is not about which cache level the line lands in.
+
+## 5. cross-read head prefetch is a null (implementer I7, code/impl_head.diff, data/head.csv)
+
+idea (agent A's ranked idea 2): the lookahead never spans reads, so the first batch of every read is resolved with no overlap; while the last batch of read i is resolved, prefetch the first distinct minimizers of read i+1 (a PeekNext() plus a once-per-read HeadPrefetch with its own scanner state; prefetch instructions only, so output cannot change). K2_HEAD = max prefetches (0 = off), K2_HEADW = scan window in items.
+
+byte-identity: K2_HEAD=32 at T=96 vs stock S19 on 8 GB and 103 GB, all reads: output identical, report byte-identical (data/head_correct.txt). small-input matrix by I7: 80/80 single and 32/32 paired comparisons per sweep.
+
+timing, T=96, K2_B=64, K2_BULK=1, pre-pass off, 5 interleaved repetitions, wall seconds:
+
+| db | K2_HEAD=0 | 16 | 32 | 64 |
+|---|---|---|---|---|
+| 103 GB | 6.82 6.62 6.64 6.42 6.39 | 6.69 6.57 6.62 6.44 6.43 | 6.67 6.50 6.49 6.40 6.42 | 6.54 6.68 6.46 6.43 6.42 |
+| 16 GB | 2.18 2.09 2.11 2.08 2.08 | 2.15 2.10 2.10 2.14 2.10 | 2.14 2.11 2.10 2.10 2.11 | 2.12 2.10 2.12 2.11 2.11 |
+| 8 GB | 1.71 1.68 1.68 1.66 1.68 | 1.70 1.69 1.70 1.67 1.70 | 1.68 1.68 1.68 1.69 1.67 | 1.69 1.71 1.69 1.69 1.68 |
+
+medians: 103 GB 6.62 / 6.57 / 6.49 / 6.46 (best -2.4%, inside a 0.4 s run-to-run spread); 16 GB 2.09 / 2.10 / 2.10 / 2.11; 8 GB 1.68 / 1.69 / 1.68 / 1.69. window sweep at K2_HEAD=32 on 103 GB (3 reps): K2_HEADW 32 / 64 / 128 / 256: 6.38 6.25 6.46 / 6.42 6.47 6.50 / 6.48 6.32 6.38 / 6.33 6.36 6.36: no trend.
+
+why it does not matter: only about 1 scanned item in 10 survives the hash filter and the repeat skip, so a 64-item window yields 6 to 7 real lookups; only about 1 of roughly 15 batches per read is helped.
+
+## summary of cycle 6
+
+every lookup-side idea for the 103 GB stall is now closed at 3% or less: huge pages fine, NUMA balancing not involved, load at the memory-bandwidth floor, prefetch hint irrelevant, cross-read head prefetch within noise. the only larger lever left is removing the load for repeated jobs (a resident database).

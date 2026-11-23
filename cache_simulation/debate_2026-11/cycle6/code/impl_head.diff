@@ -1,0 +1,126 @@
+--- ../impl_pre/src/classify.cc	2026-11-23 16:25:27.242673445 +0530
++++ src/classify.cc	2026-11-23 18:49:47.864157232 +0530
+@@ -177,6 +177,7 @@
+     KeyValueStore *hash, Taxonomy &tax,
+     IndexOptions &idx_opts, Options &opts, ClassificationStats &stats,
+     OutputStreamData &outputs, taxon_counters_t &total_taxon_counters);
++static thread_local const Sequence *k2_head_next = nullptr;
+ taxid_t ClassifySequence(Sequence &dna, Sequence &dna2, ostringstream &koss, std::string &kstr,
+     KeyValueStore *hash, Taxonomy &tax, IndexOptions &idx_opts,
+     Options &opts, ClassificationStats &stats, MinimizerScanner &scanner,
+@@ -700,6 +701,7 @@
+           if (opts.paired_end_processing)
+             MaskLowQualityBases(*seq2, opts.minimum_quality_score);
+         }
++        k2_head_next = reader1.PeekNext();   // I7
+         taxid_t call;
+         if (opts.paired_end_processing) {
+           call =
+@@ -928,6 +930,67 @@
+ static int la_batch = InitBatch();
+ struct PfSlot { uint64_t min; uint64_t hc; size_t idx; bool amb; };
+ 
++// ---- I7: head prefetch. before the last batch of read i is resolved, issue prefetches for the
++// first minimizers of read i+1 (peeked from the same block), so its first batch is not exposed.
++// only issues prefetch instructions; touches no per-read state, no stats, no results.
++static int InitHead() {
++  const char *e = getenv("K2_HEAD");
++  int h = e ? atoi(e) : 32;
++  if (h < 0) h = 0;
++  if (h > 64) h = 64;
++  return h;
++}
++static const int k2_head_n = InitHead();
++// K2_HEADW: scan window in scanner items (default 64 = the default first batch). a lookup is only issued for
++// about 1 item in 10 or so on subsampled databases, so the window, not K2_HEAD, bounds how many prefetches go out.
++static int InitHeadW() {
++  const char *e = getenv("K2_HEADW");
++  int w = e ? atoi(e) : 64;
++  if (w < 1) w = 1;
++  if (w > 256) w = 256;
++  return w;
++}
++static const int k2_head_w = InitHeadW();
++
++static void HeadPrefetch(const Sequence *nx, KeyValueStore *hash, const IndexOptions &idx_opts,
++                         const BulkParams *bpar, bool use_bulk) {
++  if (nx == nullptr || k2_head_n <= 0 || nx->seq.size() < (size_t) idx_opts.k) return;
++  uint64_t fill_last = UINT64_MAX;
++  int issued = 0;
++  const int max_items = k2_head_w;   // scan window in items; repeats of the previous minimizer and hash-filtered ones are skipped
++  if (use_bulk) {
++    static thread_local uint64_t hm[256];
++    static thread_local uint8_t ha[256];
++    BulkState hs; hs.init();
++    size_t got = ScanBulk(hs, *bpar, nx->seq.data(), nx->seq.size(), hm, ha, (size_t) max_items);
++    for (size_t j = 0; j < got && issued < k2_head_n; j++) {
++      if (ha[j] || hm[j] == fill_last) continue;
++      fill_last = hm[j];
++      uint64_t hc = MurmurHash3(hm[j]);
++      if (idx_opts.minimum_acceptable_hash_value && hc < idx_opts.minimum_acceptable_hash_value) continue;
++      (void) hash->PrefetchIndex(hc);
++      issued++;
++    }
++  }
++  else {
++    static thread_local MinimizerScanner *hsc = nullptr;   // separate instance, real scanner is not disturbed
++    if (hsc == nullptr)
++      hsc = new MinimizerScanner(idx_opts.k, idx_opts.l, idx_opts.spaced_seed_mask,
++                                 idx_opts.dna_db, idx_opts.toggle_mask, idx_opts.revcom_version);
++    hsc->LoadSequence(nx->seq);
++    for (int j = 0; j < max_items && issued < k2_head_n; j++) {
++      uint64_t *m = hsc->NextMinimizer();
++      if (m == nullptr) break;
++      if (hsc->is_ambiguous() || *m == fill_last) continue;
++      fill_last = *m;
++      uint64_t hc = MurmurHash3(*m);
++      if (idx_opts.minimum_acceptable_hash_value && hc < idx_opts.minimum_acceptable_hash_value) continue;
++      (void) hash->PrefetchIndex(hc);
++      issued++;
++    }
++  }
++}
++
+ taxid_t ClassifySequence(Sequence &dna, Sequence &dna2, ostringstream &koss, std::string &kstr,
+                          KeyValueStore *hash, Taxonomy &taxonomy,
+                          IndexOptions &idx_opts, Options &opts,
+@@ -1012,13 +1075,22 @@
+         }
+         return n;
+       };
++      // I7: once per read, on the last mate/frame, when the final batch has been filled
++      bool head_done = (k2_head_n <= 0 || k2_head_next == nullptr || opts.use_translated_search ||
++                        mate_num != (opts.paired_end_processing ? 1 : 0));
++      auto head_go = [&]() {
++        if (head_done) return;
++        head_done = true;
++        HeadPrefetch(k2_head_next, hash, idx_opts, use_bulk ? &bpar : nullptr, use_bulk);
++      };
+       int n_cur = fill(cur);
+       bool exhausted = (n_cur < la_batch);
++      if (exhausted && n_cur > 0) head_go();
+       while (n_cur > 0) {
+         int n_nxt = 0;
+         if (! exhausted) {          // start batch n+1 before resolving batch n
+           n_nxt = fill(nxt);
+-          if (n_nxt < la_batch) exhausted = true;
++          if (n_nxt < la_batch) { exhausted = true; head_go(); }
+         }
+         PfSlot *pf = cur;
+         for (int i = 0; i < n_cur; i++) {
+--- ../impl_pre/src/seqreader.h	2026-11-23 16:22:49.821682828 +0530
++++ src/seqreader.h	2026-11-23 18:46:15.906169865 +0530
+@@ -221,6 +221,13 @@
+     return seq_read;
+   }
+ 
++  // I7: the sequence NextSequence() would return next from the loaded block, or NULL (no consumption)
++  const Sequence* PeekNext() const
++  {
++    if (size_ > 0 && curr_ < size_) return &seqs_[curr_];
++    return NULL;
++  }
++
+   Sequence* NextSequence()
+   {
+     if (size_ > 0 && curr_ < size_) {
