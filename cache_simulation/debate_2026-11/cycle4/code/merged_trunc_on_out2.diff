@@ -1,0 +1,163 @@
+--- impl_out2/src/classify.cc	2026-11-23 14:35:29.009066730 +0530
++++ impl_all/src/classify.cc	2026-11-23 14:50:27.811013157 +0530
+@@ -510,6 +510,29 @@
+       if (ce != nullptr && atoll(ce) > 0) chunk = (uint64_t) atoll(ce);
+       std::string why;
+       use_pread = pread_plan.Init(files, chunk, why);
++      // pre-pass over every chunk, before any output file exists: damage anywhere except a file tail (handled exactly by the kseq
++      // replay in LoadPreadTry) makes the whole run use the stock kseq path, so malformed input behaves exactly like stock.
++      // K2_PREAD_PRESCAN=0 skips this (damage found later then aborts with exit 3, as before).
++      const char *pe = getenv("K2_PREAD_PRESCAN");
++      if (use_pread && (pe == nullptr || strcmp(pe, "0") != 0)) {
++        int prescan_bad = 0;
++        #pragma omp parallel
++        {
++          std::vector<char> pbuf;
++          k2pread::NullSink null_sink;
++          #pragma omp for schedule(dynamic, 1)
++          for (int64_t pt = 0; pt < (int64_t) pread_plan.total; pt++) {
++            if (__atomic_load_n(&prescan_bad, __ATOMIC_RELAXED)) continue;
++            size_t pf; uint64_t pk; std::string perr;
++            pread_plan.Locate((uint64_t) pt, pf, pk);
++            if (k2pread::read_chunk(pread_plan.fds[pf], pread_plan.sizes[pf], pk, pread_plan.B, pbuf, null_sink, &perr) != k2pread::PR_OK) {
++              __atomic_store_n(&prescan_bad, 1, __ATOMIC_RELAXED);
++              if (getenv("K2_PREAD_VERBOSE")) fprintf(stderr, "K2_PREAD: prescan found damage in chunk %lld: %s\n", (long long) pt, perr.c_str());
++            }
++          }
++        }
++        if (prescan_bad) { use_pread = false; why = "prescan found damage"; }
++      }
+       if (getenv("K2_PREAD_VERBOSE"))
+         fprintf(stderr, "K2_PREAD: %s (%s), %llu chunks of %llu bytes\n", use_pread ? "on" : "off, using kseq path",
+                 use_pread ? "ok" : why.c_str(), (unsigned long long) pread_plan.total, (unsigned long long) chunk);
+--- impl_out2/src/preadfq.h	2026-11-23 14:35:28.995066731 +0530
++++ impl_all/src/preadfq.h	2026-11-23 14:50:27.805013158 +0530
+@@ -151,25 +151,36 @@
+   else { int rc = find_start(b, base, off_s, fsize, S); if (rc != PR_OK) return rc; }
+   size_t pos = (size_t)(S - base);
+   if (S >= fsize) pos = b.len;
++  // tail rule: when no strict record start exists after off_e (F == fsize) and the buffer reaches eof, the first chunk that
++  // meets damage owns the whole rest of the file [pos, eof) and hands it to the real kseq state machine (sink.tail), which
++  // reproduces stock exactly (drop of a truncated last record, resync, FASTA-like accept of a record cut after its sequence).
++  // every later chunk has S == fsize and emits nothing, so there is no duplicate. damage anywhere else stays PR_BAD.
++  const bool can_tail = (F == fsize && b.eof);
+   sink.begin();
+   while (base + pos < off_e) {
+     if (pos >= b.len) { if (err) *err = "chunk ran past eof"; return PR_BAD; }
+     if (b.p[pos] != '@') {
+       // only acceptable as trailing junk with no '@' or '>' in it (kseq would skip it)
+       if (F == fsize && b.eof && !tail_has_header_char(b, pos)) { pos = b.len; break; }
++      if (can_tail) { sink.tail(b.p + pos, b.len - pos); return PR_OK; }
+       if (err) *err = "byte at record start is not '@'";
+       return PR_BAD;
+     }
+     Rec r; size_t next;
+     int rc = parse_record(b, pos, r, next);
+     if (rc == PR_MORE) return PR_MORE;
+-    if (rc != PR_OK) { if (err) *err = "record is not strict 4-line fastq"; return PR_BAD; }
++    if (rc != PR_OK) {
++      if (can_tail) { sink.tail(b.p + pos, b.len - pos); return PR_OK; }
++      if (err) *err = "record is not strict 4-line fastq";
++      return PR_BAD;
++    }
+     sink.add(r);
+     pos = next;
+   }
+   uint64_t q = base + pos;
+   if (q != F) {
+     if (F == fsize && b.eof && q < fsize && !tail_has_header_char(b, pos)) return PR_OK;
++    if (can_tail && q < fsize) { sink.tail(b.p + pos, b.len - pos); return PR_OK; }
+     if (err) *err = "end of chunk parse does not match next chunk start";
+     return PR_BAD;
+   }
+@@ -206,7 +217,10 @@
+   }
+ }
+ 
+-struct NullSink { void begin() {} void add(const Rec &) {} };
++struct NullSink { void begin() {} void add(const Rec &) {} void tail(const char *, size_t) {} };
++// (classify.cc runs read_chunk with a NullSink over every chunk before any output exists: tail damage is accepted, any other BAD
++// makes the whole run use the stock kseq path)
++
+ 
+ struct Plan {
+   std::vector<int> fds;
+@@ -243,7 +257,12 @@
+           Rec r; size_t nx;
+           int rc = parse_record(b, pos, r, nx);
+           if (rc == PR_MORE) break;
+-          if (rc != PR_OK) { why = "pre-scan: not strict 4-line fastq: " + files[i]; return false; }
++          if (rc != PR_OK) {
++            // damage inside a file that fits in the first MiB: it is the tail of the file (or a mid-file damage), both are decided by the
++            // pre-pass over all chunks and the tail replay, so only an unreadable first record rejects the plan here
++            if (b.eof && nrec > 0) break;
++            why = "pre-scan: not strict 4-line fastq: " + files[i]; return false;
++          }
+           nrec++; pos = nx;
+         }
+         if (nrec == 0 && n == sz) { why = "pre-scan: no record: " + files[i]; return false; }
+--- impl_out2/src/seqreader.h	2026-11-23 14:35:28.991066731 +0530
++++ impl_all/src/seqreader.h	2026-11-23 14:50:27.807013158 +0530
+@@ -10,6 +10,7 @@
+ #include "kraken2_headers.h"
+ #include "kseq.h"
+ #include <fcntl.h>
++#include <sys/mman.h>
+ #include "preadfq.h"
+ 
+ KSEQ_INIT(int, read)
+@@ -133,8 +134,42 @@
+   size_t loaded() const { return size_; }
+   bool LoadPreadTry(k2pread::Plan &plan, uint64_t t, std::string &err) {
+     struct PSink {
+-      std::vector<Sequence> &v; size_t n; bool skipq; SequenceFormat fmt;
++      std::vector<Sequence> &v; size_t n; bool skipq; SequenceFormat fmt; bool last_file; bool tail_failed;
+       void begin() { n = 0; }
++      // damaged tail of the file: replay [p, p+len) through the real kseq_read on a memfd, with stock's per-file rules.
++      // stock (LoadBlock): any kseq_read < 0 moves to the next file if there is one (rest of this file dropped), and in the
++      // last file a -2 just ends the block and the next LoadBlock resumes the stream (resync at the next '@' or '>').
++      void tail(const char *p, size_t len) {
++        int mfd = memfd_create("k2tail", 0);
++        if (mfd < 0) { tail_failed = true; return; }
++        size_t off = 0;
++        while (off < len) {
++          ssize_t w = ::write(mfd, p + off, len - off);
++          if (w <= 0) { tail_failed = true; ::close(mfd); return; }
++          off += (size_t) w;
++        }
++        lseek(mfd, 0, SEEK_SET);
++        kseq_t *ks = kseq_init(mfd);   // copies k2_skip_qual() into ks->skip_qual, same as the stock reader
++        for (;;) {
++          int rc = kseq_read(ks);
++          if (rc >= 0) {
++            if (n == v.size()) v.resize(n + 1);
++            Sequence &s = v[n++];
++            s.header.assign(ks->name.s, ks->name.l);
++            s.comment.assign(ks->comment.s, ks->comment.l);
++            s.seq.assign(ks->seq.s, ks->seq.l);
++            if (ks->qual.l > 0 || ks->qual_len > 0) {
++              fmt = s.format = SequenceFormat::FORMAT_FASTQ;
++              if (ks->qual.l > 0 && ! skipq) s.quals.assign(ks->qual.s, ks->qual.l); else s.quals.clear();
++            } else {
++              fmt = s.format = SequenceFormat::FORMAT_FASTA;
++            }
++          }
++          else if (rc == -1 || ! last_file) break;
++        }
++        kseq_destroy(ks);
++        ::close(mfd);
++      }
+       void add(const k2pread::Rec &r) {
+         if (n == v.size()) v.resize(n + 1);
+         Sequence &s = v[n++];
+@@ -151,8 +186,9 @@
+     };
+     size_t f; uint64_t k;
+     plan.Locate(t, f, k);
+-    PSink sink = { seqs_, 0, k2_skip_qual() != 0, file_format_ };
++    PSink sink = { seqs_, 0, k2_skip_qual() != 0, file_format_, f + 1 == plan.fds.size(), false };
+     int rc = k2pread::read_chunk(plan.fds[f], plan.sizes[f], k, plan.B, rbuf_, sink, &err);
++    if (rc == k2pread::PR_OK && sink.tail_failed) { rc = k2pread::PR_BAD; err = "memfd_create or write failed for the damaged tail"; }
+     if (rc != k2pread::PR_OK) { size_ = 0; curr_ = 0; return false; }
+     size_ = sink.n;
+     curr_ = 0;

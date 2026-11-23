@@ -1,0 +1,4 @@
+50MB bin_all T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+8GB bin_all T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+16GB bin_all T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+103GB bin_all T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
