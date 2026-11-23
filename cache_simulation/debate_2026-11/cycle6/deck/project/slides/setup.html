@@ -1,0 +1,28 @@
+<section id="setup" data-transition="fade">
+<h2>Simulating kraken2's cache hierarchy with Sniper on Luna</h2>
+<div class="cols">
+<div class="panel">
+<h3>What we built</h3>
+<ul class="list">
+<li>Sniper cloned and built on Luna, with a config read from the real machine (L1d 48 KB, L2 2 MB, shared LLC 105 MB)</li>
+<li>The LLC modelled as per-core slices (1,125 KB, 15-way)</li>
+<li>The real kraken2 binary traced through it, with cycles as the metric (never Sniper's own run time)</li>
+</ul>
+</div>
+<div class="panel">
+<h3>What we varied</h3>
+<ul class="list">
+<li>A software cache inside kraken2: none, or 1, 4, 8, 16 ways</li>
+<li>Hardware LLC associativity, 1 to 30 ways</li>
+<li>Four databases, 50 MB to 103 GB</li>
+<li>Workloads of 10 to 500 reads (one 2,000-read run)</li>
+</ul>
+</div>
+</div>
+<div class="stats">
+<div class="stat"><p class="n">12 to 15 min</p><p class="t">to simulate 10 reads</p></div>
+<div class="stat"><p class="n">2 to 3 h</p><p class="t">to simulate 100 reads</p></div>
+<div class="stat"><p class="n">about 15 h</p><p class="t">per variant for 2,000 reads</p></div>
+</div>
+<aside>The simulator cannot run a real job: a production run has 1.87 million reads. That is why every Sniper experiment used a tiny sample, and it matters for how far the results can be trusted (slide 3). The LLC slice size in this config was later found to be half of what it should be (about 2.2 MB, not 1.1 MB), because the config divided by 96 logical CPUs per socket instead of 48 physical cores.</aside>
+</section>

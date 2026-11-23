@@ -1,0 +1,24 @@
+<section id="results" data-transition="fade">
+<h2>A software 4-way cache looked like a win until the job got bigger</h2>
+<div class="cols">
+<div class="panel">
+<h3>Speedup of a 4-way cache over none (50 reads, higher is better)</h3>
+<div class="row"><p class="lab">50 MB database</p><div class="track"><div class="mark" style="left:155px"></div><div class="bar bad" style="width:157px"></div></div><p class="val">0.91x</p></div>
+<div class="row"><p class="lab">8 GB database</p><div class="track"><div class="mark" style="left:155px"></div><div class="bar good" style="width:316px"></div></div><p class="val">1.83x</p></div>
+<div class="row"><p class="lab">16 GB database</p><div class="track"><div class="mark" style="left:155px"></div><div class="bar good" style="width:354px"></div></div><p class="val">2.05x</p></div>
+<div class="row"><p class="lab">103 GB database</p><div class="track"><div class="mark" style="left:155px"></div><div class="bar good" style="width:340px"></div></div><p class="val">1.97x</p></div>
+<p class="hint">Black line = 1.00x (same speed as no cache).</p>
+</div>
+<div class="panel">
+<h3>4-way cycles divided by no-cache cycles as the job grows (8 GB, below 1.00 is a win)</h3>
+<div class="row"><p class="lab">0.35 M bases (10 reads)</p><div class="track"><div class="mark" style="left:315px"></div><div class="bar good" style="width:223px"></div></div><p class="val">0.70</p></div>
+<div class="row"><p class="lab">0.9 M bases</p><div class="track"><div class="mark" style="left:315px"></div><div class="bar good" style="width:263px"></div></div><p class="val">0.83</p></div>
+<div class="row"><p class="lab">1.9 M bases</p><div class="track"><div class="mark" style="left:315px"></div><div class="bar good" style="width:303px"></div></div><p class="val">0.96</p></div>
+<div class="row"><p class="lab">4.7 M bases</p><div class="track"><div class="mark" style="left:315px"></div><div class="bar bad" style="width:326px"></div></div><p class="val">1.03</p></div>
+<div class="row"><p class="lab">25 M bases (500 reads)</p><div class="track"><div class="mark" style="left:315px"></div><div class="bar bad" style="width:340px"></div></div><p class="val">1.09</p></div>
+<p class="hint">Black line = 1.00 (cache and no cache tie).</p>
+</div>
+</div>
+<p class="take">The cache wins on small workloads and <span>loses once the job passes about 2 to 5 million bases</span>. Total bases drove the flip; read length did not.</p>
+<aside>Left: full grid in the study notes (4-way is the best or tied-best width in every row at 50 reads). Right: the long-read scaling run, nested prefixes of one file at roughly constant read length. At 2,000 reads on the 50 MB database every cache variant was slower than none (4-way 1.28x slower, 16-way 1.39x slower). All values are simulated cycles; see slide 3 for why they are weak evidence about the real machine.</aside>
+</section>

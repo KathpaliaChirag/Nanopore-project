@@ -1,0 +1,24 @@
+<section id="audit" data-transition="fade">
+<h2>Hardware associativity did nothing, and the simulator is a weak guide to Luna</h2>
+<div class="cols">
+<div class="panel">
+<h3>Spread in cycles across LLC associativity 1 to 30 ways (lower is flatter)</h3>
+<div class="row"><p class="lab">10 reads</p><div class="track"><div class="bar good" style="width:238px"></div></div><p class="val">0.7%</p></div>
+<div class="row"><p class="lab">50 reads</p><div class="track"><div class="bar good" style="width:4px"></div></div><p class="val">0.0%</p></div>
+<div class="row"><p class="lab">100 reads</p><div class="track"><div class="bar good" style="width:306px"></div></div><p class="val">0.9%</p></div>
+<div class="row"><p class="lab">500 reads</p><div class="track"><div class="bar good" style="width:102px"></div></div><p class="val">0.3%</p></div>
+<p class="hint">Bar scale: full width = 1%. No trend with associativity; the same null held on 8 GB and 16 GB.</p>
+</div>
+<div class="panel">
+<h3>Four reasons not to trust the absolute numbers</h3>
+<ul class="list">
+<li>The simulated LLC is one 1.1 MB slice, about 1% of the real 105 MB (and half of the correct size)</li>
+<li>The no-cache build came from a different source tree: 16 to 34 M extra instructions</li>
+<li>Cold 10 to 500 read windows, a fixed 45 ns DRAM, no prefetch, TLB or contention model</li>
+<li>Never calibrated against real performance counters</li>
+</ul>
+</div>
+</div>
+<p class="take">On the real machine, a front cache covering 45% of lookups gained <span>0% at 103 GB and was 7% slower at 8 GB</span>.</p>
+<aside>The real-machine result is the oracle-ceiling test: skip a fixed fraction of the table lookups on Luna, which over-credits any real cache, and measure the wall time (T=32, all 1.87M reads, 3 repetitions). Real-trace facts: 81% of lookups repeat a slot already seen, the 262,144 hottest slots cover 56% of lookups, but the repeats are 130 thousand to 2 million other slots apart, so a small cache forgets them. Net: hardware associativity does not matter for kraken2, and a smarter cache or eviction policy can gain only a few percent once prefetching hides most of the memory latency.</aside>
+</section>
