@@ -1,0 +1,4 @@
+50MB bin_pre default T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+8GB bin_pre default T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+16GB bin_pre default T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+103GB bin_pre default T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
