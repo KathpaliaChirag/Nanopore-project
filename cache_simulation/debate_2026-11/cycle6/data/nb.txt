@@ -1,0 +1,12 @@
+== pluspf_103gb run1: 6.82 s wall, 135.83 sys-cpu-s, 255.57 user-cpu-s
+before: numa_pte_updates 26755469927;numa_hint_faults 11472949936;numa_hint_faults_local 10474337205;numa_pages_migrated 1303682144;pgmigrate_success 2246584110;thp_migration_success 1524867;
+after:  numa_pte_updates 26756002059;numa_hint_faults 11472955422;numa_hint_faults_local 10474340165;numa_pages_migrated 1303777431;pgmigrate_success 2246740708;thp_migration_success 1525049;
+== pluspf_103gb run2: 6.84 s wall, 134.88 sys-cpu-s, 253.85 user-cpu-s
+before: numa_pte_updates 26756002059;numa_hint_faults 11472955422;numa_hint_faults_local 10474340165;numa_pages_migrated 1303777431;pgmigrate_success 2246740708;thp_migration_success 1525049;
+after:  numa_pte_updates 26756266392;numa_hint_faults 11472958200;numa_hint_faults_local 10474340535;numa_pages_migrated 1303827667;pgmigrate_success 2246790944;thp_migration_success 1525143;
+== standard_8gb run1: 1.86 s wall, 27.51 sys-cpu-s, 103.63 user-cpu-s
+before: numa_pte_updates 26756266392;numa_hint_faults 11472958200;numa_hint_faults_local 10474340535;numa_pages_migrated 1303827667;pgmigrate_success 2246790944;thp_migration_success 1525143;
+after:  numa_pte_updates 26756436432;numa_hint_faults 11473056377;numa_hint_faults_local 10474435378;numa_pages_migrated 1303831000;pgmigrate_success 2246794277;thp_migration_success 1525143;
+== standard_8gb run2: 1.91 s wall, 29.34 sys-cpu-s, 105.46 user-cpu-s
+before: numa_pte_updates 26756436432;numa_hint_faults 11473056377;numa_hint_faults_local 10474435378;numa_pages_migrated 1303831000;pgmigrate_success 2246794277;thp_migration_success 1525143;
+after:  numa_pte_updates 26756608234;numa_hint_faults 11473147475;numa_hint_faults_local 10474523042;numa_pages_migrated 1303834433;pgmigrate_success 2246797710;thp_migration_success 1525143;

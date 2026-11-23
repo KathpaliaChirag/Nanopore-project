@@ -1,0 +1,15 @@
+pluspf_103gb run1: peak AnonHugePages=105858 MB, Anonymous=107140 MB, Rss=107092 MB, thp_share_of_anon=98.8%
+pluspf_103gb run2: peak AnonHugePages=105858 MB, Anonymous=106702 MB, Rss=106591 MB, thp_share_of_anon=99.2%
+pluspf_103gb run3: peak AnonHugePages=105858 MB, Anonymous=106999 MB, Rss=106839 MB, thp_share_of_anon=98.9%
+standard_16gb run1: peak AnonHugePages=15258 MB, Anonymous=16144 MB, Rss=16060 MB, thp_share_of_anon=94.5%
+standard_16gb run2: peak AnonHugePages=15258 MB, Anonymous=16141 MB, Rss=16047 MB, thp_share_of_anon=94.5%
+standard_16gb run3: peak AnonHugePages=15258 MB, Anonymous=16128 MB, Rss=16042 MB, thp_share_of_anon=94.6%
+--- /sys thp settings
+always [madvise] never
+always defer defer+madvise [madvise] never
+1
+compact_stall 1537350
+compact_fail 1439911
+compact_success 97439
+thp_fault_alloc 45844910
+thp_fault_fallback 31458
