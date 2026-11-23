@@ -34,3 +34,15 @@ every copy method lands at 35 to 40 GB/s whatever the chunk size, thread count o
 ## what is left at 103 GB (agent A's ranked list, untested)
 
 (a) pipelining lookups across reads (a read with fewer lookups than K2_B gets no lookahead; the average is about 116 lookups per read): expected 2 to 7% at 103 GB, 6 to 10 h of work, no output risk. (b) prefetch hint t1/t2 vs t0: 0 to 3%, 0.5 h. (c) a second-line prefetch for cells near a 64-byte line end: about 1.3%. none of these is worth more than a few percent.
+
+## 4. the prefetch hint is a null (data/hint.csv)
+
+bin_hint (compact_hash.cc PrefetchIndex with a runtime-selectable locality hint, K2_HINT): 3 = prefetcht0 (all cache levels, the default), 2 = prefetcht1, 1 = prefetcht2, 0 = prefetchnta. T=96, K2_B=64, pre-pass off, K2_BULK=1, all reads, 5 interleaved repetitions, wall seconds:
+
+| db | t0 (3) | t1 (2) | t2 (1) | nta (0) |
+|---|---|---|---|---|
+| 103 GB | 6.77 6.76 6.41 6.44 6.51 | 6.85 6.66 6.57 6.68 6.55 | 6.86 6.56 6.66 6.67 6.80 | 6.69 6.49 6.37 6.62 6.53 |
+| 16 GB | 2.14 2.09 2.07 2.09 2.08 | 2.14 2.12 2.11 2.12 2.09 | 2.17 2.18 2.14 2.14 2.08 | 2.11 2.09 2.12 2.09 2.09 |
+| 8 GB | 1.70 1.64 1.65 1.64 1.65 | 1.66 1.65 1.64 1.66 1.66 | 1.67 1.67 1.65 1.64 1.66 | 1.66 1.67 1.67 1.67 1.67 |
+
+medians: 103 GB 6.51 / 6.66 / 6.67 / 6.53; 16 GB 2.09 / 2.12 / 2.14 / 2.09; 8 GB 1.65 / 1.66 / 1.66 / 1.67. all within noise (about 2%), no hint beats the default. the lookup stall is not about which cache level the line lands in.
