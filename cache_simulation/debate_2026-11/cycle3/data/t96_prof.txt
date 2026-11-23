@@ -1,0 +1,36 @@
+== 8GB T=96 top symbols
+    39.85%  [.] ClassifySequence(kraken2::Sequence&, kraken2::Sequence&, std::__cxx11::basic_ostring
+    13.25%  [.] kraken2::ScanBulk(kraken2::BulkState&, kraken2::BulkParams const&, char const*, unsi
+     5.35%  [k] 0xffffffffb3247ff8                                                                  
+     4.33%  [.] __memmove_avx512_unaligned_erms                                                     
+     3.38%  [.] kraken2::CompactHashTable::GetAt(unsigned long, unsigned long, unsigned long) const 
+     3.36%  [.] AddHitlistString(std::__cxx11::basic_ostringstream<char, std::char_traits<char>, std
+     3.22%  [k] 0xffffffffb2ba20a7                                                                  
+     2.27%  [.] std::basic_streambuf<char, std::char_traits<char> >::xsputn(char const*, long)      
+     1.71%  [k] 0xffffffffb3ba2be7                                                                  
+     1.61%  [.] kraken2::CompactHashTable::PrefetchIndex(unsigned long) const                       
+     1.59%  [.] std::basic_ostream<char, std::char_traits<char> >& std::__ostream_insert<char, std::
+     1.37%  [.] std::ostreambuf_iterator<char, std::char_traits<char> > std::num_put<char, std::ostr
+     1.26%  [.] __memchr_evex                                                                       
+     1.25%  [.] std::ostream::sentry::sentry(std::ostream&)                                         
+    99.99%  classify
+     0.01%  perl    
+     0.00%  perf-exe
+== 103GB T=96 top symbols
+    29.49%  [.] kraken2::CompactHashTable::GetAt(unsigned long, unsigned long, unsigned long) const 
+    14.35%  [k] 0xffffffffb3247ff8                                                                  
+    13.02%  [.] ClassifySequence(kraken2::Sequence&, kraken2::Sequence&, std::__cxx11::basic_ostring
+     8.66%  [k] 0xffffffffb3ba2be7                                                                  
+     5.46%  [.] kraken2::CompactHashTable::PrefetchIndex(unsigned long) const                       
+     5.30%  [.] kraken2::ScanBulk(kraken2::BulkState&, kraken2::BulkParams const&, char const*, unsi
+     2.85%  [.] __memmove_avx512_unaligned_erms                                                     
+     1.37%  [.] AddHitlistString(std::__cxx11::basic_ostringstream<char, std::char_traits<char>, std
+     1.09%  [.] __memchr_evex                                                                       
+     1.08%  [k] 0xffffffffb2ba20a7                                                                  
+     1.06%  [.] std::basic_streambuf<char, std::char_traits<char> >::xsputn(char const*, long)      
+     0.88%  [k] 0xffffffffb2dbea4f                                                                  
+     0.75%  [.] kraken2::Taxonomy::IsAAncestorOfB(unsigned long, unsigned long) const               
+     0.72%  [.] std::__detail::_Map_base<unsigned long, std::pair<unsigned long const, unsigned long
+   100.00%  classify
+     0.00%  perl    
+     0.00%  kraken2 

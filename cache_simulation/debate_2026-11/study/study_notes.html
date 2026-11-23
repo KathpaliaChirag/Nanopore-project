@@ -158,7 +158,7 @@ li{margin:0 0 5px}
 </table></div>
 <p>After the fixes the first real run completed: 25.1M instructions, about 14.3M cycles, IPC 1.76, output identical to the native run (7 of 10 reads classified). <span class="tag sim">SIM</span></p>
 <div class="taught"><b>What it taught, and what it implies for trust</b><br>Three of the four bugs were silent or half-silent: a wrong flag produced a plausible run on default settings. So the config you think you ran is not necessarily the config that ran. Later the same class of bug struck again (cleanstart found <code>-n N</code> alone leaves <code>total_cores = 1</code>, and that instruction-cache modeling was off in every old run). The defence is to read the effective <code>sim.cfg</code> of every run, and Chapter 7 shows that was not done early enough.</div>
-<div class="note"><span class="tag unv">UNVERIFIED</span> The 96 in "96 slices" is the logical CPUs per socket from lscpu. If the 8468 has 48 physical cores per socket (my understanding, not checked on Luna), a per-core split would be about 2.2 MB, double the 1125 KB used. This does not change the -n 1 conclusion in Chapter 7, but it should be checked with <code>lscpu</code>.</div>
+<div class="note"><span class="tag real">REAL</span> Config error, verified 2026-11-23: the 96 in "96 slices" is the logical CPUs per socket. <code>lscpu</code> reports 48 physical cores per socket, so the per-core slice should be about 2240 KB, double the 1125 KB used. This does not change the -n 1 conclusion in Chapter 7. See Updates.</div>
 </section>
 
 <section id="ch3" data-toc="3. Associativity sweep, first positive result">
@@ -332,6 +332,7 @@ li{margin:0 0 5px}
 <li><b>Two different cache designs were mixed</b> (original: fixed 4096 sets, static thread-local array, 24 B entries, LRU, raw low-bit set index; current: heap array, 16 B entries, round-robin, murmur index, sizing formula). The weak original index was later shown to give an 8.9x hit-rate change when fixed.</li>
 <li><b>Model artifacts exceed the signal.</b> Instruction-cache modeling was off in every old run (it halves a smoke-test IPC from 0.87 to 0.42), the core is a Meteor Lake model, TLB and prefetch behaviour were never validated.</li>
 <li><b>Instrument limits.</b> Single run per cell, no replicates, uneven read axes, 2 multicore deadlocks, 17 of 27 cleanstart rows.</li>
+<li><b>Config error found 2026-11-23: the LLC slice is half size.</b> <code>luna.cfg</code> divided 107520 KB by 96, but 96 is logical CPUs per socket. <code>lscpu</code> shows 48 cores per socket, so the slice should be about 2240 KB, not 1125 KB. <span class="tag real">REAL</span> Every Luna-config run used the half-size slice. Signs of conclusions are unchanged (a single slice is about 1% to 2% of the real LLC either way), but absolute LLC-capacity results must not be cited and the config must be fixed before any rerun. <span class="tag sim">SIM</span></li>
 </ol>
 <h3>The lineage evidence <span class="tag sim">SIM</span></h3>
 <p>If the cache caused the 2x, a lookup add-on could not remove instructions, and size and width would matter. They do not behave that way:</p>
@@ -432,7 +433,7 @@ li{margin:0 0 5px}
 <h3>Unverified items, collected</h3>
 <ul>
 <li>Sniper about 25% validation error (seen in slides, not full text); TACO 2014 author list; Chips and Cheese latencies (same-class chip).</li>
-<li>96 slices versus 48 physical cores per socket on the 8468.</li>
+<li>(Resolved 2026-11-23: 48 physical cores per socket, so the slice is half size. See Updates.)</li>
 <li>Whether cleanstart 1-core runs got 16 MB or 2 MB of L3; whether the 8-core queue finished; status of the hung 4c_r50_16gb retry.</li>
 <li>Causes of: the 65536 spike; 8 GB faster than 50 MB at 1 core; the Orion-versus-desktop ordering; the 8 GB loss under the oracle (branch and batch-hole hypothesis).</li>
 <li>Real-Luna S6 ablation numbers and the 80% to 84% LLC miss rate are quoted from reports, not re-opened.</li>
@@ -617,14 +618,29 @@ li{margin:0 0 5px}
 <p class="trap"><b>Trap:</b> "Isn't a negative result unpublishable?" A priced upper bound with a reproducible oracle method is publishable as characterisation, if the claims stay within the bound.</p></div></details>
 
 <details class="qa"><summary>Is the 105 MB LLC and the 96 slices consistent?</summary><div class="ans">
-<p>The sysfs LLC is 107520 KB shared per socket. The config divides it by 96, treated as cores per socket. But 96 is the logical CPU count per socket (192 threads on 2 sockets). If the 8468 has 48 physical cores per socket (my understanding, not verified on Luna), the per-core slice would be about 2.2 MB, double the 1125 KB used.</p>
-<p>It does not rescue the setup: 2.2 MB is still about 2% of the real LLC. It should still be fixed and checked with <code>lscpu</code>. <span class="tag unv">UNVERIFIED</span></p>
+<p>The sysfs LLC is 107520 KB shared per socket. The config divides it by 96, treated as cores per socket. But 96 is the logical CPU count per socket (192 threads on 2 sockets). Verified with <code>lscpu</code> on 2026-11-23: 48 physical cores per socket, so the per-core slice should be about 2240 KB, double the 1125 KB used. <span class="tag real">REAL</span></p>
+<p>It does not rescue the setup: 2.2 MB is still about 2% of the real LLC. The config needs the one-line fix and a rerun.</p>
 <p class="trap"><b>Trap:</b> "Was it caught?" No audit flagged it, it came from reading the numbers side by side.</p></div></details>
 
 <details class="qa"><summary>Which numbers from the old log must never be cited?</summary><div class="ans">
 <p>The 2x (2.05x) speedup in seconds, and the speedup in any wall-clock column; the "50 reads is a small-workload artifact" reconciliation; +4.4% and +10.2% for the 65536 spike (use +2.5% and +6.0%); the Orion "8-way L2"; and "startup dominates 10-read runs".</p>
 <p>Also the older real-hardware "22x slowdown cliff" is superseded: it was mostly a thread-local-storage bug, not the sizing formula.</p>
 <p class="trap"><b>Trap:</b> "Why list wrong numbers?" Because they are in the log and in earlier decks, and a professor may have seen them.</p></div></details>
+
+<details class="qa"><summary>Is your simulated LLC slice size right?</summary><div class="ans">
+<p>No. <code>luna.cfg</code> divided the 107520 KB LLC by 96, which is the logical CPU count per socket. <code>lscpu</code> on Luna shows 48 physical cores per socket (2 threads each), so the per-core slice should be about 2240 KB, and the config used 1125 KB, about half. <span class="tag real">REAL</span></p>
+<p>The sign of the conclusions is unaffected: with <code>-n 1</code> a single slice is instantiated, and 1125 KB or 2240 KB is only about 1% to 2% of the real 105 MB LLC. The fix is a one-line config change plus a rerun. <span class="tag sim">SIM</span></p>
+<p class="trap"><b>Trap:</b> do not claim the old absolute LLC-capacity numbers. Only relative, same-config comparisons are usable, and even those carry the Chapter 7 caveats.</p></div></details>
+
+<details class="qa"><summary>Why do you say hardware associativity does not matter if your LLC model is wrong?</summary><div class="ans">
+<p>I do not say that. The sweep varied the associativity of a roughly 1.1 MB slice that sees under 1% of loads (on 50 MB, L2 and NUCA hit rates are under 1% to 2%). The null therefore says the simulated workload barely reaches that level, not that associativity is irrelevant on the real 105 MB cache. <span class="tag sim">SIM</span></p>
+<p>The real-machine evidence is independent of the model: the oracle ceiling shows no cache-side gain at cache-resident sizes (about 0% at 103 GB, a loss at 8 GB), and the Belady bound caps any policy at about 3% to 5% at 8 GB. <span class="tag real">REAL</span></p>
+<p class="trap"><b>Trap:</b> distinguish "null in this model" from "null in reality". The first is an instrument statement, the second needs real-hardware evidence such as a Cache Allocation Technology sweep.</p></div></details>
+
+<details class="qa"><summary>What is the single most important experiment you have not run?</summary><div class="ans">
+<p>Calibrating the simulator against <code>perf stat</code> on Luna: the same input run natively and in Sniper, with a full-size shared LLC and a lookup window long enough to warm it. Proposed acceptance: instructions within 2%, cycles within 15%, LLC misses within 20%.</p>
+<p>Every other simulator claim (associativity, size, topology, software cache effect) depends on it, because the setup has never been compared with real counters. If Sniper cannot reproduce known real orderings, it should be demoted to trace generation.</p>
+<p class="trap"><b>Trap:</b> "Why not run a new cache idea first?" Without calibration its simulated gain or loss has no known relation to Luna.</p></div></details>
 
 <!-- QA-APPEND-HERE: add new <details class="qa"> blocks above this comment, same markup. Numbering is automatic. -->
 </div>
@@ -660,6 +676,7 @@ li{margin:0 0 5px}
 <tr><td class="l">+0.9 / -1.3 / -5.3 / -12.5%</td><td class="l">Oracle at 103 GB, skip 25 / 45 / 60 / 80%</td><td>R</td></tr>
 <tr><td class="l">+4.5 / +7.1 / +5.1 / +0.1%</td><td class="l">Oracle at 8 GB, skip 25 / 45 / 60 / 80%</td><td>R</td></tr>
 <tr><td class="l">11.06 / 14.48 s vs 11.10 / 14.55 s</td><td class="l">Real ablation, no cache vs 4-way cache</td><td>R</td></tr>
+<tr><td class="l">2 x 48 x 2 = 192 logical CPUs</td><td class="l">Luna: 2 sockets x 48 cores x 2 SMT; L3 105 MiB per socket (210 MiB total); luna.cfg slice 1125 KB (should be about 2240 KB)</td><td>R / S</td></tr>
 </table></div>
 </section>
 
@@ -691,6 +708,9 @@ li{margin:0 0 5px}
 <p>On Luna, an 8 GB database, 104,980 reads, one thread: 12,237,762 lookups, 2,270,742 unique slots, 81.4% repeats, 86.75% hit a stored k-mer. Top 262K slots cover 55.8%, top 1M cover 90.0%, about 77% of repeats sit at distance 2^17 to 2^21. Hit rate at 262K entries: LRU 40.1%, 4-way LRU 38.9%, Belady 66.6%; at 1M: 76.5%, 71.0%, 81.4%. Lookup share of CPU 7.7% (8 GB), 6.9% (16 GB), 1.7% (103 GB, rough). Bound: 0.39 x 0.077 = about 3% (4-way LRU) and 0.67 x 0.077 = about 5% (Belady) at 8 GB. This replaces the "no reuse" framing. <span class="tag real">REAL</span> See Chapter 8. Source: <code>debate_2026-11/round5_RESULTS.md</code>.</p></article>
 <article class="upd"><h3>2026-11-23: Oracle ceiling kills the static hot-set front table</h3>
 <p>Time-only oracle on 32 threads, 1,872,777 reads, 3 interleaved reps. Skipping 45% of lookups (the coverage a cache-resident table can reach) changes 103 GB by -1.3% and 8 GB by +7.1% (slower). 60%: -5.3% and +5.1%. 80%: -12.5% and +0.1%. The hook itself costs about 1.6% (103 GB) and 1% (8 GB). The idea is falsified at cache-resident sizes before building; only a 0.6M to 1M entry table remains untested and is judged not worth building. <span class="tag real">REAL</span> See Chapter 8. Source: <code>debate_2026-11/cycle2/round2_RESULT_oracle_ceiling.md</code>, <code>cycle2/data/ceil.csv</code>.</p></article>
+<article class="upd"><h3>2026-11-23: luna.cfg slice size was halved (verified with lscpu)</h3>
+<p><code>configs/luna.cfg</code> derives the NUCA slice as "107520 KB total / 96 real cores per socket = 1120 KB", rounded to 1125 KB (1200 sets x 15 ways x 64 B). <code>lscpu</code> on Luna (read-only) reports Intel Xeon Platinum 8468, 2 sockets, 48 cores per socket, 2 threads per core, 192 logical CPUs, L3 210 MiB in 2 instances (105 MiB, 107520 KB, per socket). <span class="tag real">REAL</span> So 96 is the logical thread count per socket, the physical core count is 48, and the per-core slice should be about 107520 / 48 = 2240 KB before rounding to a valid set count.</p>
+<p>Consequence: every simulated LLC slice built from <code>luna.cfg</code> (fair batch, hw_assoc sweep, flat versus NUCA comparison) was about half the size it should be. It does not change the sign of any conclusion, because <code>-n 1</code> instantiates a single slice either way and 2.2 MB is still about 2% of the real 105 MB LLC. It is one more reason not to cite absolute LLC-capacity results, and the config must be fixed before any rerun. <span class="tag sim">SIM</span> See Chapter 7 item 9 and the Q&A.</p></article>
 <!-- UPDATES-APPEND-HERE: add new <article class="upd"> blocks above this comment, newest last. -->
 </div>
 </section>

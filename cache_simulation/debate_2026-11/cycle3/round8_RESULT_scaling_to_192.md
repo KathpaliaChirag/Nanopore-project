@@ -40,3 +40,20 @@ once the serial read floor is gone the scanner is the limiter again, and the bul
 - 103 GB: about 3.2 s of the 7.0 s is loading the table (kernel page-cache copy plus huge-page zeroing at about 32 GB/s); a loader thread cap of 64 gave 3% earlier. overlapping the load with scanning, or a persistent resident database, are the only ideas left on that path.
 - small databases: about 2.0 s is now a floor that does not move with threads; candidates are the ordered output writer, process exit, and the 12.5 GB parse in the preads. a perf profile at T=96 would say.
 - validation matrix on bin_pread (queued) must pass before any of this is called shippable; paired-end, FASTA, gz and stdin use the old path by design.
+
+## addendum: byte-identity at 96 and 128 threads, and the 96-thread profile (data/t96_correct.txt, data/t96_prof.txt)
+
+bin_pread2 (K2_BULK=1) vs STOCK S19 at T=32: per-read output identical and plain report byte-identical at T=96 AND T=128 on all four databases (50 MB, 8 GB, 16 GB, 103 GB, all 1,872,777 reads). this closes the "T=96 not checked" caveat.
+
+perf record, T=96, share of classify-process samples:
+| symbol | 8 GB | 103 GB |
+|---|---|---|
+| ClassifySequence (hash, resolve loop, run merge, hit list; all inlined) | 39.85% | 13.02% |
+| ScanBulk (the new scanner; was about 38% of cpu as NextMinimizer) | 13.25% | 5.30% |
+| kernel (top two unresolved symbols) | about 10% | about 23% |
+| memmove | 4.33% | 2.85% |
+| GetAt | 3.38% | 29.49% |
+| AddHitlistString + xsputn + __ostream_insert + num_put + sentry | about 10% | about 3% |
+| PrefetchIndex | 1.61% | 5.46% |
+
+the scanner is no longer the limiter. on the small databases the remaining cost is the classification loop body and string formatting; on 103 GB it is table lookups (memory stalls) plus kernel time. next candidates: build the output line without ostringstream, stop building the c1/c2/u1/u2 strings when -C/-U is off (the 4% memmove), and a perf annotate of ClassifySequence.
