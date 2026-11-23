@@ -1,0 +1,19 @@
+--- impl_out/src/classify.cc	2026-11-23 14:29:59.375086378 +0530
++++ impl_out2/src/classify.cc	2026-11-23 14:35:29.009066730 +0530
+@@ -958,6 +958,7 @@
+                 minimizer_hit_groups++;
+                 if (!opts.report_filename.empty()) {  // E5: HLL only needed for --report-minimizer-data
+                   if (opts.report_kmer_data) curr_taxon_counts[taxon].add_kmer(pf[i].min);
++                  else if (opts.quick_mode) (void) curr_taxon_counts[taxon];  // quick mode: keep stock per-hit key creation (the hit_counts shortcut is not exact there)
+                 }
+               }
+             }
+@@ -996,7 +997,7 @@
+   run_count = 0;
+ 
+   finished_searching:
+-  if (! opts.report_filename.empty() && ! opts.report_kmer_data) {  // E8: same key set as stock add_kmer, inserted once per taxon per read
++  if (! opts.report_filename.empty() && ! opts.report_kmer_data && ! opts.quick_mode) {  // E8: same key set as stock add_kmer, inserted once per taxon per read
+     for (auto &e8kv : hit_counts)
+       if (e8kv.first != AMBIGUOUS_SPAN_TAXON) (void) curr_taxon_counts[e8kv.first];
+   }

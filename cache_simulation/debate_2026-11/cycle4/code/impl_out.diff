@@ -1,0 +1,238 @@
+--- impl_pread2/src/classify.cc	2026-11-23 12:19:50.810551805 +0530
++++ impl_out/src/classify.cc	2026-11-23 14:29:59.375086378 +0530
+@@ -124,13 +124,15 @@
+     KeyValueStore *hash, Taxonomy &tax,
+     IndexOptions &idx_opts, Options &opts, ClassificationStats &stats,
+     OutputStreamData &outputs, taxon_counters_t &total_taxon_counters);
+-taxid_t ClassifySequence(Sequence &dna, Sequence &dna2, ostringstream &koss,
++taxid_t ClassifySequence(Sequence &dna, Sequence &dna2, ostringstream &koss, std::string &kstr,
+     KeyValueStore *hash, Taxonomy &tax, IndexOptions &idx_opts,
+     Options &opts, ClassificationStats &stats, MinimizerScanner &scanner,
+     vector<taxid_t> &taxa, taxon_counts_t &hit_counts,
+     vector<string> &tx_frames, taxon_counters_t &my_taxon_counts);
++void AddHitlistStringFast(std::string &out, vector<taxid_t> &taxa, Taxonomy &taxonomy);
+ void AddHitlistString(ostringstream &oss, vector<taxid_t> &taxa,
+     Taxonomy &taxonomy);
++static inline void AppendU64(std::string &o, uint64_t v);
+ taxid_t ResolveTree(taxon_counts_t &hit_counts,
+     Taxonomy &tax, size_t total_minimizers, Options &opts);
+ void ReportStats(struct timeval time1, struct timeval time2,
+@@ -528,6 +530,10 @@
+     vector<taxid_t> taxa;
+     taxon_counts_t hit_counts;
+     ostringstream kraken_oss, c1_oss, c2_oss, u1_oss, u2_oss;
++    // I5: K2_OLDFMT=1 formats the kraken line via ostringstream (old path); K2_KEEPSTR=1 always builds c1/c2/u1/u2
++    const bool old_fmt = getenv("K2_OLDFMT") != nullptr && atoi(getenv("K2_OLDFMT")) == 1;
++    const bool build_sidestr = (getenv("K2_KEEPSTR") != nullptr && atoi(getenv("K2_KEEPSTR")) == 1)
++        || !opts.classified_output_filename.empty() || !opts.unclassified_output_filename.empty();
+     ClassificationStats thread_stats = {0, 0, 0};
+     vector<string> translated_frames(6);
+     Sequence *seq1 = nullptr, *seq2 = nullptr;
+@@ -535,6 +541,8 @@
+     uint64_t block_id;
+     OutputData out_data;
+     taxon_counters_t thread_taxon_counters;
++    // K2_CHUNKMERGE=1 restores the per-chunk merge; kmer data (HLL) always keeps it
++    const bool chunk_merge = opts.report_kmer_data || (getenv("K2_CHUNKMERGE") != nullptr && atoi(getenv("K2_CHUNKMERGE")) == 1);
+ 
+     while (true) {
+       thread_stats.total_sequences = 0;
+@@ -580,11 +588,12 @@
+ 
+       // Reset all dynamically-growing things
+       kraken_oss.str("");
++      out_data.kraken_str.clear();
+       c1_oss.str("");
+       c2_oss.str("");
+       u1_oss.str("");
+       u2_oss.str("");
+-      thread_taxon_counters.clear();
++      if (chunk_merge) thread_taxon_counters.clear();
+ 
+       while ((seq1 = reader1.NextSequence()) != NULL) {
+         auto valid_fragment = true;
+@@ -609,16 +618,19 @@
+         taxid_t call;
+         if (opts.paired_end_processing) {
+           call =
+-              ClassifySequence(*seq1, *seq2, kraken_oss, hash, tax, idx_opts,
++              ClassifySequence(*seq1, *seq2, kraken_oss, out_data.kraken_str, hash, tax, idx_opts,
+                                opts, thread_stats, scanner, taxa, hit_counts,
+                                translated_frames, thread_taxon_counters);
+         } else {
+           auto empty_sequence = Sequence();
+-          call = ClassifySequence(*seq1, empty_sequence, kraken_oss, hash, tax, idx_opts,
++          call = ClassifySequence(*seq1, empty_sequence, kraken_oss, out_data.kraken_str, hash, tax, idx_opts,
+                                   opts, thread_stats, scanner, taxa, hit_counts,
+                                   translated_frames, thread_taxon_counters);
+         }
+-        if (call) {
++        if (!build_sidestr) {
++          // no -C/-U: c1/c2/u1/u2 are never written, so skip to_string and the copies
++        }
++        else if (call) {
+           char buffer[1024] = "";
+           sprintf(buffer, " kraken:taxid|%llu",
+               (unsigned long long) tax.nodes()[call].external_id);
+@@ -659,18 +671,27 @@
+       }
+ 
+       out_data.block_id = block_id;
+-      out_data.kraken_str.assign(kraken_oss.str());
+-      out_data.classified_out1_str.assign(c1_oss.str());
+-      out_data.classified_out2_str.assign(c2_oss.str());
+-      out_data.unclassified_out1_str.assign(u1_oss.str());
+-      out_data.unclassified_out2_str.assign(u2_oss.str());
++      if (old_fmt)
++        out_data.kraken_str.assign(kraken_oss.str());
++      if (build_sidestr) {
++        out_data.classified_out1_str.assign(c1_oss.str());
++        out_data.classified_out2_str.assign(c2_oss.str());
++        out_data.unclassified_out1_str.assign(u1_oss.str());
++        out_data.unclassified_out2_str.assign(u2_oss.str());
++      }
++      else {
++        out_data.classified_out1_str.clear();
++        out_data.classified_out2_str.clear();
++        out_data.unclassified_out1_str.clear();
++        out_data.unclassified_out2_str.clear();
++      }
+ 
+       #pragma omp critical(output_queue)
+       {
+         output_queue.push(std::move(out_data));
+       }
+ 
+-      if (!opts.report_filename.empty()) {
++      if (chunk_merge && !opts.report_filename.empty()) {
+ #pragma omp critical(update_taxon_counters)
+         for (auto &kv_pair : thread_taxon_counters) {
+           total_taxon_counters[kv_pair.first] += std::move(kv_pair.second);
+@@ -725,6 +746,13 @@
+         omp_unset_lock(&output_lock);
+       }  // end while output loop
+     } // end while
++    // I5: persistent per-thread counters are merged once here (only plain read/taxon counts, no HLL minimizer data)
++    if (!chunk_merge && !opts.report_filename.empty()) {
++#pragma omp critical(update_taxon_counters)
++      for (auto &kv_pair : thread_taxon_counters) {
++        total_taxon_counters[kv_pair.first] += std::move(kv_pair.second);
++      }
++    }
+   } // end parallel block
+ 
+   omp_destroy_lock(&output_lock);
+@@ -815,7 +843,7 @@
+ static int la_batch = InitBatch();
+ struct PfSlot { uint64_t min; uint64_t hc; size_t idx; bool amb; };
+ 
+-taxid_t ClassifySequence(Sequence &dna, Sequence &dna2, ostringstream &koss,
++taxid_t ClassifySequence(Sequence &dna, Sequence &dna2, ostringstream &koss, std::string &kstr,
+                          KeyValueStore *hash, Taxonomy &taxonomy,
+                          IndexOptions &idx_opts, Options &opts,
+                          ClassificationStats &stats, MinimizerScanner &scanner,
+@@ -989,6 +1017,51 @@
+       curr_taxon_counts[call].incrementReadCount();
+   }
+ 
++  static const bool old_fmt = getenv("K2_OLDFMT") != nullptr && atoi(getenv("K2_OLDFMT")) == 1;
++  if (!old_fmt) {
++    // I5: direct appends into the block buffer, identical bytes to the ostringstream path below
++    std::string &o = kstr;
++    o.append(call ? "C\t" : "U\t", 2);
++    if (! opts.paired_end_processing)
++      o.append(dna.header);
++    else
++      o.append(TrimPairInfo(dna.header));
++    o.push_back('\t');
++    auto ext_call = taxonomy.nodes()[call].external_id;
++    if (opts.print_scientific_name) {
++      const char *name = nullptr;
++      if (call) {
++        name = taxonomy.name_data() + taxonomy.nodes()[call].name_offset;
++      }
++      o.append(name ? name : "unclassified");
++      o.append(" (taxid ", 8);
++      AppendU64(o, (uint64_t) ext_call);
++      o.push_back(')');
++    }
++    else {
++      AppendU64(o, (uint64_t) ext_call);
++    }
++    o.push_back('\t');
++    AppendU64(o, (uint64_t) dna.seq.size());
++    if (opts.paired_end_processing) {
++      o.push_back('|');
++      AppendU64(o, (uint64_t) dna2.seq.size());
++    }
++    o.push_back('\t');
++    if (opts.quick_mode) {
++      AppendU64(o, (uint64_t) ext_call);
++      o.append(":Q", 2);
++    }
++    else {
++      if (taxa.empty())
++        o.append("0:0", 3);
++      else
++        AddHitlistStringFast(o, taxa, taxonomy);
++    }
++    o.push_back('\n');
++    return call;
++  }
++
+   if (call)
+     koss << "C\t";
+   else
+@@ -1031,6 +1104,52 @@
+   return call;
+ }
+ 
++static inline void AppendU64(std::string &o, uint64_t v) {
++  // hand itoa (to_chars needs c++17, the build is c++11)
++  char buf[24];
++  char *p = buf + sizeof(buf);
++  do { *--p = (char) ('0' + (v % 10)); v /= 10; } while (v);
++  o.append(p, buf + sizeof(buf) - p);
++}
++
++void AddHitlistStringFast(std::string &o, vector<taxid_t> &taxa,
++    Taxonomy &taxonomy)
++{
++  auto last_code = taxa[0];
++  uint64_t code_count = 1;
++  auto emit = [&](taxid_t lc, uint64_t cc, bool trailing_space) {
++    if (lc != MATE_PAIR_BORDER_TAXON && lc != READING_FRAME_BORDER_TAXON) {
++      if (lc == AMBIGUOUS_SPAN_TAXON) {
++        o.append("A:", 2);
++        AppendU64(o, cc);
++        o.push_back(' ');   // old code keeps the trailing space for A: even on the last run
++      }
++      else {
++        AppendU64(o, (uint64_t) taxonomy.nodes()[lc].external_id);
++        o.push_back(':');
++        AppendU64(o, cc);
++        if (trailing_space) o.push_back(' ');
++      }
++    }
++    else {
++      o.append(lc == MATE_PAIR_BORDER_TAXON ? "|:|" : "-:-", 3);
++      if (trailing_space) o.push_back(' ');
++    }
++  };
++  for (size_t i = 1; i < taxa.size(); i++) {
++    auto code = taxa[i];
++    if (code == last_code) {
++      code_count += 1;
++    }
++    else {
++      emit(last_code, code_count, true);
++      code_count = 1;
++      last_code = code;
++    }
++  }
++  emit(last_code, code_count, false);
++}
++
+ void AddHitlistString(ostringstream &oss, vector<taxid_t> &taxa,
+     Taxonomy &taxonomy)
+ {

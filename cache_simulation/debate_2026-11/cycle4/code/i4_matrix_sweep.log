@@ -1,0 +1,5 @@
+inputs ready in /dev/shm/i4_3255222/in: 48 files, base.fq 5788849 bytes, pre.fq 1489049 bytes
+=== sweep: cut the last record at every byte offset (pre.fq first 250 reads plus a 120 base synthetic last record)
+prefix 1106501 bytes, last record 269 bytes, first-MiB boundary is before the prefix end
+sweep: 1350 identical, 0 different over 270 cut points x 5 configs
+TOTAL: 1350 pass, 0 fail

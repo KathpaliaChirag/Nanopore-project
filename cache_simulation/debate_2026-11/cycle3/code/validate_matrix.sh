@@ -16,9 +16,9 @@ PROT_DB=${PROT_DB:-}                           # optional protein db (kraken2-bu
 T=${T:-8}
 W=${W:-/dev/shm/vm_$$}
 SRCFQ=${SRCFQ:-$(ls $HOME_/chirag_K/results/per_pod5_fastq/pod5_*.fastq | sort | head -1)}
-NAMES=(pread2)
-BINS=($HOME_/e1/bin_pread2)
-ENVS=("K2_BULK=1")
+NAMES=(all all_oldfmt)
+BINS=($HOME_/e1/bin_all $HOME_/e1/bin_all)
+ENVS=("K2_BULK=1" "K2_BULK=1 K2_OLDFMT=1 K2_KEEPSTR=1")
 NPASS=0; NFAIL=0; NWARN=0
 mkdir -p $W/in $W/res
 G=$W/gen.pl
