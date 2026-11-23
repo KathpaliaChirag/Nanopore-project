@@ -1,0 +1,8 @@
+50MB final config T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+50MB final config T=128 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+8GB final config T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+8GB final config T=128 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+16GB final config T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+16GB final config T=128 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+103GB final config T=96 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL
+103GB final config T=128 vs stock T=32: OUT_OK REP_BYTE_IDENTICAL

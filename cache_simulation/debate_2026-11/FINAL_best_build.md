@@ -43,3 +43,24 @@ K2_BULK=1 K2_B=64 kraken2 --threads 96 ...   (K2_PREAD=0 forces the stock reader
 - 96 to 128 threads takes up to two thirds of a shared server; the thread count is a policy decision for sir.
 - the exactness pre-pass costs about 0.2 s (about 10% of a 1.8 s run) and is skippable (K2_PREAD_PRESCAN=0, then malformed input aborts loudly instead of matching stock).
 - the 103 GB floor is the database load (about 3.2 s); only a resident database (the stock -D daemon) would remove it for repeated jobs.
+
+## UPDATE: the final configuration measured end to end in one run (luna, 2026-11-23)
+
+configuration: bin_pre (tree ~/e1/impl_pre) with K2_BULK=1 K2_B=64 K2_PRESCAN_MMAP=0 (pre-pass overlapped with the database load, plain pread), all 1,872,777 reads, plain --report, output /dev/null, 5 interleaved repetitions (cycle5/data/fcfg.csv). this closes the "final combination not re-measured" and "not run through the full matrix" gaps above.
+
+byte-identity (cycle5/data/fcfg_correct.txt): per-read output identical and plain report BYTE-identical to stock S19 at 32 threads, on 50 MB, 8 GB, 16 GB and 103 GB, at T=96 AND T=128.
+
+validation matrix run 5 (cycle5/data/validate_matrix5.log), final config plus the same binary with K2_OLDFMT=1 K2_KEEPSTR=1: 308 PASS, 0 FAIL, 0 WARN, including every malformed and truncated input case.
+
+wall seconds, medians of 5:
+
+| db | stock S19, 32 threads | final, T=96, pre-pass on | final, T=128, pre-pass on | final, T=128, pre-pass off |
+|---|---|---|---|---|
+| 50 MB | 8.37 | 1.88 | 1.83 | 1.61 |
+| 8 GB | 8.59 | 1.87 | 1.82 | 1.61 |
+| 16 GB | 10.04 | 2.28 | 2.22 | 2.05 |
+| 103 GB | 20.33 | 6.99 | 6.81 | 6.69 |
+
+speedup vs stock at its default 32 threads, T=128 with the exact pre-pass on (the safe configuration): 4.6x (50 MB), 4.7x (8 GB), 4.5x (16 GB), 3.0x (103 GB). with the pre-pass off (loud abort on mid-file damage instead of matching stock): 5.2x, 5.3x, 4.9x, 3.0x.
+
+remaining known gaps: translated (protein) search and -D daemon mode untested; paired-end, gz, stdin and FASTA inputs use the stock reader (exact, not faster); results are from one machine with a warm page cache; 96 to 128 threads is a policy decision on a shared server.
