@@ -1,0 +1,1 @@
+cd ~/cache_simulation/snipersim/config && sed -e 's/^cache_size = 1125 .*$/cache_size = 2250         # KB per-core slice: 107520 KB per socket \/ 48 physical cores = 2240, rounded to the valid 2250 (2400 sets x 15 ways x 64 B); the old 1125 divided by 96 logical CPUs (config error found 2026-11-23)/' luna.cfg > luna2.cfg && grep -n "^cache_size" luna2.cfg
