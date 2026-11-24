@@ -15,3 +15,8 @@ hardware grid: cache-off binary (classify_off) on luna2.cfg, one hardware proper
 findings: LLC/L2 associativity, replacement policy and LLC size all within 0.3% of base; only a smaller L2 (+2.4% at 50 reads) and L2 random (+1.1%) are worse. hardware prefetchers are faster everywhere: 8 GB 1-core -4 to -12%, 16 GB -3 to -10%, 4-core 8 GB -13 to -16% (growing with reads). full write-up with tables and caveats: RESULTS_hardware_cache.html.
 unsupported in Sniper: PLRU at 15 ways, 32/128-byte lines (DRAM model hard-coded to 64 B).
 known data issue: 4 four-core 50-read rows (pf_l1_n8, pf_l1_n16, pf_l1_f32, llc_assoc4) have sim_time NA because two copies of the run raced and one deleted the other's output folder; the write-up uses their cycle counts (about +-0.5%).
+
+## 8 and 16 cores (2026-11-25)
+
+16 runs: 8 and 16 cores x 8 GB and 16 GB x {base, pf_both, pf_l1_simple, llc_assoc4}, 50 reads, K2_BLOCK=1 (one read per block, output checked identical to stock at 8 and 64 threads). 12/32/64 cores were started then stopped on request (only 8 and 16 wanted).
+findings: prefetchers -17.4 to -18.2% (8 GB), -23.3 to -24.9% (16 GB); 4-way LLC control within +-0.9%. caveat: 50 reads is about 3 reads per core at 16 cores and instructions rise 52M -> 87M (8c) -> 130M (16c) from thread startup, so the gain may include a startup effect; not tested. see RESULTS_hardware_cache.html section 4f.

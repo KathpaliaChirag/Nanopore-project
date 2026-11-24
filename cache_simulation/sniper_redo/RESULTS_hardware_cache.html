@@ -27,7 +27,7 @@
 <body>
 
 <h1>Can a better hardware cache speed up kraken2? Modelling on Sniper</h1>
-<div class="meta">Simulator: Sniper on Luna. Workload: the real kraken2 classifier on 10, 25 and 50 reads. Databases: 8 GB and 16 GB. Single-core and 4-core. <strong>All runs are finished; this is the complete set (174 runs).</strong></div>
+<div class="meta">Simulator: Sniper on Luna. Workload: the real kraken2 classifier on 10, 25 and 50 reads. Databases: 8 GB and 16 GB. Single-core, 4-core, 8-core and 16-core. <strong>All runs are finished; this is the complete set (190 runs).</strong></div>
 
 <div class="box">
 <strong>Short answer.</strong> Changing how the cache is organised did nothing measurable on any database or core count: associativity (1 to 16 ways, including 4-way), replacement policy (SRRIP, PLRU, random, NRU, NMRU) and capacity (half to 4 times the LLC) all stay within 0.3% of the baseline. The hardware change that works is a <strong>hardware prefetcher</strong>, and the result repeats on every setup tried:
@@ -35,6 +35,7 @@
   <li>8 GB, one core: 4% to 12% fewer cycles (depending on read count), best with L1 and L2 prefetchers together.</li>
   <li>16 GB, one core: 3% to 10% fewer cycles.</li>
   <li>8 GB, four cores: <strong>13% to 16% fewer cycles, and the gain grows with the read count</strong> instead of shrinking.</li>
+  <li>8 and 16 cores at 50 reads: <strong>17% to 18% fewer cycles on 8 GB and 23% to 25% on 16 GB</strong>. The gain keeps growing with the core count, but the small workload may be inflating it (see 4f).</li>
 </ul>
 </div>
 
@@ -114,6 +115,29 @@
   <li>The L1 hit rate at 50 reads on one core rises from 98.86% to 99.45% with the L1 prefetcher, so it is turning sequential misses into hits. It cannot help the random hash-table lookups themselves. I have not run a test that separates the two kinds of access.</li>
 </ul>
 
+<h3>4f. Prefetchers on 8 and 16 cores, 50 reads, both databases</h3>
+<p>Each read is its own block here (<code>K2_BLOCK=1</code>) so all cores get work; the output was checked identical to the stock classifier at 8 and 64 threads. These runs are compared only with the base at the same core count and database.</p>
+<table>
+<tr><th>Setup</th><th>base (µs)</th><th>L1 + L2 prefetch</th><th>L1 prefetch only</th><th>LLC 4-way (control)</th></tr>
+<tr><td>8 GB, 8 cores</td><td>8,880.7</td><td class="win">-18.2%</td><td class="win">-17.5%</td><td class="flat">-0.7%</td></tr>
+<tr><td>8 GB, 16 cores</td><td>8,417.2</td><td class="win">-18.0%</td><td class="win">-17.4%</td><td class="flat">+0.9%</td></tr>
+<tr><td>16 GB, 8 cores</td><td>16,824.5</td><td class="win">-24.0%</td><td class="win">-23.3%</td><td class="flat">-0.2%</td></tr>
+<tr><td>16 GB, 16 cores</td><td>16,281.5</td><td class="win">-24.9%</td><td class="win">-24.4%</td><td class="flat">0.0%</td></tr>
+</table>
+<p>The gain from L1 and L2 prefetchers together at 50 reads, by core count:</p>
+<table>
+<tr><th>Database</th><th>1 core</th><th>4 cores</th><th>8 cores</th><th>16 cores</th></tr>
+<tr><td>8 GB</td><td class="win">-4.0%</td><td class="win">-15.9%</td><td class="win">-18.2%</td><td class="win">-18.0%</td></tr>
+<tr><td>16 GB</td><td class="win">-3.2%</td><td class="txt">not run</td><td class="win">-24.0%</td><td class="win">-24.9%</td></tr>
+</table>
+<p><strong>What this says.</strong> The prefetcher helps more the more cores run, and more on the 16 GB database than on 8 GB. It levels off between 8 and 16 cores on 8 GB. The control (a 4-way LLC) is flat on all four setups, within ±0.9%, so that is the noise floor for these multicore runs. 12, 32 and 64 cores were not run.</p>
+<p><strong>Why to be careful with these numbers.</strong></p>
+<ul>
+  <li>Fifty reads is little work for 16 cores: about three reads per core. Adding cores barely speeds the base up (8 GB: 13,458 µs on one core, 8,881 on eight, 8,417 on sixteen), and the instruction count grows from 52 M on one core to 87 M on eight and 130 M on sixteen, which is thread startup and splitting overhead.</li>
+  <li>So the larger multicore gain may come from that startup work, which is sequential memory traffic a prefetcher speeds up, and not from the per-read classification. I have not tested that. The one-core data point supports the worry: the gain there fell from 12% to 4% as reads grew and the startup share shrank.</li>
+  <li>The way to settle it is to repeat 8 and 16 cores with more reads per core (a few hundred, which Sniper can only do in many hours per run). Until then the multicore gain is a lower-confidence number than the single-core one.</li>
+</ul>
+
 <h3>4d. Cache organisation (no effect), 8 GB, one core</h3>
 <table>
 <tr><th>Variant</th><th>10 reads</th><th>25 reads</th><th>50 reads</th></tr>
@@ -156,7 +180,7 @@
 <tr><td>H2 replacement policy</td><td class="txt">Not supported. Six policies at the LLC all within 0.2%; random at the L2 is worse (+1.15% at 50 reads).</td></tr>
 <tr><td>H3 capacity</td><td class="txt">Not supported for the LLC (0.5x to 4x flat). Partly supported for the L2: halving it hurts (+2.4% at 50 reads), doubling it gives nothing.</td></tr>
 <tr><td>H4 prefetching</td><td class="txt"><strong>Supported.</strong> Faster on every setup, saturating at about 2 to 4 lines of depth, best with L1 and L2 together.</td></tr>
-<tr><td>H5 scale</td><td class="txt"><strong>Supported for 16 GB</strong> (same pattern, slightly smaller gains: 3% to 10%). <strong>Supported and stronger on four cores</strong> (13% to 16%, growing with reads). Cache organisation stays flat on both.</td></tr>
+<tr><td>H5 scale</td><td class="txt"><strong>Supported for 16 GB</strong> (same pattern, 3% to 10% on one core). <strong>Supported and stronger on 4, 8 and 16 cores</strong> (13% to 25%). Cache organisation stays flat everywhere. The multicore size is lower-confidence because 50 reads is little work for that many cores (see 4f).</td></tr>
 </table>
 
 <h2>6. How far to trust this</h2>
@@ -165,6 +189,7 @@
   <li>On four cores the instruction count is 67 M against 51.8 M on one core (extra work from splitting the input and starting threads), and at 10 reads four cores are slightly slower than one (2,230 µs against 2,160 µs); at 50 reads they are 1.39 times faster. The four-core windows are small and the split into 10,000-base blocks is artificial, so treat the 13% to 16% as indicative.</li>
   <li>Sniper has no model for contention or the real machine's own prefetchers, uses a fixed DRAM latency and has not been calibrated against Luna's performance counters. Treat the sizes of the effects as indicative and the direction as the finding.</li>
   <li>The prefetcher result comes from Sniper's simple stride prefetcher. A real CPU already has prefetchers, so the practical gain on Luna would be smaller than shown here. The way to check that is a run on real hardware with the CPU's prefetchers turned off and on, which I have not done.</li>
+  <li>On 8 and 16 cores each core gets only about three reads and the instruction count rises sharply with core count, so the 17% to 25% gains there may include a startup effect (see 4f). 12, 32 and 64 cores were not run.</li>
 </ul>
 
 <p class="small">Data and scripts: <code>cache_simulation/sniper_redo/</code> in the repository (<code>data/hw_results_all.csv</code>, <code>code/hw_job.sh</code>, <code>code/hw_variants.txt</code>, <code>code/hw_variants_pf.txt</code>).</p>

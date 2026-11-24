@@ -9,9 +9,9 @@ name=hw_${cores}c_${vn}_r${reads}_${dbn}
 SO=/dev/shm/hw_out; mkdir -p $SO $E/hwlogs $E/hwdone
 [ -f $E/hwdone/$name ] && exit 0
 OUT=$SO/$name; LOG=$SO/$name.log; STATS=$OUT/simulation/sim.stats
-BLK=""; [ $cores -gt 1 ] && BLK="K2_BLOCK=10000"
+BLK=""; [ $cores -gt 1 ] && BLK="K2_BLOCK=${K2B:-10000}"
 cd $SN; rm -rf $OUT; WS=$(date +%s)
-env $BLK timeout 14400 ./run-sniper -c address_translation_schemes/baseline -c luna2 -c general/total_cores=$cores $ovr -n $cores -d $OUT -- $BIN -H $DB/hash.k2d -t $DB/taxo.k2d -o $DB/opts.k2d -p $cores -T 0 -O $SO/$name.txt -Q 0 -R $SO/$name.rep -g 2 $IN > $LOG 2>&1 < /dev/null
+env $BLK timeout 43200 ./run-sniper -c address_translation_schemes/baseline -c luna2 -c general/total_cores=$cores $ovr -n $cores -d $OUT -- $BIN -H $DB/hash.k2d -t $DB/taxo.k2d -o $DB/opts.k2d -p $cores -T 0 -O $SO/$name.txt -Q 0 -R $SO/$name.rep -g 2 $IN > $LOG 2>&1 < /dev/null
 rc=$?; WALL=$(( $(date +%s) - WS ))
 ss() { grep -a -m1 "^$1 " $STATS 2>/dev/null | sed 's/^[^=]*= *//' | tr ',' ' ' | awk '{s=0;for(i=1;i<=NF;i++)s+=$i;printf "%.0f",s}'; }
 sm() { grep -a -m1 "^$1 " $STATS 2>/dev/null | sed 's/^[^=]*= *//' | tr ',' ' ' | awk '{m=0;for(i=1;i<=NF;i++)if($i+0>m)m=$i+0;printf "%.0f",m}'; }
