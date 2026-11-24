@@ -1,0 +1,2 @@
+job1 (initial, 10 reads, includes the 104GB index load): 144.73 s
+job2 (full 1.87M reads on the resident table): 142.04 s

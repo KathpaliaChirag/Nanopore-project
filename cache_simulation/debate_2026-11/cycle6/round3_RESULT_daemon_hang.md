@@ -1,11 +1,24 @@
-# resident database via the stock classify -D daemon: first attempt hangs (luna, 2026-11-24)
+# resident database via the stock classify -D daemon: not usable as shipped (luna, 2026-11-24)
 
-goal: measure how much a resident table saves on repeated jobs (the 103 GB run spends about 3.2 s of 6.7 s loading). test script: code/dm_daemon_test.sh (starts `classify -D` on the 103 GB database with a 10-read first job, then submits full 1.87M-read jobs over the daemon's FIFO and times each; the harness has a timeout and a cleanup trap).
+goal: measure how much a resident table saves on repeated jobs (the 103 GB run spends about 3.2 s of 6.7 s loading). test harness: code/dm_daemon_test.sh and dm_daemon_test2.sh (start `classify -D` on the 103 GB database with a 10-read first job, then submit full 1.87M-read jobs over the daemon's FIFO and time each; timeout and cleanup trap).
 
-result: the daemon loaded the table and forked its first child, but that child did not finish a 10-read job in 139 s (RSS 108 GB shared copy-on-write, no DONE line), so no timing was obtained. the test was killed and the FIFOs, processes and /dev/shm files were removed (checked: nothing left on luna).
+## correction of my first note
 
-likely cause (not yet confirmed): the build's parallel database loader (S10, an OpenMP `parallel for` with up to 32 threads) runs in the daemon PARENT before it forks; an OpenMP runtime is not safe to use in a forked child after its thread pool was created in the parent, and the child then uses OpenMP again (96 threads) and deadlocks. stock S19's loader may not use OpenMP in the parent, which would explain why -D worked there.
+the first attempt looked like a hang (a 10-read first job unfinished after 139 s) and I guessed an OpenMP-after-fork deadlock caused by the parallel database loader. that guess is NOT supported: the follow-up shows the same per-job cost in the stock S19 binary, so it is not a deadlock and not caused by the parallel loader.
 
-next steps: (a) run the same harness with K2_LOADT=1 (single-thread loader) or with OMP_WAIT_POLICY=passive to see whether the child then completes; (b) if so, a daemon-safe loader (do the parallel load in a short-lived child or via std::thread/pread without OpenMP); (c) only then time job 2 to 4 against a fresh run. nothing about resident-table speed is established yet.
+## measurements (data/dm_A_omp1.log, data/dm_B_stock.log; T=96 requested)
 
-also noted: `pkill -f "classify -D"` from an ssh one-liner kills its own shell (exit 255); use pids.
+| run | job 1 (10 reads, includes the table load) | job 2 (all 1.87M reads, table already resident) |
+|---|---|---|
+| best build (bin_pre), OMP_NUM_THREADS=1 in the daemon | 62.9 s | 152.5 s |
+| stock S19 classify -D (control) | 144.7 s | 142.0 s |
+
+jobs 3 and 4 did not log before the 420 s timebox. a fresh run of the same job is about 7 s (best build) or 11 to 20 s (stock). so in daemon mode every job costs about 140 to 150 s, for the best build AND for stock, and a resident table gives no speedup here. the cause of the per-job cost is not explained: candidates are the copy-on-write fork of a 104 GB mapping (page-table copy and page-fault behaviour when the table is on 4 KB pages: the single-thread load path allocates without MADV_HUGEPAGE), the output going through FIFOs, or process teardown. job 1 in the stock run (144.7 s) is simply the single-thread load of the 104 GB file at about 0.7 GB/s.
+
+## what is established and what is not
+
+established: stock -D mode as shipped does not make repeated 103 GB jobs faster (about 140 s per job here). not established: why, and whether a daemon built differently (huge-page table in the parent, output to a file instead of FIFOs, no fork) would work. no claim about resident-table speed should be made from this.
+
+cleanup verified: no classify processes and no /tmp/classify_* FIFOs left on luna after both runs.
+
+note: `pkill -f "classify -D"` from an ssh one-liner kills its own shell (exit 255); use pids. also: a script created with sed redirection needs chmod +x (the first diagnostic run silently did nothing for that reason).
