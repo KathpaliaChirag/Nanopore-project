@@ -6,3 +6,12 @@ variants (all from one tree, code/sn_patch.py + code/build.sh): off (cache never
 workloads: short set = nested prefixes of workloads/50reads.fastq (10/25/50 reads = 7.9 K / 37 K / 91 K bases); long set = the existing long_10/25/50.fastq (0.35 M / 0.9 M / 1.87 M bases).
 single core: run-sniper -n 1; multicore: -n 4 with general/total_cores=4, classify -p 4 and K2_BLOCK=10000 so small inputs split into several blocks (otherwise they fit in one 3 M-base block and only one core works).
 runner: code/sn_job.sh (one run, appends one row to results.csv), chains in code/chain1.sh and chain2.sh. results: results.csv (copied here as results.csv when the run finishes).
+
+## results (2026-11-24): hardware cache only
+
+the software-cache grid was stopped (user redirected: the goal is a better HARDWARE cache). `data/swcache_results_partial.csv` keeps the few runs that finished and is not analysed.
+
+hardware grid: cache-off binary (classify_off) on luna2.cfg, one hardware property changed per run via `-c` overrides (code/hw_job.sh, variants in code/hw_variants.txt and code/hw_variants_pf.txt). 174 runs in data/hw_results_all.csv (deduplicated; raw in data/hw_results_raw.csv): 8 GB single-core (10/25/50 reads, 31 variants), 16 GB single-core (12 variants), 8 GB 4-core (12 variants).
+findings: LLC/L2 associativity, replacement policy and LLC size all within 0.3% of base; only a smaller L2 (+2.4% at 50 reads) and L2 random (+1.1%) are worse. hardware prefetchers are faster everywhere: 8 GB 1-core -4 to -12%, 16 GB -3 to -10%, 4-core 8 GB -13 to -16% (growing with reads). full write-up with tables and caveats: RESULTS_hardware_cache.html.
+unsupported in Sniper: PLRU at 15 ways, 32/128-byte lines (DRAM model hard-coded to 64 B).
+known data issue: 4 four-core 50-read rows (pf_l1_n8, pf_l1_n16, pf_l1_f32, llc_assoc4) have sim_time NA because two copies of the run raced and one deleted the other's output folder; the write-up uses their cycle counts (about +-0.5%).

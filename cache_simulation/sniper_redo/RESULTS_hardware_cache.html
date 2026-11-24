@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hardware cache modelling for kraken2 on Sniper: hypotheses, method, results</title>
+<style>
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; color: #1b2430; background: #fff; max-width: 860px; margin: 0 auto; padding: 32px 20px 80px; line-height: 1.55; }
+  h1 { font-size: 26px; margin: 0 0 6px; }
+  h2 { font-size: 20px; margin: 34px 0 8px; border-bottom: 1px solid #d8dee6; padding-bottom: 4px; }
+  h3 { font-size: 16px; margin: 22px 0 6px; }
+  p, li { font-size: 15px; }
+  .meta { color: #5b6878; font-size: 14px; margin-bottom: 18px; }
+  .box { background: #f4f7fa; border: 1px solid #d8dee6; border-radius: 6px; padding: 12px 16px; margin: 14px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 8px 0 14px; }
+  th, td { border: 1px solid #d8dee6; padding: 5px 9px; text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  th { background: #eef2f6; }
+  td.win { background: #dff3ea; font-weight: 600; }
+  td.flat { color: #5b6878; }
+  td.loss { background: #fbe6dc; }
+  td.txt { text-align: left; }
+  code { background: #eef2f6; padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+  .small { font-size: 13px; color: #5b6878; }
+</style>
+</head>
+<body>
+
+<h1>Can a better hardware cache speed up kraken2? Modelling on Sniper</h1>
+<div class="meta">Simulator: Sniper on Luna. Workload: the real kraken2 classifier on 10, 25 and 50 reads. Databases: 8 GB and 16 GB. Single-core and 4-core. <strong>All runs are finished; this is the complete set (174 runs).</strong></div>
+
+<div class="box">
+<strong>Short answer.</strong> Changing how the cache is organised did nothing measurable on any database or core count: associativity (1 to 16 ways, including 4-way), replacement policy (SRRIP, PLRU, random, NRU, NMRU) and capacity (half to 4 times the LLC) all stay within 0.3% of the baseline. The hardware change that works is a <strong>hardware prefetcher</strong>, and the result repeats on every setup tried:
+<ul style="margin:6px 0 0">
+  <li>8 GB, one core: 4% to 12% fewer cycles (depending on read count), best with L1 and L2 prefetchers together.</li>
+  <li>16 GB, one core: 3% to 10% fewer cycles.</li>
+  <li>8 GB, four cores: <strong>13% to 16% fewer cycles, and the gain grows with the read count</strong> instead of shrinking.</li>
+</ul>
+</div>
+
+<h2>1. What I am doing</h2>
+<p>kraken2 classifies each DNA read by looking up many short pieces of it (k-mers) in a very large hash table. The table is gigabytes, so almost every lookup is a random read from main memory. The question is whether the CPU's hardware caches could be built differently to make that faster. I simulate the real kraken2 binary on a model of the Luna CPU (L1 48 KB, L2 2 MB, shared last-level cache) in Sniper and change one hardware property at a time.</p>
+<p>The same compiled kraken2 binary (with its software cache switched off) is used in every run. Only the simulated hardware changes, so any difference in cycles is caused by the hardware change and nothing else. Reads are nested prefixes of one file: the first 10, the first 25, and all 50 reads, so the three sizes are directly comparable.</p>
+
+<h2>2. Hypotheses</h2>
+<ul>
+  <li><strong>H1, associativity.</strong> A 4-way (or other) set-associative LLC or L2 runs kraken2 faster than the baseline 15-way LLC and 16-way L2.</li>
+  <li><strong>H2, replacement policy.</strong> A smarter policy (SRRIP, PLRU, random, NRU, NMRU) beats LRU.</li>
+  <li><strong>H3, capacity.</strong> A larger LLC or L2 helps; a smaller one hurts.</li>
+  <li><strong>H4, prefetching.</strong> A hardware prefetcher helps, and deeper prefetching helps more.</li>
+  <li><strong>H5, scale.</strong> The 8 GB single-core conclusions hold on the 16 GB database and with four cores running in parallel.</li>
+</ul>
+
+<h2>3. Method</h2>
+<ul>
+  <li>Command: <code>run-sniper -c address_translation_schemes/baseline -c luna2 [-c overrides] -n N</code>, one run per variant, read count and database. N is 1 for the single-core tables and 4 for the multicore table (with <code>-p 4</code> for kraken2 and small input blocks, <code>K2_BLOCK=10000</code>, so all four cores get work).</li>
+  <li><code>luna2.cfg</code> is the corrected config: the earlier one gave each LLC slice 1,125 KB by dividing by 96 logical CPUs; the right number is about 2,250 KB (physical cores).</li>
+  <li>Metric: simulated time of the run (the slowest core on 4 cores), from the full-precision <code>elapsed_time</code> counter, lower is better. The printed "cycles" are rounded to 0.1 M and hide small differences, so I do not use them to compare, except for four 4-core rows noted below.</li>
+  <li>Check on the setup: instruction count is identical across single-core variants at 50 reads (51.8 M on 8 GB), so the workload does not change, only the memory behaviour. The cache-off binary was also checked, before the runs, to give output identical to the stock classifier (on the 50-read file, at 1 and 4 threads).</li>
+  <li>Percentages are against the unmodified hardware (<code>base</code>) at the same read count, database and core count. Green is a gain of at least 1%, grey is within 1%, red is a loss of at least 1%.</li>
+</ul>
+
+<h2>4. Results</h2>
+
+<h3>4a. Prefetchers, 8 GB, one core (base: 2,160.5 / 6,235.0 / 13,457.8 µs)</h3>
+<table>
+<tr><th>Variant</th><th>10 reads</th><th>25 reads</th><th>50 reads</th></tr>
+<tr><td>L1 + L2 prefetchers together</td><td class="win">-11.9%</td><td class="win">-5.6%</td><td class="win">-4.0%</td></tr>
+<tr><td>L2 prefetcher (8 lines ahead)</td><td class="win">-11.4%</td><td class="win">-4.8%</td><td class="win">-2.9%</td></tr>
+<tr><td>L1 prefetcher, 32 streams tracked (4 lines ahead)</td><td class="win">-10.8%</td><td class="win">-5.3%</td><td class="win">-3.9%</td></tr>
+<tr><td>L1 prefetcher, 16 lines ahead</td><td class="win">-10.2%</td><td class="win">-5.2%</td><td class="win">-3.8%</td></tr>
+<tr><td>L1 prefetcher, 8 lines ahead</td><td class="win">-10.0%</td><td class="win">-5.1%</td><td class="win">-3.9%</td></tr>
+<tr><td>L1 prefetcher, 4 lines ahead (default)</td><td class="win">-9.6%</td><td class="win">-4.8%</td><td class="win">-3.5%</td></tr>
+<tr><td>L1 prefetcher, 2 lines ahead</td><td class="win">-8.1%</td><td class="win">-3.9%</td><td class="win">-3.0%</td></tr>
+<tr><td>L1 prefetcher, 1 line ahead</td><td class="flat">-0.1%</td><td class="flat">0.0%</td><td class="flat">0.0%</td></tr>
+</table>
+
+<h3>4b. Prefetchers, 16 GB, one core (base: 2,707.0 / 8,936.5 / 14,157.1 µs)</h3>
+<table>
+<tr><th>Variant</th><th>10 reads</th><th>25 reads</th><th>50 reads</th></tr>
+<tr><td>L1 + L2 prefetchers together</td><td class="win">-10.0%</td><td class="win">-4.9%</td><td class="win">-3.2%</td></tr>
+<tr><td>L2 prefetcher (8 lines ahead)</td><td class="win">-9.2%</td><td class="win">-3.7%</td><td class="win">-2.6%</td></tr>
+<tr><td>L1 prefetcher, 32 streams tracked</td><td class="win">-9.1%</td><td class="win">-4.7%</td><td class="win">-3.2%</td></tr>
+<tr><td>L1 prefetcher, 16 lines ahead</td><td class="win">-8.7%</td><td class="win">-4.7%</td><td class="win">-3.1%</td></tr>
+<tr><td>L1 prefetcher, 8 lines ahead</td><td class="win">-8.5%</td><td class="win">-4.7%</td><td class="win">-3.1%</td></tr>
+<tr><td>L1 prefetcher, 4 lines ahead (default)</td><td class="win">-8.1%</td><td class="win">-4.3%</td><td class="win">-2.9%</td></tr>
+<tr><td>L1 prefetcher, 2 lines ahead</td><td class="win">-6.6%</td><td class="win">-3.5%</td><td class="win">-2.6%</td></tr>
+<tr><td>L1 prefetcher, 1 line ahead</td><td class="flat">0.0%</td><td class="flat">+0.1%</td><td class="flat">0.0%</td></tr>
+<tr><td>LLC 4-way / LLC 8-way SRRIP / 4 MB L2</td><td class="flat">+0.03% / -0.05% / +0.10%</td><td class="flat">+0.08% / +0.01% / +0.01%</td><td class="flat">+0.04% / -0.02% / -0.08%</td></tr>
+</table>
+
+<h3>4c. Prefetchers, 8 GB, four cores (base: 2,229.9 / 4,801.3 / 9,673.6 µs)</h3>
+<table>
+<tr><th>Variant</th><th>10 reads</th><th>25 reads</th><th>50 reads</th></tr>
+<tr><td>L1 + L2 prefetchers together</td><td class="win">-12.8%</td><td class="win">-14.5%</td><td class="win">-15.9%</td></tr>
+<tr><td>L2 prefetcher (8 lines ahead)</td><td class="win">-11.9%</td><td class="win">-13.3%</td><td class="win">-14.0%</td></tr>
+<tr><td>L1 prefetcher, 32 streams tracked</td><td class="win">-11.6%</td><td class="win">-14.2%</td><td class="win">about -15.8%*</td></tr>
+<tr><td>L1 prefetcher, 16 lines ahead</td><td class="win">-11.1%</td><td class="win">-14.0%</td><td class="win">about -15.8%*</td></tr>
+<tr><td>L1 prefetcher, 8 lines ahead</td><td class="win">-11.0%</td><td class="win">-13.8%</td><td class="win">about -15.8%*</td></tr>
+<tr><td>L1 prefetcher, 4 lines ahead (default)</td><td class="win">-10.5%</td><td class="win">-13.5%</td><td class="win">-15.2%</td></tr>
+<tr><td>L1 prefetcher, 2 lines ahead</td><td class="win">-9.0%</td><td class="win">-12.2%</td><td class="win">-14.1%</td></tr>
+<tr><td>L1 prefetcher, 1 line ahead</td><td class="flat">-0.1%</td><td class="flat">0.0%</td><td class="flat">0.0%</td></tr>
+<tr><td>LLC 4-way</td><td class="flat">-0.1%</td><td class="flat">+0.1%</td><td class="flat">about 0.0%*</td></tr>
+<tr><td>LLC 8-way SRRIP</td><td class="flat">0.0%</td><td class="flat">0.0%</td><td class="flat">0.0%</td></tr>
+<tr><td>L2 4 MB</td><td class="flat">-0.1%</td><td class="flat">+0.1%</td><td class="flat">0.0%</td></tr>
+</table>
+<p class="small">* Four runs lost their detailed stats file (two copies of the same run were started at once and one deleted the other's output folder), so for these the value comes from the printed cycle count, accurate to about ±0.5%. The runs themselves completed normally.</p>
+
+<p><strong>What the prefetcher results say.</strong></p>
+<ul>
+  <li>Prefetching helps on every setup. The benefit saturates: 1 line ahead does nothing, 2 lines get most of the gain, and going from 4 to 16 lines adds under 1 percentage point. L1 and L2 together are best.</li>
+  <li>On one core the percentage shrinks as reads are added (8 GB: -9.6% at 10 reads, -3.5% at 50, default L1 prefetcher). Between 10 and 50 reads the base run costs 282.4 µs per extra read on 8 GB and the best prefetch run 274.9 µs, so the steady-state gain per read is about <strong>2.7% (8 GB) and 1.8% (16 GB)</strong>; the larger early gain is a one-off saving of roughly 140 µs, most likely in sequential startup and input parsing.</li>
+  <li>On four cores the opposite happens: the gain grows from -12.8% to -15.9% with L1 and L2 together. The 10 to 50 read slope is 186.1 µs per read for the base and 154.9 µs per read with both prefetchers, a steady-state gain of about <strong>17%</strong>. I have not tested why four cores amplify it; the cores share the memory system, so one possibility is that cutting each core's misses relieves pressure on the shared parts, but that is a guess.</li>
+  <li>The L1 hit rate at 50 reads on one core rises from 98.86% to 99.45% with the L1 prefetcher, so it is turning sequential misses into hits. It cannot help the random hash-table lookups themselves. I have not run a test that separates the two kinds of access.</li>
+</ul>
+
+<h3>4d. Cache organisation (no effect), 8 GB, one core</h3>
+<table>
+<tr><th>Variant</th><th>10 reads</th><th>25 reads</th><th>50 reads</th></tr>
+<tr><td>LLC 1-way</td><td class="flat">-0.09%</td><td class="flat">-0.04%</td><td class="flat">+0.07%</td></tr>
+<tr><td>LLC 2-way</td><td class="flat">-0.13%</td><td class="flat">+0.03%</td><td class="flat">+0.08%</td></tr>
+<tr><td>LLC 4-way (same capacity)</td><td class="flat">-0.06%</td><td class="flat">-0.06%</td><td class="flat">+0.04%</td></tr>
+<tr><td>LLC 8-way</td><td class="flat">-0.12%</td><td class="flat">-0.04%</td><td class="flat">+0.04%</td></tr>
+<tr><td>LLC 16-way</td><td class="flat">-0.13%</td><td class="flat">-0.02%</td><td class="flat">+0.04%</td></tr>
+<tr><td>LLC SRRIP (15-way)</td><td class="flat">-0.06%</td><td class="flat">-0.11%</td><td class="flat">+0.04%</td></tr>
+<tr><td>LLC random</td><td class="flat">-0.11%</td><td class="flat">-0.01%</td><td class="flat">-0.03%</td></tr>
+<tr><td>LLC NRU</td><td class="flat">-0.11%</td><td class="flat">-0.15%</td><td class="flat">+0.11%</td></tr>
+<tr><td>LLC NMRU</td><td class="flat">-0.07%</td><td class="flat">-0.05%</td><td class="flat">+0.08%</td></tr>
+<tr><td>LLC 8-way PLRU</td><td class="flat">-0.10%</td><td class="flat">-0.07%</td><td class="flat">+0.06%</td></tr>
+<tr><td>LLC 8-way SRRIP</td><td class="flat">-0.16%</td><td class="flat">-0.10%</td><td class="flat">+0.03%</td></tr>
+<tr><td>LLC half size</td><td class="flat">-0.16%</td><td class="flat">-0.04%</td><td class="flat">+0.20%</td></tr>
+<tr><td>LLC 2x size</td><td class="flat">-0.10%</td><td class="flat">-0.07%</td><td class="flat">+0.01%</td></tr>
+<tr><td>LLC 4x size</td><td class="flat">-0.17%</td><td class="flat">-0.03%</td><td class="flat">+0.23%</td></tr>
+<tr><td>L2 4-way</td><td class="flat">-0.14%</td><td class="flat">+0.01%</td><td class="flat">+0.31%</td></tr>
+<tr><td>L2 8-way</td><td class="flat">-0.06%</td><td class="flat">+0.03%</td><td class="flat">+0.10%</td></tr>
+<tr><td>L2 32-way</td><td class="flat">-0.07%</td><td class="flat">-0.02%</td><td class="flat">-0.05%</td></tr>
+<tr><td>L2 SRRIP</td><td class="flat">-0.14%</td><td class="flat">+0.19%</td><td class="flat">+0.08%</td></tr>
+<tr><td>L2 random</td><td class="flat">-0.12%</td><td class="flat">+0.02%</td><td class="loss">+1.15%</td></tr>
+<tr><td>L2 8-way PLRU</td><td class="flat">+0.14%</td><td class="flat">-0.01%</td><td class="flat">+0.30%</td></tr>
+<tr><td>L2 1 MB (half)</td><td class="flat">-0.16%</td><td class="flat">-0.04%</td><td class="loss">+2.42%</td></tr>
+<tr><td>L2 4 MB (double)</td><td class="flat">-0.16%</td><td class="flat">-0.05%</td><td class="flat">-0.10%</td></tr>
+</table>
+<p>Every LLC variant stays within 0.3% of the baseline. The only two losses are a smaller L2 (+2.4%) and random replacement at the L2 (+1.1%), both at 50 reads, where the working set starts to matter for the L2. The three organisation variants rerun on 16 GB and on four cores (4b and 4c, last rows) were flat too.</p>
+<p><strong>Why the LLC cannot matter here.</strong> The share of loads served by the LLC is about 0.00% in every single-core run. A 10 to 50 read window touches each cache line roughly once, so there is no reuse for any LLC organisation to catch. A bigger, smarter or more associative LLC has nothing to improve in a window this small, and that is a limit of the experiment, not proof that the real 1.87 M-read job behaves the same.</p>
+
+<h3>4e. Variants that could not be run</h3>
+<ul>
+  <li>PLRU at the LLC's 15 ways: Sniper only implements PLRU for 4 or 8 ways (I ran 8-way instead, above).</li>
+  <li>32-byte and 128-byte cache lines: Sniper's DRAM model is hard-coded for 64-byte lines and aborts. Line size cannot be tested in this simulator without changing its source.</li>
+</ul>
+
+<h2>5. Verdict on the hypotheses</h2>
+<table>
+<tr><th>Hypothesis</th><th>Result</th></tr>
+<tr><td>H1 associativity</td><td class="txt">Not supported. 1 to 16 ways at the LLC and 4 to 32 at the L2 are all within noise (largest: +0.31%). 4-way specifically: +0.04% at the LLC, +0.31% at the L2.</td></tr>
+<tr><td>H2 replacement policy</td><td class="txt">Not supported. Six policies at the LLC all within 0.2%; random at the L2 is worse (+1.15% at 50 reads).</td></tr>
+<tr><td>H3 capacity</td><td class="txt">Not supported for the LLC (0.5x to 4x flat). Partly supported for the L2: halving it hurts (+2.4% at 50 reads), doubling it gives nothing.</td></tr>
+<tr><td>H4 prefetching</td><td class="txt"><strong>Supported.</strong> Faster on every setup, saturating at about 2 to 4 lines of depth, best with L1 and L2 together.</td></tr>
+<tr><td>H5 scale</td><td class="txt"><strong>Supported for 16 GB</strong> (same pattern, slightly smaller gains: 3% to 10%). <strong>Supported and stronger on four cores</strong> (13% to 16%, growing with reads). Cache organisation stays flat on both.</td></tr>
+</table>
+
+<h2>6. How far to trust this</h2>
+<ul>
+  <li>Windows of 10 to 50 reads are tiny next to a real 1.87 M-read run, and the simulated LLC never gets reused in them. The null result on the LLC is expected from the setup, so do not read it as proof about the real workload.</li>
+  <li>On four cores the instruction count is 67 M against 51.8 M on one core (extra work from splitting the input and starting threads), and at 10 reads four cores are slightly slower than one (2,230 µs against 2,160 µs); at 50 reads they are 1.39 times faster. The four-core windows are small and the split into 10,000-base blocks is artificial, so treat the 13% to 16% as indicative.</li>
+  <li>Sniper has no model for contention or the real machine's own prefetchers, uses a fixed DRAM latency and has not been calibrated against Luna's performance counters. Treat the sizes of the effects as indicative and the direction as the finding.</li>
+  <li>The prefetcher result comes from Sniper's simple stride prefetcher. A real CPU already has prefetchers, so the practical gain on Luna would be smaller than shown here. The way to check that is a run on real hardware with the CPU's prefetchers turned off and on, which I have not done.</li>
+</ul>
+
+<p class="small">Data and scripts: <code>cache_simulation/sniper_redo/</code> in the repository (<code>data/hw_results_all.csv</code>, <code>code/hw_job.sh</code>, <code>code/hw_variants.txt</code>, <code>code/hw_variants_pf.txt</code>).</p>
+
+</body>
+</html>
