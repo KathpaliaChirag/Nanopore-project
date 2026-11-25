@@ -93,7 +93,7 @@
 <h3>4c. Prefetchers, 8 GB, four cores (base: 2,229.9 / 4,801.3 / 9,673.6 µs)</h3>
 <table>
 <tr><th>Variant</th><th>10 reads</th><th>25 reads</th><th>50 reads</th></tr>
-<tr><td>L1 + L2 prefetchers together</td><td class="win">-12.8%</td><td class="win">-14.5%</td><td class="win">-15.9%</td></tr>
+<tr><td>L1 + L2 prefetchers together</td><td class="win">-12.7%</td><td class="win">-14.5%</td><td class="win">-15.8%</td></tr>
 <tr><td>L2 prefetcher (8 lines ahead)</td><td class="win">-11.9%</td><td class="win">-13.3%</td><td class="win">-14.0%</td></tr>
 <tr><td>L1 prefetcher, 32 streams tracked</td><td class="win">-11.6%</td><td class="win">-14.2%</td><td class="win">about -15.8%*</td></tr>
 <tr><td>L1 prefetcher, 16 lines ahead</td><td class="win">-11.1%</td><td class="win">-14.0%</td><td class="win">about -15.8%*</td></tr>
@@ -111,7 +111,7 @@
 <ul>
   <li>Prefetching helps on every setup. The benefit saturates: 1 line ahead does nothing, 2 lines get most of the gain, and going from 4 to 16 lines adds under 1 percentage point. L1 and L2 together are best.</li>
   <li>On one core the percentage shrinks as reads are added (8 GB: -9.6% at 10 reads, -3.5% at 50, default L1 prefetcher). Between 10 and 50 reads the base run costs 282.4 µs per extra read on 8 GB and the best prefetch run 274.9 µs, so the steady-state gain per read is about <strong>2.7% (8 GB) and 1.8% (16 GB)</strong>; the larger early gain is a one-off saving of roughly 140 µs, most likely in sequential startup and input parsing.</li>
-  <li>On four cores the opposite happens: the gain grows from -12.8% to -15.9% with L1 and L2 together. The 10 to 50 read slope is 186.1 µs per read for the base and 154.9 µs per read with both prefetchers, a steady-state gain of about <strong>17%</strong>. I have not tested why four cores amplify it; the cores share the memory system, so one possibility is that cutting each core's misses relieves pressure on the shared parts, but that is a guess.</li>
+  <li>On four cores the opposite happens: the gain grows from -12.7% to -15.8% with L1 and L2 together. The 10 to 50 read slope is 186.1 µs per read for the base and 154.9 µs per read with both prefetchers, a steady-state gain of about <strong>17%</strong>. I have not tested why four cores amplify it; the cores share the memory system, so one possibility is that cutting each core's misses relieves pressure on the shared parts, but that is a guess.</li>
   <li>The L1 hit rate at 50 reads on one core rises from 98.86% to 99.45% with the L1 prefetcher, so it is turning sequential misses into hits. It cannot help the random hash-table lookups themselves. I have not run a test that separates the two kinds of access.</li>
 </ul>
 
@@ -127,7 +127,7 @@
 <p>The gain from L1 and L2 prefetchers together at 50 reads, by core count:</p>
 <table>
 <tr><th>Database</th><th>1 core</th><th>4 cores</th><th>8 cores</th><th>16 cores</th></tr>
-<tr><td>8 GB</td><td class="win">-4.0%</td><td class="win">-15.9%</td><td class="win">-18.2%</td><td class="win">-18.0%</td></tr>
+<tr><td>8 GB</td><td class="win">-4.0%</td><td class="win">-15.8%</td><td class="win">-18.2%</td><td class="win">-18.0%</td></tr>
 <tr><td>16 GB</td><td class="win">-3.2%</td><td class="txt">not run</td><td class="win">-24.0%</td><td class="win">-24.9%</td></tr>
 </table>
 <p><strong>What this says.</strong> The prefetcher helps more the more cores run, and more on the 16 GB database than on 8 GB. It levels off between 8 and 16 cores on 8 GB. The control (a 4-way LLC) is flat on all four setups, within ±0.9%, so that is the noise floor for these multicore runs. 12, 32 and 64 cores were not run.</p>

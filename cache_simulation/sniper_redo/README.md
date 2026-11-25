@@ -20,3 +20,8 @@ known data issue: 4 four-core 50-read rows (pf_l1_n8, pf_l1_n16, pf_l1_f32, llc_
 
 16 runs: 8 and 16 cores x 8 GB and 16 GB x {base, pf_both, pf_l1_simple, llc_assoc4}, 50 reads, K2_BLOCK=1 (one read per block, output checked identical to stock at 8 and 64 threads). 12/32/64 cores were started then stopped on request (only 8 and 16 wanted).
 findings: prefetchers -17.4 to -18.2% (8 GB), -23.3 to -24.9% (16 GB); 4-way LLC control within +-0.9%. caveat: 50 reads is about 3 reads per core at 16 cores and instructions rise 52M -> 87M (8c) -> 130M (16c) from thread startup, so the gain may include a startup effect; not tested. see RESULTS_hardware_cache.html section 4f.
+
+## figures and slides (2026-11-25)
+
+figures/plot_figs.py draws the four deck figures from data/hw_results_all.csv with pycairo only (matplotlib could not be installed on Luna: PyPI needs the campus login). run: `python3 plot_figs.py ../data/hw_results_all.csv out` (needs pycairo and the Liberation Sans font; Luna has both). outputs per figure: vector .pdf and .svg (white background, for a paper) and a 2x _slide.png. every percentage is computed from the CSV; nothing is typed in. figures/out/ holds the committed outputs.
+the 7-slide deck is a Slides artifact built from these PNGs; metric and caveats are the same as RESULTS_hardware_cache.html. rounding fix: the 4-core L1+L2 gain is 12.7/14.5/15.8 (the page briefly said 12.8 and 15.9 from rounding a rounded number).
