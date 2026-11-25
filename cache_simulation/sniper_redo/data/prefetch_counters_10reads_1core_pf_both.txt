@@ -1,0 +1,14 @@
+dram.reads = 24429
+L1-D.evict-prefetch = 6830
+L1-D.hits-prefetch = 13372
+L1-D.load-misses-data = 16070
+L1-D.loads-data = 2064368
+L1-D.prefetches = 26005
+L1-D.prefetches-fillup = 5261
+L1-D.stores-data = 1100167
+L2.evict-prefetch = 4
+L2.hits-prefetch = 4732
+L2.load-misses-data = 7967
+L2.loads-data = 42075
+L2.prefetches = 15052
+L2.prefetches-fillup = 15052

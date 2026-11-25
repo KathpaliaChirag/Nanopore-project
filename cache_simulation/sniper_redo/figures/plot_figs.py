@@ -259,12 +259,12 @@ def fig2(c, bg):
             "One L1 prefetcher; 8 GB database, 1 core. Higher = faster than no prefetcher.",
             [("line", BLUE, "10 reads"), ("line", AMBER, "25 reads"), ("line", INK, "50 reads")])
     anns = [
-        {"i": 0, "v": -0.7, "text": "1 line ahead: no effect", "dx": -10, "color": MUTED},
-        {"i": 1, "v": 11.5, "text": "2 lines already gets most of the gain", "dx": -40},
-        {"i": 3, "v": 7.4, "text": "levels off beyond 4 lines", "anchor": "m"},
+        {"i": 0, "v": -0.7, "text": "depth 1: nothing extra is fetched", "dx": -10, "color": MUTED},
+        {"i": 1, "v": 11.5, "text": "depth 2 (one extra address) gets most of the gain", "dx": -40},
+        {"i": 3, "v": 7.4, "text": "levels off beyond depth 4", "anchor": "m"},
     ]
     line_chart(c, bg, W, H, cats, series, 12.4, [0, 3, 6, 9, 12], "Time saved vs no prefetcher (%)",
-               "How far ahead the prefetcher fetches (cache lines)", head, anns, right_pad=170, ymin=-1.2)
+               "Prefetch depth setting (depth 1 fetches nothing extra)", head, anns, right_pad=170, ymin=-1.2)
 
 
 # ----------------------------------------------------------------------------- figure 3: gain vs core count
@@ -328,7 +328,7 @@ def fig5(c, bg):
         ("L2 associativity (4 to 32 way)", "org", ["l2_assoc4", "l2_assoc8", "l2_assoc32"]),
         ("L2 replacement policy (3)", "org", ["l2_srrip", "l2_random", "l2_8_plru"]),
         ("L2 size (1 MB and 4 MB)", "org", ["l2_1mb", "l2_4mb"]),
-        ("L1 prefetcher (1 to 16 lines)", "pf", ["pf_l1_n1", "pf_l1_n2", "pf_l1_simple", "pf_l1_n8", "pf_l1_n16", "pf_l1_f32"]),
+        ("L1 prefetcher (depth 1 to 16)", "pf", ["pf_l1_n1", "pf_l1_n2", "pf_l1_simple", "pf_l1_n8", "pf_l1_n16", "pf_l1_f32"]),
         ("L2 prefetcher", "pf", ["pf_l2_simple"]),
         ("L1 + L2 prefetchers", "pf", ["pf_both"]),
     ]

@@ -1,7 +1,7 @@
 <section id="tweaks" data-transition="fade">
 <h2>What we tried: only hardware prefetching helped</h2>
 <div class="chartrow">
-<img src="/_blob/98607c6a6701d7397da277070c5a98ab" alt="Dot plot of the time saved against the unmodified cache for every tweak tried, on the 8 GB database with one core and 50 reads. Six rows of cache design changes (LLC ways, LLC replacement policy, LLC size, L2 ways, L2 replacement policy, L2 size) cluster at zero, within 1 percent; a half-size L2 is 2.4 percent slower. Three rows of hardware prefetchers (L1, L2, and both together) are 3 to 4 percent faster." style="width:1000px; height:655px; object-fit:contain">
+<img src="/_blob/5a71e00d573c2615d0230ac2b082bb31" alt="Dot plot of the time saved against the unmodified cache for every tweak tried, on the 8 GB database with one core and 50 reads. Six rows of cache design changes (LLC ways, LLC replacement policy, LLC size, L2 ways, L2 replacement policy, L2 size) cluster at zero, within 1 percent; a half-size L2 is 2.4 percent slower. Three rows of hardware prefetchers (L1, L2, and both together) are 3 to 4 percent faster." style="width:1000px; height:655px; object-fit:contain">
 <div class="side">
 <div class="blk"><h3>The idea: hardware prefetching</h3>
 <div class="sqrow">
@@ -22,5 +22,5 @@
 </div>
 </div>
 </div>
-<aside>8 GB database, 1 core, 50 reads, Sniper simulation of Luna. Each dot is one run; the baseline is Sniper's default hardware, which has no prefetcher. The six grey rows are cache design changes: LLC 1 to 16 ways, six LLC replacement policies, LLC half to 4x size, L2 4 to 32 ways, three L2 policies, L2 1 and 4 MB. The L1 prefetcher row covers depths of 1 to 16 lines ahead. One line ahead does nothing; two to four lines get most of the gain. A 50-read run touches each cache line about once, so a larger or smarter cache has little to reuse; this is a limit of the experiment, not proof about the full 1.87 million read job.</aside>
+<aside>8 GB database, 1 core, 50 reads, Sniper simulation of Luna. Each dot is one run; the baseline is Sniper's default hardware, which has no prefetcher. The six grey rows are cache design changes: LLC 1 to 16 ways, six LLC replacement policies, LLC half to 4x size, L2 4 to 32 ways, three L2 policies, L2 1 and 4 MB. The L1 prefetcher row covers depth settings 1 to 16. In Sniper the depth counts the address being read plus the extra addresses it requests, so depth 1 fetches nothing extra and has no effect; depth 2 (one extra address) to 4 gets most of the gain. The prefetcher is Sniper's simple one: it watches the addresses one core reads, finds a constant step between nearby addresses (within the same 4 KB page) and requests the next addresses along that step. It has one copy per core and level (L1 and L2). In a 10-read, one-core run it issued about 26,000 L1 and 15,000 L2 requests against about 3.2 million data accesses (about 1.3%). A 50-read run touches each cache line about once, so a larger or smarter cache has little to reuse; this is a limit of the experiment, not proof about the full 1.87 million read job.</aside>
 </section>
