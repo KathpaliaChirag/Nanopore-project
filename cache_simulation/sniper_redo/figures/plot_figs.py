@@ -389,15 +389,20 @@ def fig6(c, bg):
 
     # value labels: 50 reads above, 10 reads above at 1 core and below at 4+ cores, 25 reads below its point,
     # so the three never share the crowded 4-core spot
+    # at 8 and 16 cores the 10- and 50-read lines are within 0.6 points of each other, so their values are
+    # given in one note instead of two labels on top of each other
     series = [
-        {"vals": get(50), "color": INK, "label": "50 reads", "below": (0,)},
-        {"vals": get(25), "color": AMBER, "label": "25 reads", "left": (1, 2, 3), "label_dy": -8},
-        {"vals": get(10), "color": BLUE, "label": "10 reads", "below": (1, 2, 3), "label_dy": 22},
+        {"vals": get(50), "color": INK, "label": "50 reads", "below": (0,), "skip": (2, 3), "label_dy": 18},
+        {"vals": get(25), "color": AMBER, "label": "25 reads", "left": (1,), "below": (2, 3)},
+        {"vals": get(10), "color": BLUE, "label": "10 reads", "below": (1,), "label_dy": -18},
     ]
     head = ("Does the prefetcher gain grow with more cores?",
             "L1 + L2 prefetchers together, 8 GB database. Higher = faster than no prefetcher.",
             [("line", BLUE, "10 reads"), ("line", AMBER, "25 reads"), ("line", INK, "50 reads")])
     anns = []
+    if all(v is not None for v in get(50)[2:]):
+        anns.append({"i": 2, "v": 22.0, "dx": -40, "color": INK,
+                     "text": f"50 reads: {get(50)[2]:.1f} at 8 cores, {get(50)[3]:.1f} at 16 cores"})
     if any(v is None for v in get(10)[2:] + get(25)[2:]):  # shown only while those runs are missing
         anns.append({"i": 2, "v": 2.2, "text": "10 and 25 reads at 8 and 16 cores: still running", "dx": -60, "color": ORANGE})
     line_chart(c, bg, W, H, cores, series, 24, [0, 6, 12, 18, 24], "Time saved vs no prefetcher (%)",
