@@ -103,18 +103,18 @@ def draw(c):
     c.set_source_rgb(*WHITE)
     c.paint()
     text(c, 24, 30, "Which cache tweaks speed kraken2 up?", 30, INK, bold=True)
-    text(c, 24, 68, "One dot = one run (8 GB database, 1 core, 50 reads). Right of 0 = faster than the unmodified cache.", 22, MUTED)
-    dot(c, 38, 108, TEAL, TEAL)
-    text(c, 58, 108, "cache design: size, ways, policy", 23)
-    dot(c, 470, 108, ORANGE, ORANGE_D)
-    text(c, 490, 108, "hardware prefetcher", 23)
+    text(c, 24, 68, "One dot per row = biggest effect of that tweak (8 GB, 1 core, 50 reads). Right of 0 = faster.", 22, MUTED)
+    dot(c, 38, 100, TEAL, TEAL)
+    text(c, 58, 100, "cache design: size, ways, policy", 23)
+    dot(c, 470, 100, ORANGE, ORANGE_D)
+    text(c, 490, 100, "hardware prefetcher", 23)
 
     n = len(GROUPS)
     step = (Y1 - Y0) / n
     c.set_source_rgb(*BAND)
     c.rectangle(px(-1), Y0, px(1) - px(-1), Y1 - Y0)
     c.fill()
-    text(c, px(1) - 8, Y1 - 24, "within 1%", 20, MUTED, anchor="r")
+    text(c, px(0), Y0 - 10, "within 1%", 20, MUTED, anchor="m")
     for t in (-2, 0, 2, 4, 6):
         line(c, px(t), Y0, px(t), Y1, 2.0 if t == 0 else 1.0, INK if t == 0 else GRID)
         text(c, px(t), Y1 + 26, ("−" + str(-t)) if t < 0 else str(t), 23, MUTED, anchor="m")
@@ -125,16 +125,17 @@ def draw(c):
         text(c, X0 - 16, cy, label, 21, INK, anchor="r", bold=(kind == "pf"))
         vals = [saved(v) for v in variants]
         fill, outline = (TEAL, TEAL) if kind == "design" else (ORANGE, ORANGE_D)
-        for v in vals:
-            dot(c, px(v), cy, fill, outline)
-        if max(vals) > 1.0:
-            text(c, px(max(vals)) + 16, cy, f"best +{max(vals):.1f}%", 21, ORANGE_D, bold=True)
-        if min(vals) < -1.0:
-            v = min(vals)
-            if v < -2.0:
-                text(c, px(v) + 16, cy, f"−{abs(v):.1f}%", 21, RED, bold=True)
-            else:
-                text(c, px(v) - 16, cy, f"−{abs(v):.1f}%", 21, RED, bold=True, anchor="r")
+        v = max(vals) if kind == "pf" else max(vals, key=abs)   # ONE dot per row: the biggest effect among its variants
+        dot(c, px(v), cy, fill, outline)
+        label_txt = ("−" if v < 0 else "+") + f"{abs(v):.1f}%"
+        col = RED if v < -1.0 else (ORANGE_D if v > 1.0 else MUTED)
+        bold = abs(v) > 1.0
+        if v < -2.0:   # too close to the row label on the left: put the value on the right
+            text(c, px(v) + 16, cy, label_txt, 21, col, bold=bold)
+        elif v < -1.0:
+            text(c, px(v) - 16, cy, label_txt, 21, col, bold=bold, anchor="r")
+        else:          # small values: write them to the right of the zero line so the line never cuts through the text
+            text(c, max(px(v), px(0)) + 22, cy, label_txt, 21, col, bold=bold)
     line(c, X0, Y1, X1, Y1, 1.5, INK)
     text(c, px(-3), Y1 + 56, "← slower", 22, RED)
     text(c, px(6), Y1 + 56, "faster →", 22, GREEN_D, anchor="r")
