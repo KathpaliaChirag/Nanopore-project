@@ -16,6 +16,11 @@ h2 { font-size: 56px; font-weight: 700; line-height: 1.1; margin: 0 0 28px 0; }
 .blk h3 { font-size: 27px; font-weight: 700; line-height: 1.2; color: #0072b2; margin: 0 0 8px 0; }
 .blk p { font-size: 26px; line-height: 1.36; margin: 0 0 10px 0; }
 .blk.warn h3 { color: #d55e00; }
+.tbl { border-collapse: collapse; width: 616px; margin: 0 0 22px 0; }
+.tbl th { font-size: 24px; font-weight: 700; color: #5b6470; text-align: center; padding: 6px 4px; border-bottom: 3px solid #1c1f24; }
+.tbl td { font-size: 24px; line-height: 1.25; text-align: center; padding: 8px 4px; border-bottom: 2px solid #d9dce1; }
+.tbl td.rl { font-weight: 700; text-align: left; }
+.tbl b { color: #0072b2; }
 .sqrow { display: flex; flex-direction: row; align-items: center; gap: 8px; margin: 0 0 12px 0; }
 .sq { width: 64px; height: 64px; border-radius: 9px; border: 3px solid #1c1f24; background: #ffffff; display: flex; align-items: center; justify-content: center; }
 .sq.done { background: #1c1f24; }
