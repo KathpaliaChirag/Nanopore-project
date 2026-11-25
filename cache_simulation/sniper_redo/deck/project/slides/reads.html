@@ -1,0 +1,13 @@
+<section id="reads" data-transition="fade">
+<h2>With more reads the gain falls on one core and rises on four</h2>
+<div class="chartrow">
+<img src="/_blob/08ffd7de132edfba22d72d3bbc4df00e" alt="Line chart of time saved by L1 and L2 prefetchers together against the number of reads classified, 10, 25 and 50, on the 8 GB database. On one core the saving falls from 11.9 to 5.6 to 4.0 percent. On four cores it rises from 12.7 to 14.5 to 15.8 percent." style="width:1000px; height:627px; object-fit:contain">
+<div class="side">
+<div class="blk"><h3>How to read it</h3><p>Same height as before: time saved by the prefetchers. The horizontal axis is how many reads were classified.</p></div>
+<div class="blk"><h3>What we found</h3><p>One core: 11.9% falls to 4.0%. Four cores: 12.7% rises to 15.8%.</p></div>
+<div class="blk warn"><h3>Caution</h3><p>At 50 reads the instruction count rises from 52 M (1 core) to 87 M (8 cores) and 130 M (16 cores): thread start-up work. Part of the multi-core gain may come from that. Untested.</p></div>
+<div class="blk"><h3>To settle it</h3><p>Run 8 and 16 cores with a few hundred reads each.</p></div>
+</div>
+</div>
+<aside>Fifty reads is about three reads per core at 16 cores, so start-up and splitting overhead is a large share of the run. On one core the early gain is largely a fixed start-up saving, which is why the percentage falls as reads are added. Sniper would need many hours per run for a few hundred reads on many cores, which is why this was not done yet.</aside>
+</section>

@@ -1,0 +1,10 @@
+<section id="knobs" data-transition="fade">
+<h2>Four things a cache designer can change</h2>
+<div class="grid2">
+<div class="card"><h3>Associativity</h3><p class="ct">How many places a block of memory may sit in the cache. 1-way: one place, so two blocks that share it keep evicting each other. 4-way: four places to choose from.</p></div>
+<div class="card"><h3>Replacement policy</h3><p class="ct">Which block is thrown out when the places are full. LRU: the one unused longest. SRRIP, NRU, NMRU, PLRU: cheaper approximations. Random: pick any.</p></div>
+<div class="card"><h3>Size</h3><p class="ct">How many bytes the level holds. We tried the LLC from half to 4 times its size, and the L2 at 1, 2 and 4 MB.</p></div>
+<div class="card"><h3>Prefetching</h3><p class="ct">Guess what will be needed next and fetch it before it is asked for. The depth is how many blocks ahead it fetches.</p></div>
+</div>
+<aside>The first three change how well the cache keeps useful data. Prefetching is different: it tries to bring data in before the program asks, which hides the wait. Everything we tested is one of these four.</aside>
+</section>

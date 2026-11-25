@@ -1,0 +1,21 @@
+<section id="method" class="tint" data-transition="fade">
+<h2>How we measured</h2>
+<div class="cols">
+<div class="col">
+<ol class="list">
+<li>Run the same kraken2 program every time (its own software cache is switched off)</li>
+<li>Sniper, a CPU simulator, models Luna: L1 48 KB, L2 2 MB, LLC 2.25 MB per core</li>
+<li>Change one hardware property per run</li>
+<li>Compare the simulated time with an unmodified run, called base: no prefetcher</li>
+</ol>
+</div>
+<div class="col">
+<div class="formula">
+<p class="fm">time saved (%) = (base &#8722; variant) / base &#215; 100</p>
+<p class="fx">Example: 8 GB database, 8 cores, 50 reads. Base 8,880.7 &#181;s, with prefetchers 7,265.8 &#181;s, so 18.2% saved. Higher means faster.</p>
+</div>
+<p class="small">190 runs: 8 GB and 16 GB databases; 10, 25 and 50 reads; 1, 4, 8 and 16 cores. The metric is the simulated time of the slowest core.</p>
+</div>
+</div>
+<aside>Only one thing changes between a variant and its base, so any difference in time is caused by that change. The unmodified base has no prefetcher at all; that matters for how much of the result would carry over to the real machine, which already has prefetchers (see the last slide).</aside>
+</section>

@@ -1,0 +1,13 @@
+<section id="cores" data-transition="fade">
+<h2>More cores, a bigger gain</h2>
+<div class="chartrow">
+<img src="/_blob/59e76a48d9eedd78dace59f08a3f1c7f" alt="Line chart of time saved by L1 and L2 prefetchers together against core count of 1, 4, 8 and 16 at 50 reads. On the 8 GB database the saving rises from 4.0 to 15.8, 18.2 and 18.0 percent. On the 16 GB database it rises from 3.2 to 24.0 and 24.9 percent at 8 and 16 cores. A grey control, a 4-way LLC change, stays within 0.9 percent of zero." style="width:1000px; height:627px; object-fit:contain">
+<div class="side">
+<div class="blk"><h3>How to read it</h3><p>Height is the time saved by L1 and L2 prefetchers together. Grey is a control: an LLC change that did nothing in every other test.</p></div>
+<div class="blk"><h3>What we found</h3><p>At 16 cores the prefetchers save 18.0% on the 8 GB database and 24.9% on 16 GB.</p></div>
+<div class="blk"><h3>Why trust the gap</h3><p>The control stays within 0.9% at every core count, so the gap above it is not noise.</p></div>
+<div class="blk warn"><h3>Not explained yet</h3><p>We have not tested why more cores gain more. See the next slide.</p></div>
+</div>
+</div>
+<aside>Each percentage compares the same core count, database and 50-read input with and without the prefetchers. Base is Sniper's default hardware, which has no prefetcher at all, so the gain on the real machine, whose CPU already has prefetchers, would be smaller. 8 GB at 8 cores: 8,880.7 to 7,265.8 microseconds. The 16 GB database was not run at 4 cores. The 12, 32 and 64 core runs were not done.</aside>
+</section>

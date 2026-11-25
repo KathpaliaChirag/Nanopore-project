@@ -1,0 +1,12 @@
+<section id="depth" data-transition="fade">
+<h2>Fetching ahead does help</h2>
+<div class="chartrow">
+<img src="/_blob/58a31b77c9ceb874049d6d0da0b8d6d5" alt="Line chart of time saved against L1 prefetcher depth of 1, 2, 4, 8 and 16 cache lines, for 10, 25 and 50 reads on the 8 GB database with one core. One line ahead saves nothing. Two lines already saves most of the gain. Beyond four lines the curves level off at about 10, 5 and 4 percent." style="width:1000px; height:627px; object-fit:contain">
+<div class="side">
+<div class="blk"><h3>How to read it</h3><p>Height is the time saved against a run with no prefetcher. Each line is a different number of reads.</p></div>
+<div class="blk"><h3>What we found</h3><p>Two lines ahead already saves 3% to 8%. Sixteen ahead saves 10.2% at 10 reads and 3.8% at 50 reads.</p></div>
+<div class="blk"><h3>Why it helps</h3><p>Parts of kraken2 read memory in order, and a prefetcher can fetch those early. The L1 hit rate rose from 98.86% to 99.45%. This is our reading; we did not measure the parts separately.</p></div>
+</div>
+</div>
+<aside>The percentage falls as reads are added because part of the early gain is a one-off saving of about 140 microseconds, most likely start-up and input parsing. Between 10 and 50 reads the steady-state saving is about 2.7% on 8 GB and 1.8% on 16 GB. L1 and L2 prefetchers together are best: 11.9%, 5.6% and 4.0% at 10, 25 and 50 reads. The 16 GB database shows the same pattern, 3% to 10%.</aside>
+</section>

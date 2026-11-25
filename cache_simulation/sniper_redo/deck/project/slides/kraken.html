@@ -1,0 +1,15 @@
+<section id="kraken" data-transition="fade">
+<h2>kraken2 spends its time looking things up</h2>
+<div class="flow">
+<div class="fbox"><p class="ft">A DNA read from the sequencer</p></div>
+<p class="farrow">&#8594;</p>
+<div class="fbox"><p class="ft">Cut into short pieces (k-mers)</p></div>
+<p class="farrow">&#8594;</p>
+<div class="fbox hot"><p class="ft">Look each piece up in a hash table of 8 GB or 16 GB</p></div>
+<p class="farrow">&#8594;</p>
+<div class="fbox"><p class="ft">Vote: which species is this read?</p></div>
+</div>
+<p class="lead">Each lookup lands at an unpredictable place in a table far bigger than any CPU cache. That is the step we wanted to speed up.</p>
+<p class="small">Project question: can a different cache design make those lookups faster?</p>
+<aside>A k-mer is a short string of k letters taken from the read. The hash table maps each k-mer to the species that contain it. Because the table is gigabytes, almost every lookup goes to main memory rather than a cache.</aside>
+</section>

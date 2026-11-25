@@ -1,0 +1,27 @@
+<section id="prefetch" data-transition="fade">
+<h2>A prefetcher fetches ahead of a pattern</h2>
+<div class="sqrow">
+<p class="rowlab">Reads in order</p>
+<div class="sq done"><p class="sqt">1</p></div>
+<div class="sq done"><p class="sqt">2</p></div>
+<div class="sq done"><p class="sqt">3</p></div>
+<div class="sq pre"><p class="sqt">4</p></div>
+<div class="sq pre"><p class="sqt">5</p></div>
+<div class="sq pre"><p class="sqt">6</p></div>
+<div class="sq pre"><p class="sqt">7</p></div>
+<div class="sq"><p class="sqt">8</p></div>
+</div>
+<p class="cap">Dark: already read. Blue: fetched early. The CPU read 1, 2, 3, the prefetcher saw the pattern and fetched 4 to 7 before they were asked for.</p>
+<div class="sqrow">
+<p class="rowlab">Hash lookups</p>
+<div class="sq done"><p class="sqt">7</p></div>
+<div class="sq done"><p class="sqt">91</p></div>
+<div class="sq done"><p class="sqt">3</p></div>
+<div class="sq done"><p class="sqt">55</p></div>
+<div class="sq"><p class="sqt">?</p></div>
+<div class="sq"><p class="sqt">?</p></div>
+</div>
+<p class="cap">The lookups jump around, so there is no pattern and nothing to fetch ahead.</p>
+<p class="lead">Depth: how many blocks ahead it fetches. We tried 1, 2, 4, 8 and 16.</p>
+<aside>This is the reason we expected a prefetcher to help only the parts of kraken2 that read memory in order, such as the input file, the scan along a read and start-up work, and not the random hash-table lookups themselves. That expectation is our reading of the mechanism; we did not measure the two parts separately.</aside>
+</section>

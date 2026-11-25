@@ -1,0 +1,10 @@
+<section id="cache" data-transition="fade">
+<h2>A cache keeps recent data close to the CPU</h2>
+<div class="lvl"><p class="nm">L1 cache</p><div class="bar" style="width:70px"></div><p class="sz">48 KB</p></div>
+<div class="lvl"><p class="nm">L2 cache</p><div class="bar" style="width:240px"></div><p class="sz">2 MB</p></div>
+<div class="lvl"><p class="nm">LLC (last level)</p><div class="bar" style="width:280px"></div><p class="sz">2.25 MB per core</p></div>
+<div class="lvl"><p class="nm">Main memory</p><div class="bar big" style="width:760px"></div><p class="sz">8 GB or 16 GB</p></div>
+<p class="lead">Found in a level: a hit, fast. Not found: a miss, so ask the next level, which is bigger and slower.</p>
+<p class="small">Sizes are Luna's, as modelled in Sniper. Bars are not to scale. In the model, one main-memory access costs a fixed 45 ns.</p>
+<aside>L1 is closest to the core, then L2, then the last-level cache (LLC), which the cores share. The whole kraken2 database is the orange bar: it is thousands of times bigger than the caches above it, so a lookup into it usually misses every cache level.</aside>
+</section>

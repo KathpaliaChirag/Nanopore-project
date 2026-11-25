@@ -1,0 +1,29 @@
+<section id="claim" class="tint" data-transition="fade">
+<h2>What we can and cannot claim</h2>
+<div class="cols">
+<div class="col">
+<h3>We can say</h3>
+<ul class="list">
+<li>In this simulator, LLC and L2 associativity, replacement policy and size did not speed kraken2 up</li>
+<li>A hardware prefetcher did, on every setup we ran: 3% to 25%</li>
+<li>The gain was larger with more cores</li>
+</ul>
+</div>
+<div class="col">
+<h3>We cannot say</h3>
+<ul class="list">
+<li>That the same holds for the full 1.87 M-read job: our runs are tiny and the LLC is never reused</li>
+<li>That Luna would gain this much: the baseline has no prefetcher and Luna's CPU already has its own</li>
+<li>Why the gain grows with cores</li>
+</ul>
+</div>
+<div class="col">
+<h3>Next</h3>
+<ul class="list">
+<li>Run kraken2 on Luna with the CPU's prefetchers off and on</li>
+<li>Repeat 8 and 16 cores with a few hundred reads each</li>
+</ul>
+</div>
+</div>
+<aside>Direction is the finding; sizes are indicative. Sniper is not calibrated against Luna's performance counters. All data and the figure script are in cache_simulation/sniper_redo in the repository.</aside>
+</section>

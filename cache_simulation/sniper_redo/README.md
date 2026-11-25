@@ -25,3 +25,7 @@ findings: prefetchers -17.4 to -18.2% (8 GB), -23.3 to -24.9% (16 GB); 4-way LLC
 
 figures/plot_figs.py draws the four deck figures from data/hw_results_all.csv with pycairo only (matplotlib could not be installed on Luna: PyPI needs the campus login). run: `python3 plot_figs.py ../data/hw_results_all.csv out` (needs pycairo and the Liberation Sans font; Luna has both). outputs per figure: vector .pdf and .svg (white background, for a paper) and a 2x _slide.png. every percentage is computed from the CSV; nothing is typed in. figures/out/ holds the committed outputs.
 the 7-slide deck is a Slides artifact built from these PNGs; metric and caveats are the same as RESULTS_hardware_cache.html. rounding fix: the 4-core L1+L2 gain is 12.7/14.5/15.8 (the page briefly said 12.8 and 15.9 from rounding a rounded number).
+
+## deck v2 (2026-11-25): explanatory rebuild
+
+the first deck only showed results and the graphs had no legends. rebuilt: figures/plot_figs.py v2 (title = the question each graph answers, subtitle = what is plotted and which way is better, legend, direct labels, callouts, group labels on the dot plot, a control series on the cores graph). deck source is in deck/project/ (11 slides: what kraken2 does, what a cache is, the four design knobs, what a prefetcher does, how we measured, four result slides each with how-to-read / what-we-found / why, and what we can and cannot claim). the Slides artifact is built from these files; the figure PNGs are uploaded assets, so re-upload figures/out/*_slide.png if the figures change.
