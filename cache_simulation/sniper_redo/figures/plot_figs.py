@@ -54,6 +54,7 @@ BLUE = (0.0, 0.447, 0.698)
 ORANGE = (0.835, 0.369, 0.0)
 AMBER = (0.80, 0.55, 0.0)
 GREY = (0.50, 0.52, 0.56)
+GREEN = (0.0, 0.55, 0.40)       # Okabe-Ito bluish green, darkened
 SLIDE_BG = (0.984, 0.984, 0.976)  # = --paper in the deck css (#fbfbf9)
 
 
@@ -392,20 +393,22 @@ def fig6(c, bg):
     # at 8 and 16 cores the 10- and 50-read lines are within 0.6 points of each other, so their values are
     # given in one note instead of two labels on top of each other
     series = [
-        {"vals": get(50), "color": INK, "label": "50 reads", "below": (0,), "skip": (2, 3), "label_dy": 18},
-        {"vals": get(25), "color": AMBER, "label": "25 reads", "left": (1,), "below": (2, 3)},
-        {"vals": get(10), "color": BLUE, "label": "10 reads", "below": (1,), "label_dy": -18},
+        {"vals": get(100), "color": GREEN, "label": "100 reads", "below": (0,)},
+        {"vals": get(50), "color": INK, "label": "50 reads", "left": (0,), "skip": (2, 3), "label_dy": 2},
+        {"vals": get(25), "color": AMBER, "label": "25 reads", "left": (1,), "below": (2, 3), "label_dy": 20},
+        {"vals": get(10), "color": BLUE, "label": "10 reads", "below": (1,), "label_dy": -22},
     ]
     head = ("Does the prefetcher gain grow with more cores?",
             "L1 + L2 prefetchers together, 8 GB database. Higher = faster than no prefetcher.",
-            [("line", BLUE, "10 reads"), ("line", AMBER, "25 reads"), ("line", INK, "50 reads")])
+            [("line", BLUE, "10 reads"), ("line", AMBER, "25 reads"), ("line", INK, "50 reads"),
+             ("line", GREEN, "100 reads")])
     anns = []
     if all(v is not None for v in get(50)[2:]):
-        anns.append({"i": 2, "v": 22.0, "dx": -40, "color": INK,
+        anns.append({"i": 2, "v": 7.0, "dx": -40, "color": INK,
                      "text": f"50 reads: {get(50)[2]:.1f} at 8 cores, {get(50)[3]:.1f} at 16 cores"})
     if any(v is None for v in get(10)[2:] + get(25)[2:]):  # shown only while those runs are missing
         anns.append({"i": 2, "v": 2.2, "text": "10 and 25 reads at 8 and 16 cores: still running", "dx": -60, "color": ORANGE})
-    line_chart(c, bg, W, H, cores, series, 24, [0, 6, 12, 18, 24], "Time saved vs no prefetcher (%)",
+    line_chart(c, bg, W, H, cores, series, 30, [0, 6, 12, 18, 24, 30], "Time saved vs no prefetcher (%)",
                "Cores simulated", head, anns, right_pad=190)
 
 

@@ -33,3 +33,7 @@ the first deck only showed results and the graphs had no legends. rebuilt: figur
 ## 100-read file (2026-11-25)
 
 r100.fastq = our 50-read file (r50, unchanged, first 50 reads) + 50 more reads from the same source basecalled file (~/chirag_K/data/basecalled/sup/FBE01990_24778b97_03e50f91_15.fastq), taken in file order from the same length range (300 to 8,700 bases), skipping r50's reads. r50 was not the first 50 or a consecutive block of that file (its original selection rule was not recoverable), so the extra 50 are NOT picked by the same rule: mean length 1,458 vs 1,827 for r50. total 164,285 bases (1.8x r50), 97% classified by stock kraken2 on the 8 GB db. raw reads are not committed (real sequencing data). runs: code/r100_chain.sh (base + pf_both at 1, 4, 8, 16 cores, 8 GB; 8 and 16 cores use K2_BLOCK=1, 4 cores K2_BLOCK=10000 like the earlier 4-core series).
+
+## 100-read results (2026-11-25, finished 21:57 IST, 70 min for 8 runs)
+
+8 GB, base vs pf_both, r100.fastq (164,285 bases): saved 3.1% (1 core), 22.0% (4), 24.6% (8), 25.4% (16). one-core gain keeps falling with reads (11.9, 5.6, 4.0, 3.1) but the multicore gain RISES at 100 reads, so the earlier "mostly start-up work" explanation is weakened. base time barely changes with cores at 100 reads (17.9, 19.6, 18.2, 17.5 ms): something serial dominates; untested hypothesis = the serial in-order FASTQ reader (streaming, prefetch-friendly). 206 runs total in data/hw_results_all.csv. figures/plot_figs.py fig6 now has a 100-read line. slide 2 of deck2 and the results page are updated.

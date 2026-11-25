@@ -11,14 +11,14 @@
 section { background: #fbfbf9; color: #1c1f24; font-family: "Inter", sans-serif; padding: 128px; }
 h2 { font-size: 56px; font-weight: 700; line-height: 1.1; margin: 0 0 28px 0; }
 .chartrow { display: flex; flex-direction: row; gap: 48px; align-items: flex-start; }
-.side { width: 616px; display: flex; flex-direction: column; }
+.side { width: 676px; display: flex; flex-direction: column; }
 .blk { margin: 0 0 24px 0; }
 .blk h3 { font-size: 27px; font-weight: 700; line-height: 1.2; color: #0072b2; margin: 0 0 8px 0; }
 .blk p { font-size: 26px; line-height: 1.36; margin: 0 0 10px 0; }
 .blk.warn h3 { color: #d55e00; }
-.tbl { border-collapse: collapse; width: 616px; margin: 0 0 22px 0; }
-.tbl th { font-size: 24px; font-weight: 700; color: #5b6470; text-align: center; padding: 6px 4px; border-bottom: 3px solid #1c1f24; }
-.tbl td { font-size: 24px; line-height: 1.25; text-align: center; padding: 8px 4px; border-bottom: 2px solid #d9dce1; }
+.tbl { border-collapse: collapse; width: 676px; margin: 0 0 22px 0; }
+.tbl th { font-size: 22px; font-weight: 700; color: #5b6470; text-align: center; padding: 6px 2px; border-bottom: 3px solid #1c1f24; }
+.tbl td { font-size: 22px; line-height: 1.25; text-align: center; padding: 8px 2px; border-bottom: 2px solid #d9dce1; white-space: nowrap; }
 .tbl td.rl { font-weight: 700; text-align: left; }
 .tbl b { color: #0072b2; }
 .sqrow { display: flex; flex-direction: row; align-items: center; gap: 8px; margin: 0 0 12px 0; }
