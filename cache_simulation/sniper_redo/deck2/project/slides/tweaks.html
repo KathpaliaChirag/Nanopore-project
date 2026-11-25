@@ -1,0 +1,26 @@
+<section id="tweaks" data-transition="fade">
+<h2>What we tried: only hardware prefetching helped</h2>
+<div class="chartrow">
+<img src="/_blob/98607c6a6701d7397da277070c5a98ab" alt="Dot plot of the time saved against the unmodified cache for every tweak tried, on the 8 GB database with one core and 50 reads. Six rows of cache design changes (LLC ways, LLC replacement policy, LLC size, L2 ways, L2 replacement policy, L2 size) cluster at zero, within 1 percent; a half-size L2 is 2.4 percent slower. Three rows of hardware prefetchers (L1, L2, and both together) are 3 to 4 percent faster." style="width:1000px; height:655px; object-fit:contain">
+<div class="side">
+<div class="blk"><h3>The idea: hardware prefetching</h3>
+<div class="sqrow">
+<div class="sq done"><p class="sqt">1</p></div>
+<div class="sq done"><p class="sqt">2</p></div>
+<div class="sq done"><p class="sqt">3</p></div>
+<div class="sq pre"><p class="sqt">4</p></div>
+<div class="sq pre"><p class="sqt">5</p></div>
+<div class="sq pre"><p class="sqt">6</p></div>
+<div class="sq pre"><p class="sqt">7</p></div>
+</div>
+<p>The CPU reads 1, 2, 3. The prefetcher sees the pattern and fetches 4 to 7 early (blue).</p>
+<p>Random hash lookups (7, 91, 3, 55) have no pattern, so there is nothing to fetch ahead.</p>
+</div>
+<div class="blk"><h3>What we found</h3>
+<p>Changing ways, policy or size of the LLC and L2 moved the time by 1% or less. Only a half-size L2 (&#8722;2.4%) and a random L2 (&#8722;1.1%) were worse.</p>
+<p>Prefetchers saved up to 4.0% on one core. They gain far more with more cores (next slide).</p>
+</div>
+</div>
+</div>
+<aside>8 GB database, 1 core, 50 reads, Sniper simulation of Luna. Each dot is one run; the baseline is Sniper's default hardware, which has no prefetcher. The six grey rows are cache design changes: LLC 1 to 16 ways, six LLC replacement policies, LLC half to 4x size, L2 4 to 32 ways, three L2 policies, L2 1 and 4 MB. The L1 prefetcher row covers depths of 1 to 16 lines ahead. One line ahead does nothing; two to four lines get most of the gain. A 50-read run touches each cache line about once, so a larger or smarter cache has little to reuse; this is a limit of the experiment, not proof about the full 1.87 million read job.</aside>
+</section>

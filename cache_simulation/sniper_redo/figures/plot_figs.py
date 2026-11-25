@@ -180,7 +180,10 @@ def line_chart(c, bg, W, H, cats, series, ymax, yticks, ylab, xlab, head, anns=(
         for i, v in pts:
             dot(c, px(i), py(v), s.get("r", 7), s["color"], hollow=s.get("hollow", False), bg=bg)
             if s.get("labels", True) and i not in s.get("skip", ()):
-                text(c, px(i), py(v) + (26 if i in s.get("below", ()) else -24), f"{v:.1f}", 22, s["color"], bold=True, anchor="m")
+                if i in s.get("left", ()):
+                    text(c, px(i) - 16, py(v), f"{v:.1f}", 22, s["color"], bold=True, anchor="r")
+                else:
+                    text(c, px(i), py(v) + (26 if i in s.get("below", ()) else -24), f"{v:.1f}", 22, s["color"], bold=True, anchor="m")
         i, v = pts[-1]
         text(c, px(i) + 22, py(v) + s.get("label_dy", 0), s["label"], 23, s["color"], bold=True)
     for a in anns:
@@ -314,6 +317,95 @@ def fig4(c, bg):
                "Reads classified", head, anns, right_pad=190)
 
 
+# ----------------------------------------------------------------------------- figure 5: every tweak we tried (two-slide summary)
+def fig5(c, bg):
+    W, H = 1100, 720
+    groups = [  # (row label, colour kind, [variants])
+        ("LLC associativity (1 to 16 way)", "org", ["llc_assoc1", "llc_assoc2", "llc_assoc4", "llc_assoc8", "llc_assoc16"]),
+        ("LLC replacement policy (6)", "org", ["llc_srrip", "llc_random", "llc_nru", "llc_nmru", "llc8_plru", "llc8_srrip"]),
+        ("LLC size (half to 4x)", "org", ["llc_half", "llc_x2", "llc_x4"]),
+        ("L2 associativity (4 to 32 way)", "org", ["l2_assoc4", "l2_assoc8", "l2_assoc32"]),
+        ("L2 replacement policy (3)", "org", ["l2_srrip", "l2_random", "l2_8_plru"]),
+        ("L2 size (1 MB and 4 MB)", "org", ["l2_1mb", "l2_4mb"]),
+        ("L1 prefetcher (1 to 16 lines)", "pf", ["pf_l1_n1", "pf_l1_n2", "pf_l1_simple", "pf_l1_n8", "pf_l1_n16", "pf_l1_f32"]),
+        ("L2 prefetcher", "pf", ["pf_l2_simple"]),
+        ("L1 + L2 prefetchers", "pf", ["pf_both"]),
+    ]
+    header(c, bg, "Which cache tweaks speed kraken2 up?",
+           "One dot = one run (8 GB database, 1 core, 50 reads). Right of 0 = faster than the unmodified cache.",
+           [("dot", GREY, "cache design: size, ways, policy"), ("dot", BLUE, "hardware prefetcher")])
+    L, R, T, B = 400, 50, 140, 100
+    x0, x1, y0, y1 = L, W - R, T, H - B
+    xmin, xmax = -3.0, 6.0
+
+    def px(v):
+        return x0 + (v - xmin) / (xmax - xmin) * (x1 - x0)
+
+    step = (y1 - y0) / len(groups)
+    c.set_source_rgb(*BAND)
+    c.rectangle(px(-1), y0, px(1) - px(-1), y1 - y0)
+    c.fill()
+    text(c, px(1) - 8, y1 - 16, "within 1%", 20, MUTED, anchor="r")
+    for t in (-2, 0, 2, 4, 6):
+        line(c, px(t), y0, px(t), y1, 2.0 if t == 0 else 1.0, INK if t == 0 else RULE)
+        text(c, px(t), y1 + 26, f"{t}" if t >= 0 else "−" + str(-t), 23, MUTED, anchor="m")
+    for k, (label, kind, variants) in enumerate(groups):
+        cy = y0 + step * (k + 0.5)
+        if k:
+            line(c, 24, y0 + step * k, x1, y0 + step * k, 1.0, RULE)
+        text(c, x0 - 16, cy, label, 21, INK, anchor="r", bold=(kind == "pf"))
+        vals = [saved(v, 1, 50, "8gb") for v in variants]
+        col = BLUE if kind == "pf" else GREY
+        for v in vals:
+            c.new_path()
+            c.arc(px(v), cy, 8, 0, 2 * math.pi)
+            c.set_source_rgba(*col, 0.85)
+            c.fill()
+        if max(vals) > 1.0:
+            text(c, px(max(vals)) + 16, cy, f"best +{max(vals):.1f}%", 21, BLUE, bold=True)
+        if min(vals) < -1.0:
+            if min(vals) < -2.0:  # too close to the row label on the left: put the value on the right of the dot
+                text(c, px(min(vals)) + 16, cy, f"−{abs(min(vals)):.1f}%", 21, ORANGE, bold=True)
+            else:
+                text(c, px(min(vals)) - 16, cy, f"−{abs(min(vals)):.1f}%", 21, ORANGE, bold=True, anchor="r")
+    text(c, px(-3), y1 + 56, "← slower", 22, MUTED)
+    text(c, px(6), y1 + 56, "faster →", 22, MUTED, anchor="r")
+    text(c, (x0 + x1) / 2, H - 12, "Time saved vs the unmodified cache (%)", 24, INK, anchor="m")
+
+
+# ----------------------------------------------------------------------------- figure 6: gain vs cores, one line per read count
+def fig6(c, bg):
+    W, H = 1100, 690
+    cores = [1, 4, 8, 16]
+
+    def get(reads):
+        out = []
+        for n in cores:
+            try:
+                out.append(saved("pf_both", n, reads, "8gb"))
+            except KeyError:
+                out.append(None)
+        return out
+
+    # value labels: 50 reads above, 10 reads above at 1 core and below at 4+ cores, 25 reads below its point,
+    # so the three never share the crowded 4-core spot
+    series = [
+        {"vals": get(50), "color": INK, "label": "50 reads", "below": (0,)},
+        {"vals": get(25), "color": AMBER, "label": "25 reads", "left": (1, 2, 3), "label_dy": -8},
+        {"vals": get(10), "color": BLUE, "label": "10 reads", "below": (1, 2, 3), "label_dy": 22},
+    ]
+    head = ("Does the prefetcher gain grow with more cores?",
+            "L1 + L2 prefetchers together, 8 GB database. Higher = faster than no prefetcher.",
+            [("line", BLUE, "10 reads"), ("line", AMBER, "25 reads"), ("line", INK, "50 reads")])
+    anns = []
+    if any(v is None for v in get(10)[2:] + get(25)[2:]):  # shown only while those runs are missing
+        anns.append({"i": 2, "v": 2.2, "text": "10 and 25 reads at 8 and 16 cores: still running", "dx": -60, "color": ORANGE})
+    line_chart(c, bg, W, H, cores, series, 24, [0, 6, 12, 18, 24], "Time saved vs no prefetcher (%)",
+               "Cores simulated", head, anns, right_pad=190)
+
+
+render("fig5_all_tweaks", 1100, 720, fig5)
+render("fig6_cores_by_reads", 1100, 690, fig6)
 render("fig1_organisation_flat", 1100, 730, fig1)
 render("fig2_prefetch_depth", 1100, 690, fig2)
 render("fig3_gain_vs_cores", 1100, 690, fig3)

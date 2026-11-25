@@ -1,0 +1,25 @@
+/* two-slide summary: off-white slides, near-black text, blue and orange accents only.
+   layout: title on top, figure on the left, short explanation blocks on the right. */
+:root {
+  --paper: #fbfbf9;
+  --ink: #1c1f24;
+  --muted: #5b6470;
+  --rule: #d9dce1;
+  --blue: #0072b2;
+  --orange: #d55e00;
+}
+section { background: #fbfbf9; color: #1c1f24; font-family: "Inter", sans-serif; padding: 128px; }
+h2 { font-size: 56px; font-weight: 700; line-height: 1.1; margin: 0 0 28px 0; }
+.chartrow { display: flex; flex-direction: row; gap: 48px; align-items: flex-start; }
+.side { width: 616px; display: flex; flex-direction: column; }
+.blk { margin: 0 0 24px 0; }
+.blk h3 { font-size: 27px; font-weight: 700; line-height: 1.2; color: #0072b2; margin: 0 0 8px 0; }
+.blk p { font-size: 26px; line-height: 1.36; margin: 0 0 10px 0; }
+.blk.warn h3 { color: #d55e00; }
+.sqrow { display: flex; flex-direction: row; align-items: center; gap: 8px; margin: 0 0 12px 0; }
+.sq { width: 64px; height: 64px; border-radius: 9px; border: 3px solid #1c1f24; background: #ffffff; display: flex; align-items: center; justify-content: center; }
+.sq.done { background: #1c1f24; }
+.sq.pre { background: #0072b2; border-color: #0072b2; }
+.sq .sqt { font-size: 26px; font-weight: 700; margin: 0; color: #1c1f24; }
+.sq.done .sqt { color: #fbfbf9; }
+.sq.pre .sqt { color: #ffffff; }
